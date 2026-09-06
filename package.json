@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
+    "start": "node server.js",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --import tsx --test tests/*.test.ts",
     "database": "node --import tsx scripts/export-database.ts",
@@ -14,6 +15,7 @@
     "balance": "node --import tsx scripts/balance.ts",
     "test:browser": "node scripts/browser-smoke.mjs && node scripts/mobile-smoke.mjs && node scripts/campaign-browser.mjs",
     "test:production": "node scripts/production-smoke.mjs",
+    "test:webapp": "node scripts/node-production-smoke.mjs",
     "package:hostinger": "npm run build && python3 scripts/package-hostinger.py",
     "test:hostinger": "python3 scripts/test-hostinger.py"
   },

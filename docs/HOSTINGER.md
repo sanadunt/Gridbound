@@ -1,5 +1,7 @@
 # Gridbound on Hostinger / hPanel
 
+**Importing GitHub with a Build Config form on Business hosting? Use [HOSTINGER-GITHUB.md](HOSTINGER-GITHUB.md) instead.** It covers Vite builds and the optional `server.js` entry. The instructions below are only for manual static ZIP upload.
+
 Gridbound runs as **static files**. Use Hostinger web hosting that exposes File Manager / a document root. No Node.js runtime, npm on the server, PHP app, MySQL database, VPS or environment secrets are needed. Hostinger Website Builder/Horizons-only workflows are different: if no File Manager is available, do not try importing this ZIP as a builder theme. Check the site's hosting type first.
 
 ## Ready-to-upload package

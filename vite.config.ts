@@ -1,2 +1,8 @@
 import { defineConfig } from 'vite';
-export default defineConfig({base:'./',build:{rollupOptions:{output:{manualChunks:{engine:['phaser']}}}}});
+export default defineConfig({
+  base: './',
+  build: {
+    outDir: 'dist',
+    rollupOptions: { output: { manualChunks: { engine: ['phaser'] } } },
+  },
+});
