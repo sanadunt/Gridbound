@@ -8,3 +8,4 @@ artifacts/
 *.key
 *.log
 *.tsbuildinfo
+__pycache__/

@@ -2,12 +2,13 @@
 
 ## Executed gates
 
-- `npm test`: 57 passing tests, zero failures. Includes all 20 advanced/third signature skills executing real mechanics, job/prerequisite/save validation, equipment ownership, recruitment, combat input caps, AI targets, ritual counters and boon exhaustion.
+- `npm test`: 59 passing tests, zero failures. Includes Hostinger configuration and deterministic static-only ZIP validation. Includes all 20 advanced/third signature skills executing real mechanics, job/prerequisite/save validation, equipment ownership, recruitment, combat input caps, AI targets, ritual counters and boon exhaustion.
 - `npm run build`: TypeScript and Vite production build pass. Application and Phaser engine are separately cached chunks. Phaser's large-chunk warning remains visible rather than hidden.
 - `npm run database`: generates 9 characters, 5 basic / 10 advanced / 10 third jobs, 40 skills, 15 talent nodes per hero, 9 equipment items, 32 monster records, 12 boons, 16 chapters and 76 encounters.
 - `scripts/browser-smoke.mjs`: fresh town/three starters, talent purchase, equip/reload, real tap, pause/Escape, opening-act stage transitions, recruitment, no duplicate rewards, roguelike draft/floor continuation, defeat/retry and local-only resource requests.
 - `scripts/mobile-smoke.mjs`: real CDP two-touch input and drag at 360, 390 and 768 px; pause, no horizontal overflow, job/talent controls. At 360 px the sprite tap target is about 81.6×44.1 px and the skill chip 62×24 px, with **zero overlap**.
 - `scripts/campaign-browser.mjs`: all 16 chapters/76 transitions, advanced + third promotion, signature equip/save/reload, nine recruits, ending journal, 32 distinct rendered texture images, all 12 boons and continuation to floor 14 after the draft pool is exhausted.
+- `npm run test:hostinger`: extracts the deploy ZIP into isolated local Apache roots; real browser gameplay passes at `/` and `/gridbound/`. HTTP checks verify JavaScript MIME, HTML revalidation, immutable hashed cache, gzip, 403 for hidden files/directory listing and 404 for missing assets. This is not a live Hostinger deployment.
 - `npm run test:production`: real static bundle under a nested subpath; all resources local, gameplay changes enemy HP, no development QA global.
 - Browser harness forced startup failure with a nonexistent Chrome executable: expected nonzero exit and temporary profile cleanup. The success path also exits cleanly.
 - npm package audit reported zero vulnerabilities during lockfile synchronization.

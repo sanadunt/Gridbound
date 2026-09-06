@@ -64,6 +64,8 @@ npm run build
 
 Upload **the contents of `dist/`**, not the source folder. Any ordinary static host works: Netlify, Vercel, nginx, Apache, object storage or a GitHub Pages subfolder. `base: './'` permits nested paths. Netlify/Vercel build settings are included. No server-side routes or SPA fallback are necessary. See [docs/HOSTING.md](docs/HOSTING.md).
 
+**Hostinger / hPanel:** use `npm run package:hostinger` to generate a static-only ZIP with `.htaccess`, ready to extract into a dedicated `public_html/` or `public_html/gridbound/` folder. Packaging additionally needs Python 3.9+ locally, not on Hostinger. See [docs/HOSTINGER.md](docs/HOSTINGER.md) for safe upload/update steps. CI also produces a `gridbound-hostinger` artifact.
+
 The private repository does not itself create a public game URL. Deployment is a separate choice.
 
 ## Source of truth

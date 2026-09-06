@@ -10,8 +10,12 @@ const server=createServer(async(req,res)=>{
 });
 try{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${server.address().port}`;
+ const target=process.env.GRIDBOUND_STATIC_URL || origin+prefix;
+ const publicRoot=new URL('.',target).href;
  await withBrowser(async({send,wait,evaluate,click,screenshot,errors})=>{
-  await send('Page.navigate',{url:origin+prefix});await wait('document.querySelector("canvas") && document.querySelector("#town-screen:not([hidden])")');
+  await send('Page.navigate',{url:target});
+  try { await wait('document.querySelector("canvas") && document.querySelector("#town-screen:not([hidden])")'); }
+  catch(error) { console.error('BOOT EVIDENCE', JSON.stringify({errors,page:await evaluate('({url:location.href,ready:document.readyState,text:document.body?.innerText.slice(0,200),resources:performance.getEntriesByType("resource").map(r=>r.name)})')}));throw error; }
   assert.equal(await evaluate('typeof window.gridbound'),'undefined','No QA API in production');
   await click('[data-facility="party"]');await click('[data-talent="active-2"]');
   await click('[data-facility="campaign"]');await click('[data-depart="adventure"]');await click('#start');
@@ -19,8 +23,8 @@ try{
   await click('[data-tap="0"]');await click('[data-tap="3"]');
   await wait(`document.querySelector('#boss-hp').style.width!==${JSON.stringify(before)}`);
   const resources=await evaluate('performance.getEntriesByType("resource").map(r=>r.name)');
-  assert.ok(resources.length>5);assert.ok(resources.every(url=>url.startsWith(origin+prefix)||url.startsWith('data:')),JSON.stringify(resources));
+  assert.ok(resources.length>5);assert.ok(resources.every(url=>url.startsWith(publicRoot)||url.startsWith('data:')),JSON.stringify(resources));
   assert.deepEqual(errors,[]);await screenshot('artifacts/production-subpath.png');
-  console.log('PASS production nested subpath, all resources local, gameplay active, no dev QA API');
+  console.log('PASS production '+new URL(target).pathname+', all resources local, gameplay active, no dev QA API');
  });
 }finally{await new Promise(resolve=>server.close(resolve));}

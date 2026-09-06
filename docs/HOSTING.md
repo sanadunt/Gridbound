@@ -11,6 +11,7 @@ npm run build
 
 Publish the **contents of dist/**. Do not upload node_modules or the development source as the website. No secrets, environment variables, database, cloud account or server process are needed by the game.
 
+- **Hostinger / hPanel:** use the Hostinger-specific ZIP; follow [HOSTINGER.md](HOSTINGER.md). No Node server or database is needed.
 - **Netlify:** import the repository; the included netlify.toml sets build command and dist directory.
 - **Vercel:** import as Vite; vercel.json explicitly selects dist and npm run build.
 - **nginx / Apache / object storage:** copy dist contents to the web root, or a subfolder ending with a slash.
