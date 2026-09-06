@@ -1,0 +1,64 @@
+/* Small stance chips leave the sprite as the primary tap target. */
+.unit-card .unit-tap { position:absolute; inset:0 0 22% 0; height:calc(100% - 26px); width:100%; min-height:0; padding:0; background:transparent; border:0; border-radius:6px; touch-action:none; }
+.unit-card .unit-stance { position:absolute; top:auto; bottom:0; left:50%; transform:translateX(-50%); width:76%; max-width:94px; height:26px; min-height:26px; padding:0 3px; font:600 9px 'Space Grotesk',sans-serif; line-height:24px; background:#172824eb; border:1px solid #677662; color:#ead8aa; border-radius:3px; z-index:6; }
+.unit-card .unit-name { position:absolute; top:0; width:100%; left:0; text-align:center; font-size:10px; }
+.unit-card .unit-cd { position:absolute; top:24px; right:4px; font-size:10px; background:#13221ddd; padding:2px 4px; border-radius:3px; }
+.unit-card .tap-hint { position:absolute; top:15px; left:0; width:100%; text-align:center; font-size:8px; letter-spacing:.05em; color:#d8eabc; opacity:.9; text-shadow:0 1px #142b22; }
+.unit-card .unit-health { bottom:31px; top:auto; }
+.unit-card .unit-cooldown { bottom:27px; top:auto; }
+.unit-card.selected .unit-tap { box-shadow:inset 0 0 0 1px #d9ca9244; }
+.unit-card.tapped .unit-tap { box-shadow:inset 0 0 0 2px #efd595; }
+.tap-instruction {font-size:12px;color:#b7c8b1;margin:8px 0;line-height:1.5;}
+.tap-instruction b {color:#eddbad;}
+.character-bio {color:#bccbb6;font-size:14px;line-height:1.8;border-left:2px solid #8f9770;padding-left:15px;margin-bottom:24px;}
+.job-paths {display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.job-paths section {min-width:0;}
+.job-node {display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:17px;text-align:left;border:1px solid #526456;border-radius:4px;background:#1d312b;gap:8px;}
+.job-node b {font-size:17px;color:#ead8b0;}
+.job-node small {font-size:10px;letter-spacing:.07em;color:#a9c8ad;}
+.job-node span,.job-node em {font-size:12px;line-height:1.65;color:#b9c7b6;font-style:normal;}
+.job-node strong {font-size:11px;color:#dec891;}
+.job-node:disabled {opacity:.68;cursor:default;}
+.job-node.learned {opacity:1;border-color:#a0b884;background:#23392d;}
+.job-connector {display:block;padding:6px;color:#aabfa2;text-align:center;}
+.gear-slots {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+.gear-slots label {display:flex;flex-direction:column;gap:9px;font-size:11px;letter-spacing:.04em;color:#d8c79c;}
+.gear-slots small {font-size:12px;letter-spacing:0;line-height:1.6;color:#bdc8b7;}
+.gear-slots select {width:100%;min-width:0;font-size:12px;}
+.zone-route {max-height:290px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#81926d #1b2e25;}
+.mission-brief>p,.story-journal p,#ready-copy,#modal>p {white-space:pre-line;line-height:1.85;}
+.start-overlay>div {max-height:85%;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;}
+.start-overlay p {font-size:13px;}
+.story-journal {border-top:1px solid #526456;margin-top:28px;padding-top:18px;}
+.story-journal details {margin:14px 0;border-left:2px solid #526456;padding-left:14px;}
+.story-journal summary {min-height:44px;cursor:pointer;color:#e0d4ae;line-height:1.6;padding:9px 0;}
+.story-journal p {color:#bdc8b7;font-size:14px;}
+.bestiary-list {max-height:760px;overflow-y:auto;}
+button:focus-visible,summary:focus-visible,select:focus-visible {outline:2px solid #f0d290;outline-offset:3px;}
+@media(max-width:720px) {
+ .unit-card .unit-stance {height:24px;min-height:24px;line-height:22px;max-width:80px;font-size:8px;}
+ .unit-card .unit-tap {height:calc(100% - 24px);}
+ .unit-card .unit-name {top:-2px;font-size:8px;}
+ .unit-card .tap-hint {top:10px;font-size:7px;}
+ .unit-card .unit-cd {top:22px;right:1px;font-size:8px;}
+ .unit-card .unit-health {bottom:28px;}
+ .unit-card .unit-cooldown {bottom:25px;}
+ .job-paths {gap:9px;}
+ .job-node {padding:11px;gap:7px;}
+ .job-node b {font-size:14px;}
+ .job-node span {font-size:11px;}
+ .gear-slots {grid-template-columns:1fr;}
+ .zone-route {max-height:238px;}
+ .talent-tree {grid-template-columns:1fr 1fr;gap:9px;}
+ .talent-node {padding:12px;}
+ .talent-node b {font-size:13px;}
+ .tap-instruction {font-size:11px;}
+ .start-overlay>div {max-height:88%;padding:18px;}
+ .start-overlay p {font-size:12px;line-height:1.6;}
+ .action-bar {position:sticky;bottom:max(6px,env(safe-area-inset-bottom));z-index:12;background:#12231ff5;padding:6px;border:1px solid #526456;border-radius:5px;}
+ .action-bar button {min-height:48px;}
+ .story-journal p {font-size:13px;}
+ .bestiary-list {max-height:none;}
+}
+@media(max-width:380px) {.job-node b {font-size:12px;}.job-node span{font-size:10px;}.unit-card .unit-stance{font-size:7px;}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;}}
