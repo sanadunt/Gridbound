@@ -7,7 +7,7 @@ const finiteNumber=(value:unknown)=>typeof value==='number'&&Number.isFinite(val
 
 /** Accept v3 only when its persisted envelope is structurally complete. */
 export function isCompleteV3(value:unknown):boolean {
-  if(!isRecord(value)||value.version!==3||!finiteNumber(value.gold)||!Array.isArray(value.claimedQuests)||!Array.isArray(value.roster)||!Array.isArray(value.cleared)||!finiteNumber(value.bestFloor)||!finiteNumber(value.wins)||typeof value.sound!=='boolean'||typeof value.motion!=='boolean')return false;
+  if(!isRecord(value)||value.version!==3||!finiteNumber(value.gold)||!isRecord(value.economy)||!finiteNumber(value.economy.gold)||!finiteNumber(value.economy.commanderCrystal)||!isRecord(value.economy.materials)||!Array.isArray(value.settlementReceipts)||!Array.isArray(value.challengeUnlocks)||!Array.isArray(value.claimedQuests)||!Array.isArray(value.roster)||!Array.isArray(value.cleared)||!finiteNumber(value.bestFloor)||!finiteNumber(value.wins)||typeof value.sound!=='boolean'||typeof value.motion!=='boolean')return false;
   if(!isRecord(value.ledger)||!finiteNumber(value.ledger.raids)||!finiteNumber(value.ledger.victories)||!isRecord(value.ledger.enemies)||!isRecord(value.loadouts))return false;
   const loadouts=value.loadouts;
   const roster=value.roster.filter((id):id is number=>typeof id==='number'&&Number.isInteger(id));

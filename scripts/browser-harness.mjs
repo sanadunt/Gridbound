@@ -37,6 +37,7 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
         if (message.error) request.reject(new Error(JSON.stringify(message.error)));
         else request.resolve(message.result);
       }
+      if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') errors.push(message.params);
       if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
       if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') errors.push(message.params.entry);
     });

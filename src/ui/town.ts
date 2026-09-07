@@ -3,13 +3,15 @@ import { CAMPAIGN, ENEMIES } from '../game/world';
 import { TALENTS, canEnterZone, talentReason, availablePoints, gearReason, profileModifiers, type Profile } from '../game/profile';
 import { JOBS, GEAR, GEAR_SETS, legalSkill } from '../game/jobs';
 import { heroProgress } from '../game/levels';
+import { storyPartyCap } from '../game/story-party';
 import { Battle } from '../game/simulation';
+import { BANK_SHOP, CHALLENGE_SHOP, getRaidContractForEnemy } from '../economy/challenge';
 import { questBoard } from './quests';
 import { CHARACTERS } from '../game/characters';
 import { heroCanvas } from '../art/pixels';
 import { monsterCanvas, townCanvas } from '../art/monsters';
 
-export type TownTab = 'campaign' | 'party' | 'bestiary' | 'quests' | 'raid' | 'endless';
+export type TownTab = 'campaign' | 'party' | 'bestiary' | 'quests' | 'raid' | 'endless' | 'challenge-shop';
 export type TrainingTab = 'overview'|'skills'|'jobs'|'talents'|'gear'|'formation';
 export type PendingGear = { hero: number; slot: 'weapon'|'armor'|'charm'; gearId: string };
 export type TownState = {
@@ -58,13 +60,13 @@ export function renderTown(root: HTMLElement, p: Profile, state: TownState) {
           const r = ROSTER[id];
           return `<button data-town-hero="${id}" class="town-hero ${state.hero === id ? 'chosen' : ''}" aria-label="Siapkan ${r.name}"><img src="${portrait(r.classId)}" alt=""/><span><b>${r.name}</b><small>${JOBS[p.loadouts[id].job??'']?.name??KITS[r.classId].name}</small></span><span class="ready-dot">Lv.${heroProgress(p.loadouts[id].xp).level}</span></button>`;
         }).join('')}</div>
-        <p class="town-note">${p.roster.length === 3 ? 'Aldric menjaga. Lyra memulihkan. Rowan memburu. Petualangan ini dimulai dengan mereka bertiga.' : 'Rekan yang diselamatkan ikut bertarung. Isi tile kosong dan pilih dua skill tiap hero sebelum berangkat.'}</p>
+        <p class="town-note">Story: ${p.storyActive.length}/${storyPartyCap(p.cleared)} aktif, ${p.roster.length-p.storyActive.length} bench. Semua loadout tetap tersimpan. Atur party di Training hall.</p>
         <div class="town-progress"><b>${p.cleared.length} / ${CAMPAIGN.length}</b><span>SEALS RESTORED</span></div>
       </details>
       <section class="town-content" aria-label="Fasilitas kota">
-        <nav class="facility-tabs" aria-label="Fasilitas"><button data-facility="campaign" class="${state.tab === 'campaign' ? 'active' : ''}">War table</button><button data-facility="party" class="${state.tab === 'party' ? 'active' : ''}">Training hall</button><button data-facility="quests" class="${state.tab === 'quests' ? 'active' : ''}">Quest ledger</button><button data-facility="bestiary" class="${state.tab === 'bestiary' ? 'active' : ''}">Bestiary</button></nav>
+        <nav class="facility-tabs" aria-label="Fasilitas"><button data-facility="campaign" class="${state.tab === 'campaign' ? 'active' : ''}">War table</button><button data-facility="party" class="${state.tab === 'party' ? 'active' : ''}">Training hall</button><button data-facility="quests" class="${state.tab === 'quests' ? 'active' : ''}">Quest ledger</button><button data-facility="bestiary" class="${state.tab === 'bestiary' ? 'active' : ''}">Bestiary</button><button data-facility="challenge-shop" class="${state.tab === 'challenge-shop' ? 'active' : ''}">Challenge shop</button></nav>
         <p id="town-notice" class="town-notice" role="status" ${state.notice ? '' : 'hidden'}>${escape(state.notice)}</p>
-        ${state.tab === 'campaign' ? campaign(p, state) : state.tab === 'party' ? training(p, state) : state.tab === 'quests' ? questBoard(p, state.hero, state.questFilter, state.questPage) : state.tab === 'bestiary' ? bestiary(state.bestiaryPage) : state.tab === 'raid' ? raids(state) : endless(p)}
+        ${state.tab === 'campaign' ? campaign(p, state) : state.tab === 'party' ? training(p, state) : state.tab === 'quests' ? questBoard(p, state.hero, state.questFilter, state.questPage) : state.tab === 'bestiary' ? bestiary(state.bestiaryPage) : state.tab === 'raid' ? raids(state) : state.tab === 'challenge-shop' ? challengeShop(p) : endless(p)}
       </section>
     </div>`;
 }
@@ -91,8 +93,13 @@ function training(p: Profile, state: TownState) {
   const preview = new Battle('raid', 1, profileModifiers(p), { roster: [state.hero], loadouts: p.loadouts }).hero(state.hero)!;
   const active = state.trainingTab ?? 'talents';
   const tabs: [TrainingTab, string][] = [['overview','Overview'],['skills','Active skills'],['jobs','Jobs'],['talents','Talent branches'],['gear','Equipment'],['formation','Formation']];
-  const panel = active === 'overview' ? trainingOverview(p, state, r, preview, progress) : active === 'skills' ? skillsPanel(loadout, kit) : active === 'jobs' ? advancement(p, state.hero) : active === 'talents' ? talentsPanel(p, state, r, kit, loadout) : active === 'gear' ? forge(p, state.hero, state) : formation(p, state.hero, r, loadout);
+  const panel = storyPartyPanel(p) + (active === 'overview' ? trainingOverview(p, state, r, preview, progress) : active === 'skills' ? skillsPanel(loadout, kit) : active === 'jobs' ? advancement(p, state.hero) : active === 'talents' ? talentsPanel(p, state, r, kit, loadout) : active === 'gear' ? forge(p, state.hero, state) : formation(p, state.hero, r, loadout));
   return `<div class="training-identity"><img src="${portrait(r.classId)}" alt="${r.name}"/><div><span class="eyebrow">${JOBS[loadout.job??'']?.name??kit.name} · LEVEL ${progress.level}</span><h2>${r.name}</h2><p>${kit.role}</p></div></div>${active === 'overview' ? `<p class="character-bio">${CHARACTERS[state.hero].bio}</p>` : ''}<nav class="training-tabs" aria-label="Training sections">${tabs.map(([id,label]) => `<button data-training-tab="${id}" class="${active === id ? 'active' : ''}" aria-current="${active === id ? 'page' : 'false'}">${label}</button>`).join('')}</nav><section class="training-panel" data-training-panel="${active}">${panel}</section>`;
+}
+
+function storyPartyPanel(p: Profile) {
+  const cap=storyPartyCap(p.cleared);
+  return `<details class="story-party" open><summary>Story party: ${p.storyActive.length}/${cap} active · ${p.roster.length}/9 recruited</summary><p>Cap 3 awal; 4 setelah Ch2, 5 setelah Ch3, 6 setelah Ch4. Replay mengikuti progress. Bench: 50% victory XP plus catch-up terbatas median XP aktif. Rekan baru tidak mendapat XP settlement perekrutan. Raid dan Rogue tidak berubah.</p><div class="departure-actions">${p.roster.map(id=>{const active=p.storyActive.includes(id);return `<button class="secondary-button" data-story-toggle="${id}" aria-pressed="${active}" ${active?p.storyActive.length===1?'disabled':'':p.storyActive.length>=cap?'disabled':''}>${ROSTER[id].name}: ${active?'Active → bench':'Bench → active'}</button>`;}).join('')}</div><p>Swap saat penuh: bench satu hero, lalu aktifkan penggantinya.</p></details>`;
 }
 
 function trainingOverview(p: Profile, state: TownState, r: typeof ROSTER[number], preview: ReturnType<Battle['hero']> & {}, progress: ReturnType<typeof heroProgress>) {
@@ -172,9 +179,21 @@ function bestiary(pageIndex: number) {
 
 function raids(state: TownState) {
   const choices = Object.values(ENEMIES).filter(e => e.archetype === e.id).map(e => e.id), selected = ENEMIES[state.raid];
-  return `<div class="section-heading"><div><span class="eyebrow">RAID CONTRACTS</span><h2>Choose your quarry.</h2></div></div><p class="town-copy">Satu boss. Party dan talent dari town ikut bertarung. Musuh menyesuaikan ukuran party; mekanik tetap berbahaya.</p><details><summary>Browse 12 enemy archetypes</summary><div class="raid-roster">${choices.map(id => `<button data-raid="${id}" class="${state.raid === id ? 'chosen' : ''}" aria-pressed="${state.raid === id}"><img src="${monster(id)}" alt=""/><b>${ENEMIES[id].name}</b><small>${ENEMIES[id].title}</small></button>`).join('')}</div></details><label class="raid-variant">Enemy & variant<select data-raid-variant aria-label="Enemy and variant">${Object.values(ENEMIES).map(e => `<option value="${e.id}" ${state.raid === e.id ? 'selected' : ''}>${e.name} · tier ${e.tier}</option>`).join('')}</select></label><article class="mission-brief"><h3>${selected.name}</h3><p>${selected.description}</p><p class="counter-note">${selected.counter}</p><div class="departure-actions"><button class="gold-button" data-depart="raid">Hunt ${selected.name}</button><button class="secondary-button" data-facility="party">Atur loadout</button></div></article>`;
+  const tiers = (['bronze', 'silver', 'gold'] as const).map(tier => {
+    const contract = getRaidContractForEnemy(state.raid, tier);
+    return contract ? `<option value="${contract.id}" ${state.raid === contract.bossId && tier === 'bronze' ? 'selected' : ''}>${tier.toUpperCase()} · ${contract.riskPoints} risk · certified Crystal</option>` : '';
+  }).join('');
+  return `<div class="section-heading"><div><span class="eyebrow">RAID CONTRACTS</span><h2>Choose your quarry.</h2></div><span class="chapter-counter">CERTIFIED ONLY</span></div><p class="town-copy">Contracts use frozen authored boss records. Changing raw enemy fields is not available here; Practice/Sandbox runs pay no Crystal.</p><details><summary>Browse 12 enemy archetypes</summary><div class="raid-roster">${choices.map(id => `<button data-raid="${id}" class="${state.raid === id ? 'chosen' : ''}" aria-pressed="${state.raid === id}"><img src="${monster(id)}" alt=""/><b>${ENEMIES[id].name}</b><small>${ENEMIES[id].title}</small></button>`).join('')}</div></details><label class="raid-variant">Boss variant<select data-raid-variant aria-label="Enemy and variant">${Object.values(ENEMIES).map(e => `<option value="${e.id}" ${state.raid === e.id ? 'selected' : ''}>${e.name} · tier ${e.tier}</option>`).join('')}</select></label><label class="raid-tier">Reward contract<select data-raid-tier aria-label="Raid reward tier">${tiers}</select></label><article class="mission-brief"><span class="eyebrow">${getRaidContractForEnemy(state.raid, 'bronze') ? 'REWARDED CONTRACT' : 'PRACTICE'}</span><h3>${selected.name}</h3><p>${selected.description}</p><p class="counter-note">${selected.counter}</p><p class="mission-reward">Bronze 12 · Silver 18 + risk · Gold 26 + risk. Reward is derived from the immutable contract at settlement.</p><div class="departure-actions"><button class="gold-button" data-depart="raid">Hunt ${selected.name}</button><button class="secondary-button" data-facility="party">Atur loadout</button></div></article>`;
+}
+
+function challengeShop(p: Profile) {
+  return `<div class="section-heading"><div><span class="eyebrow">SHARED CHALLENGE WALLET</span><h2>Spend bank Crystal.</h2></div><span class="chapter-counter">${p.economy.commanderCrystal} CRYSTAL</span></div><p class="town-copy">Bank Crystal persists on this Commander and is shared by Raid and Roguelike. Story Gold and journey Crystal never pay this shop.</p><section class="challenge-shop-grid"><article><span class="eyebrow">SUNKEN ARCHIVE · RUN META</span>${BANK_SHOP.map(item => { const owned = p.challengeUnlocks.includes(item.id); return `<div class="shop-item"><div><h3>${item.name}</h3><p>${item.description}</p></div><button class="${owned ? 'secondary-button' : 'gold-button'}" data-bank-buy="${item.id}" ${owned || p.economy.commanderCrystal < item.cost ? 'disabled' : ''}>${owned ? 'OWNED' : `${item.cost} CRYSTAL`}</button></div>`; }).join('')}</article><article><span class="eyebrow">JOURNEY SHOP · RUN ONLY</span><p>Available after entering a Roguelike run. These purchases disappear on abandon, defeat, or clear; no purse conversion.</p>${CHALLENGE_SHOP.map(item => `<div class="shop-item"><div><h3>${item.name}</h3><p>${item.description}</p></div><span class="shop-cost">${item.cost} RUN</span></div>`).join('')}</article></section></div>`;
+}
+
+function runShop(purse: number) {
+  return `<section class="run-shop"><span class="eyebrow">JOURNEY SHOP · ${purse} RUN CRYSTAL</span>${CHALLENGE_SHOP.map(item => `<div class="shop-item"><div><h3>${item.name}</h3><p>${item.description}</p></div><button class="secondary-button" data-run-buy="${item.id}" ${purse < item.cost ? 'disabled' : ''}>${item.cost} RUN</button></div>`).join('')}</section>`;
 }
 
 function endless(p: Profile) {
-  return `<div class="section-heading"><div><span class="eyebrow">THE SUNKEN BELL</span><h2>A different run.<br>A different build.</h2></div><span class="chapter-counter">BEST ${p.bestFloor}</span></div><p class="town-copy">Turun ke ruang bawah lonceng. Setelah tiap kemenangan, pilih satu dari tiga boon. Efek bisa saling menguatkan: bangun gaya main dari pilihan yang muncul, bukan hanya angka damage.</p><div class="endless-rules"><p><b>Town talents stay.</b> Skill dan talent pilihanmu dibawa masuk.</p><p><b>Boons belong to this run.</b> Kematian atau pulang mengakhiri build sementara.</p><p><b>Every floor pushes back.</b> Musuh berganti, tekanan meningkat. Party pulih saat turun ke floor berikutnya.</p></div><div class="departure-actions"><button class="gold-button" data-depart="endless">Descend · floor 1</button><button class="secondary-button" data-facility="party">Siapkan build</button></div>`;
+  return `<div class="section-heading"><div><span class="eyebrow">THE SUNKEN BELL</span><h2>A different run.<br>A different build.</h2></div><span class="chapter-counter">BEST ${p.bestFloor}</span></div><p class="town-copy">Turun ke ruang bawah lonceng. Setelah tiap kemenangan, pilih satu dari tiga boon. Efek bisa saling menguatkan: bangun gaya main dari pilihan yang muncul, bukan hanya angka damage.</p><div class="endless-rules"><p><b>Town talents stay.</b> Skill dan talent pilihanmu dibawa masuk.</p><p><b>Boons belong to this run.</b> Kematian atau pulang mengakhiri build sementara.</p><p><b>Every floor pushes back.</b> Musuh berganti, tekanan meningkat. Party pulih saat turun ke floor berikutnya.</p><p><b>Run purse.</b> Room clear memberi journey Crystal untuk temporary shop; act clear memberi bank Crystal lewat receipt. Sisa purse tidak pernah dikonversi.</p></div><div class="departure-actions"><button class="gold-button" data-depart="endless">Descend · floor 1</button><button class="secondary-button" data-facility="challenge-shop">Open Challenge shop</button><button class="secondary-button" data-facility="party">Siapkan build</button></div>`;
 }

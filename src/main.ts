@@ -13,13 +13,15 @@ import './compact-combat.css';
 import { Battle, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CAMPAIGN, BOONS, boonChoices } from './game/world';
-import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest } from './game/profile';
+import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock } from './game/profile';
 import { renderTown, portrait, type TownState, type TownTab } from './ui/town';
 import { BattleScene, ARENA, cell } from './render/BattleScene';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
 import { loadSave, saveProfile } from './game/save';
+import { storyBattleOptions, setStoryParty } from './game/story-party';
 import { QUESTS, questProgress } from './game/quests';
+import { CHALLENGE_SHOP, createRunWallet, creditRun, resetRunWallet, getRaidContractForEnemy, roguelikeMilestoneForFloor, buyRunItem, type RunWallet } from './economy/challenge';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const store={getItem:(key:string)=>localStorage.getItem(key),setItem:(key:string,value:string)=>localStorage.setItem(key,value)};
@@ -28,14 +30,17 @@ const profile=saved.profile;
 if (matchMedia('(prefers-reduced-motion: reduce)').matches) profile.motion = false;
 let storageFailed = false;
 function persist() {
+  syncProfileEconomy(profile);
   try { saveProfile(store,profile,saved.readOnly); storageFailed = false; }
   catch { storageFailed = true; }
   $('wallet').textContent = `${profile.gold}g`;
+  const bankWallet = document.getElementById('bank-wallet');
+  if (bankWallet) bankWallet.textContent = `${profile.economy.commanderCrystal} Crystal`;
   $('storage-status').textContent = saved.readOnly ? saved.warning : storageFailed ? 'Save tidak tersedia. Progress hanya bertahan selama tab ini terbuka.' : 'Local save v3 · level, quest dan build tersimpan di perangkat ini';
 }
 const sound = new Sound();
 sound.enabled = profile.sound;
-let battle = new Battle('adventure', 1, profileModifiers(profile), { roster: profile.roster, loadouts: profile.loadouts });
+let battle = new Battle('adventure', 1, profileModifiers(profile), storyBattleOptions(profile));
 let scene: BattleScene;
 let inTown = true;
 let initialized = false;
@@ -47,6 +52,7 @@ let moveMode = false;
 let selectedKey = '';
 let bannerTimer = 0;
 let runBoons: string[] = [];
+let runWallet: RunWallet = createRunWallet();
 let runSeed = Date.now() % 1000000;
 let offeredBoons: typeof BOONS = [];
 let resumeOnClose = false;
@@ -57,15 +63,15 @@ const townState: TownState = {
 };
 
 $('app').innerHTML = `
-  <header class="site-header"><button class="brand" id="home" aria-label="Pulang ke Emberhollow"><span class="brand-mark" aria-hidden="true">${'<i></i>'.repeat(9)}</span><span>GRIDBOUND<small>ASHES OF THE BELL</small></span></button>
-    <nav class="mode-tabs" aria-label="Mode permainan"><button data-view="campaign" class="active">Town & story</button><button data-view="raid">Raid hunts</button><button data-view="endless">Roguelike</button></nav>
-    <div class="header-tools"><b id="wallet" class="wallet">${profile.gold}g</b><button id="sound" class="icon-button" aria-label="Toggle audio" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="Settings">⚙</button></div>
-  </header>
+<header class="site-header"><button class="brand" id="home" aria-label="Pulang ke Emberhollow"><span class="brand-mark" aria-hidden="true">${'<i></i>'.repeat(9)}</span><span>GRIDBOUND<small>ASHES OF THE BELL</small></span></button>
+  <nav class="mode-tabs" aria-label="Mode permainan"><button data-view="campaign" class="active">Town & story</button><button data-view="raid">Raid hunts</button><button data-view="endless">Roguelike</button></nav>
+  <div class="header-tools"><b id="wallet" class="wallet">${profile.gold}g</b><b id="bank-wallet" class="wallet bank-wallet">${profile.economy.commanderCrystal} Crystal</b><button id="sound" class="icon-button" aria-label="Toggle audio" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="Settings">⚙</button></div>
+</header>
   <main id="town-screen" class="town-screen"></main>
   <main id="battle-screen" class="game-layout" hidden>
     <aside class="left-sidebar"><span class="eyebrow" id="expedition-label">EXPEDITION</span><h1 id="journey-title">Beyond<br>the bell.</h1><p class="intro-copy" id="journey-copy"></p><ol id="stage-list" class="expedition-stages"></ol>
       <section class="field-guide"><div class="section-label">READ. REACT. SURVIVE.</div><p>Tap hero untuk mengisi skill lebih cepat. Ganti fokus saat fatigue naik.</p><p>Ground: pindah tile. Marked: lindungi hero yang diincar. All-grid: Guard atau interrupt.</p><button id="howto" class="secondary-button">Field guide</button></section>
-      <section class="run-boons"><h3>Run boons</h3><div id="boon-list"></div></section><button id="retreat" class="secondary-button">Pulang ke town</button>
+      <section class="run-boons"><h3>Run boons</h3><div id="boon-list"></div></section><section class="run-shop-panel"><h3>Journey shop</h3><div id="run-shop-host"></div><small>Journey Crystal resets on abandon, defeat, or clear. It never enters the bank.</small></section><button id="retreat" class="secondary-button">Pulang ke town</button>
     </aside>
     <section class="arena-column" aria-label="Arena pertarungan">
       <div class="arena-heading"><span><b id="mode-label"></b><span id="encounter-label"></span></span><button id="pause" class="icon-button" aria-label="Jeda permainan">Ⅱ</button></div>
@@ -109,6 +115,13 @@ $('town-screen').addEventListener('click', event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
   if (!button || button.disabled || !inTown) return;
   sound.unlock();
+  if (button.dataset.storyToggle !== undefined) {
+    const id=Number(button.dataset.storyToggle);
+    const ids=profile.storyActive.includes(id)?profile.storyActive.filter(hero=>hero!==id):[...profile.storyActive,id];
+    const ok=setStoryParty(profile,ids);
+    showTown('party',ok?'Story party disimpan. Semua loadout tetap tersimpan.':'Pilih minimal 1 hero dan jangan melebihi cap Story.');
+    return;
+  }
   if (button.dataset.facility) {
     townState.pendingGear = undefined;
     showTown(button.dataset.facility as TownTab);
@@ -142,6 +155,23 @@ $('town-screen').addEventListener('click', event => {
     showTown('campaign');
   }
   if (button.dataset.raid) { townState.raid = button.dataset.raid; showTown('raid'); }
+  if (button.dataset.bankBuy) {
+    const item = buyChallengeUnlock(profile, button.dataset.bankBuy);
+    showTown(townState.tab, item ? `${item.name} unlocked. Bank Crystal spent; equip it before a future run.` : 'Not enough bank Crystal or this unlock is already owned.');
+    return;
+  }
+  if (button.dataset.runBuy) {
+    const item = buyRunItem(runWallet, button.dataset.runBuy);
+    if (item) {
+      if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
+      if (item.id === 'run-upgrade') battle.power *= 1.1;
+      if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
+      updateExpedition();
+      frame(1);
+    }
+    if (item && inTown) showTown(townState.tab, `${item.name} bought for this run.`);
+    return;
+  }
   if (button.hasAttribute('data-confirm-gear')) {
     const pending = townState.pendingGear;
     if (pending && pending.hero === townState.hero && pending.gearId) {
@@ -196,6 +226,8 @@ $('town-screen').addEventListener('change', event => {
 function depart(mode: Mode) {
   if (mode === 'adventure' && !canEnterZone(profile, townState.zone)) return;
   runBoons = [];
+  resetRunWallet(runWallet);
+  runWallet = createRunWallet();
   runSeed = Date.now() % 1000000;
   boot(mode, mode === 'adventure' ? townState.zone + 1 : mode === 'raid' ? profile.cleared.length+1 : 1);
 }
@@ -208,9 +240,13 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   sidebar?.classList.remove('info-open');
   battleInfoToggle.setAttribute('aria-expanded', 'false');
   battleInfoToggle.querySelector('span')!.textContent = '＋';
+  const milestone = mode === 'endless' ? roguelikeMilestoneForFloor(floor) : undefined;
   battle = new Battle(mode, floor, profileModifiers(profile), {
     roster: [...profile.roster], loadouts: structuredClone(profile.loadouts),
-    boons: [...runBoons], ...(mode === 'raid' ? { enemyId: townState.raid } : {}), ...options,
+    boons: [...runBoons], settlementId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    ...(mode === 'raid' ? { enemyId: townState.raid, raidContract: getRaidContractForEnemy(townState.raid, 'bronze') } : {}),
+    ...(mode === 'endless' && milestone ? { runWallet, runAct: milestone.act, runActClear: milestone.actClear, runFinalClear: milestone.finalClear } : {}), ...options,
+    ...(mode === 'adventure' ? storyBattleOptions(profile) : {}),
   });
   recorded = false;
   experienceRewards=[];
@@ -233,6 +269,9 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
 }
 function updateExpedition() {
   const c = CAMPAIGN[battle.floor - 1];
+  $('loot').textContent = battle.mode === 'endless' ? `${runWallet.crystal} RUN` : battle.mode === 'raid' ? `${battle.raidContract?.tier.toUpperCase() ?? 'PRACTICE'} · ${battle.raidContract?.sandbox ? 'NO CRYSTAL' : 'CONTRACT'}` : `${battle.gold}g`;
+  const runShopHost = document.getElementById('run-shop-host');
+  if (runShopHost) runShopHost.innerHTML = battle.mode === 'endless' && battle.status === 'ready' ? CHALLENGE_SHOP.map(item => `<button class="secondary-button" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${item.cost} RUN</button>`).join('') : '';
   $('mode-label').textContent = battle.mode === 'adventure' ? `CHAPTER ${battle.floor}` : battle.mode === 'endless' ? `FLOOR ${battle.floor}` : 'RAID HUNT';
   $('encounter-label').textContent = battle.stageName;
   $('boss-name').textContent = battle.enemyName;
@@ -371,7 +410,7 @@ function frame(dt: number) {
   $('intent').querySelector('span')!.textContent = threat ? `${threat.counter ?? 'Pindahkan hero dari tile yang ditandai.'}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1} intent lain)` : ''}` : 'Ground: move. Marked: protect. All-grid: Guard / interrupt.';
   $('damage').textContent = Math.round(battle.damage).toLocaleString();
   $('blocked').textContent = Math.round(battle.blocked).toLocaleString();
-  $('loot').textContent = `${battle.gold}g`;
+  $('loot').textContent = battle.mode === 'endless' ? `${runWallet.crystal} RUN` : battle.mode === 'raid' ? `${battle.raidContract?.sandbox ? 'PRACTICE' : battle.raidContract?.tier.toUpperCase() ?? 'PRACTICE'}` : `${battle.gold}g`;
   $('standing').textContent = `${battle.living().length} / ${battle.heroes.length} STANDING`;
   $('move-tip').textContent = moveMode ? 'CHOOSE A DESTINATION' : 'DRAG TO REPOSITION';
   $('resolve-fill').style.width = `${battle.resolve}%`;
@@ -453,12 +492,12 @@ function pauseMenu() {
   if (modal.open) { modal.close(); return; }
   openModal(`<span class="eyebrow">TAKE A BREATH</span><h2 id="modal-title">The forest can wait.</h2><p>Simulasi berhenti selama dialog terbuka.</p><button class="gold-button" data-close>Lanjutkan</button><button id="pause-help" class="secondary-button">Kontrol & counter</button><button id="pause-retreat" class="secondary-button">Akhiri expedition · pulang</button>`);
   $('pause-help').addEventListener('click', help);
-  $('pause-retreat').addEventListener('click', () => { closeWithoutResume(); runBoons = []; showTown(); });
+  $('pause-retreat').addEventListener('click', () => { closeWithoutResume(); runBoons = []; resetRunWallet(runWallet); showTown(); });
 }
 function navigateTown(tab: TownTab = 'campaign') {
-  if (inTown || ['ready', 'victory', 'defeat'].includes(battle.status)) { runBoons = []; showTown(tab); return; }
+  if (inTown || ['ready', 'victory', 'defeat'].includes(battle.status)) { runBoons = []; resetRunWallet(runWallet); showTown(tab); return; }
   openModal(`<h2 id="modal-title">Pulang ke Emberhollow?</h2><p>HP dipulihkan di town, tetapi loot yang belum dibank dan boon run ini akan hilang.</p><button id="confirm-retreat" class="gold-button">Akhiri run & pulang</button><button class="secondary-button" data-close>Tetap bertarung</button>`);
-  $('confirm-retreat').addEventListener('click', () => { closeWithoutResume(); runBoons = []; showTown(tab); });
+  $('confirm-retreat').addEventListener('click', () => { closeWithoutResume(); runBoons = []; resetRunWallet(runWallet); showTown(tab); });
 }
 const resultGate = new ResultGate();
 let presentingResult = false;
@@ -511,8 +550,9 @@ function presentResult() {
   if (!recorded && !moreWaves) {
     recorded = true;
     if (won) {
+      if (battle.mode === 'endless') creditRun(runWallet, 3);
       reward = battle.gold + (battle.mode === 'adventure' ? zone.reward : 0);
-      profile.gold += reward;
+      if (battle.mode === 'adventure') profile.gold += reward;
       profile.wins++;
       if (battle.mode === 'adventure') {
         const before = new Set(profile.roster);
@@ -532,8 +572,8 @@ function presentResult() {
   $('ready-title').textContent = won ? moreWaves ? 'The path opens.' : 'The bell remembers.' : 'The ember remains.';
   $('ready-copy').textContent = 'Buka hasil untuk melanjutkan atau kembali ke town.';
   $('start').textContent = 'Lihat hasil';
-  const description = moreWaves ? 'Masih ada bahaya di depan. HP, potion, formasi, dan cooldown party dibawa ke pertempuran berikutnya.' : won && battle.mode === 'adventure' ? zone.outro : won ? 'Kontrak selesai. Loot sudah dibank. Pilih jalan berikutnya.' : 'Party tumbang. Coba skill berbeda, jaga hero yang ditandai, dan simpan Guard untuk ritual.';
-  openModal(`<span class="eyebrow">${moreWaves ? `STAGE ${battle.stage + 1} / ${battle.stageCount} CLEARED` : won ? 'EXPEDITION COMPLETE' : 'EXPEDITION LOST'}</span><h2 id="modal-title">${won ? moreWaves ? 'Keep moving.' : 'Bring the fire home.' : 'Rally. Adapt. Return.'}</h2><p>${description}</p>${recruited.length ? `<p class="recruit-notice">${recruited.join(' dan ')} bergabung dengan Bellkeepers. Rekan baru mengikuti level tengah party.</p>` : ''}${experienceRewards.length?`<section class="xp-results"><h3>Hero experience banked</h3>${experienceRewards.map(r=>`<p><b>${ROSTER[r.id].name}</b><span>+${r.xp} XP · ${r.after>r.before?`LEVEL UP ${r.before} → ${r.after}`:`Lv.${r.after}`}</span></p>`).join('')}<small>Hero tumbang mendapat 60% XP. Bonus stat baru aktif expedition berikutnya. ${QUESTS.filter(q=>questProgress(profile,q).ready).length} quest siap diklaim di town.</small></section>`:''}<div class="result-stats"><div><b>${formatTime(battle.time)}</b><small>ELAPSED</small></div><div><b>${battle.living().length}/${battle.heroes.length}</b><small>STANDING</small></div><div><b>${won ? moreWaves ? `${battle.gold}g` : `${battle.gold + (battle.mode === 'adventure' ? zone.reward : 0)}g` : '0g'}</b><small>${moreWaves ? 'CARRIED · NOT BANKED' : 'GOLD BANKED'}</small></div></div>${moreWaves ? '<button id="next-wave" class="gold-button">Lanjut ke encounter berikutnya</button>' : won && battle.mode === 'endless' ? `<h3>Choose a boon</h3><p>Efek aktif sampai run berakhir. Party pulih untuk floor berikutnya.</p>${!offeredBoons.length?'<button id="next-floor" class="gold-button">All boons collected · descend</button>':''}<div class="boon-draft">${offeredBoons.map(b => `<button data-boon="${b.id}"><small>${b.patron}</small><b>${b.name}</b><span>${b.description}</span></button>`).join('')}</div>` : '<button id="retry" class="secondary-button">Ulang expedition dari awal</button>'}<button id="result-town" class="${moreWaves ? 'secondary-button' : 'gold-button'}">${moreWaves ? 'Abandon loot & pulang' : 'Kembali ke Emberhollow'}</button>`, false);
+  const description = moreWaves ? 'Masih ada bahaya di depan. HP, potion, formasi, dan cooldown party dibawa ke pertempuran berikutnya.' : won && battle.mode === 'adventure' ? zone.outro : won && battle.mode === 'raid' ? `${battle.raidContract?.sandbox ? 'Practice selesai; kontrak Sandbox tidak memberi Crystal.' : `Certified ${battle.raidContract?.tier ?? 'bronze'} contract settled. Bank Crystal: ${battle.raidContract ? 'receipt recorded' : 'none'}.`}` : won ? `Room clear. Journey purse sekarang ${runWallet.crystal} Crystal; act reward hanya masuk bank pada authored act clear.` : 'Party tumbang. Coba skill berbeda, jaga hero yang ditandai, dan simpan Guard untuk ritual.';
+  openModal(`<span class="eyebrow">${moreWaves ? `STAGE ${battle.stage + 1} / ${battle.stageCount} CLEARED` : won ? 'EXPEDITION COMPLETE' : 'EXPEDITION LOST'}</span><h2 id="modal-title">${won ? moreWaves ? 'Keep moving.' : 'Bring the fire home.' : 'Rally. Adapt. Return.'}</h2><p>${description}</p>${recruited.length ? `<p class="recruit-notice">${recruited.join(' dan ')} bergabung dengan Bellkeepers. Rekan baru mengikuti level tengah party.</p>` : ''}${experienceRewards.length?`<section class="xp-results"><h3>Hero experience banked</h3>${experienceRewards.map(r=>`<p data-xp-kind="${r.kind}"><b>${ROSTER[r.id].name} · ${r.kind === 'bench' ? 'BENCH' : 'ACTIVE'}</b><span>+${r.xp} XP${r.bonus ? ` (catch-up +${r.bonus})` : ''} · ${r.after>r.before?`LEVEL UP ${r.before} → ${r.after}`:`Lv.${r.after}`}</span></p>`).join('')}<small>Hero tumbang mendapat 60% XP. Bonus stat baru aktif expedition berikutnya. ${QUESTS.filter(q=>questProgress(profile,q).ready).length} quest siap diklaim di town.</small></section>`:''}<div class="result-stats"><div><b>${formatTime(battle.time)}</b><small>ELAPSED</small></div><div><b>${battle.living().length}/${battle.heroes.length}</b><small>STANDING</small></div><div><b>${won ? moreWaves ? `${battle.gold}g` : `${battle.gold + (battle.mode === 'adventure' ? zone.reward : 0)}g` : '0g'}</b><small>${moreWaves ? 'CARRIED · NOT BANKED' : 'GOLD BANKED'}</small></div></div>${moreWaves ? '<button id="next-wave" class="gold-button">Lanjut ke encounter berikutnya</button>' : won && battle.mode === 'endless' ? `<h3>Choose a boon</h3><p>Efek aktif sampai run berakhir. Party pulih untuk floor berikutnya.</p>${!offeredBoons.length?'<button id="next-floor" class="gold-button">All boons collected · descend</button>':''}<div class="boon-draft">${offeredBoons.map(b => `<button data-boon="${b.id}"><small>${b.patron}</small><b>${b.name}</b><span>${b.description}</span></button>`).join('')}</div>` : '<button id="retry" class="secondary-button">Ulang expedition dari awal</button>'}<button id="result-town" class="${moreWaves ? 'secondary-button' : 'gold-button'}">${moreWaves ? 'Abandon loot & pulang' : 'Kembali ke Emberhollow'}</button>`, false);
   $('next-wave')?.addEventListener('click', () => {
     closeWithoutResume();
     if (battle.nextWave()) {
@@ -555,8 +595,44 @@ function presentResult() {
     boot('endless', battle.floor + 1);
   }));
   $('next-floor')?.addEventListener('click',()=>{closeWithoutResume();boot('endless',battle.floor+1);});
+  modal.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
+    const item = buyRunItem(runWallet, el.dataset.runBuy!);
+    if (!item) return;
+    if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
+    if (item.id === 'run-upgrade') battle.power *= 1.1;
+    if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
+    closeWithoutResume();
+    updateExpedition();
+    if (battle.mode === 'endless' && battle.status === 'paused') battle.pause();
+    frame(1);
+  }));
+  modal.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
+    const item = buyRunItem(runWallet, el.dataset.runBuy!);
+    if (!item) return;
+    if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
+    if (item.id === 'run-upgrade') battle.power *= 1.1;
+    if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
+    closeWithoutResume();
+    updateExpedition();
+    if (battle.mode === 'endless' && battle.status === 'paused') battle.pause();
+    frame(1);
+  }));
+  modal.querySelector('[data-open-run-shop]')?.addEventListener('click', () => {
+    const shop = document.createElement('section');
+    shop.className = 'run-shop-modal';
+    shop.innerHTML = `<h3>Journey shop · ${runWallet.crystal} Crystal</h3>${CHALLENGE_SHOP.map(item => `<button class="secondary-button" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${item.cost} RUN</button>`).join('')}`;
+    modal.querySelector('[data-open-run-shop]')?.replaceWith(shop);
+    shop.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
+      const item = buyRunItem(runWallet, el.dataset.runBuy!);
+      if (!item) return;
+      if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
+      if (item.id === 'run-upgrade') battle.power *= 1.1;
+      if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
+      closeWithoutResume(); updateExpedition(); frame(1);
+    }));
+  });
   $('retry')?.addEventListener('click', () => { const mode = battle.mode, floor = battle.mode === 'endless' ? 1 : battle.floor; runBoons = []; closeWithoutResume(); boot(mode, floor); });
-  $('result-town').addEventListener('click', () => { runBoons = []; closeWithoutResume(); showTown(battle.mode === 'adventure' ? 'campaign' : battle.mode === 'raid' ? 'raid' : 'endless'); });
+  $('result-town').addEventListener('click', () => { runBoons = []; resetRunWallet(runWallet); closeWithoutResume(); showTown(battle.mode === 'adventure' ? 'campaign' : battle.mode === 'raid' ? 'raid' : 'endless'); });
 }
 
 $('home').addEventListener('click', () => navigateTown());

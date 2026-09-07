@@ -1,23 +1,26 @@
 import { JOBS, gearStats, legalSkill } from './jobs';
 import { TALENTS, talentStats } from './talents';
 import { heroProgress, levelStats } from './levels';
+import { normalizeStoryParty, storyPartyCap } from './story-party';
 import { KITS, ROSTER, type ClassId, type Mode } from './content';
 import { CAMPAIGN, ENEMIES, BOONS, type Intent } from './world';
+import { getRaidContractForEnemy, validateRaidContract, type RaidContract, type RunWallet } from '../economy/challenge';
 export type Hero = { offensiveActs:number; level:number; perks:ReturnType<typeof talentStats>; equipment:ReturnType<typeof gearStats>; id:number; name:string; classId:ClassId; slot:number; hp:number; maxHp:number; shield:number; stance:number; remaining:number; total:number; fatigue:number; lastTap:number; moveLock:number; buff:number; acts:number; talents:string[]; skills:number[]; regen:number; regenPower:number; rescued:boolean; job?:string; gear:Record<string,string>; gearPower:number; gearTempo:number };
 export type Telegraph = { id:number; name:string; type:'front'|'meteor'|'breath'|'target'|'all'; slots:number[]; left:number; total:number; targetId?:number; counter?:string; damage?:number };
 export type Minion = { id:number; lane:number; hp:number; maxHp:number; timer:number; enemyId?:string };
 export type BattleEvent = { type:string; source?:number; slot?:number; lane?:number; amount?:number; color?:string; text?:string; targets?:number[]; kind?:string };
 export type Status = 'ready'|'fighting'|'paused'|'victory'|'defeat';
-export type BattleOptions = { roster?:number[]; loadouts?:Record<number,{skills:number[];talents:string[];xp?:number;slot?:number;job?:string;gear?:Record<string,string>}>; boons?:string[]; enemyId?:string; stage?:number };
+export type BattleOptions = { roster?:number[]; storyCleared?:number[]; storyRecruited?:number[]; loadouts?:Record<number,{skills:number[];talents:string[];xp?:number;slot?:number;job?:string;gear?:Record<string,string>}>; boons?:string[]; enemyId?:string; stage?:number; settlementId?:string; raidContract?:RaidContract; runWallet?:RunWallet; runAct?:1|2|3; runActClear?:boolean; runFinalClear?:boolean };
 const defaultUpgrades = {power:1,vitality:1,tempo:1};
 export class Battle {
   heroes:Hero[]=[]; threats:Telegraph[]=[]; minions:Minion[]=[]; events:BattleEvent[]=[];
+  storyRecruited:readonly number[]=[];
   status:Status='ready'; mode:Mode='raid'; floor=1; stage=0; time=0; stageTime=0;
   bossHp=0; bossMax=0; enemyId='dragon'; enemyName=''; enemyTitle=''; stageName=''; stageCount=1;
   stagger=0; breakLeft=0; phase=1; resolve=25; gold=0; purse=120; potions=2;
   guardLeft=0; guardCooldown=0; markLeft=0;
   targetLane=-1; selected=0; damage=0; healed=0; blocked=0; dodged=0; taps=0; relocations=0;
-  power=1; vitality=1; tempo=1; boons:string[]=[];
+  power=1; vitality=1; tempo=1; boons:string[]=[]; settlementId=''; raidContract?: RaidContract; runWallet?: RunWallet; runAct?: 1|2|3; runActClear=false; runFinalClear=false;
   private seed=271828; private eventId=0; private pattern=0;
   private attackIn=5; private clawIn=7; private summonIn=18;
   private lastTapped=-1; private castCount=0;
@@ -30,11 +33,14 @@ export class Battle {
     this.power=Number.isFinite(upgrades.power)?Math.max(.1,upgrades.power):1;
     this.vitality=Number.isFinite(upgrades.vitality)?Math.max(.1,upgrades.vitality):1;
     this.tempo=Number.isFinite(upgrades.tempo)?Math.max(.1,upgrades.tempo):1;
-    this.options=structuredClone(options); this.boons=[...new Set(options.boons??[])].filter(id=>BOONS.some(b=>b.id===id));
+    this.options=structuredClone(options); this.settlementId=options.settlementId??''; this.raidContract=mode==='raid' ? validateRaidContract(options.raidContract ?? getRaidContractForEnemy(options.enemyId ?? 'dragon')) : undefined; this.runWallet=options.runWallet; this.runAct=options.runAct; this.runActClear=options.runActClear===true; this.runFinalClear=options.runFinalClear===true; this.boons=[...new Set(options.boons??[])].filter(id=>BOONS.some(b=>b.id===id));
     this.stage=Math.max(0,Math.min(mode==='adventure'?CAMPAIGN[this.floor-1].stages.length-1:0,Number.isInteger(options.stage)?options.stage!:0));
     const defaults=mode==='adventure'?[[0,4,3],[0,4,3,2],[0,4,3,2,7],[0,4,3,2,7,1,5]][this.floor-1]??ROSTER.map((_,id)=>id):ROSTER.map((_,id)=>id);
-    const ids=[...new Set(options.roster??defaults)].filter(id=>Number.isInteger(id)&&ROSTER[id]);
+    let ids=[...new Set(options.roster??defaults)].filter(id=>Number.isInteger(id)&&ROSTER[id]);
     if (!ids.length) ids.push(0,4,3);
+    this.storyRecruited=Object.freeze(mode==='adventure'?[...new Set(options.storyRecruited??ids)].filter(id=>Number.isInteger(id)&&ROSTER[id]):[]);
+    if(mode==='adventure')ids=normalizeStoryParty(ids,this.storyRecruited,options.storyCleared??[]).slice(0,storyPartyCap(options.storyCleared??[]));
+    if(!ids.length)ids=[0,4,3];
     const occupied=new Set<number>();
     this.heroes=ids.map((id,i)=>{
       const r=ROSTER[id],k=KITS[r.classId],loadout=options.loadouts?.[id];
@@ -63,8 +69,10 @@ export class Battle {
       this.bossMax=Math.round(stage.hp*(this.floor<=4?2.2:4+this.floor*.75));
     } else {
       const endless=Object.values(ENEMIES).filter(e=>e.archetype===e.id).map(e=>e.id);
-      this.enemyId=ENEMIES[this.options.enemyId??'']?this.options.enemyId!:this.mode==='endless'?endless[(this.floor-1)%endless.length]:'dragon';
-      this.stageCount=1; this.stageName=this.mode==='endless'?`Descent ${this.floor}`:'Raid contract';
+      const requestedEnemy = this.options.enemyId ?? (this.mode === 'raid' ? this.raidContract?.bossId : undefined);
+      this.enemyId=ENEMIES[requestedEnemy??'']?requestedEnemy!:this.mode==='endless'?endless[(this.floor-1)%endless.length]:'dragon';
+      if (this.mode === 'raid' && this.raidContract?.bossId !== ENEMIES[this.enemyId]?.archetype) this.raidContract = validateRaidContract(undefined);
+      this.stageCount=1; this.stageName=this.mode==='endless'?`Descent ${this.floor}`:this.raidContract?.sandbox?'Practice arena · no Crystal':'Raid contract';
       this.bossMax=Math.round((this.mode==='endless'?1900:3400)*Math.pow(this.heroes.length/3,.9)*Math.pow(1.2,this.floor-1)*ENEMIES[this.enemyId].hp);
     }
     this.bossHp=this.bossMax; this.enemyName=ENEMIES[this.enemyId].name; this.enemyTitle=ENEMIES[this.enemyId].title;

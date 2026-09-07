@@ -6,10 +6,15 @@ export { TALENTS } from './talents';
 import { heroProgress, normalizedXP, xpForLevel } from './levels';
 import { QUESTS, questProgress } from './quests';
 import type { Battle } from './simulation';
+import { normalizeStoryParty, benchExperience } from './story-party';
+import { createCurrencyState, creditCurrency, type CurrencyState } from '../economy/currency';
+import { bankRaidReward, bankRoguelikeReward, buyBankItem, normalizeChallengeUnlocks, raidReward, roguelikeBankReward, creditRunRoom, type RunWallet } from '../economy/challenge';
 export type Loadout = { skills:number[]; talents:string[]; slot:number; xp?:number; job?:string; gear?:Record<string,string>; inventory?:string[] };
-export type Profile = { version:3; gold:number; claimedQuests:string[]; trackedQuest?:string; ledger:{raids:number;victories:number;enemies:Record<string,number>}; roster:number[]; cleared:number[]; loadouts:Record<number,Loadout>; bestFloor:number; wins:number; sound:boolean; motion:boolean };
+export type Profile = { version:3; gold:number; economy:CurrencyState; settlementReceipts:string[]; challengeUnlocks:string[]; claimedQuests:string[]; trackedQuest?:string; ledger:{raids:number;victories:number;enemies:Record<string,number>}; roster:number[]; storyActive:number[]; cleared:number[]; loadouts:Record<number,Loadout>; bestFloor:number; wins:number; sound:boolean; motion:boolean };
 export function createProfile():Profile {
-  return {version:3,claimedQuests:[],ledger:{raids:0,victories:0,enemies:{}},gold:60,roster:[0,4,3],cleared:[],loadouts:{0:{skills:[0,1],talents:[],xp:0,slot:1},4:{skills:[0,1],talents:[],xp:0,slot:7},3:{skills:[0,1],talents:[],xp:0,slot:6}},bestFloor:0,wins:0,sound:true,motion:true};
+  const economy=createCurrencyState();
+  economy.gold=60;
+  return {version:3,claimedQuests:[],settlementReceipts:[],challengeUnlocks:[],ledger:{raids:0,victories:0,enemies:{}},gold:60,economy,roster:[0,4,3],storyActive:[0,4,3],cleared:[],loadouts:{0:{skills:[0,1],talents:[],xp:0,slot:1},4:{skills:[0,1],talents:[],xp:0,slot:7},3:{skills:[0,1],talents:[],xp:0,slot:6}},bestFloor:0,wins:0,sound:true,motion:true};
 }
 function loadout(p:Profile,id:number) { return Number.isInteger(id)&&p.roster.includes(id)?p.loadouts[id]:undefined; }
 export function buyTalent(p:Profile,heroId:number,talentId:string) {
@@ -62,6 +67,21 @@ export function completeZone(p:Profile,index:number) {
   return true;
 }
 export function profileModifiers(p:Profile) { const level=p.cleared.length;return {power:1+level*.12,vitality:1+level*.13,tempo:1+level*.035}; }
+
+export function syncProfileEconomy(p:Profile): void {
+  p.economy.gold = Math.max(0, Math.min(1000000, Math.floor(p.gold)));
+  p.gold = p.economy.gold;
+  p.economy.commanderCrystal = Math.max(0, Math.min(1000000000, Math.floor(p.economy.commanderCrystal)));
+}
+/** Purchase a persistent challenge unlock as one domain operation. */
+export function buyChallengeUnlock(p:Profile,itemId:string) {
+  const item=buyBankItem(p.economy,itemId,p.challengeUnlocks);
+  if(item)syncProfileEconomy(p);
+  return item;
+}
+export const buyBankUnlock=buyChallengeUnlock;
+export const purchaseChallengeUnlock=buyChallengeUnlock;
+export function ownsChallengeUnlock(p:Profile,itemId:string) { return p.challengeUnlocks.includes(itemId); }
 const record=(value:unknown):Record<string,unknown>=>value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{};
 const bounded=(value:unknown,fallback:number,max:number)=>typeof value==='number'&&Number.isFinite(value)?Math.max(0,Math.min(max,Math.floor(value))):fallback;
 export function normalizeProfile(raw:unknown,legacy?:unknown):Profile {
@@ -73,9 +93,19 @@ export function normalizeProfile(raw:unknown,legacy?:unknown):Profile {
     return p;
   }
   p.gold=bounded(data.gold,60,1000000);p.bestFloor=bounded(data.bestFloor,0,100);p.wins=bounded(data.wins,0,1000000);
+  p.settlementReceipts=Array.isArray(data.settlementReceipts)?[...new Set(data.settlementReceipts.filter((id):id is string=>typeof id==='string'&&id.length<=160))]:[];
+  p.challengeUnlocks=normalizeChallengeUnlocks(data.challengeUnlocks);
+  const economy=record(data.economy),materials=record(economy.materials);
+  if(data.version===3&&Object.prototype.hasOwnProperty.call(data,'economy')){
+    p.economy.gold=bounded(economy.gold,p.gold,1000000);
+    p.economy.commanderCrystal=bounded(economy.commanderCrystal,0,1000000000);
+    for(const [id,amount] of Object.entries(materials))if(/^[a-z0-9-]+$/.test(id))p.economy.materials[id]=bounded(amount,0,1000000);
+    p.gold=p.economy.gold;
+  }else p.economy.gold=p.gold;
   if(typeof data.sound==='boolean')p.sound=data.sound;if(typeof data.motion==='boolean')p.motion=data.motion;
   const cleared=Array.isArray(data.cleared)?data.cleared:[];
   for(let index=0;index<CAMPAIGN.length&&cleared.includes(index);index++)completeZone(p,index);
+  p.storyActive=normalizeStoryParty(data.storyActive,p.roster,p.cleared);
   const loads=record(data.loadouts),occupied=new Set<number>();
   for(const id of p.roster){
     const source=record(loads[String(id)]),h=p.loadouts[id];
@@ -143,13 +173,48 @@ export function claimQuest(p:Profile,id:string,recipient:number) {
   return true;
 }
 const settled=new WeakSet<Battle>();
-export function settleProgress(p:Profile,b:Battle) {
+function bankRewardForRun(b: Battle): number {
+  if (!b.runAct || !b.runActClear) return 0;
+  return roguelikeBankReward(b.runAct, b.runFinalClear);
+}
+function bankRewardCurrency(p: Profile, b: Battle, amount: number): boolean {
+  if (amount <= 0) return true;
+  return b.mode === 'raid' ? bankRaidReward(p.economy, amount) : bankRoguelikeReward(p.economy, b.runAct!, b.runFinalClear) === amount;
+}
+export function settleProgress(p:Profile,b:Battle,runWallet?:RunWallet) {
   if(b.status!=='victory'||(b.mode==='adventure'&&b.stage+1<b.stageCount)||settled.has(b))return null;
-  settled.add(b);
+  const contractId=b.mode==='raid'?b.raidContract?.id??'practice':'';
+  const receipt=b.settlementId?`${b.settlementId}:${b.mode}:${b.floor}:${b.stage}:${contractId}`:'';
+  const legacyReceipt=b.settlementId?`${b.settlementId}:${b.mode}:${b.floor}:${b.stage}`:'';
+  if((receipt&&p.settlementReceipts.includes(receipt))||(legacyReceipt&&p.settlementReceipts.includes(legacyReceipt)))return null;
+
+  // Calculate every delta before mutating the profile.  The operations below
+  // are bounded integer updates, so a settlement either commits as a whole or
+  // returns without changing the profile.
   const xp=b.mode==='adventure'?180+b.floor*75+b.stageCount*45:b.mode==='endless'?100+b.floor*35:180+b.floor*45;
-  const rewards=b.heroes.map(h=>{const amount=Math.floor(xp*(h.hp>0?1:.6));const before=heroProgress(p.loadouts[h.id]?.xp).level;awardExperience(p,h.id,amount);return {id:h.id,xp:amount,before,after:heroProgress(p.loadouts[h.id]?.xp).level};});
+  const rewards=b.heroes.map(h=>{const amount=Math.floor(xp*(h.hp>0?1:.6));const before=heroProgress(p.loadouts[h.id]?.xp).level;return {id:h.id,kind:'active' as 'active'|'bench',bonus:0,xp:amount,before,after:heroProgress((p.loadouts[h.id]?.xp??0)+amount).level};});
+  if(b.mode==='adventure') {
+    const activeXP=b.heroes.map(h=>normalizedXP(p.loadouts[h.id]?.xp)).sort((a,b)=>a-b);
+    const mid=Math.floor(activeXP.length/2);
+    const median=activeXP.length%2?activeXP[mid]:Math.floor((activeXP[mid-1]+activeXP[mid])/2);
+    for(const id of b.storyRecruited) {
+      if(b.heroes.some(h=>h.id===id)||!p.roster.includes(id)||!p.loadouts[id])continue;
+      const current=normalizedXP(p.loadouts[id].xp),gain=benchExperience(b.mode,xp,current,median)!;
+      rewards.push({id,kind:'bench',bonus:gain.bonus,xp:normalizedXP(current+gain.total)-current,before:heroProgress(current).level,after:heroProgress(current+gain.total).level});
+    }
+  }
+  const wallet=runWallet??b.runWallet;
+  const roomReward=b.mode==='endless'&&wallet?3:0;
+  const bankReward=b.mode==='raid'?raidReward(b.raidContract,b.enemyId):b.mode==='endless'&&b.runAct?bankRewardForRun(b):0;
+  const shouldBank=b.mode==='raid' ? bankReward > 0 : b.mode==='endless' && Boolean(b.runAct && b.runActClear);
+  if (shouldBank && !bankRewardCurrency(p, b, bankReward)) return null;
+  settled.add(b);
+  if(receipt)p.settlementReceipts.push(receipt);
+  for(const reward of rewards)awardExperience(p,reward.id,reward.xp);
   p.ledger.victories++;if(b.mode==='raid')p.ledger.raids++;
+  if(roomReward>0&&wallet)creditRunRoom(wallet,roomReward);
   const enemies=b.mode==='adventure'?CAMPAIGN[b.floor-1].stages.map(s=>s.enemy):[b.enemyId];
-  for(const id of enemies){const base=ENEMIES[id].archetype??id;p.ledger.enemies[base]=(p.ledger.enemies[base]??0)+1;}
+  for(const id of enemies){const base=ENEMIES[id]?.archetype??id;p.ledger.enemies[base]=(p.ledger.enemies[base]??0)+1;}
+  syncProfileEconomy(p);
   return rewards;
 }

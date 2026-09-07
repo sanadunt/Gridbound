@@ -57,6 +57,11 @@ select:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .stage-route b { font-size: 12px; font-weight: 500; line-height: 1.6; }
 .mission-brief .mission-warning { font-size: 11px; color: #d3bd93; }
 .mission-reward { font-size: 12px; color: #bcd2a6; line-height: 1.7; }
+.story-party { margin-bottom: 20px; }
+.story-party p { font-size: 13px; line-height: 1.6; }
+.story-party .departure-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.story-party button { min-height: 44px; }
+.story-party button[aria-pressed="true"] { border-color: #e6c78c; }
 .departure-actions { display: flex; gap: 12px; margin-top: 23px; align-items: stretch; }
 .departure-actions > button { width: auto; flex: 1; margin: 0; font-size: 12px; line-height: 1.6; }
 .training-identity { display: flex; align-items: center; gap: 22px; margin-bottom: 20px; }
