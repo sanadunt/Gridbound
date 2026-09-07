@@ -1,0 +1,14 @@
+flowchart TD
+  Town[Town] --> Prep[Hero skills talents gear formation]
+  Prep --> Mission[Campaign raid or endless]
+  Mission --> Ready[Encounter ready]
+  Ready --> Fight[Tap read telegraph and counter]
+  Fight --> Outcome{Outcome}
+  Outcome -->|Victory| Death[Wait for death animation]
+  Death --> Locked[Result visible and locked 1000ms]
+  Outcome -->|Defeat| Locked
+  Locked --> Choice{Options enabled}
+  Choice -->|Next wave if available| Ready
+  Choice -->|Return or retry| Town
+  Choice -->|Endless victory| Boon[Bank floor and choose boon]
+  Boon --> Ready

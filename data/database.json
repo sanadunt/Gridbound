@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "title": "Gridbound: Ashes of the Bell",
   "characters": [
     {
@@ -931,6 +931,508 @@
       "description": "Setiap cast menambah 2 Resolve.",
       "cost": 120,
       "requires": "mastery"
+    },
+    {
+      "id": "assault-root",
+      "name": "Committed Strike",
+      "description": "+6% power. Jalur serangan; perlu Mastery.",
+      "level": 3,
+      "points": 1,
+      "requires": "mastery",
+      "effect": {
+        "power": 0.06
+      },
+      "cost": 32,
+      "branch": "assault"
+    },
+    {
+      "id": "assault-break",
+      "name": "Fracture Rhythm",
+      "description": "+5% power dan +5% tempo.",
+      "level": 6,
+      "points": 1,
+      "requires": "assault-root",
+      "effect": {
+        "power": 0.05,
+        "tempo": 0.05
+      },
+      "cost": 44,
+      "branch": "assault"
+    },
+    {
+      "id": "assault-hunt",
+      "name": "Lane Predator",
+      "description": "+18% damage ke minion.",
+      "level": 10,
+      "points": 2,
+      "requires": "assault-root",
+      "effect": {
+        "minionDamage": 0.18
+      },
+      "cost": 60,
+      "branch": "assault"
+    },
+    {
+      "id": "assault-echo",
+      "name": "Resounding Blow",
+      "description": "Setiap cast ofensif kelima: echo 18% power ke boss.",
+      "level": 15,
+      "points": 2,
+      "requires": "assault-break",
+      "effect": {
+        "echo": 0.18
+      },
+      "cost": 80,
+      "branch": "assault",
+      "requiresAll": [
+        "assault-hunt"
+      ]
+    },
+    {
+      "id": "assault-crown",
+      "name": "Crown of Cinders",
+      "description": "Keystone: +14% power, tetapi −8% HP. Pilih satu keystone.",
+      "level": 20,
+      "points": 3,
+      "requires": "assault-echo",
+      "effect": {
+        "power": 0.14,
+        "hp": -0.08
+      },
+      "cost": 100,
+      "branch": "assault",
+      "exclusive": "keystone"
+    },
+    {
+      "id": "guard-root",
+      "name": "Deep Roots",
+      "description": "+10% max HP.",
+      "level": 3,
+      "points": 1,
+      "requires": "vigor",
+      "effect": {
+        "hp": 0.1
+      },
+      "cost": 32,
+      "branch": "guard"
+    },
+    {
+      "id": "guard-shell",
+      "name": "Layered Guard",
+      "description": "Damage masuk −5%.",
+      "level": 6,
+      "points": 1,
+      "requires": "guard-root",
+      "effect": {
+        "reduction": 0.05
+      },
+      "cost": 44,
+      "branch": "guard"
+    },
+    {
+      "id": "guard-mend",
+      "name": "Kindling Shelter",
+      "description": "Heal yang diberikan +10%; mulai dengan barrier 8% HP.",
+      "level": 10,
+      "points": 2,
+      "requires": "guard-root",
+      "effect": {
+        "heal": 0.1,
+        "openingBarrier": 0.08
+      },
+      "cost": 60,
+      "branch": "guard"
+    },
+    {
+      "id": "guard-wall",
+      "name": "Living Rampart",
+      "description": "Pantulkan 15% damage yang diserap shield/Guard ke boss.",
+      "level": 15,
+      "points": 2,
+      "requires": "guard-shell",
+      "effect": {
+        "thorns": 0.15
+      },
+      "cost": 80,
+      "branch": "guard",
+      "requiresAll": [
+        "guard-mend",
+        "fortitude"
+      ]
+    },
+    {
+      "id": "guard-crown",
+      "name": "Crown of Hearths",
+      "description": "Keystone: +20% HP dan −6% damage masuk, tetapi −5% tempo.",
+      "level": 20,
+      "points": 3,
+      "requires": "guard-wall",
+      "effect": {
+        "hp": 0.2,
+        "reduction": 0.06,
+        "tempo": -0.05
+      },
+      "cost": 100,
+      "branch": "guard",
+      "exclusive": "keystone"
+    },
+    {
+      "id": "tempo-root",
+      "name": "Measured Breath",
+      "description": "+5% tempo dan tap efektif +0,05s.",
+      "level": 3,
+      "points": 1,
+      "requires": "focus",
+      "effect": {
+        "tempo": 0.05,
+        "tapBonus": 0.05
+      },
+      "cost": 32,
+      "branch": "tempo"
+    },
+    {
+      "id": "tempo-weave",
+      "name": "Thread the Needle",
+      "description": "Tap efektif +0,10s; fatigue tetap membatasi.",
+      "level": 6,
+      "points": 1,
+      "requires": "tempo-root",
+      "effect": {
+        "tapBonus": 0.1
+      },
+      "cost": 44,
+      "branch": "tempo"
+    },
+    {
+      "id": "tempo-flow",
+      "name": "Borrowed Beat",
+      "description": "+8% tempo.",
+      "level": 10,
+      "points": 2,
+      "requires": "tempo-root",
+      "effect": {
+        "tempo": 0.08
+      },
+      "cost": 60,
+      "branch": "tempo"
+    },
+    {
+      "id": "tempo-echo",
+      "name": "Returning Echo",
+      "description": "Setiap cast ofensif kelima: echo 12%. Tiap cast ofensif memulihkan diri 4% power.",
+      "level": 15,
+      "points": 2,
+      "requires": "tempo-weave",
+      "effect": {
+        "echo": 0.12,
+        "leech": 0.04
+      },
+      "cost": 80,
+      "branch": "tempo",
+      "requiresAll": [
+        "tempo-flow"
+      ]
+    },
+    {
+      "id": "tempo-crown",
+      "name": "Crown of Hours",
+      "description": "Keystone: +15% tempo dan tap +0,10s, tetapi −7% power.",
+      "level": 20,
+      "points": 3,
+      "requires": "tempo-echo",
+      "effect": {
+        "tempo": 0.15,
+        "tapBonus": 0.1,
+        "power": -0.07
+      },
+      "cost": 100,
+      "branch": "tempo",
+      "exclusive": "keystone"
+    },
+    {
+      "id": "warrior-1",
+      "name": "Shieldwright",
+      "description": "Shield yang diberikan +12%.",
+      "level": 5,
+      "points": 1,
+      "requires": "focus",
+      "effect": {
+        "shield": 0.12
+      },
+      "cost": 40,
+      "branch": "class",
+      "classId": "warrior"
+    },
+    {
+      "id": "warrior-2",
+      "name": "Hold the Line",
+      "description": "Barrier awal 10% HP.",
+      "level": 9,
+      "points": 1,
+      "requires": "warrior-1",
+      "effect": {
+        "openingBarrier": 0.1
+      },
+      "cost": 56,
+      "branch": "class",
+      "classId": "warrior"
+    },
+    {
+      "id": "warrior-3",
+      "name": "Reprisal",
+      "description": "Pantulkan 12% damage yang ditahan.",
+      "level": 14,
+      "points": 2,
+      "requires": "warrior-2",
+      "effect": {
+        "thorns": 0.12
+      },
+      "cost": 76,
+      "branch": "class",
+      "classId": "warrior"
+    },
+    {
+      "id": "warrior-4",
+      "name": "Unbroken Oath",
+      "description": "+8% HP dan shield +10%.",
+      "level": 18,
+      "points": 2,
+      "requires": "warrior-3",
+      "effect": {
+        "hp": 0.08,
+        "shield": 0.1
+      },
+      "cost": 92,
+      "branch": "class",
+      "classId": "warrior"
+    },
+    {
+      "id": "rogue-1",
+      "name": "Red Thread",
+      "description": "Cast ofensif memulihkan diri 5% power.",
+      "level": 5,
+      "points": 1,
+      "requires": "focus",
+      "effect": {
+        "leech": 0.05
+      },
+      "cost": 40,
+      "branch": "class",
+      "classId": "rogue"
+    },
+    {
+      "id": "rogue-2",
+      "name": "Knife Between Beats",
+      "description": "+6% tempo.",
+      "level": 9,
+      "points": 1,
+      "requires": "rogue-1",
+      "effect": {
+        "tempo": 0.06
+      },
+      "cost": 56,
+      "branch": "class",
+      "classId": "rogue"
+    },
+    {
+      "id": "rogue-3",
+      "name": "Surgical Finish",
+      "description": "Echo ofensif kelima +15%.",
+      "level": 14,
+      "points": 2,
+      "requires": "rogue-2",
+      "effect": {
+        "echo": 0.15
+      },
+      "cost": 76,
+      "branch": "class",
+      "classId": "rogue"
+    },
+    {
+      "id": "rogue-4",
+      "name": "No Wasted Motion",
+      "description": "+8% power dan tap +0,08s.",
+      "level": 18,
+      "points": 2,
+      "requires": "rogue-3",
+      "effect": {
+        "power": 0.08,
+        "tapBonus": 0.08
+      },
+      "cost": 92,
+      "branch": "class",
+      "classId": "rogue"
+    },
+    {
+      "id": "archer-1",
+      "name": "Trailcraft",
+      "description": "Damage ke minion +15%.",
+      "level": 5,
+      "points": 1,
+      "requires": "focus",
+      "effect": {
+        "minionDamage": 0.15
+      },
+      "cost": 40,
+      "branch": "class",
+      "classId": "archer"
+    },
+    {
+      "id": "archer-2",
+      "name": "Steady Draw",
+      "description": "+8% power.",
+      "level": 9,
+      "points": 1,
+      "requires": "archer-1",
+      "effect": {
+        "power": 0.08
+      },
+      "cost": 56,
+      "branch": "class",
+      "classId": "archer"
+    },
+    {
+      "id": "archer-3",
+      "name": "Split Feathers",
+      "description": "Echo ofensif kelima +15%.",
+      "level": 14,
+      "points": 2,
+      "requires": "archer-2",
+      "effect": {
+        "echo": 0.15
+      },
+      "cost": 76,
+      "branch": "class",
+      "classId": "archer"
+    },
+    {
+      "id": "archer-4",
+      "name": "Horizon Keeper",
+      "description": "+8% tempo dan damage minion +10%.",
+      "level": 18,
+      "points": 2,
+      "requires": "archer-3",
+      "effect": {
+        "tempo": 0.08,
+        "minionDamage": 0.1
+      },
+      "cost": 92,
+      "branch": "class",
+      "classId": "archer"
+    },
+    {
+      "id": "healer-1",
+      "name": "Warm Hands",
+      "description": "Heal yang diberikan +12%.",
+      "level": 5,
+      "points": 1,
+      "requires": "focus",
+      "effect": {
+        "heal": 0.12
+      },
+      "cost": 40,
+      "branch": "class",
+      "classId": "healer"
+    },
+    {
+      "id": "healer-2",
+      "name": "Safe Ember",
+      "description": "Shield yang diberikan +12%.",
+      "level": 9,
+      "points": 1,
+      "requires": "healer-1",
+      "effect": {
+        "shield": 0.12
+      },
+      "cost": 56,
+      "branch": "class",
+      "classId": "healer"
+    },
+    {
+      "id": "healer-3",
+      "name": "Mercy Reservoir",
+      "description": "15% overheal yang diterima hero ini jadi barrier.",
+      "level": 14,
+      "points": 2,
+      "requires": "healer-2",
+      "effect": {
+        "overheal": 0.15
+      },
+      "cost": 76,
+      "branch": "class",
+      "classId": "healer"
+    },
+    {
+      "id": "healer-4",
+      "name": "Dawn Within",
+      "description": "Heal +10% dan barrier awal 10% HP.",
+      "level": 18,
+      "points": 2,
+      "requires": "healer-3",
+      "effect": {
+        "heal": 0.1,
+        "openingBarrier": 0.1
+      },
+      "cost": 92,
+      "branch": "class",
+      "classId": "healer"
+    },
+    {
+      "id": "wizard-1",
+      "name": "Runic Weight",
+      "description": "+8% power.",
+      "level": 5,
+      "points": 1,
+      "requires": "focus",
+      "effect": {
+        "power": 0.08
+      },
+      "cost": 40,
+      "branch": "class",
+      "classId": "wizard"
+    },
+    {
+      "id": "wizard-2",
+      "name": "Clear Thought",
+      "description": "+6% tempo.",
+      "level": 9,
+      "points": 1,
+      "requires": "wizard-1",
+      "effect": {
+        "tempo": 0.06
+      },
+      "cost": 56,
+      "branch": "class",
+      "classId": "wizard"
+    },
+    {
+      "id": "wizard-3",
+      "name": "Prism Echo",
+      "description": "Echo ofensif kelima +18%.",
+      "level": 14,
+      "points": 2,
+      "requires": "wizard-2",
+      "effect": {
+        "echo": 0.18
+      },
+      "cost": 76,
+      "branch": "class",
+      "classId": "wizard"
+    },
+    {
+      "id": "wizard-4",
+      "name": "Unwritten Formula",
+      "description": "+10% power dan tap +0,05s.",
+      "level": 18,
+      "points": 2,
+      "requires": "wizard-3",
+      "effect": {
+        "power": 0.1,
+        "tapBonus": 0.05
+      },
+      "cost": 92,
+      "branch": "class",
+      "classId": "wizard"
     }
   ],
   "equipment": [
@@ -1023,8 +1525,1028 @@
       "hp": 0.18,
       "tempo": 0.04,
       "description": "+18% HP, +4% tempo."
+    },
+    {
+      "id": "scout-weapon",
+      "name": "Trailknife",
+      "slot": "weapon",
+      "power": 0.14,
+      "hp": 0,
+      "tempo": 0.02,
+      "cost": 154,
+      "minLevel": 3,
+      "setId": "scout",
+      "source": "forge",
+      "rarity": "uncommon",
+      "description": "14% power · 0% HP · 2% tempo. Ashwood Scout: 2 pieces: tap +0,08s. 3: barrier awal 10% HP."
+    },
+    {
+      "id": "scout-armor",
+      "name": "Barkweave Coat",
+      "slot": "armor",
+      "power": 0,
+      "hp": 0.2,
+      "tempo": 0.02,
+      "cost": 169,
+      "minLevel": 3,
+      "setId": "scout",
+      "source": "forge",
+      "rarity": "uncommon",
+      "description": "0% power · 20% HP · 2% tempo. Ashwood Scout: 2 pieces: tap +0,08s. 3: barrier awal 10% HP."
+    },
+    {
+      "id": "scout-charm",
+      "name": "Scout Whistle",
+      "slot": "charm",
+      "power": 0.04,
+      "hp": 0.05,
+      "tempo": 0.06,
+      "cost": 184,
+      "minLevel": 3,
+      "setId": "scout",
+      "source": "forge",
+      "rarity": "uncommon",
+      "description": "4% power · 5% HP · 6% tempo. Ashwood Scout: 2 pieces: tap +0,08s. 3: barrier awal 10% HP."
+    },
+    {
+      "id": "wind-weapon",
+      "name": "Gale Sabre",
+      "slot": "weapon",
+      "power": 0.1,
+      "hp": -0.03,
+      "tempo": 0.13,
+      "cost": 208,
+      "minLevel": 6,
+      "setId": "wind",
+      "source": "forge",
+      "rarity": "uncommon",
+      "description": "10% power · -3% HP · 13% tempo. Windwalker: 2 pieces: tap +0,10s. 3: damage masuk −5%."
+    },
+    {
+      "id": "wind-armor",
+      "name": "Featherstep Mantle",
+      "slot": "armor",
+      "power": 0,
+      "hp": 0.12,
+      "tempo": 0.1,
+      "cost": 223,
+      "minLevel": 6,
+      "setId": "wind",
+      "source": "forge",
+      "rarity": "uncommon",
+      "description": "0% power · 12% HP · 10% tempo. Windwalker: 2 pieces: tap +0,10s. 3: damage masuk −5%."
+    },
+    {
+      "id": "wind-charm",
+      "name": "Windglass Knot",
+      "slot": "charm",
+      "power": 0.02,
+      "hp": 0,
+      "tempo": 0.14,
+      "cost": 238,
+      "minLevel": 6,
+      "setId": "wind",
+      "source": "forge",
+      "rarity": "uncommon",
+      "description": "2% power · 0% HP · 14% tempo. Windwalker: 2 pieces: tap +0,10s. 3: damage masuk −5%."
+    },
+    {
+      "id": "pilgrim-weapon",
+      "name": "Dawn Staff",
+      "slot": "weapon",
+      "power": 0.18,
+      "hp": 0.05,
+      "tempo": 0,
+      "cost": 244,
+      "minLevel": 8,
+      "setId": "pilgrim",
+      "source": "forge",
+      "rarity": "rare",
+      "description": "18% power · 5% HP · 0% tempo. Dawn Pilgrim: 2 pieces: heal yang diberikan +12%. 3: shield +12%."
+    },
+    {
+      "id": "pilgrim-armor",
+      "name": "Pilgrim Vestments",
+      "slot": "armor",
+      "power": 0,
+      "hp": 0.26,
+      "tempo": 0.02,
+      "cost": 259,
+      "minLevel": 8,
+      "setId": "pilgrim",
+      "source": "forge",
+      "rarity": "rare",
+      "description": "0% power · 26% HP · 2% tempo. Dawn Pilgrim: 2 pieces: heal yang diberikan +12%. 3: shield +12%."
+    },
+    {
+      "id": "pilgrim-charm",
+      "name": "Sunwell Rosary",
+      "slot": "charm",
+      "power": 0.07,
+      "hp": 0.09,
+      "tempo": 0.03,
+      "cost": 274,
+      "minLevel": 8,
+      "setId": "pilgrim",
+      "source": "forge",
+      "rarity": "rare",
+      "description": "7% power · 9% HP · 3% tempo. Dawn Pilgrim: 2 pieces: heal yang diberikan +12%. 3: shield +12%."
+    },
+    {
+      "id": "cinder-weapon",
+      "name": "Cinderbrand",
+      "slot": "weapon",
+      "power": 0.3,
+      "hp": 0,
+      "tempo": -0.04,
+      "cost": 280,
+      "minLevel": 10,
+      "setId": "cinder",
+      "source": "forge",
+      "rarity": "rare",
+      "description": "30% power · 0% HP · -4% tempo. Ember Duelist: 2 pieces: barrier awal 12% HP. 3: tap +0,15s."
+    },
+    {
+      "id": "cinder-armor",
+      "name": "Ashrunner Jacket",
+      "slot": "armor",
+      "power": 0.06,
+      "hp": 0.2,
+      "tempo": 0.02,
+      "cost": 295,
+      "minLevel": 10,
+      "setId": "cinder",
+      "source": "forge",
+      "rarity": "rare",
+      "description": "6% power · 20% HP · 2% tempo. Ember Duelist: 2 pieces: barrier awal 12% HP. 3: tap +0,15s."
+    },
+    {
+      "id": "cinder-charm",
+      "name": "Coalheart Seal",
+      "slot": "charm",
+      "power": 0.14,
+      "hp": 0.04,
+      "tempo": 0,
+      "cost": 310,
+      "minLevel": 10,
+      "setId": "cinder",
+      "source": "forge",
+      "rarity": "rare",
+      "description": "14% power · 4% HP · 0% tempo. Ember Duelist: 2 pieces: barrier awal 12% HP. 3: tap +0,15s."
+    },
+    {
+      "id": "bastion-weapon",
+      "name": "Gatekeeper Mace",
+      "slot": "weapon",
+      "power": 0.22,
+      "hp": 0.12,
+      "tempo": -0.05,
+      "cost": 316,
+      "minLevel": 12,
+      "setId": "bastion",
+      "source": "forge",
+      "rarity": "rare",
+      "description": "22% power · 12% HP · -5% tempo. Bellmetal Bastion: 2 pieces: damage masuk −8%. 3: shield yang diberikan +15%."
+    },
+    {
+      "id": "bastion-armor",
+      "name": "Bastion Harness",
+      "slot": "armor",
+      "power": 0,
+      "hp": 0.42,
+      "tempo": -0.06,
+      "cost": 331,
+      "minLevel": 12,
+      "setId": "bastion",
+      "source": "forge",
+      "rarity": "rare",
+      "description": "0% power · 42% HP · -6% tempo. Bellmetal Bastion: 2 pieces: damage masuk −8%. 3: shield yang diberikan +15%."
+    },
+    {
+      "id": "bastion-charm",
+      "name": "Oath Anchor",
+      "slot": "charm",
+      "power": 0.02,
+      "hp": 0.22,
+      "tempo": -0.02,
+      "cost": 346,
+      "minLevel": 12,
+      "setId": "bastion",
+      "source": "forge",
+      "rarity": "rare",
+      "description": "2% power · 22% HP · -2% tempo. Bellmetal Bastion: 2 pieces: damage masuk −8%. 3: shield yang diberikan +15%."
+    },
+    {
+      "id": "unbound-weapon",
+      "name": "Tomorrow Blade",
+      "slot": "weapon",
+      "power": 0.25,
+      "hp": 0,
+      "tempo": 0.06,
+      "cost": 370,
+      "minLevel": 15,
+      "setId": "unbound",
+      "source": "quest",
+      "rarity": "epic",
+      "description": "25% power · 0% HP · 6% tempo. Unbound Tomorrow: 2 pieces: heal dan shield +12%. 3: barrier awal 18% HP dan tap +0,08s. Hanya reward town story."
+    },
+    {
+      "id": "unbound-armor",
+      "name": "Open Door Mantle",
+      "slot": "armor",
+      "power": 0,
+      "hp": 0.3,
+      "tempo": 0.04,
+      "cost": 385,
+      "minLevel": 15,
+      "setId": "unbound",
+      "source": "quest",
+      "rarity": "epic",
+      "description": "0% power · 30% HP · 4% tempo. Unbound Tomorrow: 2 pieces: heal dan shield +12%. 3: barrier awal 18% HP dan tap +0,08s. Hanya reward town story."
+    },
+    {
+      "id": "unbound-charm",
+      "name": "Unwritten Promise",
+      "slot": "charm",
+      "power": 0.1,
+      "hp": 0.12,
+      "tempo": 0.05,
+      "cost": 400,
+      "minLevel": 15,
+      "setId": "unbound",
+      "source": "quest",
+      "rarity": "epic",
+      "description": "10% power · 12% HP · 5% tempo. Unbound Tomorrow: 2 pieces: heal dan shield +12%. 3: barrier awal 18% HP dan tap +0,08s. Hanya reward town story."
+    },
+    {
+      "id": "warrior-weapon-1",
+      "name": "Watchman Sword",
+      "slot": "weapon",
+      "cost": 150,
+      "power": 0.16,
+      "hp": 0.05,
+      "tempo": 0,
+      "classId": "warrior",
+      "minLevel": 5,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "shield": 0.08
+      },
+      "description": "16% power. Shield +8%, HP +5%. Khusus warrior."
+    },
+    {
+      "id": "warrior-weapon-2",
+      "name": "Oathsplitter",
+      "slot": "weapon",
+      "cost": 330,
+      "power": 0.26,
+      "hp": 0.05,
+      "tempo": 0,
+      "classId": "warrior",
+      "minLevel": 10,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "shield": 0.12
+      },
+      "description": "26% power. Shield +12%, HP +5%. Khusus warrior."
+    },
+    {
+      "id": "warrior-weapon-3",
+      "name": "Last Bulwark",
+      "slot": "weapon",
+      "cost": 510,
+      "power": 0.36,
+      "hp": 0.05,
+      "tempo": 0,
+      "classId": "warrior",
+      "minLevel": 20,
+      "rarity": "epic",
+      "source": "forge",
+      "effects": {
+        "shield": 0.16
+      },
+      "description": "36% power. Shield +16%, HP +5%. Khusus warrior."
+    },
+    {
+      "id": "rogue-weapon-1",
+      "name": "Threadcutter",
+      "slot": "weapon",
+      "cost": 150,
+      "power": 0.16,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "rogue",
+      "minLevel": 5,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "tapBonus": 0.04
+      },
+      "description": "16% power. Tap +0.04s. Khusus rogue."
+    },
+    {
+      "id": "rogue-weapon-2",
+      "name": "Dusk Needle",
+      "slot": "weapon",
+      "cost": 330,
+      "power": 0.26,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "rogue",
+      "minLevel": 10,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "tapBonus": 0.08
+      },
+      "description": "26% power. Tap +0.08s. Khusus rogue."
+    },
+    {
+      "id": "rogue-weapon-3",
+      "name": "Mercy Razor",
+      "slot": "weapon",
+      "cost": 510,
+      "power": 0.36,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "rogue",
+      "minLevel": 20,
+      "rarity": "epic",
+      "source": "forge",
+      "effects": {
+        "tapBonus": 0.12
+      },
+      "description": "36% power. Tap +0.12s. Khusus rogue."
+    },
+    {
+      "id": "archer-weapon-1",
+      "name": "Scout Longbow",
+      "slot": "weapon",
+      "cost": 150,
+      "power": 0.16,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "archer",
+      "minLevel": 5,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "openingBarrier": 0.06
+      },
+      "description": "16% power. Barrier awal 6% HP. Khusus archer."
+    },
+    {
+      "id": "archer-weapon-2",
+      "name": "Briarstring",
+      "slot": "weapon",
+      "cost": 330,
+      "power": 0.26,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "archer",
+      "minLevel": 10,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "openingBarrier": 0.09
+      },
+      "description": "26% power. Barrier awal 9% HP. Khusus archer."
+    },
+    {
+      "id": "archer-weapon-3",
+      "name": "Horizon Bow",
+      "slot": "weapon",
+      "cost": 510,
+      "power": 0.36,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "archer",
+      "minLevel": 20,
+      "rarity": "epic",
+      "source": "forge",
+      "effects": {
+        "openingBarrier": 0.12
+      },
+      "description": "36% power. Barrier awal 12% HP. Khusus archer."
+    },
+    {
+      "id": "healer-weapon-1",
+      "name": "Kindling Crook",
+      "slot": "weapon",
+      "cost": 150,
+      "power": 0.16,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "healer",
+      "minLevel": 5,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "heal": 0.1
+      },
+      "description": "16% power. Heal diberikan +10%. Khusus healer."
+    },
+    {
+      "id": "healer-weapon-2",
+      "name": "Dawn Reliquary",
+      "slot": "weapon",
+      "cost": 330,
+      "power": 0.26,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "healer",
+      "minLevel": 10,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "heal": 0.14
+      },
+      "description": "26% power. Heal diberikan +14%. Khusus healer."
+    },
+    {
+      "id": "healer-weapon-3",
+      "name": "Living Bell",
+      "slot": "weapon",
+      "cost": 510,
+      "power": 0.36,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "healer",
+      "minLevel": 20,
+      "rarity": "epic",
+      "source": "forge",
+      "effects": {
+        "heal": 0.18
+      },
+      "description": "36% power. Heal diberikan +18%. Khusus healer."
+    },
+    {
+      "id": "wizard-weapon-1",
+      "name": "Runeslate Rod",
+      "slot": "weapon",
+      "cost": 150,
+      "power": 0.16,
+      "hp": 0,
+      "tempo": 0.03,
+      "classId": "wizard",
+      "minLevel": 5,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {},
+      "description": "16% power. Tempo +3%. Khusus wizard."
+    },
+    {
+      "id": "wizard-weapon-2",
+      "name": "Prism Branch",
+      "slot": "weapon",
+      "cost": 330,
+      "power": 0.26,
+      "hp": 0,
+      "tempo": 0.05,
+      "classId": "wizard",
+      "minLevel": 10,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {},
+      "description": "26% power. Tempo +5%. Khusus wizard."
+    },
+    {
+      "id": "wizard-weapon-3",
+      "name": "Unwritten Star",
+      "slot": "weapon",
+      "cost": 510,
+      "power": 0.36,
+      "hp": 0,
+      "tempo": 0.07,
+      "classId": "wizard",
+      "minLevel": 20,
+      "rarity": "epic",
+      "source": "forge",
+      "effects": {},
+      "description": "36% power. Tempo +7%. Khusus wizard."
     }
   ],
+  "equipmentSets": [
+    {
+      "id": "scout",
+      "name": "Ashwood Scout",
+      "level": 3,
+      "two": {
+        "tapBonus": 0.08
+      },
+      "three": {
+        "openingBarrier": 0.1
+      },
+      "description": "2 pieces: tap +0,08s. 3: barrier awal 10% HP."
+    },
+    {
+      "id": "wind",
+      "name": "Windwalker",
+      "level": 6,
+      "two": {
+        "tapBonus": 0.1
+      },
+      "three": {
+        "reduction": 0.05
+      },
+      "description": "2 pieces: tap +0,10s. 3: damage masuk −5%."
+    },
+    {
+      "id": "pilgrim",
+      "name": "Dawn Pilgrim",
+      "level": 8,
+      "two": {
+        "heal": 0.12
+      },
+      "three": {
+        "shield": 0.12
+      },
+      "description": "2 pieces: heal yang diberikan +12%. 3: shield +12%."
+    },
+    {
+      "id": "cinder",
+      "name": "Ember Duelist",
+      "level": 10,
+      "two": {
+        "openingBarrier": 0.12
+      },
+      "three": {
+        "tapBonus": 0.15
+      },
+      "description": "2 pieces: barrier awal 12% HP. 3: tap +0,15s."
+    },
+    {
+      "id": "bastion",
+      "name": "Bellmetal Bastion",
+      "level": 12,
+      "two": {
+        "reduction": 0.08
+      },
+      "three": {
+        "shield": 0.15
+      },
+      "description": "2 pieces: damage masuk −8%. 3: shield yang diberikan +15%."
+    },
+    {
+      "id": "unbound",
+      "name": "Unbound Tomorrow",
+      "level": 15,
+      "quest": true,
+      "two": {
+        "heal": 0.12,
+        "shield": 0.12
+      },
+      "three": {
+        "openingBarrier": 0.18,
+        "tapBonus": 0.08
+      },
+      "description": "2 pieces: heal dan shield +12%. 3: barrier awal 18% HP dan tap +0,08s. Hanya reward town story."
+    }
+  ],
+  "quests": [
+    {
+      "id": "hunt-wolf",
+      "name": "Tracks Beside the Cradle",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Jejak abu mencapai rumah-rumah. Rowan meminta bukti bahwa jalan pulang aman.",
+      "kind": "hunt",
+      "chapter": 0,
+      "metric": "enemy",
+      "enemy": "wolf",
+      "target": 1,
+      "gold": 65,
+      "xp": 100,
+      "gear": "iron-edge"
+    },
+    {
+      "id": "hunt-goblin",
+      "name": "The Stolen Rations",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Lumbung tidak kosong karena kelaparan. Ada perintah militer di setiap karung yang dicuri.",
+      "kind": "hunt",
+      "chapter": 0,
+      "metric": "enemy",
+      "enemy": "goblin",
+      "target": 1,
+      "gold": 79,
+      "xp": 125,
+      "gear": "oak-plate"
+    },
+    {
+      "id": "hunt-spider",
+      "name": "Names in the Silk",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Jaring di jembatan menyimpan label nama para pengungsi. Putuskan sarangnya, bukan daftar mereka.",
+      "kind": "hunt",
+      "chapter": 1,
+      "metric": "enemy",
+      "enemy": "spider",
+      "target": 1,
+      "gold": 93,
+      "xp": 150,
+      "gear": "ember-charm"
+    },
+    {
+      "id": "hunt-shaman",
+      "name": "A Voice That Is Not Yours",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Seorang anak mendengar suaranya sendiri dari sumur. Lyra mengenali irama ritual di dalamnya.",
+      "kind": "hunt",
+      "chapter": 1,
+      "metric": "enemy",
+      "enemy": "shaman",
+      "target": 1,
+      "gold": 107,
+      "xp": 175
+    },
+    {
+      "id": "hunt-golem",
+      "name": "The Bridge Remembers",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Orin menemukan bahwa penjaga batu masih memungut tol dari orang yang sudah mati.",
+      "kind": "hunt",
+      "chapter": 2,
+      "metric": "enemy",
+      "enemy": "golem",
+      "target": 1,
+      "gold": 121,
+      "xp": 200
+    },
+    {
+      "id": "hunt-wraith",
+      "name": "An Unfinished Funeral",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Tidak ada nama yang boleh dihapus hanya karena lonceng tak mau mengingatnya.",
+      "kind": "hunt",
+      "chapter": 2,
+      "metric": "enemy",
+      "enemy": "wraith",
+      "target": 1,
+      "gold": 135,
+      "xp": 225
+    },
+    {
+      "id": "hunt-treant",
+      "name": "Roots Under the School",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Akar membawa halaman pelajaran ke bawah tanah. Sable mencari halaman yang mengajarkan hari esok.",
+      "kind": "hunt",
+      "chapter": 3,
+      "metric": "enemy",
+      "enemy": "treant",
+      "target": 1,
+      "gold": 149,
+      "xp": 250
+    },
+    {
+      "id": "hunt-dragon",
+      "name": "An Oath Freely Given",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Temui penjaga gerbang lagi, kali ini tanpa memaksanya menerima sumpah kota.",
+      "kind": "hunt",
+      "chapter": 3,
+      "metric": "enemy",
+      "enemy": "dragon",
+      "target": 1,
+      "gold": 163,
+      "xp": 275
+    },
+    {
+      "id": "hunt-moth",
+      "name": "Lanterns Without Flames",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Cahaya jalan menghilang satu per satu. Pemburu baru mengikuti panas yang tersisa.",
+      "kind": "hunt",
+      "chapter": 1,
+      "metric": "enemy",
+      "enemy": "moth",
+      "target": 1,
+      "gold": 177,
+      "xp": 300
+    },
+    {
+      "id": "hunt-basilisk",
+      "name": "The Stone Orchard",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Petani masih memanggil nama pohon-pohonnya. Di kebun, sesuatu menjawab dengan tatapan.",
+      "kind": "hunt",
+      "chapter": 3,
+      "metric": "enemy",
+      "enemy": "basilisk",
+      "target": 1,
+      "gold": 191,
+      "xp": 325
+    },
+    {
+      "id": "hunt-crab",
+      "name": "The River Toll",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Dermaga ditutup oleh cangkang besi. Tanpa jalur air, obat tidak akan tiba.",
+      "kind": "hunt",
+      "chapter": 2,
+      "metric": "enemy",
+      "enemy": "crab",
+      "target": 1,
+      "gold": 205,
+      "xp": 350
+    },
+    {
+      "id": "hunt-revenant",
+      "name": "The Last Watch Never Ends",
+      "giver": "SCOUTS OF EMBERHOLLOW",
+      "story": "Penjaga yang gugur kembali meminta pergantian giliran. Beri ia akhir yang tidak diberikan kota.",
+      "kind": "hunt",
+      "chapter": 5,
+      "metric": "enemy",
+      "enemy": "revenant",
+      "target": 1,
+      "gold": 219,
+      "xp": 375
+    },
+    {
+      "id": "first-road",
+      "name": "One Road Open",
+      "story": "Jangan janjikan seluruh hutan. Buka satu jalan dulu, agar utusan benar-benar bisa pulang.",
+      "giver": "MAREN · TOWN STEWARD",
+      "kind": "town",
+      "chapter": 0,
+      "metric": "chapters",
+      "target": 1,
+      "gold": 90,
+      "xp": 180
+    },
+    {
+      "id": "a-shared-craft",
+      "name": "Tools, Not Trophies",
+      "story": "Pandai besi meminta satu rekan memakai perlengkapan buatannya. Besi harus bekerja, bukan dipajang.",
+      "giver": "MAREN · TOWN STEWARD",
+      "kind": "town",
+      "chapter": 1,
+      "requires": "first-road",
+      "metric": "gear",
+      "target": 2,
+      "gold": 160,
+      "xp": 300
+    },
+    {
+      "id": "a-lesson-kept",
+      "name": "Teach Someone Tomorrow",
+      "story": "Bawa pulang keahlian yang bisa diajarkan. Pelajari empat talent pada satu hero.",
+      "giver": "MAREN · TOWN STEWARD",
+      "kind": "town",
+      "chapter": 1,
+      "requires": "a-shared-craft",
+      "metric": "talents",
+      "target": 4,
+      "gold": 230,
+      "xp": 420
+    },
+    {
+      "id": "letters-unburned",
+      "name": "Letters Never Burned",
+      "story": "Empat segel pulih. Peti surat yang dulu disegel akhirnya boleh dibuka.",
+      "giver": "MAREN · TOWN STEWARD",
+      "kind": "town",
+      "chapter": 3,
+      "requires": "a-lesson-kept",
+      "metric": "chapters",
+      "target": 4,
+      "gold": 300,
+      "xp": 540,
+      "gear": "unbound-weapon"
+    },
+    {
+      "id": "river-of-names",
+      "name": "A River of Names",
+      "story": "Delapan perjalanan memberi cukup nama untuk menulis sejarah yang berbeda.",
+      "giver": "MAREN · TOWN STEWARD",
+      "kind": "town",
+      "chapter": 7,
+      "requires": "letters-unburned",
+      "metric": "chapters",
+      "target": 8,
+      "gold": 370,
+      "xp": 660,
+      "gear": "unbound-armor"
+    },
+    {
+      "id": "a-door-unlocked",
+      "name": "Leave the Door Unlocked",
+      "story": "Selesaikan kisah lonceng. Bangun pintu yang boleh dilewati, bukan segel baru.",
+      "giver": "MAREN · TOWN STEWARD",
+      "kind": "town",
+      "chapter": 15,
+      "requires": "river-of-names",
+      "metric": "chapters",
+      "target": 16,
+      "gold": 440,
+      "xp": 780,
+      "gear": "unbound-charm"
+    },
+    {
+      "id": "companion-0",
+      "name": "A Shield Set Down",
+      "giver": "ALDRIC",
+      "story": "Aldric ingin cukup kuat untuk meletakkan perisainya tanpa meninggalkan siapa pun.",
+      "kind": "companion",
+      "chapter": 0,
+      "heroId": 0,
+      "metric": "level",
+      "target": 8,
+      "gold": 180,
+      "xp": 300
+    },
+    {
+      "id": "companion-1",
+      "name": "A Wall with Windows",
+      "giver": "BRAN",
+      "story": "Bran belajar bahwa benteng juga harus memberi orang jalan melihat ke luar.",
+      "kind": "companion",
+      "chapter": 0,
+      "heroId": 1,
+      "metric": "level",
+      "target": 8,
+      "gold": 200,
+      "xp": 340
+    },
+    {
+      "id": "companion-2",
+      "name": "The Name She Chose",
+      "giver": "SABLE",
+      "story": "Sable menyimpan nama untuk masa setelah perang. Bantu ia hidup cukup lama untuk memakainya.",
+      "kind": "companion",
+      "chapter": 0,
+      "heroId": 2,
+      "metric": "level",
+      "target": 8,
+      "gold": 220,
+      "xp": 380
+    },
+    {
+      "id": "companion-3",
+      "name": "The Arrow Home",
+      "giver": "ROWAN",
+      "story": "Rowan membuat anak panah yang tidak harus ditembakkan: penunjuk jalan pulang.",
+      "kind": "companion",
+      "chapter": 0,
+      "heroId": 3,
+      "metric": "level",
+      "target": 12,
+      "gold": 240,
+      "xp": 420
+    },
+    {
+      "id": "companion-4",
+      "name": "A Song for the Living",
+      "giver": "LYRA",
+      "story": "Lyra menulis lagu tanpa nama orang mati di bait terakhirnya.",
+      "kind": "companion",
+      "chapter": 0,
+      "heroId": 4,
+      "metric": "level",
+      "target": 12,
+      "gold": 260,
+      "xp": 460
+    },
+    {
+      "id": "companion-5",
+      "name": "The Weight of Speed",
+      "giver": "KESTREL",
+      "story": "Kestrel selalu datang lebih dulu. Kali ini ia belajar menunggu rekan-rekannya.",
+      "kind": "companion",
+      "chapter": 0,
+      "heroId": 5,
+      "metric": "level",
+      "target": 12,
+      "gold": 280,
+      "xp": 500
+    },
+    {
+      "id": "companion-6",
+      "name": "No Debt to the Night",
+      "giver": "NYX",
+      "story": "Nyx berhenti menghitung hidup sebagai utang yang harus dilunasi.",
+      "kind": "companion",
+      "chapter": 0,
+      "heroId": 6,
+      "metric": "level",
+      "target": 16,
+      "gold": 300,
+      "xp": 540
+    },
+    {
+      "id": "companion-7",
+      "name": "A Question Unanswered",
+      "giver": "ORIN",
+      "story": "Orin berlatih meninggalkan satu pertanyaan terbuka, agar masih ada alasan untuk bangun besok.",
+      "kind": "companion",
+      "chapter": 0,
+      "heroId": 7,
+      "metric": "level",
+      "target": 16,
+      "gold": 320,
+      "xp": 580
+    },
+    {
+      "id": "companion-8",
+      "name": "Fire Without a Cage",
+      "giver": "MIRA",
+      "story": "Mira belajar memegang api tanpa mengurung siapa pun di dalam cahayanya.",
+      "kind": "companion",
+      "chapter": 0,
+      "heroId": 8,
+      "metric": "level",
+      "target": 16,
+      "gold": 340,
+      "xp": 620
+    },
+    {
+      "id": "descent-3",
+      "name": "Below the First Bell",
+      "giver": "THE KEEPER BELOW",
+      "story": "Tiga lantai cukup untuk membuktikan bahwa tangga ini tidak hanya turun di dalam mimpi.",
+      "kind": "descent",
+      "chapter": 0,
+      "metric": "floor",
+      "target": 3,
+      "gold": 200,
+      "xp": 400
+    },
+    {
+      "id": "descent-7",
+      "name": "The Seventh Echo",
+      "giver": "THE KEEPER BELOW",
+      "story": "Gema ketujuh membawa suara yang bukan milik penjaga lama.",
+      "kind": "descent",
+      "chapter": 3,
+      "requires": "descent-3",
+      "metric": "floor",
+      "target": 7,
+      "gold": 420,
+      "xp": 750
+    },
+    {
+      "id": "descent-12",
+      "name": "An Exit, Not a Throne",
+      "giver": "THE KEEPER BELOW",
+      "story": "Bawa kabar dari lantai kedua belas. Jangan jadikan kedalaman sebagai rumah baru.",
+      "kind": "descent",
+      "chapter": 6,
+      "requires": "descent-7",
+      "metric": "floor",
+      "target": 12,
+      "gold": 640,
+      "xp": 1100
+    }
+  ],
+  "progression": {
+    "maxLevel": 40,
+    "xpThresholds": [
+      0,
+      120,
+      282,
+      490,
+      748,
+      1060,
+      1430,
+      1862,
+      2360,
+      2928,
+      3570,
+      4290,
+      5092,
+      5980,
+      6958,
+      8030,
+      9200,
+      10472,
+      11850,
+      13338,
+      14940,
+      16660,
+      18502,
+      20470,
+      22568,
+      24800,
+      27170,
+      29682,
+      32340,
+      35148,
+      38110,
+      41230,
+      44512,
+      47960,
+      51578,
+      55370,
+      59340,
+      63492,
+      67830,
+      72358
+    ],
+    "skillPointsPerLevel": 1
+  },
   "monsters": {
     "wolf": {
       "id": "wolf",
@@ -1162,6 +2684,76 @@
       "damage": 112,
       "interval": 8.2,
       "archetype": "dragon",
+      "tier": 1
+    },
+    "moth": {
+      "id": "moth",
+      "name": "Lantern Eater",
+      "title": "CINDERWING MOTH",
+      "description": "Ngengat yang memburu cahaya skill terkuat, lalu menghamburkan debu ke tile ramai dan satu lane.",
+      "counter": "Mark mengikuti hero terkuat; lindungi dia, kemudian pindah dari tanda meteor dan lane breath.",
+      "patterns": [
+        "strongest",
+        "meteor",
+        "breath"
+      ],
+      "hp": 0.95,
+      "damage": 78,
+      "interval": 8.3,
+      "archetype": "moth",
+      "tier": 1
+    },
+    "basilisk": {
+      "id": "basilisk",
+      "name": "Glassjaw",
+      "title": "MIRROR BASILISK",
+      "description": "Reptil cermin menyerang hero terlemah, menyembur satu lane, lalu mengunci target terkuat.",
+      "counter": "Tidak ada petrify tersembunyi. Baca lane breath, heal target lemah, dan Guard mark yang mengikuti hero.",
+      "patterns": [
+        "weakest",
+        "breath",
+        "strongest",
+        "meteor"
+      ],
+      "hp": 1.1,
+      "damage": 96,
+      "interval": 8.6,
+      "archetype": "basilisk",
+      "tier": 1
+    },
+    "crab": {
+      "id": "crab",
+      "name": "Bellshore Claw",
+      "title": "RELIC CRAB",
+      "description": "Kepiting pengangkut lonceng menyapu row depan dan menjatuhkan puing ke tile ramai sebelum meruntuhkan grid.",
+      "counter": "HP tinggi tetapi interval panjang. Reposisi dari front dan meteor; interrupt atau Guard runtuhan all-grid.",
+      "patterns": [
+        "front",
+        "meteor",
+        "all"
+      ],
+      "hp": 1.3,
+      "damage": 105,
+      "interval": 10,
+      "archetype": "crab",
+      "tier": 1
+    },
+    "revenant": {
+      "id": "revenant",
+      "name": "The Last Watch",
+      "title": "HOLLOW REVENANT",
+      "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid.",
+      "counter": "Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka.",
+      "patterns": [
+        "strongest",
+        "front",
+        "all",
+        "weakest"
+      ],
+      "hp": 1.16,
+      "damage": 108,
+      "interval": 8.8,
+      "archetype": "revenant",
       "tier": 1
     },
     "wolf-ash": {
@@ -1599,6 +3191,228 @@
       "damage": 129,
       "interval": 7.6,
       "archetype": "dragon",
+      "tier": 4,
+      "tint": 16766874
+    },
+    "moth-ash": {
+      "id": "moth-ash",
+      "name": "Ashbound Lantern Eater",
+      "title": "ASHBOUND · CINDERWING MOTH",
+      "description": "Ngengat yang memburu cahaya skill terkuat, lalu menghamburkan debu ke tile ramai dan satu lane. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Mark mengikuti hero terkuat; lindungi dia, kemudian pindah dari tanda meteor dan lane breath.",
+      "patterns": [
+        "strongest",
+        "meteor",
+        "breath"
+      ],
+      "hp": 1.064,
+      "damage": 82,
+      "interval": 8.3,
+      "archetype": "moth",
+      "tier": 2,
+      "tint": 15840154
+    },
+    "moth-frost": {
+      "id": "moth-frost",
+      "name": "Frostbound Lantern Eater",
+      "title": "FROSTBOUND · CINDERWING MOTH",
+      "description": "Ngengat yang memburu cahaya skill terkuat, lalu menghamburkan debu ke tile ramai dan satu lane. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Mark mengikuti hero terkuat; lindungi dia, kemudian pindah dari tanda meteor dan lane breath.",
+      "patterns": [
+        "meteor",
+        "breath",
+        "strongest"
+      ],
+      "hp": 1.159,
+      "damage": 86,
+      "interval": 8,
+      "archetype": "moth",
+      "tier": 3,
+      "tint": 10934015
+    },
+    "moth-auric": {
+      "id": "moth-auric",
+      "name": "Gilded Lantern Eater",
+      "title": "GILDED · CINDERWING MOTH",
+      "description": "Ngengat yang memburu cahaya skill terkuat, lalu menghamburkan debu ke tile ramai dan satu lane. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Mark mengikuti hero terkuat; lindungi dia, kemudian pindah dari tanda meteor dan lane breath.",
+      "patterns": [
+        "breath",
+        "strongest",
+        "meteor"
+      ],
+      "hp": 1.254,
+      "damage": 90,
+      "interval": 7.700000000000001,
+      "archetype": "moth",
+      "tier": 4,
+      "tint": 16766874
+    },
+    "basilisk-ash": {
+      "id": "basilisk-ash",
+      "name": "Ashbound Glassjaw",
+      "title": "ASHBOUND · MIRROR BASILISK",
+      "description": "Reptil cermin menyerang hero terlemah, menyembur satu lane, lalu mengunci target terkuat. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Tidak ada petrify tersembunyi. Baca lane breath, heal target lemah, dan Guard mark yang mengikuti hero.",
+      "patterns": [
+        "weakest",
+        "breath",
+        "strongest",
+        "meteor"
+      ],
+      "hp": 1.2320000000000002,
+      "damage": 101,
+      "interval": 8.6,
+      "archetype": "basilisk",
+      "tier": 2,
+      "tint": 15840154
+    },
+    "basilisk-frost": {
+      "id": "basilisk-frost",
+      "name": "Frostbound Glassjaw",
+      "title": "FROSTBOUND · MIRROR BASILISK",
+      "description": "Reptil cermin menyerang hero terlemah, menyembur satu lane, lalu mengunci target terkuat. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Tidak ada petrify tersembunyi. Baca lane breath, heal target lemah, dan Guard mark yang mengikuti hero.",
+      "patterns": [
+        "breath",
+        "strongest",
+        "meteor",
+        "weakest"
+      ],
+      "hp": 1.342,
+      "damage": 106,
+      "interval": 8.299999999999999,
+      "archetype": "basilisk",
+      "tier": 3,
+      "tint": 10934015
+    },
+    "basilisk-auric": {
+      "id": "basilisk-auric",
+      "name": "Gilded Glassjaw",
+      "title": "GILDED · MIRROR BASILISK",
+      "description": "Reptil cermin menyerang hero terlemah, menyembur satu lane, lalu mengunci target terkuat. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Tidak ada petrify tersembunyi. Baca lane breath, heal target lemah, dan Guard mark yang mengikuti hero.",
+      "patterns": [
+        "strongest",
+        "meteor",
+        "weakest",
+        "breath"
+      ],
+      "hp": 1.4520000000000002,
+      "damage": 110,
+      "interval": 8,
+      "archetype": "basilisk",
+      "tier": 4,
+      "tint": 16766874
+    },
+    "crab-ash": {
+      "id": "crab-ash",
+      "name": "Ashbound Bellshore Claw",
+      "title": "ASHBOUND · RELIC CRAB",
+      "description": "Kepiting pengangkut lonceng menyapu row depan dan menjatuhkan puing ke tile ramai sebelum meruntuhkan grid. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "HP tinggi tetapi interval panjang. Reposisi dari front dan meteor; interrupt atau Guard runtuhan all-grid.",
+      "patterns": [
+        "front",
+        "meteor",
+        "all"
+      ],
+      "hp": 1.4560000000000002,
+      "damage": 110,
+      "interval": 10,
+      "archetype": "crab",
+      "tier": 2,
+      "tint": 15840154
+    },
+    "crab-frost": {
+      "id": "crab-frost",
+      "name": "Frostbound Bellshore Claw",
+      "title": "FROSTBOUND · RELIC CRAB",
+      "description": "Kepiting pengangkut lonceng menyapu row depan dan menjatuhkan puing ke tile ramai sebelum meruntuhkan grid. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "HP tinggi tetapi interval panjang. Reposisi dari front dan meteor; interrupt atau Guard runtuhan all-grid.",
+      "patterns": [
+        "meteor",
+        "all",
+        "front"
+      ],
+      "hp": 1.586,
+      "damage": 116,
+      "interval": 9.7,
+      "archetype": "crab",
+      "tier": 3,
+      "tint": 10934015
+    },
+    "crab-auric": {
+      "id": "crab-auric",
+      "name": "Gilded Bellshore Claw",
+      "title": "GILDED · RELIC CRAB",
+      "description": "Kepiting pengangkut lonceng menyapu row depan dan menjatuhkan puing ke tile ramai sebelum meruntuhkan grid. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "HP tinggi tetapi interval panjang. Reposisi dari front dan meteor; interrupt atau Guard runtuhan all-grid.",
+      "patterns": [
+        "all",
+        "front",
+        "meteor"
+      ],
+      "hp": 1.7160000000000002,
+      "damage": 121,
+      "interval": 9.4,
+      "archetype": "crab",
+      "tier": 4,
+      "tint": 16766874
+    },
+    "revenant-ash": {
+      "id": "revenant-ash",
+      "name": "Ashbound The Last Watch",
+      "title": "ASHBOUND · HOLLOW REVENANT",
+      "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka.",
+      "patterns": [
+        "strongest",
+        "front",
+        "all",
+        "weakest"
+      ],
+      "hp": 1.2992000000000001,
+      "damage": 113,
+      "interval": 8.8,
+      "archetype": "revenant",
+      "tier": 2,
+      "tint": 15840154
+    },
+    "revenant-frost": {
+      "id": "revenant-frost",
+      "name": "Frostbound The Last Watch",
+      "title": "FROSTBOUND · HOLLOW REVENANT",
+      "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka.",
+      "patterns": [
+        "front",
+        "all",
+        "weakest",
+        "strongest"
+      ],
+      "hp": 1.4151999999999998,
+      "damage": 119,
+      "interval": 8.5,
+      "archetype": "revenant",
+      "tier": 3,
+      "tint": 10934015
+    },
+    "revenant-auric": {
+      "id": "revenant-auric",
+      "name": "Gilded The Last Watch",
+      "title": "GILDED · HOLLOW REVENANT",
+      "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka.",
+      "patterns": [
+        "all",
+        "weakest",
+        "strongest",
+        "front"
+      ],
+      "hp": 1.5312,
+      "damage": 124,
+      "interval": 8.200000000000001,
+      "archetype": "revenant",
       "tier": 4,
       "tint": 16766874
     }

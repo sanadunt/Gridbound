@@ -1,0 +1,17 @@
+sequenceDiagram
+  participant Player
+  participant Combat
+  participant Renderer
+  participant UI
+  participant Gate
+  Combat->>Renderer: Victory state
+  Renderer->>Renderer: Death collapse or reduced-motion fade
+  Renderer-->>UI: Death readiness complete
+  UI->>Gate: Open new presentation generation
+  UI-->>Player: Show options disabled
+  Player->>UI: Early click or key
+  UI->>Gate: Check time and generation
+  Gate-->>UI: Reject before 1000ms
+  UI->>Gate: Check current generation after delay
+  Gate-->>UI: Allow current presentation
+  UI-->>Player: Enable choices

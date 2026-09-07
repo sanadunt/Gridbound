@@ -2,6 +2,14 @@
 
 An offline-first, pixel-art tactical RPG for the browser. Three Bellkeepers leave Emberhollow to restore a broken sanctuary—and discover what its protection costs.
 
+## Full production planning
+
+[Production Masterplan](docs/PRODUCTION-MASTERPLAN.md): milestone M0–M7, proposed feature roadmap, editable diagrams, QA/device acceptance, release/rollback operations and evidence templates. This is a documentation-only plan, not production certification or approval to deploy.
+
+## Release status and next production
+
+The local v0.4 candidate is **not deployed or production-approved**. See [docs/NEXT-PRODUCTION.md](docs/NEXT-PRODUCTION.md) for the implemented/tested/pending matrix, release blockers, acceptance criteria, verification commands and Hostinger rollback plan. Latest GUI evidence: [docs/GUI-VERIFIED.md](docs/GUI-VERIFIED.md). Earlier PLAYTEST entries describe prior checkpoints, not automatic acceptance of the current working tree.
+
 ## Play
 
 Node.js **22.12+** is required only for development/building.
@@ -28,13 +36,15 @@ Use the local URL Vite prints. A new save opens in town with **Aldric (Warrior),
 - Nine named heroes, recruited through the opening act.
 - Five basic jobs, **two advanced branches per job**, and a linked **third job for each branch**: ten advanced and ten third jobs.
 - Forty active skill definitions; **two equipped at a time**. Promotion unlocks signature skills but does not automatically equip them.
-- Fifteen talent nodes per hero: thirteen passive nodes and two basic active-skill unlocks. Job advancement adds the signature unlocks separately.
-- Three equipment slots (weapon, armor, charm), nine deterministic items, ownership and free swapping of purchased items.
-- Eight original monster silhouettes, each with ash/frost/auric variants: **32 monster records** with readable intent patterns.
-- Four raid contracts and an escalating roguelike with **12 mechanical boons**, nonduplicating drafts and continued floors after all boons are collected.
+- **Hero levels 1–40**, individual XP bars and level-up results; recruits catch up to the roster median.
+- **50 talent definitions / 34 applicable nodes per hero**: foundational unlocks, Assault/Bastion/Tempo branches, class disciplines, dual-prerequisite nodes and mutually exclusive keystones. New nodes spend level-earned skill points and gold.
+- Three equipment slots, **42 equipment items**, class/level gates, ownership, six sets with two/three-piece combat bonuses and quest-only relics.
+- **12 original monster silhouettes / 48 records** including ash/frost/auric variants; new moth, basilisk, crab and revenant opponents have authored intent sequences and counterplay.
+- **30 quests**: twelve hunts, six linked town requests, nine companion milestones and three endless milestones. Track objectives and manually claim gold, selected-hero XP and item rewards.
+- Twelve raid targets with variant selection, plus an escalating roguelike with **12 mechanical boons**, nonduplicating drafts and continued floors after all boons are collected.
 - Local procedural sprites, fonts and synthesized sound; no runtime backend, remote CDN or account required.
 
-Advanced promotion requires party level 4; third jobs require level 10 and their parent branch. Level rises on a chapter's first clear. Respec refunds talent and job costs; equipment remains owned. Loot is banked only at the end of an expedition. Replays give gold but never duplicate recruitment or levels.
+Advanced promotion requires **campaign rank 4**; third jobs require rank 10 and their parent branch. Campaign rank rises on first clears; **individual hero levels rise through earned XP**. Respec refunds talent/job gold and skill points without resetting XP or equipment. Combat XP and hunt progress settle once on successful expedition/floor completion; downed participants receive 60% XP. Successful replays award XP/gold but never duplicate recruitment or first-clear bonuses.
 
 ## Verify
 
@@ -77,7 +87,8 @@ The private repository does not itself create a public game URL. Deployment is a
 | `src/game/simulation.ts` | Seeded combat, targeting, threat resolution, job/gear/boon effects |
 | `src/game/content.ts`, `jobs.ts`, `characters.ts` | Skills, progression classes, gear, hero biographies |
 | `src/game/world.ts`, `story.ts` | Encounters, monster variants, boons, campaign narrative |
-| `src/game/profile.ts` | Validated saves, purchases, prerequisites, recruitment and respec |
+| `src/game/profile.ts`, `save.ts` | Validated saves/migration, purchases, reward settlement, recruitment and respec |
+| `src/game/levels.ts`, `talents.ts`, `quests.ts` | XP curve, skill trees, quest definitions/objectives |
 | `src/ui/town.ts`, `src/main.ts` | Town/training/forge, journal, combat controls and dialogs |
 | `src/art/`, `src/render/`, `src/audio/` | Procedural visuals, Phaser renderer and Web Audio |
 | `data/database.json` | Regeneratable content database, including actual scaled encounter HP |
@@ -86,6 +97,6 @@ The private repository does not itself create a public game URL. Deployment is a
 
 ## Save and release boundaries
 
-Progress uses browser `localStorage` under the existing v2 namespace. New job/gear fields migrate safely. The older prototype save is left intact; only compatible currency/settings are migrated from it. Save data is per-browser **and per-origin**: moving to another domain does not automatically move progress. In-progress fights are not saved; finish the current chapter before reloading.
+Progress uses browser `localStorage` under **`gridbound.v3`**. Existing v2 saves migrate automatically; the original v2 value is left untouched. Migrated heroes receive a campaign-rank-based starting level. Corrupt or future-version saves disable writes instead of overwriting their source. Settings can download a JSON backup. The older prototype migrates only compatible currency/settings. Save data is per-browser **and per-origin**: moving to another domain does not automatically move progress. In-progress fights are not saved; finish the current chapter before reloading.
 
 This is a complete playable campaign slice, not a claim of production certification. Physical iOS/Android, Safari/Firefox, low-end performance and human difficulty/usability testing remain unverified. There is no cloud sync, controller support, voice acting or multiplayer. Phaser still emits a large-engine-chunk warning; application and engine chunks are split for caching.

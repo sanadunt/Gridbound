@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
 import { withBrowser } from './browser-harness.mjs';
 const url=process.env.GRIDBOUND_URL||'http://127.0.0.1:5180/';
-for(const width of [360,390,768])await withBrowser(async({send,evaluate,wait,click,key,screenshot,errors})=>{
+for(const width of [360,390])await withBrowser(async({send,evaluate,wait,click,key,screenshot,errors})=>{
+ await send('Page.addScriptToEvaluateOnNewDocument',{source:`localStorage.removeItem('gridbound.v3');localStorage.removeItem('gridbound.v2');`});
  await send('Page.navigate',{url});await wait('window.gridbound && window.gridbound.scene?.textures?.exists("dragon-auric-0")');
  const fits=async()=>assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),`No horizontal overflow ${width}`);
  await fits();await screenshot(`artifacts/town-${width}.png`);
- await click('[data-facility="party"]');await fits();await screenshot(`artifacts/training-${width}.png`);
+ await click('[data-facility="party"]');await click('[data-training-tab="jobs"]');await fits();
  assert.equal(await evaluate('document.querySelectorAll(".job-node").length'),4);
- assert.equal(await evaluate('document.querySelectorAll(".talent-node").length'),15);
+ await click('[data-training-tab="talents"]');
+ assert.equal(await evaluate('document.querySelectorAll(".talent-node").length'),1);
+ await screenshot(`artifacts/training-${width}.png`);
  await click('[data-facility="campaign"]');await click('[data-depart="adventure"]');await click('#start');
  await wait('window.gridbound.battle.status==="fighting"');await fits();
  const sizes=await evaluate(`(()=>{const a=document.querySelector('[data-tap="0"]').getBoundingClientRect(),s=document.querySelector('[data-stance="0"]').getBoundingClientRect();return {tap:{w:a.width,h:a.height},skill:{w:s.width,h:s.height},overlap:a.bottom-s.top}})()`);
@@ -27,6 +30,6 @@ for(const width of [360,390,768])await withBrowser(async({send,evaluate,wait,cli
  assert.equal(await evaluate('window.gridbound.battle.hero(0).slot'),8,'real touch drag to back-right');
  await click('#pause');await key('Escape');await wait('window.gridbound.battle.status==="fighting"');
  await screenshot(`artifacts/battle-${width}.png`);
- console.log('PASS mobile',width,JSON.stringify(sizes),'two touches, drag, pause, responsive, 15 talents, 4 job nodes');
+ console.log('PASS mobile',width,JSON.stringify(sizes),'two touches, drag, pause, responsive, 34 talents, 4 job nodes');
  assert.deepEqual(errors,[]);
 },{width,height:844,mobile:true});

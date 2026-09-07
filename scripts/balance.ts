@@ -1,6 +1,8 @@
 import { Battle } from '../src/game/simulation';
-import { CAMPAIGN } from '../src/game/world';
-import { createProfile,completeZone,profileModifiers,buyTalent,equipGear,promote,equipSkill } from '../src/game/profile';
+import { CAMPAIGN,ENEMIES } from '../src/game/world';
+import { createProfile,completeZone,profileModifiers,settleProgress,claimQuest,buyTalent,equipGear,promote,equipSkill } from '../src/game/profile';
+import { QUESTS } from '../src/game/quests';
+import { heroProgress } from '../src/game/levels';
 import { JOBS } from '../src/game/jobs';
 import { ROSTER } from '../src/game/content';
 import { mkdirSync,writeFileSync } from 'node:fs';
@@ -30,11 +32,12 @@ for(let zone=0;zone<CAMPAIGN.length;zone++){
  for(let stage=0;stage<b.stageCount;stage++){
   const result=play(b);rows.push({chapter:zone+1,stage:stage+1,...result});if(result.status!=='victory'){victory=false;break;}if(stage+1<b.stageCount)b.nextWave();
  }
- if(!victory)break;p.gold+=b.gold+CAMPAIGN[zone].reward;completeZone(p,zone);
+ if(!victory)break;p.gold+=b.gold+CAMPAIGN[zone].reward;completeZone(p,zone);settleProgress(p,b);for(const q of QUESTS)claimQuest(p,q.id,p.roster[zone%p.roster.length]);
 }
+const expandedRaids=Object.keys(ENEMIES).map(enemyId=>({enemyId,...play(new Battle('raid',p.cleared.length+1,profileModifiers(p),{roster:p.roster,loadouts:p.loadouts,raid:enemyId}))}));
 const raidOptions={roster:[0,4,3]};
 const idle=play(new Battle('raid',1,undefined,raidOptions),false),active=play(new Battle('raid',1,undefined,raidOptions));
-const result={cleared:p.cleared.length,chapters:CAMPAIGN.length,stageResults:rows,raid:{idle,active},earnedBuild:p.loadouts,remainingGold:p.gold};
+const result={cleared:p.cleared.length,chapters:CAMPAIGN.length,stageResults:rows,raid:{idle,active},earnedBuild:p.loadouts,remainingGold:p.gold,expandedRaids,heroLevels:p.roster.map(id=>({id,...heroProgress(p.loadouts[id].xp)})),claimedQuests:p.claimedQuests};
 mkdirSync('artifacts',{recursive:true});writeFileSync('artifacts/balance.json',JSON.stringify(result,null,2));
-console.log(JSON.stringify({cleared:result.cleared,chapters:result.chapters,stages:rows.length,last:rows.at(-1),raid:result.raid,gold:p.gold}));
-if(p.cleared.length!==CAMPAIGN.length)process.exitCode=1;
+console.log(JSON.stringify({cleared:result.cleared,chapters:result.chapters,stages:rows.length,last:rows.at(-1),raid:result.raid,expandedRaidWins:expandedRaids.filter(r=>r.status==='victory').length,gold:p.gold}));
+if(p.cleared.length!==CAMPAIGN.length||expandedRaids.some(r=>r.status!=='victory'))process.exitCode=1;

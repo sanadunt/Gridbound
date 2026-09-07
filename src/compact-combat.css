@@ -1,0 +1,304 @@
+/* Combat-only density pass. Import after the other stylesheets so these rules stay scoped to the battle screen. */
+#battle-screen.game-layout {
+  min-width: 0;
+  min-height: 0;
+  align-items: start;
+}
+
+#battle-screen .arena-column,
+#battle-screen .right-sidebar,
+#battle-screen #inspector {
+  min-width: 0;
+  min-height: 0;
+}
+
+#battle-screen .arena-column {
+  align-self: start;
+}
+
+#battle-screen .arena {
+  max-width: 100%;
+}
+
+/* Keep the lower combat controls close to the board without reducing hit areas. */
+#battle-screen .tap-instruction {
+  margin: 5px 0;
+  line-height: 1.4;
+}
+
+#battle-screen .intent-panel {
+  min-height: 60px;
+  margin-top: 8px;
+  padding: 9px 12px;
+}
+
+#battle-screen .action-bar {
+  position: relative;
+  inset: auto;
+  margin-top: 10px;
+}
+
+#battle-screen .arena-footnote {
+  margin-top: 8px;
+}
+
+/* Lane targets remain thumb-sized, but move above the unit hit regions. */
+#battle-screen .lane-targets {
+  /* The original 44.1% anchor plus a 44px control box reached into hero
+     hit regions. Lift it just enough to leave a visible breathing gap. */
+  top: calc(44.1% - 26px);
+  height: 44px;
+}
+
+#battle-screen .lane-targets button {
+  min-height: 44px;
+  height: 44px;
+}
+
+/* The inspector is content-bearing: it may scroll only in a genuinely short phone viewport. */
+#battle-screen #inspector {
+  scrollbar-width: thin;
+  scrollbar-color: #6f805d #14271f;
+}
+
+@media (min-width: 1001px) {
+  #battle-screen .right-sidebar > .section-label {
+    margin-bottom: 14px;
+  }
+
+  #battle-screen .hero-identity {
+    gap: 10px;
+  }
+
+  #battle-screen .hero-stats {
+    padding-block: 13px;
+  }
+
+  #battle-screen .stance-label {
+    margin-block: 15px 9px;
+  }
+
+  #battle-screen .stance-options {
+    gap: 6px;
+  }
+
+  #battle-screen .stance-option {
+    padding: 8px 9px;
+  }
+
+  #battle-screen .skill-description {
+    min-height: 44px;
+    margin-block: 10px;
+    line-height: 1.55;
+  }
+
+  #battle-screen .move-button {
+    margin-top: 10px;
+  }
+
+  #battle-screen .battle-notes {
+    margin-top: 16px;
+    padding-top: 14px;
+  }
+
+  #battle-screen #combat-log {
+    min-height: 76px;
+    margin-top: 12px;
+  }
+
+  #battle-screen .session-stats {
+    padding-top: 14px;
+  }
+}
+
+/* Short-to-mid desktop screens get a smaller arena track, not a clipped board or hidden sidebar. */
+@media (min-width: 1001px) and (max-height: 1100px) {
+  #battle-screen.game-layout {
+    grid-template-columns:
+      minmax(180px, 1fr)
+      minmax(350px, clamp(350px, calc((100dvh - 275px) * .78947), 590px))
+      minmax(190px, 1fr);
+    gap: 22px;
+    padding-top: 12px;
+    padding-bottom: 16px;
+  }
+
+  #battle-screen .arena-heading {
+    height: 32px;
+    margin-bottom: 7px;
+  }
+
+  #battle-screen .tap-instruction {
+    font-size: 11px;
+    margin-block: 4px;
+  }
+
+  #battle-screen .intent-panel {
+    min-height: 56px;
+    margin-top: 7px;
+    padding-block: 8px;
+  }
+
+  #battle-screen .action-bar {
+    height: 56px;
+    min-height: 56px;
+    margin-top: 8px;
+  }
+
+  #battle-screen .action-bar > button {
+    min-height: 56px;
+    padding-block: 8px;
+  }
+
+  #battle-screen .arena-footnote {
+    margin-top: 6px;
+  }
+
+  #battle-screen .right-sidebar > .section-label {
+    margin-bottom: 10px;
+  }
+
+  #battle-screen .hero-stats {
+    padding-block: 10px;
+  }
+
+  #battle-screen .stance-label {
+    margin-block: 11px 7px;
+  }
+
+  #battle-screen .stance-options {
+    gap: 5px;
+  }
+
+  #battle-screen .stance-option {
+    min-height: 44px;
+    padding-block: 6px;
+  }
+
+  #battle-screen .skill-description {
+    min-height: 38px;
+    margin-block: 8px;
+    line-height: 1.45;
+  }
+
+  #battle-screen .move-button {
+    margin-top: 8px;
+  }
+
+  #battle-screen .battle-notes {
+    margin-top: 12px;
+    padding-top: 11px;
+  }
+
+  #battle-screen #combat-log {
+    min-height: 64px;
+    margin-top: 9px;
+  }
+
+  #battle-screen .session-stats {
+    padding-top: 10px;
+  }
+}
+
+/* The two-column tablet layout also gets a height-aware arena track. */
+@media (min-width: 721px) and (max-width: 1000px) and (max-height: 900px) {
+  #battle-screen.game-layout {
+    grid-template-columns:
+      minmax(350px, min(450px, calc((100dvh - 275px) * .78947)))
+      minmax(200px, 220px);
+    gap: 18px;
+    padding: 16px;
+    justify-content: center;
+  }
+
+  #battle-screen .arena-heading {
+    margin-bottom: 7px;
+  }
+
+  #battle-screen .tap-instruction {
+    margin-block: 4px;
+  }
+
+  #battle-screen .intent-panel {
+    min-height: 60px;
+    margin-top: 7px;
+  }
+
+  #battle-screen .action-bar {
+    margin-top: 8px;
+  }
+
+  #battle-screen .arena-footnote {
+    margin-top: 6px;
+  }
+
+  #battle-screen .right-sidebar > .section-label {
+    margin-bottom: 10px;
+  }
+
+  #battle-screen .battle-notes {
+    margin-top: 14px;
+    padding-top: 12px;
+  }
+
+  #battle-screen #combat-log {
+    min-height: 82px;
+    margin-top: 10px;
+  }
+
+  #battle-screen .session-stats {
+    padding-top: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  #battle-screen.game-layout {
+    gap: 18px;
+    padding-bottom: 24px;
+  }
+
+  #battle-screen .arena-footnote {
+    margin-top: 7px;
+  }
+
+  #battle-screen .action-bar {
+    /* Sticky combat actions can cover the intent panel on short phones. */
+    position: relative;
+    bottom: auto;
+  }
+
+  #battle-screen .intent-panel {
+    min-height: 67px;
+    margin-top: 8px;
+  }
+
+  #battle-screen .lane-targets button {
+    font-size: 6px;
+  }
+
+  #battle-screen .lane-targets button span {
+    font-size: 6px;
+  }
+
+  #battle-screen .right-sidebar > .section-label {
+    margin-bottom: 12px;
+  }
+
+  #battle-screen .battle-notes {
+    margin-top: 16px;
+    padding-top: 13px;
+  }
+
+  #battle-screen #combat-log {
+    margin-top: 10px;
+  }
+}
+
+@media (max-width: 720px) and (max-height: 700px) {
+  #battle-screen #inspector {
+    max-height: 260px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+  }
+}

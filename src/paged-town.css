@@ -1,0 +1,130 @@
+.town-panorama { height:72px!important; min-height:0!important; margin-bottom:10px!important; }
+.town-caption h1 { font-size:18px!important; }
+.town-caption p,.town-rest { display:none; }
+.town-layout { display:block!important; }
+.town-sidebar { padding:8px!important; margin-bottom:8px; }
+.town-sidebar > summary { min-height:44px; cursor:pointer; color:var(--gold); padding:12px; }
+.town-content { padding:12px!important; }
+.facility-tabs { margin-bottom:12px!important; gap:8px!important; flex-wrap:wrap; }
+.facility-tabs button { padding:8px!important; min-height:44px; }
+.section-heading h2 { font-size:22px!important; }
+.section-heading { margin-bottom:8px!important; }
+.town-copy { margin:8px 0!important; font-size:12px!important; line-height:1.5!important; }
+.branch-tabs { display:flex; flex-wrap:wrap; gap:4px; }
+.branch-tabs button { flex:1; padding:8px; min-height:44px; border:1px solid var(--line); }
+.branch-tabs [aria-pressed=true] { color:var(--gold); border-color:var(--gold); }
+.gear-set-status summary, .mission-brief summary { min-height:44px; padding:10px; cursor:pointer; }
+.quest-recipient { margin:8px 0!important; }
+.quest-entry { padding:12px!important; }
+.quest-entry footer { margin-top:8px!important; }
+.quest-actions { flex-direction:row!important; }
+.quest-actions button { width:auto!important; }
+.training-identity { padding-bottom:8px!important; }
+.training-tabs { margin:8px 0!important; }
+.training-identity > img { width:44px!important; height:48px!important; }
+.training-overview-grid { grid-template-columns:1fr!important; }
+.talent-node { min-height:90px!important; }
+.talent-node span { font-size:11px; }
+.gear-slots { gap:6px!important; }
+@media(max-width:720px) { .town-panorama { height:48px!important; } .town-caption { padding:8px!important; } .town-caption .eyebrow { display:none; } .town-content { padding:8px!important; } }
+.talent-map { position:relative; height:240px; margin:10px 0; }
+.talent-map svg { position:absolute; inset:0; width:100%; height:100%; }
+.talent-map-nodes { position:relative; display:grid; grid-template-columns:repeat(3,1fr); grid-auto-rows:44px; gap:4px; }
+.talent-map-nodes button { min-width:0; font-size:10px; padding:3px; background:#172c23; border:1px solid var(--line); }
+.talent-map-nodes .chosen { border-color:var(--gold); }
+#town-screen .town-content { padding:8px!important; }
+#town-screen .town-layout { margin-top:0!important; }
+#town-screen .town-panorama { display:none; }
+#town-screen .town-copy { display:none; }
+#town-screen .mission-brief { margin-top:8px; padding:12px; }
+#town-screen .section-heading { padding:0; }
+#town-screen .training-overview-grid { display:none; }
+#town-screen .character-bio { font-size:12px; margin:8px 0; }
+#town-screen .quest-recipient small { display:none; }
+#town-screen .quest-section { margin:0; }
+#town-screen .training-panel .gear-slots { grid-template-columns:repeat(3,minmax(0,1fr)); }
+#town-screen .gear-slots small { display:none; }
+#town-screen .formation-grid img { height:40px; width:40px; }
+#town-screen .formation-grid button { min-height:70px; padding:4px; }
+#town-screen .formation-grid { max-width:340px; }
+#town-screen .section-heading { min-height:0!important; gap:6px!important; margin:8px 0!important; }
+#town-screen h2 { font-family:var(--body)!important; line-height:1.2!important; margin:5px 0!important; }
+#town-screen .facility-tabs { display:grid!important; grid-template-columns:repeat(4,minmax(0,1fr)); }
+#town-screen .facility-tabs button { font-size:10px!important; }
+#town-screen .formation-grid { grid-template-rows:repeat(3,70px)!important; }
+#town-screen .mission-brief h3 { font-size:19px; }
+#town-screen .departure-actions { margin-top:8px; gap:6px; }
+#town-screen .mission-brief p { font-size:12px; line-height:1.5; }
+@media(max-width:720px) {
+ .site-header { min-height:0!important; padding:8px!important; gap:6px!important; }
+ .site-header .brand small { display:none; }
+ #town-screen .quest-entry { font-size:11px; line-height:1.5; }
+ #town-screen .section-heading { display:flex!important; }
+ #town-screen .section-heading .eyebrow { font-size:9px; }
+ #town-screen .job-node { padding:8px; min-height:0; }
+ #town-screen .job-node span { font-size:11px; line-height:1.4; }
+}
+/* Town pages keep one decision visible at a time; collections use explicit pagination instead of a tall wall. */
+.town-content { min-width: 0; }
+.training-identity { display:flex; align-items:center; gap:18px; border-bottom:1px solid var(--line); padding-bottom:18px; }
+.training-identity > img { width:72px; height:78px; object-fit:contain; image-rendering:pixelated; background:#1c342b; border:1px solid #657553; }
+.training-identity h2 { margin:5px 0; }
+.training-identity p { margin:0; color:var(--muted); }
+.character-bio { max-width:75ch; }
+.training-tabs { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px; border-bottom:1px solid var(--line); margin:18px 0 22px; }
+.training-tabs button { min-height:46px; padding:9px 7px; color:var(--muted); border-bottom:2px solid transparent; font-size:11px; }
+.training-tabs button:hover,.training-tabs button.active { color:var(--gold); border-bottom-color:var(--gold); background:#1b3329; }
+.training-panel { min-width:0; }
+.training-overview-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.training-overview-grid article { border:1px solid var(--line); padding:18px; background:#172c23; }
+.training-overview-grid h3 { margin:10px 0; color:var(--ink); font-size:16px; }
+.training-overview-grid p { color:var(--muted); line-height:1.75; font-size:12px; }
+.loadout-slots { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.loadout-slots label { display:grid; gap:9px; padding:16px; border:1px solid var(--line); background:#172c23; color:var(--gold); font-size:11px; }
+.loadout-slots small { color:var(--muted); line-height:1.65; }
+.page-controls { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:18px 0 0; padding-top:14px; border-top:1px solid var(--line); color:var(--gold); font-size:11px; }
+.page-controls button { min-height:44px; padding:9px 13px; }
+.paged-collection { min-width:0; }
+.talent-tree { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; align-items:start; }
+.talent-node-wrap { min-width:0; display:grid; gap:6px; }
+.talent-arrow { min-height:28px; padding:5px 7px; color:#d8c58e; border-left:2px solid #9b8a5f; background:#172b24; font-size:10px; line-height:1.3; }
+.talent-arrow span { display:inline-block; margin-right:4px; color:var(--gold); font-size:14px; }
+.talent-node-wrap + .talent-node-wrap { position:relative; }
+.talent-node { min-height:142px; }
+.gear-preview { margin:18px 0; padding:18px; border:1px solid var(--gold); background:#1a3027; }
+.gear-preview h3 { margin:8px 0; color:var(--ink); }
+.gear-preview p { color:var(--muted); line-height:1.7; font-size:12px; }
+.gear-preview-status { border-left:2px solid var(--gold); padding-left:11px; color:var(--ink)!important; }
+.gear-preview-empty { padding:16px; border:1px dashed var(--line); color:var(--muted); line-height:1.7; font-size:12px; }
+.gear-preview-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.gear-preview-actions button { min-height:46px; }
+.gear-comparison { display:flex; flex-wrap:wrap; gap:24px; margin:16px 0; }
+.gear-comparison dt { color:var(--muted); font-size:10px; }
+.gear-comparison dd { margin:4px 0 0; color:var(--gold); font-size:16px; }
+.quest-pages .page-controls { grid-column:1/-1; }
+.bestiary-list .page-controls { grid-column:1/-1; }
+.bestiary-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.bestiary-list article { min-width:0; }
+.bestiary-list article img { width:84px; height:84px; object-fit:contain; image-rendering:pixelated; }
+/* Mobile combat exposes the arena first. Inspector, notes and session data remain reachable from one explicit panel. */
+.battle-info-toggle { display:none; }
+#battle-info-panel { display:block; min-width:0; }
+@media(max-width:720px) {
+  .training-tabs { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .training-tabs button { min-height:44px; font-size:10px; }
+  .training-overview-grid,.loadout-slots { grid-template-columns:minmax(0,1fr); }
+  .talent-tree { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .talent-node { min-height:128px; padding:11px; }
+  .page-controls { gap:7px; font-size:10px; }
+  .page-controls button { flex:1 1 0; padding-inline:7px; }
+  .bestiary-list { grid-template-columns:minmax(0,1fr); }
+  .battle-info-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:48px; margin-top:10px; padding:10px 12px; border:1px solid var(--line); color:var(--gold); background:#172c23; }
+  #battle-info-panel { display:none; margin-top:10px; }
+  .right-sidebar.info-open #battle-info-panel { display:block; }
+  #battle-screen .right-sidebar { width:100%; }
+}
+@media(max-width:380px) {
+  .training-tabs { gap:3px; }
+  .training-tabs button { padding-inline:3px; font-size:9px; }
+  .talent-tree { grid-template-columns:minmax(0,1fr); }
+}

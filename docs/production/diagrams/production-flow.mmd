@@ -1,0 +1,10 @@
+flowchart LR
+  M0[Scope lock M0] --> M1[UX and safety M1]
+  M1 --> M2[Progression onboarding M2]
+  M2 --> M3[Content and licenses M3]
+  M3 --> M4[Device performance QA M4]
+  M4 --> M5[RC and rollback drill M5]
+  M5 --> Approval{Explicit approval}
+  Approval -->|Yes| M6[Deploy and remote smoke M6]
+  Approval -->|No| M1
+  M6 --> M7[Observe launch maintain M7]

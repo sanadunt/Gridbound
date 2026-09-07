@@ -1,32 +1,20 @@
-import { CAMPAIGN } from './world';
+import { CAMPAIGN, ENEMIES } from './world';
 import { JOBS, GEAR, legalSkill } from './jobs';
 import { ROSTER } from './content';
-export type Loadout = { skills:number[]; talents:string[]; slot:number; job?:string; gear?:Record<string,string>; inventory?:string[] };
-export type Profile = { version:2; gold:number; roster:number[]; cleared:number[]; loadouts:Record<number,Loadout>; bestFloor:number; wins:number; sound:boolean; motion:boolean };
-export const TALENTS:{id:string;name:string;description:string;cost:number;requires?:string}[] = [
-  {id:'vigor',name:'Vigor',description:'+18% max HP untuk hero ini.',cost:35},
-  {id:'focus',name:'Focus',description:'Cooldown hero ini 10% lebih cepat.',cost:35},
-  {id:'active-2',name:'Tactical art',description:'Buka skill aktif ketiga, lalu pasang ke salah satu slot.',cost:45},
-  {id:'mastery',name:'Mastery',description:'+18% power skill hero ini, termasuk heal dan shield.',cost:65,requires:'focus'},
-  {id:'active-3',name:'Signature art',description:'Buka skill aktif keempat. Tetap hanya dua slot saat bertarung.',cost:80,requires:'active-2'},
-  {id:'vigor-2',name:'Iron Constitution',description:'+20% max HP, multiplicative dengan Vigor.',cost:100,requires:'vigor'},
-  {id:'focus-2',name:'Flow State',description:'+8% tempo.',cost:110,requires:'focus'},
-  {id:'mastery-2',name:'Grandmaster',description:'+20% skill power.',cost:150,requires:'mastery'},
-  {id:'fortitude',name:'Fortitude',description:'Damage masuk −10%, sebelum shield.',cost:95,requires:'vigor'},
-  {id:'shelter',name:'Shelter',description:'Mulai expedition dengan barrier 20% HP.',cost:100,requires:'fortitude'},
-  {id:'recovery',name:'Open Heart',description:'Heal diterima +15%.',cost:90,requires:'vigor'},
-  {id:'momentum',name:'Momentum',description:'Tap fresh mengurangi tambahan 0,2s cooldown; fatigue tetap berlaku.',cost:110,requires:'focus'},
-  {id:'composure',name:'Composure',description:'Pemulihan fatigue 50% lebih cepat.',cost:95,requires:'focus'},
-  {id:'evasive',name:'Footwork',description:'Penalti relokasi diri turun ke 0,45s.',cost:100,requires:'composure'},
-  {id:'resolve',name:'Conviction',description:'Setiap cast menambah 2 Resolve.',cost:120,requires:'mastery'},
-];
+import { TALENTS, type Talent } from './talents';
+export { TALENTS } from './talents';
+import { heroProgress, normalizedXP, xpForLevel } from './levels';
+import { QUESTS, questProgress } from './quests';
+import type { Battle } from './simulation';
+export type Loadout = { skills:number[]; talents:string[]; slot:number; xp?:number; job?:string; gear?:Record<string,string>; inventory?:string[] };
+export type Profile = { version:3; gold:number; claimedQuests:string[]; trackedQuest?:string; ledger:{raids:number;victories:number;enemies:Record<string,number>}; roster:number[]; cleared:number[]; loadouts:Record<number,Loadout>; bestFloor:number; wins:number; sound:boolean; motion:boolean };
 export function createProfile():Profile {
-  return {version:2,gold:60,roster:[0,4,3],cleared:[],loadouts:{0:{skills:[0,1],talents:[],slot:1},4:{skills:[0,1],talents:[],slot:7},3:{skills:[0,1],talents:[],slot:6}},bestFloor:0,wins:0,sound:true,motion:true};
+  return {version:3,claimedQuests:[],ledger:{raids:0,victories:0,enemies:{}},gold:60,roster:[0,4,3],cleared:[],loadouts:{0:{skills:[0,1],talents:[],xp:0,slot:1},4:{skills:[0,1],talents:[],xp:0,slot:7},3:{skills:[0,1],talents:[],xp:0,slot:6}},bestFloor:0,wins:0,sound:true,motion:true};
 }
 function loadout(p:Profile,id:number) { return Number.isInteger(id)&&p.roster.includes(id)?p.loadouts[id]:undefined; }
 export function buyTalent(p:Profile,heroId:number,talentId:string) {
   const h=loadout(p,heroId),t=TALENTS.find(t=>t.id===talentId);
-  if(!h||!t||h.talents.includes(t.id)||p.gold<t.cost||(t.requires&&!h.talents.includes(t.requires)))return false;
+  if(!h||!t||talentReason(p,heroId,t))return false;
   p.gold-=t.cost;h.talents.push(t.id);return true;
 }
 export function equipSkill(p:Profile,heroId:number,slotIndex:number,skillIndex:number) {
@@ -50,7 +38,7 @@ export function promote(p:Profile,id:number,jobId:string) {
   p.gold-=j.cost;h.job=j.id;return true;
 }
 export function equipGear(p:Profile,id:number,gearId:string) {
-  const h=loadout(p,id),g=GEAR.find(g=>g.id===gearId);if(!h||!g||h.gear?.[g.slot]===g.id)return false;
+  const h=loadout(p,id),g=GEAR.find(g=>g.id===gearId);if(!h||!g||h.gear?.[g.slot]===g.id||gearReason(p,id,gearId))return false;
   h.inventory??=[];h.gear??={};
   if(!h.inventory.includes(g.id)){if(p.gold<g.cost)return false;p.gold-=g.cost;h.inventory.push(g.id);}
   h.gear[g.slot]=g.id;return true;
@@ -68,7 +56,8 @@ export function completeZone(p:Profile,index:number) {
   for(const id of CAMPAIGN[index].recruit)if(!p.roster.includes(id)){
     const occupied=new Set(p.roster.map(id=>p.loadouts[id].slot));
     const slot=Array.from({length:9},(_,i)=>i).find(i=>!occupied.has(i))!;
-    p.roster.push(id);p.loadouts[id]={skills:[0,1],talents:[],slot};
+    const levels=p.roster.map(i=>heroProgress(p.loadouts[i].xp).level).sort((a,b)=>a-b);
+    p.loadouts[id]={skills:[0,1],talents:[],slot,xp:xpForLevel(levels[Math.floor(levels.length/2)]??1)};p.roster.push(id);
   }
   return true;
 }
@@ -77,7 +66,7 @@ const record=(value:unknown):Record<string,unknown>=>value!==null&&typeof value=
 const bounded=(value:unknown,fallback:number,max:number)=>typeof value==='number'&&Number.isFinite(value)?Math.max(0,Math.min(max,Math.floor(value))):fallback;
 export function normalizeProfile(raw:unknown,legacy?:unknown):Profile {
   const p=createProfile(),data=record(raw);
-  if(data.version!==2){
+  if(data.version!==2&&data.version!==3){
     const old=record(legacy);p.gold=bounded(old.gold,60,1000000);
     if(typeof old.sound==='boolean')p.sound=old.sound;
     if(typeof old.motion==='boolean')p.motion=old.motion;
@@ -91,11 +80,12 @@ export function normalizeProfile(raw:unknown,legacy?:unknown):Profile {
   for(const id of p.roster){
     const source=record(loads[String(id)]),h=p.loadouts[id];
     const claimed=Array.isArray(source.talents)?source.talents:[];
+    h.xp=data.version===2?xpForLevel(p.cleared.length+1):normalizedXP(source.xp);
     h.talents=[];
-    for(const talent of TALENTS)if(claimed.includes(talent.id)&&(!talent.requires||h.talents.includes(talent.requires)))h.talents.push(talent.id);
+    for(const talent of TALENTS)if(claimed.includes(talent.id)&&!talentReason(p,id,talent,true))h.talents.push(talent.id);
     const job=JOBS[String(source.job??'')];if(job&&job.base===ROSTER[id].classId&&job.level<=p.cleared.length+1)h.job=job.id;
     h.inventory=Array.isArray(source.inventory)?[...new Set(source.inventory.filter((id):id is string=>typeof id==='string'&&GEAR.some(g=>g.id===id)))]:[];
-    h.gear={};for(const [slot,id] of Object.entries(record(source.gear)))if(typeof id==='string'&&h.inventory.includes(id)&&GEAR.some(g=>g.id===id&&g.slot===slot))h.gear[slot]=id;
+    h.gear={};for(const [slot,gearId] of Object.entries(record(source.gear)))if(typeof gearId==='string'&&h.inventory.includes(gearId)&&GEAR.some(g=>g.id===gearId&&g.slot===slot)&&!gearReason(p,id,gearId,true))h.gear[slot]=gearId;
     const skills=Array.isArray(source.skills)?source.skills:[];
     const valid=[...new Set(skills)].filter((index):index is number=>typeof index==='number'&&legalSkill(index,h.talents,h.job));
     h.skills=valid.length===2?valid:[0,1];
@@ -104,5 +94,62 @@ export function normalizeProfile(raw:unknown,legacy?:unknown):Profile {
     else if(occupied.has(h.slot))h.slot=Array.from({length:9},(_,i)=>i).find(i=>!occupied.has(i))!;
     occupied.add(h.slot);
   }
+  const ledger=record(data.ledger),enemies=record(ledger.enemies);
+  p.ledger.raids=bounded(ledger.raids,0,1000000);p.ledger.victories=bounded(ledger.victories,0,1000000);
+  for(const e of Object.values(ENEMIES))if(e.archetype===e.id&&enemies[e.id]!==undefined)p.ledger.enemies[e.id]=bounded(enemies[e.id],0,1000000);
+  const claims=Array.isArray(data.claimedQuests)?data.claimedQuests:[];
+  for(const q of QUESTS)if(claims.includes(q.id)&&(!q.requires||p.claimedQuests.includes(q.requires)))p.claimedQuests.push(q.id);
+  if(typeof data.trackedQuest==='string'&&QUESTS.some(q=>q.id===data.trackedQuest)&&!p.claimedQuests.includes(data.trackedQuest))p.trackedQuest=data.trackedQuest;
   return p;
+}
+
+export function awardExperience(p:Profile,id:number,amount:number) {
+  const h=loadout(p,id);if(!h||!Number.isFinite(amount)||amount<=0)return 0;
+  const before=heroProgress(h.xp).level;h.xp=normalizedXP(normalizedXP(h.xp)+Math.floor(amount));
+  return heroProgress(h.xp).level-before;
+}
+export function availablePoints(p:Profile,id:number) {
+  const h=loadout(p,id);if(!h)return 0;
+  return Math.max(0,heroProgress(h.xp).level-1-TALENTS.filter(t=>h.talents.includes(t.id)).reduce((sum,t)=>sum+(t.points??0),0));
+}
+export function talentReason(p:Profile,id:number,t:Talent,ignoreGold=false):string {
+  const h=loadout(p,id);if(!h)return 'Hero belum direkrut';
+  if(h.talents.includes(t.id))return 'Sudah dipelajari';
+  if(t.classId&&t.classId!==ROSTER[id].classId)return 'Khusus class lain';
+  if(t.requires&&!h.talents.includes(t.requires))return `Perlu ${TALENTS.find(n=>n.id===t.requires)?.name??t.requires}`;
+  if(t.requiresAll?.some(key=>!h.talents.includes(key)))return 'Perlu kedua cabang sebelumnya';
+  if(t.level&&heroProgress(h.xp).level<t.level)return `Perlu hero Lv.${t.level}`;
+  if(t.exclusive&&TALENTS.some(n=>n.exclusive===t.exclusive&&h.talents.includes(n.id)))return 'Keystone lain dipilih';
+  if(availablePoints(p,id)<(t.points??0))return 'Skill point belum cukup';
+  if(!ignoreGold&&p.gold<t.cost)return 'Gold belum cukup';
+  return '';
+}
+export function gearReason(p:Profile,id:number,gearId:string,ignoreGold=false):string {
+  const h=loadout(p,id),g=GEAR.find(g=>g.id===gearId);if(!h||!g)return 'Item tidak tersedia';
+  if(g.classId&&g.classId!==ROSTER[id].classId)return 'Khusus class lain';
+  if(heroProgress(h.xp).level<(g.minLevel??1))return `Perlu hero Lv.${g.minLevel}`;
+  if(!h.inventory?.includes(g.id)){
+    if(g.source==='quest')return 'Hadiah quest';
+    if(!ignoreGold&&p.gold<g.cost)return 'Gold belum cukup';
+  }
+  return '';
+}
+export function claimQuest(p:Profile,id:string,recipient:number) {
+  const q=QUESTS.find(q=>q.id===id);if(!q||!questProgress(p,q).ready)return false;
+  const heroId=q.heroId??recipient,h=loadout(p,heroId);if(!h)return false;
+  p.claimedQuests.push(q.id);p.gold+=q.gold;awardExperience(p,heroId,q.xp);
+  if(q.gear&&GEAR.some(g=>g.id===q.gear)){h.inventory??=[];if(!h.inventory.includes(q.gear))h.inventory.push(q.gear);}
+  if(p.trackedQuest===q.id)delete p.trackedQuest;
+  return true;
+}
+const settled=new WeakSet<Battle>();
+export function settleProgress(p:Profile,b:Battle) {
+  if(b.status!=='victory'||(b.mode==='adventure'&&b.stage+1<b.stageCount)||settled.has(b))return null;
+  settled.add(b);
+  const xp=b.mode==='adventure'?180+b.floor*75+b.stageCount*45:b.mode==='endless'?100+b.floor*35:180+b.floor*45;
+  const rewards=b.heroes.map(h=>{const amount=Math.floor(xp*(h.hp>0?1:.6));const before=heroProgress(p.loadouts[h.id]?.xp).level;awardExperience(p,h.id,amount);return {id:h.id,xp:amount,before,after:heroProgress(p.loadouts[h.id]?.xp).level};});
+  p.ledger.victories++;if(b.mode==='raid')p.ledger.raids++;
+  const enemies=b.mode==='adventure'?CAMPAIGN[b.floor-1].stages.map(s=>s.enemy):[b.enemyId];
+  for(const id of enemies){const base=ENEMIES[id].archetype??id;p.ledger.enemies[base]=(p.ledger.enemies[base]??0)+1;}
+  return rewards;
 }

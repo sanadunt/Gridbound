@@ -10,6 +10,8 @@ export const ARENA={width:600,height:760,x:72,y:367,cw:144,ch:112,gap:12};
 export function cell(slot:number){return {x:ARENA.x+(slot%3)*(ARENA.cw+ARENA.gap),y:ARENA.y+Math.floor(slot/3)*(ARENA.ch+ARENA.gap)};}
 export function center(slot:number){const p=cell(slot);return {x:p.x+72,y:p.y+54};}
 type Particle={x:number;y:number;vx:number;vy:number;life:number;max:number;color:number;size:number;gravity:number};
+export const ENEMY_DEATH_ANIMATION_MS=780;
+export const ENEMY_DEATH_ANIMATION_REDUCED_MS=120;
 export class BattleScene extends Phaser.Scene {
  battle:Battle; soundBox:Sound; onFrame:(dt:number)=>void;
  reducedMotion=false;hoverSlot=-1;dragId=-1;dragPoint?:{x:number;y:number};
@@ -17,26 +19,67 @@ export class BattleScene extends Phaser.Scene {
  private dragon!:Phaser.GameObjects.Image;private floor!:Phaser.GameObjects.Graphics;private fx!:Phaser.GameObjects.Graphics;private threats!:Phaser.GameObjects.Graphics;
  private particles:Particle[]=[];private age=0;private accumulator=0;private pulse=0;private shake=0;
  private flashes=new Map<number,number>();private attacks=new Map<number,number>();private bg!:Phaser.GameObjects.Image;
+ private enemyDeathElapsed=0;private enemyDeathDuration=ENEMY_DEATH_ANIMATION_MS;private enemyDeathEnemyId:string|null=null;private enemyDeathStarted=false;private enemyDeathComplete=true;private enemyDeathWaiters:Array<()=>void>=[];
  constructor(battle:Battle,sound:Sound,onFrame:(dt:number)=>void){super('battle');this.battle=battle;this.soundBox=sound;this.onFrame=onFrame;}
  create(){
   installArt(this);
   for(const id of Object.keys(ENEMIES).filter(id=>id!=='dragon'))for(let frame=0;frame<8;frame++)this.textures.addCanvas(`${id}-${frame}`,monsterCanvas(id,frame));
   this.bg=this.add.image(300,380,'ruins').setScale(2);this.floor=this.add.graphics().setDepth(2);
   this.dragon=this.add.image(300,200,'dragon-0').setScale(2.28).setDepth(5);
-  this.threats=this.add.graphics().setDepth(7);this.fx=this.add.graphics().setDepth(20);this.syncHeroes();
+  this.threats=this.add.graphics().setDepth(7);this.fx=this.add.graphics().setDepth(20);this.resetEnemyDeathAnimation();this.syncHeroes();
  }
- replace(battle:Battle){this.tweens.killAll();for(const child of [...this.children.list])if('depth' in child && Number(child.depth)>=17)child.destroy();this.fx=this.add.graphics().setDepth(20);this.pulse=0;this.shake=0;this.dragId=-1;this.dragPoint=undefined;this.hoverSlot=-1;this.battle=battle;this.heroes.forEach(s=>s.destroy());this.heroes.clear();this.enemies.forEach(s=>s.destroy());this.enemies.clear();this.particles=[];this.flashes.clear();this.attacks.clear();this.accumulator=0;this.syncHeroes();}
+replace(battle:Battle){this.tweens.killAll();for(const child of [...this.children.list])if('depth' in child && Number(child.depth)>=17)child.destroy();this.fx=this.add.graphics().setDepth(20);this.pulse=0;this.shake=0;this.dragId=-1;this.dragPoint=undefined;this.hoverSlot=-1;this.battle=battle;this.heroes.forEach(s=>s.destroy());this.heroes.clear();this.enemies.forEach(s=>s.destroy());this.enemies.clear();this.particles=[];this.flashes.clear();this.attacks.clear();this.accumulator=0;this.resetEnemyDeathAnimation();this.syncHeroes();}
+
+ /** True when the current victory's boss sequence has finished, or no victory is active. */
+ public isEnemyDeathAnimationComplete(): boolean {this.ensureEnemyDeathAnimation();return this.enemyDeathComplete;}
+
+ /** Resolve when the current boss has finished dying. A replacement encounter cancels the old wait. */
+ public waitForEnemyDeathAnimation(): Promise<void> {this.ensureEnemyDeathAnimation();if(this.enemyDeathComplete)return Promise.resolve();return new Promise(resolve=>this.enemyDeathWaiters.push(resolve));}
+
+ private resetEnemyDeathAnimation(){
+  this.enemyDeathWaiters.splice(0).forEach(resolve=>resolve());
+  this.enemyDeathElapsed=0;this.enemyDeathDuration=ENEMY_DEATH_ANIMATION_MS;this.enemyDeathEnemyId=this.battle.enemyId;this.enemyDeathStarted=false;this.enemyDeathComplete=true;
+  if(this.dragon?.active){const texture=`${this.battle.enemyId}-0`,scale=this.battle.enemyId==='dragon'?2.28:1.95;if(this.textures.exists(texture))this.dragon.setTexture(texture);this.dragon.setPosition(300,194).setScale(scale).setAlpha(1).setRotation(0).clearTint();}
+ }
+
+ private ensureEnemyDeathAnimation(){
+  if(this.enemyDeathEnemyId!==this.battle.enemyId){this.resetEnemyDeathAnimation();}
+  if(this.enemyDeathStarted&&this.battle.status!=='victory'){this.resetEnemyDeathAnimation();}
+  if(this.battle.status==='victory'&&!this.enemyDeathStarted)this.startEnemyDeathAnimation();
+ }
+
+ private startEnemyDeathAnimation(){
+  if(this.enemyDeathStarted)return;
+  this.enemyDeathStarted=true;this.enemyDeathComplete=false;this.enemyDeathElapsed=0;this.enemyDeathDuration=this.reducedMotion?ENEMY_DEATH_ANIMATION_REDUCED_MS:ENEMY_DEATH_ANIMATION_MS;this.enemyDeathEnemyId=this.battle.enemyId;
+  if(!this.reducedMotion){
+   const colors=[0xeed694,0xf4c77f,0x9bd1a1];
+   for(let i=0;i<84;i++){const angle=Math.random()*Math.PI*2,radius=Math.random()*48;this.particle(300+Math.cos(angle)*radius,194+Math.sin(angle)*radius*.72,colors[i%colors.length],Math.random()>.65?4:2,.45+Math.random()*.3,Math.cos(angle)*(35+Math.random()*85),-18-Math.random()*70,65+Math.random()*55);}
+  }
+ }
+
+ private advanceEnemyDeathAnimation(dt:number){
+  this.ensureEnemyDeathAnimation();
+  if(!this.enemyDeathStarted||this.enemyDeathComplete)return;
+  this.enemyDeathElapsed=Math.min(this.enemyDeathDuration,this.enemyDeathElapsed+dt*1000);
+  if(this.enemyDeathElapsed>=this.enemyDeathDuration){this.enemyDeathComplete=true;this.enemyDeathWaiters.splice(0).forEach(resolve=>resolve());}
+ }
+
+ private deathProgress(){return Math.min(1,this.enemyDeathDuration>0?this.enemyDeathElapsed/this.enemyDeathDuration:1);}
+
  private syncHeroes(){if(!this.floor)return;for(const h of this.battle.heroes){if(this.heroes.has(h.id))continue;const p=center(h.slot);this.heroes.set(h.id,this.add.image(p.x,p.y-7,`${h.classId}-0`).setScale(1.65).setDepth(9));}}
  update(_time:number,delta:number){
   const dt=Math.min(delta/1000,.1);this.age+=dt;
   if(this.battle.status==='fighting'){this.accumulator+=dt;while(this.accumulator>=1/60){this.battle.tick(1/60);this.accumulator-=1/60;}}
   const events=this.battle.drain();events.forEach(e=>{this.event(e);this.soundBox.play(e.type);});this.soundBox.music(this.battle.status==='fighting');
+  this.advanceEnemyDeathAnimation(dt);
   this.draw(dt);this.onFrame(dt);
  }
  private draw(dt:number){
   const b=this.battle,t=this.age;this.floor.clear();this.threats.clear();this.fx.clear();
-  const charging=b.threats.some(v=>v.left<1);this.dragon.setTexture(`${b.enemyId}-${this.reducedMotion?0:Math.floor(t*7)%8}`).setY(194+(this.reducedMotion?0:Math.sin(t*1.8)*5)).setScale((b.enemyId==='dragon'?2.28:1.95)+(charging&&!this.reducedMotion?Math.sin(t*16)*.035:0));
-  this.dragon.setAlpha(b.status==='victory'?.28:1);if(this.pulse>0){this.pulse-=dt;this.dragon.setTint(0xffe6af);}else this.dragon.clearTint();
+  const death=this.enemyDeathStarted&&b.status==='victory',progress=death?this.deathProgress():0,collapse=this.reducedMotion?progress:progress*progress,baseScale=b.enemyId==='dragon'?2.28:1.95,charging=b.threats.some(v=>v.left<1);
+  const bossFrame=death&&this.enemyDeathComplete?0:this.reducedMotion?0:Math.floor(t*7)%8,idleBob=death||this.reducedMotion?0:Math.sin(t*1.8)*5,shakeScale=charging&&!this.reducedMotion?Math.sin(t*16)*.035:0;
+  this.dragon.setTexture(`${b.enemyId}-${bossFrame}`).setY(194+idleBob+(death&&!this.reducedMotion?collapse*34:0)).setScale(baseScale*(1+(!this.reducedMotion?collapse*.08:0)+shakeScale),baseScale*(1-(death&&!this.reducedMotion?collapse*.72:0)));
+  this.dragon.setAlpha(death?Math.max(0,1-progress):1).setRotation(death&&!this.reducedMotion?collapse*.18:0);if(this.pulse>0){this.pulse-=dt;this.dragon.setTint(0xffe6af);}else if(death)this.dragon.setTint(0xf1c77f);else this.dragon.clearTint();
   if(this.shake>0&&!this.reducedMotion){this.shake-=dt;this.cameras.main.setScroll(Math.sin(t*80)*this.shake*9,Math.cos(t*70)*this.shake*7);}else this.cameras.main.setScroll(0,0);
   // Slot borders remain visible beneath effects and communicate the legal drop area.
   for(let i=0;i<9;i++){
@@ -62,13 +105,13 @@ export class BattleScene extends Phaser.Scene {
    this.threats.lineStyle(1,color,.28);for(let stripe=0;stripe<6;stripe++)this.threats.lineBetween(p.x+8+stripe*24,p.y+111,p.x+30+stripe*20,p.y+5);
    this.threats.lineStyle(2,0xffd4a6,.8).strokeTriangle(p.x+119,p.y+15,p.x+111,p.y+29,p.x+127,p.y+29);
    if(danger.type==='target'){const marked=center(s);this.threats.lineStyle(3,0xffce91).strokeCircle(marked.x,marked.y-7,35);this.threats.lineBetween(marked.x,marked.y-49,marked.x,marked.y-28);}
-   if(danger.type==='meteor'&&danger.left<.55&&!this.reducedMotion){const hit=center(s),yy=hit.y-230*(danger.left/.55);this.fx.fillStyle(0xfac589,.9).fillRect(hit.x-4,yy,8,13);this.fx.fillStyle(0xee9970,.5).fillRect(hit.x-2,yy-17,4,19);this.particle(hit.x,yy,0xfac589,3,.25,0,-20,0);}
+   if(b.status==='fighting'&&danger.type==='meteor'&&danger.left<.55&&!this.reducedMotion){const hit=center(s),yy=hit.y-230*(danger.left/.55);this.fx.fillStyle(0xfac589,.9).fillRect(hit.x-4,yy,8,13);this.fx.fillStyle(0xee9970,.5).fillRect(hit.x-2,yy-17,4,19);this.particle(hit.x,yy,0xfac589,3,.25,0,-20,0);}
   }}
   for(const m of b.minions){let spr=this.enemies.get(m.id);if(!spr){spr=this.add.image(144+m.lane*156,320,`${m.enemyId??'goblin'}-0`).setScale(.42).setDepth(6);this.enemies.set(m.id,spr);}spr.y=321+(this.reducedMotion?0:Math.sin(t*4+m.lane)*3);this.threats.fillStyle(0x102621).fillRect(spr.x-23,348,46,3);this.threats.fillStyle(0xd6be78).fillRect(spr.x-23,348,46*m.hp/m.maxHp,3);}
   for(const [id,spr] of this.enemies){if(!b.minions.some(m=>m.id===id)){spr.destroy();this.enemies.delete(id);}}
   if(b.targetLane>=0){const x=144+b.targetLane*156;this.threats.lineStyle(1,0xf2d891,.7).strokeCircle(x,321,30);this.threats.lineBetween(x-36,321,x-24,321).lineBetween(x+24,321,x+36,321);}
-  // Ambient embers use the same bounded pool as combat effects.
-  if(Math.random()<dt*(this.reducedMotion?4:16))this.particle(35+Math.random()*530,320,0xe4c278,1,3,(Math.random()-.5)*15,-12,0);
+  // Ambient embers stop at a terminal result so victory cannot keep feeding effects.
+  if(b.status!=='victory'&&b.status!=='defeat'&&Math.random()<dt*(this.reducedMotion?4:16))this.particle(35+Math.random()*530,320,0xe4c278,1,3,(Math.random()-.5)*15,-12,0);
   for(const x of [55,545]){const y=292;this.fx.fillStyle(0xe8ac59,.08).fillCircle(x,y,16);this.fx.fillStyle(0xf3cc7e,.8).fillRect(x-3,y-6+Math.sin(t*9)*2,6,10);this.fx.fillStyle(0xffe6aa).fillRect(x-1,y-6,2,8);}
   for(const p of this.particles){p.life-=dt;p.vy+=p.gravity*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;this.fx.fillStyle(p.color,Math.max(0,p.life/p.max));this.fx.fillRect(Math.round(p.x/2)*2,Math.round(p.y/2)*2,p.size,p.size);}
   this.particles=this.particles.filter(p=>p.life>0);
@@ -102,7 +145,7 @@ export class BattleScene extends Phaser.Scene {
   if(e.type==='minionAttack'){const from={x:144+(e.lane??1)*156,y:320};const bolt=this.add.rectangle(from.x,from.y,5,5,0xd3e1a1).setDepth(17);this.tweens.add({targets:bolt,x:pos.x,y:pos.y,duration:210,onComplete:()=>bolt.destroy()});}
   if(e.type==='minionDown'){this.burst(144+e.lane!*156,320,0xb9d58a,26);}
   if(e.type==='ultimate'){this.shake=.8;this.ring(300,420,0xffe3a0);this.ring(300,220,0xffe3a0);for(let i=0;i<180;i++)this.particle(Math.random()*600,Math.random()*760,0xf3dda4,4,1.7,(Math.random()-.5)*100,-60,0);}
-  if(e.type==='victory'){for(let i=0;i<100;i++)this.particle(Math.random()*600,-Math.random()*300,0xeed694,4,5,10,80,0);}
+  if(e.type==='victory')this.ensureEnemyDeathAnimation();
   if(['banner','phase','warning','break','summon','ultimate'].includes(e.type)||(e.type==='shield'&&e.text))window.dispatchEvent(new CustomEvent('battle-banner',{detail:e}));
  }
 }

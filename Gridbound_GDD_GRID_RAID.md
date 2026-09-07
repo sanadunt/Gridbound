@@ -1,4 +1,4 @@
-# Gridbound: Ashes of the Bell — GDD v0.3
+# Gridbound: Ashes of the Bell — GDD v0.4
 
 This document describes the implemented browser game. The earlier, broader proposal is archived in [docs/GDD-PROTOTYPE-ARCHIVE.md](docs/GDD-PROTOTYPE-ARCHIVE.md). Runtime TypeScript is authoritative; this document and data/database.json are generated from those definitions. Story spoilers follow.
 
@@ -8,7 +8,7 @@ A mobile-friendly real-time grid RPG with an authored four-act campaign and repe
 
 ## 2. Full playable loop
 
-Town → assign two skills, talents, job and three equipment slots → place heroes → depart → read encounter beat → Begin → waves → miniboss → boss → return with banked loot and first-clear progression. Chapters 1–4 have four stages each; chapters 5–16 have five. There are 76 encounters, not 76 unique enemy models. HP, cooldown, formation and potion attrition carry between stages; surviving heroes receive a small 8% HP breather. Downed allies remain down until town. Quitting or losing an unfinished expedition forfeits carried loot. Replaying a completed chapter grants encounter gold but not another level or recruit.
+Town → assign two skills, talents, job and three equipment slots → place heroes → depart → read encounter beat → Begin → waves → miniboss → boss → return with banked loot and first-clear progression. Chapters 1–4 have four stages each; chapters 5–16 have five. There are 76 encounters, not 76 unique enemy models. HP, cooldown, formation and potion attrition carry between stages; surviving heroes receive a small 8% HP breather. Downed allies remain down until town. Quitting or losing an unfinished expedition forfeits carried loot. Replaying a completed chapter grants encounter gold but not another campaign-rank bonus or recruit; hero XP is repeatable.
 
 ## 3. Input and pacing
 
@@ -34,7 +34,7 @@ Start with Aldric, Lyra and Rowan. Additional recruits arrive on first clears of
 
 ## 5. Jobs and specialization
 
-Each basic job branches into two mutually exclusive advanced jobs at party level 4; each advanced job leads to one third job at level 10. A third job requires the correct advanced parent. Advanced promotion costs 180g; third promotion costs 420g. Promoting opens an active skill and a passive specialty. The player must explicitly equip the unlocked skill into one of the two slots. Third jobs retain access to their parent skill. A full respec refunds talents and both promotion steps exactly once; equipped gear remains owned.
+Each basic job branches into two mutually exclusive advanced jobs at campaign rank 4; each advanced job leads to one third job at campaign rank 10. A third job requires the correct advanced parent. Advanced promotion costs 180g; third promotion costs 420g. Promoting opens an active skill and a passive specialty. The player must explicitly equip the unlocked skill into one of the two slots. Third jobs retain access to their parent skill. A full respec refunds talents and both promotion steps exactly once; equipped gear remains owned.
 
 | Basic | Advanced → third | Specialty | Signature |
 | --- | --- | --- | --- |
@@ -116,29 +116,64 @@ Forty definitions: four foundational and four job-specific skills per basic job.
 
 ## 7. Talent tree
 
-Fifteen nodes per hero: thirteen passive talents and two foundational active-skill unlocks. The five classes share the passive tree; active node names/effects come from their own kit. Job advancement is a separate branch system. This does not claim fifteen bespoke passives per class.
+Fifty catalog nodes; thirty-four apply to each hero: fifteen retained foundational nodes, fifteen shared Assault/Bastion/Tempo nodes and four class-specific disciplines. New nodes require individual hero levels and earned skill points; some require both preceding branches. Only one of the three keystones can be held. Foundational talents remain gold-only for legacy compatibility. Respec returns both gold and spent points without resetting XP. Job advancement remains a separate campaign-rank system.
 
-| Node | Cost | Prerequisite | Effect |
-| --- | --- | --- | --- |
-| Vigor | 35 | Root | +18% max HP untuk hero ini. |
-| Focus | 35 | Root | Cooldown hero ini 10% lebih cepat. |
-| Tactical art | 45 | Root | Buka skill aktif ketiga, lalu pasang ke salah satu slot. |
-| Mastery | 65 | focus | +18% power skill hero ini, termasuk heal dan shield. |
-| Signature art | 80 | active-2 | Buka skill aktif keempat. Tetap hanya dua slot saat bertarung. |
-| Iron Constitution | 100 | vigor | +20% max HP, multiplicative dengan Vigor. |
-| Flow State | 110 | focus | +8% tempo. |
-| Grandmaster | 150 | mastery | +20% skill power. |
-| Fortitude | 95 | vigor | Damage masuk −10%, sebelum shield. |
-| Shelter | 100 | fortitude | Mulai expedition dengan barrier 20% HP. |
-| Open Heart | 90 | vigor | Heal diterima +15%. |
-| Momentum | 110 | focus | Tap fresh mengurangi tambahan 0,2s cooldown; fatigue tetap berlaku. |
-| Composure | 95 | focus | Pemulihan fatigue 50% lebih cepat. |
-| Footwork | 100 | composure | Penalti relokasi diri turun ke 0,45s. |
-| Conviction | 120 | mastery | Setiap cast menambah 2 Resolve. |
+| Node | Branch/class | Hero level | Gold / SP | Prerequisite | Effect |
+| --- | --- | --- | --- | --- | --- |
+| Vigor | Foundations | 1 | 35g / 0 SP | Root | +18% max HP untuk hero ini. |
+| Focus | Foundations | 1 | 35g / 0 SP | Root | Cooldown hero ini 10% lebih cepat. |
+| Tactical art | Foundations | 1 | 45g / 0 SP | Root | Buka skill aktif ketiga, lalu pasang ke salah satu slot. |
+| Mastery | Foundations | 1 | 65g / 0 SP | focus | +18% power skill hero ini, termasuk heal dan shield. |
+| Signature art | Foundations | 1 | 80g / 0 SP | active-2 | Buka skill aktif keempat. Tetap hanya dua slot saat bertarung. |
+| Iron Constitution | Foundations | 1 | 100g / 0 SP | vigor | +20% max HP, multiplicative dengan Vigor. |
+| Flow State | Foundations | 1 | 110g / 0 SP | focus | +8% tempo. |
+| Grandmaster | Foundations | 1 | 150g / 0 SP | mastery | +20% skill power. |
+| Fortitude | Foundations | 1 | 95g / 0 SP | vigor | Damage masuk −10%, sebelum shield. |
+| Shelter | Foundations | 1 | 100g / 0 SP | fortitude | Mulai expedition dengan barrier 20% HP. |
+| Open Heart | Foundations | 1 | 90g / 0 SP | vigor | Heal diterima +15%. |
+| Momentum | Foundations | 1 | 110g / 0 SP | focus | Tap fresh mengurangi tambahan 0,2s cooldown; fatigue tetap berlaku. |
+| Composure | Foundations | 1 | 95g / 0 SP | focus | Pemulihan fatigue 50% lebih cepat. |
+| Footwork | Foundations | 1 | 100g / 0 SP | composure | Penalti relokasi diri turun ke 0,45s. |
+| Conviction | Foundations | 1 | 120g / 0 SP | mastery | Setiap cast menambah 2 Resolve. |
+| Committed Strike | assault | 3 | 32g / 1 SP | mastery | +6% power. Jalur serangan; perlu Mastery. |
+| Fracture Rhythm | assault | 6 | 44g / 1 SP | assault-root | +5% power dan +5% tempo. |
+| Lane Predator | assault | 10 | 60g / 2 SP | assault-root | +18% damage ke minion. |
+| Resounding Blow | assault | 15 | 80g / 2 SP | assault-break + assault-hunt | Setiap cast ofensif kelima: echo 18% power ke boss. |
+| Crown of Cinders | assault | 20 | 100g / 3 SP | assault-echo | Keystone: +14% power, tetapi −8% HP. Pilih satu keystone. |
+| Deep Roots | guard | 3 | 32g / 1 SP | vigor | +10% max HP. |
+| Layered Guard | guard | 6 | 44g / 1 SP | guard-root | Damage masuk −5%. |
+| Kindling Shelter | guard | 10 | 60g / 2 SP | guard-root | Heal yang diberikan +10%; mulai dengan barrier 8% HP. |
+| Living Rampart | guard | 15 | 80g / 2 SP | guard-shell + guard-mend + fortitude | Pantulkan 15% damage yang diserap shield/Guard ke boss. |
+| Crown of Hearths | guard | 20 | 100g / 3 SP | guard-wall | Keystone: +20% HP dan −6% damage masuk, tetapi −5% tempo. |
+| Measured Breath | tempo | 3 | 32g / 1 SP | focus | +5% tempo dan tap efektif +0,05s. |
+| Thread the Needle | tempo | 6 | 44g / 1 SP | tempo-root | Tap efektif +0,10s; fatigue tetap membatasi. |
+| Borrowed Beat | tempo | 10 | 60g / 2 SP | tempo-root | +8% tempo. |
+| Returning Echo | tempo | 15 | 80g / 2 SP | tempo-weave + tempo-flow | Setiap cast ofensif kelima: echo 12%. Tiap cast ofensif memulihkan diri 4% power. |
+| Crown of Hours | tempo | 20 | 100g / 3 SP | tempo-echo | Keystone: +15% tempo dan tap +0,10s, tetapi −7% power. |
+| Shieldwright | class | 5 | 40g / 1 SP | focus | Shield yang diberikan +12%. |
+| Hold the Line | class | 9 | 56g / 1 SP | warrior-1 | Barrier awal 10% HP. |
+| Reprisal | class | 14 | 76g / 2 SP | warrior-2 | Pantulkan 12% damage yang ditahan. |
+| Unbroken Oath | class | 18 | 92g / 2 SP | warrior-3 | +8% HP dan shield +10%. |
+| Red Thread | class | 5 | 40g / 1 SP | focus | Cast ofensif memulihkan diri 5% power. |
+| Knife Between Beats | class | 9 | 56g / 1 SP | rogue-1 | +6% tempo. |
+| Surgical Finish | class | 14 | 76g / 2 SP | rogue-2 | Echo ofensif kelima +15%. |
+| No Wasted Motion | class | 18 | 92g / 2 SP | rogue-3 | +8% power dan tap +0,08s. |
+| Trailcraft | class | 5 | 40g / 1 SP | focus | Damage ke minion +15%. |
+| Steady Draw | class | 9 | 56g / 1 SP | archer-1 | +8% power. |
+| Split Feathers | class | 14 | 76g / 2 SP | archer-2 | Echo ofensif kelima +15%. |
+| Horizon Keeper | class | 18 | 92g / 2 SP | archer-3 | +8% tempo dan damage minion +10%. |
+| Warm Hands | class | 5 | 40g / 1 SP | focus | Heal yang diberikan +12%. |
+| Safe Ember | class | 9 | 56g / 1 SP | healer-1 | Shield yang diberikan +12%. |
+| Mercy Reservoir | class | 14 | 76g / 2 SP | healer-2 | 15% overheal yang diterima hero ini jadi barrier. |
+| Dawn Within | class | 18 | 92g / 2 SP | healer-3 | Heal +10% dan barrier awal 10% HP. |
+| Runic Weight | class | 5 | 40g / 1 SP | focus | +8% power. |
+| Clear Thought | class | 9 | 56g / 1 SP | wizard-1 | +6% tempo. |
+| Prism Echo | class | 14 | 76g / 2 SP | wizard-2 | Echo ofensif kelima +18%. |
+| Unwritten Formula | class | 18 | 92g / 2 SP | wizard-3 | +10% power dan tap +0,05s. |
 
 ## 8. Equipment and economy
 
-Three slots: weapon, armor and charm. Each has three authored options. Buying records ownership per hero; switching an owned item is free and repeated equip cannot deduct currency twice. There are no loot boxes, random affixes or monetization. Currency is earned in encounters and banked at expedition completion. Skill/gear/job effects alter the simulation, not just labels.
+Three slots: weapon, armor and charm. Forty-two items include nine original items, eighteen pieces across six sets, and fifteen class weapons across three tiers. Set effects activate at two and three correctly equipped pieces; bonuses stack. Class/level gates apply before purchase. Three Unbound set pieces are quest-only, not zero-price shop items. Buying records ownership per hero; switching an owned item is free and repeated equip cannot deduct currency twice. There are no loot boxes, random affixes or monetization. Currency is earned in encounters and banked at expedition completion. Skill/gear/job effects alter the simulation, not just labels.
 
 | Item | Slot | Cost | Effect |
 | --- | --- | --- | --- |
@@ -151,12 +186,45 @@ Three slots: weapon, armor and charm. Each has three authored options. Buying re
 | Ember Pendant | charm | 60 | +10% power, +5% HP. |
 | Clockseed | charm | 95 | +13% tempo. |
 | Hearthstone | charm | 110 | +18% HP, +4% tempo. |
+| Trailknife | weapon | 154 | 14% power · 0% HP · 2% tempo. Ashwood Scout: 2 pieces: tap +0,08s. 3: barrier awal 10% HP. |
+| Barkweave Coat | armor | 169 | 0% power · 20% HP · 2% tempo. Ashwood Scout: 2 pieces: tap +0,08s. 3: barrier awal 10% HP. |
+| Scout Whistle | charm | 184 | 4% power · 5% HP · 6% tempo. Ashwood Scout: 2 pieces: tap +0,08s. 3: barrier awal 10% HP. |
+| Gale Sabre | weapon | 208 | 10% power · -3% HP · 13% tempo. Windwalker: 2 pieces: tap +0,10s. 3: damage masuk −5%. |
+| Featherstep Mantle | armor | 223 | 0% power · 12% HP · 10% tempo. Windwalker: 2 pieces: tap +0,10s. 3: damage masuk −5%. |
+| Windglass Knot | charm | 238 | 2% power · 0% HP · 14% tempo. Windwalker: 2 pieces: tap +0,10s. 3: damage masuk −5%. |
+| Dawn Staff | weapon | 244 | 18% power · 5% HP · 0% tempo. Dawn Pilgrim: 2 pieces: heal yang diberikan +12%. 3: shield +12%. |
+| Pilgrim Vestments | armor | 259 | 0% power · 26% HP · 2% tempo. Dawn Pilgrim: 2 pieces: heal yang diberikan +12%. 3: shield +12%. |
+| Sunwell Rosary | charm | 274 | 7% power · 9% HP · 3% tempo. Dawn Pilgrim: 2 pieces: heal yang diberikan +12%. 3: shield +12%. |
+| Cinderbrand | weapon | 280 | 30% power · 0% HP · -4% tempo. Ember Duelist: 2 pieces: barrier awal 12% HP. 3: tap +0,15s. |
+| Ashrunner Jacket | armor | 295 | 6% power · 20% HP · 2% tempo. Ember Duelist: 2 pieces: barrier awal 12% HP. 3: tap +0,15s. |
+| Coalheart Seal | charm | 310 | 14% power · 4% HP · 0% tempo. Ember Duelist: 2 pieces: barrier awal 12% HP. 3: tap +0,15s. |
+| Gatekeeper Mace | weapon | 316 | 22% power · 12% HP · -5% tempo. Bellmetal Bastion: 2 pieces: damage masuk −8%. 3: shield yang diberikan +15%. |
+| Bastion Harness | armor | 331 | 0% power · 42% HP · -6% tempo. Bellmetal Bastion: 2 pieces: damage masuk −8%. 3: shield yang diberikan +15%. |
+| Oath Anchor | charm | 346 | 2% power · 22% HP · -2% tempo. Bellmetal Bastion: 2 pieces: damage masuk −8%. 3: shield yang diberikan +15%. |
+| Tomorrow Blade | weapon | 370 | 25% power · 0% HP · 6% tempo. Unbound Tomorrow: 2 pieces: heal dan shield +12%. 3: barrier awal 18% HP dan tap +0,08s. Hanya reward town story. |
+| Open Door Mantle | armor | 385 | 0% power · 30% HP · 4% tempo. Unbound Tomorrow: 2 pieces: heal dan shield +12%. 3: barrier awal 18% HP dan tap +0,08s. Hanya reward town story. |
+| Unwritten Promise | charm | 400 | 10% power · 12% HP · 5% tempo. Unbound Tomorrow: 2 pieces: heal dan shield +12%. 3: barrier awal 18% HP dan tap +0,08s. Hanya reward town story. |
+| Watchman Sword | weapon | 150 | 16% power. Shield +8%, HP +5%. Khusus warrior. |
+| Oathsplitter | weapon | 330 | 26% power. Shield +12%, HP +5%. Khusus warrior. |
+| Last Bulwark | weapon | 510 | 36% power. Shield +16%, HP +5%. Khusus warrior. |
+| Threadcutter | weapon | 150 | 16% power. Tap +0.04s. Khusus rogue. |
+| Dusk Needle | weapon | 330 | 26% power. Tap +0.08s. Khusus rogue. |
+| Mercy Razor | weapon | 510 | 36% power. Tap +0.12s. Khusus rogue. |
+| Scout Longbow | weapon | 150 | 16% power. Barrier awal 6% HP. Khusus archer. |
+| Briarstring | weapon | 330 | 26% power. Barrier awal 9% HP. Khusus archer. |
+| Horizon Bow | weapon | 510 | 36% power. Barrier awal 12% HP. Khusus archer. |
+| Kindling Crook | weapon | 150 | 16% power. Heal diberikan +10%. Khusus healer. |
+| Dawn Reliquary | weapon | 330 | 26% power. Heal diberikan +14%. Khusus healer. |
+| Living Bell | weapon | 510 | 36% power. Heal diberikan +18%. Khusus healer. |
+| Runeslate Rod | weapon | 150 | 16% power. Tempo +3%. Khusus wizard. |
+| Prism Branch | weapon | 330 | 26% power. Tempo +5%. Khusus wizard. |
+| Unwritten Star | weapon | 510 | 36% power. Tempo +7%. Khusus wizard. |
 
 ## 9. Enemy AI and counterplay
 
 Intent selection is an authored per-archetype pattern with phase-dependent pace and seeded lane/tile choices, not a machine-learned agent. Marked weakest-target attacks choose the lowest living HP ratio. Strongest-target attacks rank living skill throughput. Their marker follows the hero until resolution; dragging does not evade a tracking attack. Front-row, lane breath and meteor attacks stay at their ground locations. Ritual attacks target all nine tiles. Guard mitigates party damage by 65% for 2.3 seconds with a 12-second cooldown. Interrupt skills can cancel an all-grid ritual; ultimate also interrupts. Shield/heal timing gives additional counterplay. Encounters enrage after 150 seconds.
 
-The eight base silhouettes have ash/frost/auric palette variants. Variants also adjust intent order or cadence. Strength in campaign additionally comes from encounter HP and chapter scaling.
+The twelve base silhouettes have ash/frost/auric palette variants. Variants also adjust intent order or cadence. Strength in campaign additionally comes from encounter HP and chapter scaling.
 
 | Monster | Title | Pattern | Counter |
 | --- | --- | --- | --- |
@@ -168,6 +236,10 @@ The eight base silhouettes have ash/frost/auric palette variants. Variants also 
 | The Unburied | OATHBOUND WRAITH | weakest → all → strongest | Heal menjelang mark, Guard saat ratapan. Bunuh spirit minion agar mereka tidak menghabisi target. |
 | Mournbark | ANCIENT TREANT | front → all → meteor | Jangan bertahan di front yang ditandai. Guard spora atau interrupt; shield satu lane membantu attrition. |
 | Vharok | THE EMERALD GATE | breath → front → meteor → all | Baca empat pola. Sisakan Guard untuk Cataclysm; phase lanjut menambahkan aftershock tertunda. |
+| Lantern Eater | CINDERWING MOTH | strongest → meteor → breath | Mark mengikuti hero terkuat; lindungi dia, kemudian pindah dari tanda meteor dan lane breath. |
+| Glassjaw | MIRROR BASILISK | weakest → breath → strongest → meteor | Tidak ada petrify tersembunyi. Baca lane breath, heal target lemah, dan Guard mark yang mengikuti hero. |
+| Bellshore Claw | RELIC CRAB | front → meteor → all | HP tinggi tetapi interval panjang. Reposisi dari front dan meteor; interrupt atau Guard runtuhan all-grid. |
+| The Last Watch | HOLLOW REVENANT | strongest → front → all → weakest | Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka. |
 | Ashbound Ashfang | ASHBOUND · CINDER WOLF | weakest → front → strongest | Marked mengikuti hero. Pulihkan target atau lindungi dengan Guard; hindari sapuan tanah. |
 | Frostbound Ashfang | FROSTBOUND · CINDER WOLF | front → strongest → weakest | Marked mengikuti hero. Pulihkan target atau lindungi dengan Guard; hindari sapuan tanah. |
 | Gilded Ashfang | GILDED · CINDER WOLF | strongest → weakest → front | Marked mengikuti hero. Pulihkan target atau lindungi dengan Guard; hindari sapuan tanah. |
@@ -192,6 +264,18 @@ The eight base silhouettes have ash/frost/auric palette variants. Variants also 
 | Ashbound Vharok | ASHBOUND · THE EMERALD GATE | breath → front → meteor → all | Baca empat pola. Sisakan Guard untuk Cataclysm; phase lanjut menambahkan aftershock tertunda. |
 | Frostbound Vharok | FROSTBOUND · THE EMERALD GATE | front → meteor → all → breath | Baca empat pola. Sisakan Guard untuk Cataclysm; phase lanjut menambahkan aftershock tertunda. |
 | Gilded Vharok | GILDED · THE EMERALD GATE | meteor → all → breath → front | Baca empat pola. Sisakan Guard untuk Cataclysm; phase lanjut menambahkan aftershock tertunda. |
+| Ashbound Lantern Eater | ASHBOUND · CINDERWING MOTH | strongest → meteor → breath | Mark mengikuti hero terkuat; lindungi dia, kemudian pindah dari tanda meteor dan lane breath. |
+| Frostbound Lantern Eater | FROSTBOUND · CINDERWING MOTH | meteor → breath → strongest | Mark mengikuti hero terkuat; lindungi dia, kemudian pindah dari tanda meteor dan lane breath. |
+| Gilded Lantern Eater | GILDED · CINDERWING MOTH | breath → strongest → meteor | Mark mengikuti hero terkuat; lindungi dia, kemudian pindah dari tanda meteor dan lane breath. |
+| Ashbound Glassjaw | ASHBOUND · MIRROR BASILISK | weakest → breath → strongest → meteor | Tidak ada petrify tersembunyi. Baca lane breath, heal target lemah, dan Guard mark yang mengikuti hero. |
+| Frostbound Glassjaw | FROSTBOUND · MIRROR BASILISK | breath → strongest → meteor → weakest | Tidak ada petrify tersembunyi. Baca lane breath, heal target lemah, dan Guard mark yang mengikuti hero. |
+| Gilded Glassjaw | GILDED · MIRROR BASILISK | strongest → meteor → weakest → breath | Tidak ada petrify tersembunyi. Baca lane breath, heal target lemah, dan Guard mark yang mengikuti hero. |
+| Ashbound Bellshore Claw | ASHBOUND · RELIC CRAB | front → meteor → all | HP tinggi tetapi interval panjang. Reposisi dari front dan meteor; interrupt atau Guard runtuhan all-grid. |
+| Frostbound Bellshore Claw | FROSTBOUND · RELIC CRAB | meteor → all → front | HP tinggi tetapi interval panjang. Reposisi dari front dan meteor; interrupt atau Guard runtuhan all-grid. |
+| Gilded Bellshore Claw | GILDED · RELIC CRAB | all → front → meteor | HP tinggi tetapi interval panjang. Reposisi dari front dan meteor; interrupt atau Guard runtuhan all-grid. |
+| Ashbound The Last Watch | ASHBOUND · HOLLOW REVENANT | strongest → front → all → weakest | Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka. |
+| Frostbound The Last Watch | FROSTBOUND · HOLLOW REVENANT | front → all → weakest → strongest | Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka. |
+| Gilded The Last Watch | GILDED · HOLLOW REVENANT | all → weakest → strongest → front | Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka. |
 
 ## 10. Campaign: four acts
 
@@ -592,7 +676,7 @@ Reward: 825g zone bonus. Recruits: none.
 
 ## 11. Raids and roguelike
 
-Raid contracts select golem, wraith, treant or dragon. Contract level follows cleared campaign chapters, while HP also scales to roster size. Sunken Bell starts a fresh floor-one run with the prepared roster and no boons; persistent job/gear/talents carry in. Each victory banks reward and offers up to three distinct, not-yet-owned boons. Select one, fully recover and descend. All twelve can be collected; a dedicated continuation button prevents an exhausted draft from trapping the run. Death or return to town clears run boons.
+Raids select any of twelve base silhouettes and all forty-eight variants. The new lantern-eater moth, basilisk, river crab and revenant are hunt/raid opponents and enter the endless rotation; the sixteen authored campaign chapters retain their existing opponents. Contract level follows cleared campaign chapters, while HP also scales to roster size. Sunken Bell starts a fresh floor-one run with the prepared roster and no boons; persistent job/gear/talents carry in. Each victory banks reward and offers up to three distinct, not-yet-owned boons. Select one, fully recover and descend. All twelve can be collected; a dedicated continuation button prevents an exhausted draft from trapping the run. Death or return to town clears run boons.
 
 | Boon | Patron | Effect |
 | --- | --- | --- |
@@ -611,10 +695,111 @@ Raid contracts select golem, wraith, treant or dragon. Contract level follows cl
 
 ## 12. Architecture, saves and delivery
 
-Phaser 3 + TypeScript + Vite, procedural pixel art, Web Audio, local fonts. No runtime server or third-party network dependency. Profile validation repairs invalid skills, impossible jobs, equipment ownership, chapter gaps and duplicate tile placement. v2 save namespace is retained with optional job/gear fields for backwards compatibility. Live combat is not persisted. Saves are tied to origin/browser. Development-only QA exposes snapshots and fixed-step simulation; production bundles do not expose that API.
+Phaser 3 + TypeScript + Vite, procedural pixel art, Web Audio, local fonts. No runtime server or third-party network dependency. Profile validation repairs invalid skills, impossible jobs, equipment ownership, chapter gaps and duplicate tile placement. Profile v3 uses gridbound.v3. A valid v2 save migrates automatically and remains untouched for rollback; existing heroes receive XP corresponding to campaign rank. Corrupt or future-version primary saves disable writes rather than overwriting the original. Recruits join at the existing roster median level. A JSON backup download is available in Settings. Live combat is not persisted. Saves are tied to origin/browser. Development-only QA exposes snapshots and fixed-step simulation; production bundles do not expose that API.
 
 Production uses relative asset URLs and independently cached engine/application chunks. Upload dist contents to a static host, including a nested subfolder. Netlify and Vercel configurations are included. CI regenerates the database, checks it against Git, tests, builds and runs the full campaign policy.
 
 ## 13. Verification and honest boundaries
 
 See PLAYTEST.md for executed commands. Automated policy tests establish reachability, not subjective fun. Browser campaign tests force terminal HP solely to exercise transitions; full simulation benchmarks separately fight every encounter normally. Physical touch feel, Safari/Firefox, low-end performance and human difficulty testing remain unverified. No multiplayer, cloud save, voiceover, free-roaming town, procedural narrative or paid economy is implemented. The broad prototype archive contains ideas that are not acceptance criteria for this release.
+
+## 14. Individual hero progression and quests
+
+Hero XP and campaign rank are separate. Each hero starts at level 1 and caps at level 40, gaining one skill point per level. Levels increase HP and power; only expedition participants earn combat XP, with downed heroes receiving 60%. XP and hunt counters settle once at a completed expedition/floor; defeat or an unfinished chapter earns neither. Successful replays continue earning XP. Quest XP goes to the selected recruited hero, except companion rewards always go to their named hero.
+
+Thirty quests: twelve hunts, six chained town requests, nine companion milestones and three chained endless milestones. Objectives recognize recorded lifetime achievements; hunt counters begin with v3 migration rather than inventing past kills. Rewards are claimed manually once, never auto-spent. Tracking does not reset objective counters. Locked prerequisites and already claimed rewards cannot be bypassed through the UI.
+
+| Quest | Kind / giver | Unlock / objective | Gold / XP | Item reward |
+| --- | --- | --- | --- | --- |
+| Tracks Beside the Cradle | hunt / SCOUTS OF EMBERHOLLOW | 0 clears; no prior quest; enemy 1 wolf | 65g / 100 XP | iron-edge |
+| The Stolen Rations | hunt / SCOUTS OF EMBERHOLLOW | 0 clears; no prior quest; enemy 1 goblin | 79g / 125 XP | oak-plate |
+| Names in the Silk | hunt / SCOUTS OF EMBERHOLLOW | 1 clears; no prior quest; enemy 1 spider | 93g / 150 XP | ember-charm |
+| A Voice That Is Not Yours | hunt / SCOUTS OF EMBERHOLLOW | 1 clears; no prior quest; enemy 1 shaman | 107g / 175 XP | None |
+| The Bridge Remembers | hunt / SCOUTS OF EMBERHOLLOW | 2 clears; no prior quest; enemy 1 golem | 121g / 200 XP | None |
+| An Unfinished Funeral | hunt / SCOUTS OF EMBERHOLLOW | 2 clears; no prior quest; enemy 1 wraith | 135g / 225 XP | None |
+| Roots Under the School | hunt / SCOUTS OF EMBERHOLLOW | 3 clears; no prior quest; enemy 1 treant | 149g / 250 XP | None |
+| An Oath Freely Given | hunt / SCOUTS OF EMBERHOLLOW | 3 clears; no prior quest; enemy 1 dragon | 163g / 275 XP | None |
+| Lanterns Without Flames | hunt / SCOUTS OF EMBERHOLLOW | 1 clears; no prior quest; enemy 1 moth | 177g / 300 XP | None |
+| The Stone Orchard | hunt / SCOUTS OF EMBERHOLLOW | 3 clears; no prior quest; enemy 1 basilisk | 191g / 325 XP | None |
+| The River Toll | hunt / SCOUTS OF EMBERHOLLOW | 2 clears; no prior quest; enemy 1 crab | 205g / 350 XP | None |
+| The Last Watch Never Ends | hunt / SCOUTS OF EMBERHOLLOW | 5 clears; no prior quest; enemy 1 revenant | 219g / 375 XP | None |
+| One Road Open | town / MAREN · TOWN STEWARD | 0 clears; no prior quest; chapters 1 | 90g / 180 XP | None |
+| Tools, Not Trophies | town / MAREN · TOWN STEWARD | 1 clears; first-road; gear 2 | 160g / 300 XP | None |
+| Teach Someone Tomorrow | town / MAREN · TOWN STEWARD | 1 clears; a-shared-craft; talents 4 | 230g / 420 XP | None |
+| Letters Never Burned | town / MAREN · TOWN STEWARD | 3 clears; a-lesson-kept; chapters 4 | 300g / 540 XP | unbound-weapon |
+| A River of Names | town / MAREN · TOWN STEWARD | 7 clears; letters-unburned; chapters 8 | 370g / 660 XP | unbound-armor |
+| Leave the Door Unlocked | town / MAREN · TOWN STEWARD | 15 clears; river-of-names; chapters 16 | 440g / 780 XP | unbound-charm |
+| A Shield Set Down | companion / ALDRIC | 0 clears; no prior quest; level 8 | 180g / 300 XP | None |
+| A Wall with Windows | companion / BRAN | 0 clears; no prior quest; level 8 | 200g / 340 XP | None |
+| The Name She Chose | companion / SABLE | 0 clears; no prior quest; level 8 | 220g / 380 XP | None |
+| The Arrow Home | companion / ROWAN | 0 clears; no prior quest; level 12 | 240g / 420 XP | None |
+| A Song for the Living | companion / LYRA | 0 clears; no prior quest; level 12 | 260g / 460 XP | None |
+| The Weight of Speed | companion / KESTREL | 0 clears; no prior quest; level 12 | 280g / 500 XP | None |
+| No Debt to the Night | companion / NYX | 0 clears; no prior quest; level 16 | 300g / 540 XP | None |
+| A Question Unanswered | companion / ORIN | 0 clears; no prior quest; level 16 | 320g / 580 XP | None |
+| Fire Without a Cage | companion / MIRA | 0 clears; no prior quest; level 16 | 340g / 620 XP | None |
+| Below the First Bell | descent / THE KEEPER BELOW | 0 clears; no prior quest; floor 3 | 200g / 400 XP | None |
+| The Seventh Echo | descent / THE KEEPER BELOW | 3 clears; descent-3; floor 7 | 420g / 750 XP | None |
+| An Exit, Not a Throne | descent / THE KEEPER BELOW | 6 clears; descent-7; floor 12 | 640g / 1100 XP | None |
+
+### Equipment sets
+
+| Set | Two pieces | Three pieces |
+| --- | --- | --- |
+| Ashwood Scout | {"tapBonus":0.08} | {"openingBarrier":0.1} |
+| Windwalker | {"tapBonus":0.1} | {"reduction":0.05} |
+| Dawn Pilgrim | {"heal":0.12} | {"shield":0.12} |
+| Ember Duelist | {"openingBarrier":0.12} | {"tapBonus":0.15} |
+| Bellmetal Bastion | {"reduction":0.08} | {"shield":0.15} |
+| Unbound Tomorrow | {"heal":0.12,"shield":0.12} | {"openingBarrier":0.18,"tapBonus":0.08} |
+
+### XP thresholds (cumulative)
+
+| Hero level | Total XP |
+| --- | --- |
+| 1 | 0 |
+| 2 | 120 |
+| 3 | 282 |
+| 4 | 490 |
+| 5 | 748 |
+| 6 | 1060 |
+| 7 | 1430 |
+| 8 | 1862 |
+| 9 | 2360 |
+| 10 | 2928 |
+| 11 | 3570 |
+| 12 | 4290 |
+| 13 | 5092 |
+| 14 | 5980 |
+| 15 | 6958 |
+| 16 | 8030 |
+| 17 | 9200 |
+| 18 | 10472 |
+| 19 | 11850 |
+| 20 | 13338 |
+| 21 | 14940 |
+| 22 | 16660 |
+| 23 | 18502 |
+| 24 | 20470 |
+| 25 | 22568 |
+| 26 | 24800 |
+| 27 | 27170 |
+| 28 | 29682 |
+| 29 | 32340 |
+| 30 | 35148 |
+| 31 | 38110 |
+| 32 | 41230 |
+| 33 | 44512 |
+| 34 | 47960 |
+| 35 | 51578 |
+| 36 | 55370 |
+| 37 | 59340 |
+| 38 | 63492 |
+| 39 | 67830 |
+| 40 | 72358 |
+
+## 15. GUI interaction and next production
+
+Training is split into overview, active skills, jobs, talent branches, equipment and formation. Campaign, quests and bestiary use single-record listing pages. Talent branches draw SVG prerequisite arrows; selecting a node shows its detail and a separate learn action. Equipment selection previews description, cost, restrictions and stat comparison without spending; explicit confirmation applies the purchase/equip. Victory waits for enemy death readiness (780ms normal, 120ms reduced-motion fade), then result choices remain disabled for one full second. Save loading protects incomplete v3 envelopes instead of overwriting legacy progress.
+
+Implemented does not mean visually accepted or deployed. Default-page height measurements still show some vertical scroll; expanded content, final combat bounds, physical devices and arrow clarity require review. See [docs/NEXT-PRODUCTION.md](docs/NEXT-PRODUCTION.md) for current status, ordered blockers, release acceptance and rollback. See [docs/GUI-VERIFIED.md](docs/GUI-VERIFIED.md) for the latest executed GUI checkpoint. Do not use old agent snapshots as current release evidence.

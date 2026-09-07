@@ -26,7 +26,9 @@ const entries:Job[]=[
 export const JOBS:Record<string,Job>=Object.fromEntries(entries.map(j=>[j.id,j]));
 export function jobSkills(job?:string) {const j=JOBS[job??''];return j?[j.index,...(j.parent?[JOBS[j.parent].index]:[])]:[];}
 export function legalSkill(index:number,talents:string[],job?:string) {return Number.isInteger(index)&&index>=0&&(index<2||(index<4&&talents.includes(`active-${index}`))||jobSkills(job).includes(index));}
-export type Gear={id:string;name:string;slot:'weapon'|'armor'|'charm';cost:number;power:number;hp:number;tempo:number;description:string};
+export type GearEffect=Partial<{reduction:number;heal:number;shield:number;openingBarrier:number;tapBonus:number}>;
+export type Gear={id:string;name:string;slot:'weapon'|'armor'|'charm';cost:number;power:number;hp:number;tempo:number;description:string;rarity?:'common'|'uncommon'|'rare'|'epic';minLevel?:number;classId?:ClassId;setId?:string;source?:'forge'|'quest';effects?:GearEffect};
+export type GearSet={id:string;name:string;level:number;quest?:boolean;two:GearEffect;three:GearEffect;description:string};
 export const GEAR:Gear[]=[
 {id:'iron-edge',name:'Forged Edge',slot:'weapon',cost:65,power:.15,hp:0,tempo:0,description:'+15% skill power.'},
 {id:'swift-edge',name:'Quicksteel',slot:'weapon',cost:95,power:.06,hp:0,tempo:.12,description:'+6% power, +12% tempo.'},
@@ -38,4 +40,40 @@ export const GEAR:Gear[]=[
 {id:'tempo-charm',name:'Clockseed',slot:'charm',cost:95,power:0,hp:0,tempo:.13,description:'+13% tempo.'},
 {id:'hearth-charm',name:'Hearthstone',slot:'charm',cost:110,power:0,hp:.18,tempo:.04,description:'+18% HP, +4% tempo.'},
 ];
-export function gearStats(gear:Record<string,string>={}) {return Object.entries(gear).reduce((s,[slot,id])=>{const g=GEAR.find(g=>g.id===id&&g.slot===slot);if(g){s.power+=g.power;s.hp+=g.hp;s.tempo+=g.tempo;}return s;},{power:1,hp:1,tempo:1});}
+export const GEAR_SETS:GearSet[]=[
+ {id:'scout',name:'Ashwood Scout',level:3,two:{tapBonus:.08},three:{openingBarrier:.1},description:'2 pieces: tap +0,08s. 3: barrier awal 10% HP.'},
+ {id:'wind',name:'Windwalker',level:6,two:{tapBonus:.1},three:{reduction:.05},description:'2 pieces: tap +0,10s. 3: damage masuk −5%.'},
+ {id:'pilgrim',name:'Dawn Pilgrim',level:8,two:{heal:.12},three:{shield:.12},description:'2 pieces: heal yang diberikan +12%. 3: shield +12%.'},
+ {id:'cinder',name:'Ember Duelist',level:10,two:{openingBarrier:.12},three:{tapBonus:.15},description:'2 pieces: barrier awal 12% HP. 3: tap +0,15s.'},
+ {id:'bastion',name:'Bellmetal Bastion',level:12,two:{reduction:.08},three:{shield:.15},description:'2 pieces: damage masuk −8%. 3: shield yang diberikan +15%.'},
+ {id:'unbound',name:'Unbound Tomorrow',level:15,quest:true,two:{heal:.12,shield:.12},three:{openingBarrier:.18,tapBonus:.08},description:'2 pieces: heal dan shield +12%. 3: barrier awal 18% HP dan tap +0,08s. Hanya reward town story.'}
+];
+const setPieces:Record<string,[string,number,number,number][]>={
+ scout:[['Trailknife',.14,0,.02],['Barkweave Coat',0,.2,.02],['Scout Whistle',.04,.05,.06]],
+ wind:[['Gale Sabre',.1,-.03,.13],['Featherstep Mantle',0,.12,.1],['Windglass Knot',.02,0,.14]],
+ pilgrim:[['Dawn Staff',.18,.05,0],['Pilgrim Vestments',0,.26,.02],['Sunwell Rosary',.07,.09,.03]],
+ cinder:[['Cinderbrand',.3,0,-.04],['Ashrunner Jacket',.06,.2,.02],['Coalheart Seal',.14,.04,0]],
+ bastion:[['Gatekeeper Mace',.22,.12,-.05],['Bastion Harness',0,.42,-.06],['Oath Anchor',.02,.22,-.02]],
+ unbound:[['Tomorrow Blade',.25,0,.06],['Open Door Mantle',0,.3,.04],['Unwritten Promise',.1,.12,.05]]
+};
+for(const set of GEAR_SETS) setPieces[set.id].forEach(([name,power,hp,tempo],i)=>{
+ const slot=(['weapon','armor','charm'] as const)[i];
+ GEAR.push({id:`${set.id}-${slot}`,name,slot,power,hp,tempo,cost:100+set.level*18+i*15,minLevel:set.level,setId:set.id,source:set.quest?'quest':'forge',rarity:set.quest?'epic':set.level>=8?'rare':'uncommon',description:`${Math.round(power*100)}% power · ${Math.round(hp*100)}% HP · ${Math.round(tempo*100)}% tempo. ${set.name}: ${set.description}`});
+});
+const weapons:Record<ClassId,[string,string,string]>={warrior:['Watchman Sword','Oathsplitter','Last Bulwark'],rogue:['Threadcutter','Dusk Needle','Mercy Razor'],archer:['Scout Longbow','Briarstring','Horizon Bow'],healer:['Kindling Crook','Dawn Reliquary','Living Bell'],wizard:['Runeslate Rod','Prism Branch','Unwritten Star']};
+for(const [classId,names] of Object.entries(weapons) as [ClassId,string[]][]) names.forEach((name,i)=>{
+ const effects:GearEffect=classId==='warrior'?{shield:.08+i*.04}:classId==='healer'?{heal:.1+i*.04}:classId==='rogue'?{tapBonus:.04+i*.04}:classId==='archer'?{openingBarrier:.06+i*.03}:{};
+ GEAR.push({id:`${classId}-weapon-${i+1}`,name,slot:'weapon',cost:150+i*180,power:.16+i*.1,hp:classId==='warrior'?.05:0,tempo:classId==='wizard'?.03+i*.02:0,classId,minLevel:[5,10,20][i],rarity:i===2?'epic':'rare',source:'forge',effects,description:`${Math.round((.16+i*.1)*100)}% power. ${classId==='warrior'?`Shield +${8+i*4}%, HP +5%.`:classId==='healer'?`Heal diberikan +${10+i*4}%.`:classId==='rogue'?`Tap +${(.04+i*.04).toFixed(2)}s.`:classId==='archer'?`Barrier awal ${6+i*3}% HP.`:`Tempo +${3+i*2}%.`} Khusus ${classId}.`});
+});
+export function gearStats(gear:Record<string,string>={}) {
+ const s={power:1,hp:1,tempo:1,reduction:0,heal:0,shield:0,openingBarrier:0,tapBonus:0};
+ const pieces=new Map<string,number>();
+ const add=(effects:GearEffect)=>{for(const [key,value] of Object.entries(effects))s[key as keyof GearEffect]+=value;};
+ for(const [slot,id] of Object.entries(gear)){
+  const g=GEAR.find(g=>g.id===id&&g.slot===slot);if(!g)continue;
+  s.power+=g.power;s.hp+=g.hp;s.tempo+=g.tempo;add(g.effects??{});
+  if(g.setId)pieces.set(g.setId,(pieces.get(g.setId)??0)+1);
+ }
+ for(const set of GEAR_SETS){const n=pieces.get(set.id)??0;if(n>=2)add(set.two);if(n>=3)add(set.three);}
+ s.reduction=Math.min(.2,s.reduction);return s;
+}

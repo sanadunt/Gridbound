@@ -1,13 +1,14 @@
 import { JOBS, gearStats, legalSkill } from './jobs';
-import { TALENTS } from './profile';
+import { TALENTS, talentStats } from './talents';
+import { heroProgress, levelStats } from './levels';
 import { KITS, ROSTER, type ClassId, type Mode } from './content';
 import { CAMPAIGN, ENEMIES, BOONS, type Intent } from './world';
-export type Hero = { id:number; name:string; classId:ClassId; slot:number; hp:number; maxHp:number; shield:number; stance:number; remaining:number; total:number; fatigue:number; lastTap:number; moveLock:number; buff:number; acts:number; talents:string[]; skills:number[]; regen:number; regenPower:number; rescued:boolean; job?:string; gear:Record<string,string>; gearPower:number; gearTempo:number };
+export type Hero = { offensiveActs:number; level:number; perks:ReturnType<typeof talentStats>; equipment:ReturnType<typeof gearStats>; id:number; name:string; classId:ClassId; slot:number; hp:number; maxHp:number; shield:number; stance:number; remaining:number; total:number; fatigue:number; lastTap:number; moveLock:number; buff:number; acts:number; talents:string[]; skills:number[]; regen:number; regenPower:number; rescued:boolean; job?:string; gear:Record<string,string>; gearPower:number; gearTempo:number };
 export type Telegraph = { id:number; name:string; type:'front'|'meteor'|'breath'|'target'|'all'; slots:number[]; left:number; total:number; targetId?:number; counter?:string; damage?:number };
 export type Minion = { id:number; lane:number; hp:number; maxHp:number; timer:number; enemyId?:string };
 export type BattleEvent = { type:string; source?:number; slot?:number; lane?:number; amount?:number; color?:string; text?:string; targets?:number[]; kind?:string };
 export type Status = 'ready'|'fighting'|'paused'|'victory'|'defeat';
-export type BattleOptions = { roster?:number[]; loadouts?:Record<number,{skills:number[];talents:string[];slot?:number;job?:string;gear?:Record<string,string>}>; boons?:string[]; enemyId?:string; stage?:number };
+export type BattleOptions = { roster?:number[]; loadouts?:Record<number,{skills:number[];talents:string[];xp?:number;slot?:number;job?:string;gear?:Record<string,string>}>; boons?:string[]; enemyId?:string; stage?:number };
 const defaultUpgrades = {power:1,vitality:1,tempo:1};
 export class Battle {
   heroes:Hero[]=[]; threats:Telegraph[]=[]; minions:Minion[]=[]; events:BattleEvent[]=[];
@@ -39,15 +40,16 @@ export class Battle {
       const r=ROSTER[id],k=KITS[r.classId],loadout=options.loadouts?.[id];
       const talents=[...new Set(loadout?.talents??[])].filter(t=>TALENTS.some(def=>def.id===t));
       const job=JOBS[loadout?.job??'']?.base===r.classId?loadout?.job:undefined,stats=gearStats(loadout?.gear);
+      const perks=talentStats(talents,r.classId),growth=levelStats(loadout?.xp),level=heroProgress(loadout?.xp).level;
       const allowed=(index:number)=>legalSkill(index,talents,job);
       let skills=[...new Set(loadout?.skills??[0,1])].filter(index=>Number.isInteger(index)&&index>=0&&index<KITS[r.classId].skills.length&&allowed(index)).slice(0,2);
       if(skills.length<2) skills=[0,1];
       let slot=loadout?.slot??(ids.length===3?[1,7,6][i]:r.slot);
       if(!Number.isInteger(slot)||slot<0||slot>8||occupied.has(slot)) slot=Array.from({length:9},(_,j)=>j).find(j=>!occupied.has(j))!;
       occupied.add(slot);
-      const maxHp=Math.round(k.hp*this.vitality*stats.hp*(talents.includes('vigor')?1.18:1)*(talents.includes('vigor-2')?1.2:1));
-      const total=k.skills[skills[0]].cooldown/(this.tempo*stats.tempo*(talents.includes('focus')?1.1:1)*(talents.includes('focus-2')?1.08:1)*(JOBS[job??'']?.effect==='time'?1.15:1));
-      return {id,name:r.name,classId:r.classId,slot,hp:maxHp,maxHp,shield:maxHp*((talents.includes('shelter')?.2:0)+(['aegis','veil','bell-oracle'].includes(job??'')?.25:0)),job,gear:loadout?.gear??{},gearPower:stats.power,gearTempo:stats.tempo,stance:skills[0],remaining:1.2+i*.25,total,fatigue:0,lastTap:-10,moveLock:0,buff:0,acts:0,talents,skills,regen:0,regenPower:0,rescued:false};
+      const maxHp=Math.round(k.hp*this.vitality*stats.hp*perks.hp*growth.hp*(talents.includes('vigor')?1.18:1)*(talents.includes('vigor-2')?1.2:1));
+      const total=k.skills[skills[0]].cooldown/(this.tempo*stats.tempo*perks.tempo*(talents.includes('focus')?1.1:1)*(talents.includes('focus-2')?1.08:1)*(JOBS[job??'']?.effect==='time'?1.15:1));
+      return {offensiveActs:0,level,perks,equipment:stats,id,name:r.name,classId:r.classId,slot,hp:maxHp,maxHp,shield:maxHp*Math.min(.6,perks.openingBarrier+(stats.openingBarrier??0)+(talents.includes('shelter')?.2:0)+(['aegis','veil','bell-oracle'].includes(job??'')?.25:0)),job,gear:loadout?.gear??{},gearPower:stats.power*perks.power*growth.power,gearTempo:stats.tempo*perks.tempo,stance:skills[0],remaining:1.2+i*.25,total,fatigue:0,lastTap:-10,moveLock:0,buff:0,acts:0,talents,skills,regen:0,regenPower:0,rescued:false};
     });
     this.time=0; this.gold=0; this.potions=2; this.resolve=25; this.taps=0; this.damage=0; this.healed=0; this.blocked=0; this.dodged=0; this.relocations=0; this.seed=271828; this.eventId=0; this.events=[]; this.castCount=0; this.lastTapped=-1; this.selected=this.heroes[0].id;
     this.prepareStage();
@@ -60,7 +62,7 @@ export class Battle {
       this.stageCount=zone.stages.length; this.enemyId=stage.enemy; this.stageName=stage.name;
       this.bossMax=Math.round(stage.hp*(this.floor<=4?2.2:4+this.floor*.75));
     } else {
-      const endless=['wolf','goblin','spider','shaman','golem','wraith','treant','dragon'];
+      const endless=Object.values(ENEMIES).filter(e=>e.archetype===e.id).map(e=>e.id);
       this.enemyId=ENEMIES[this.options.enemyId??'']?this.options.enemyId!:this.mode==='endless'?endless[(this.floor-1)%endless.length]:'dragon';
       this.stageCount=1; this.stageName=this.mode==='endless'?`Descent ${this.floor}`:'Raid contract';
       this.bossMax=Math.round((this.mode==='endless'?1900:3400)*Math.pow(this.heroes.length/3,.9)*Math.pow(1.2,this.floor-1)*ENEMIES[this.enemyId].hp);
@@ -83,7 +85,7 @@ export class Battle {
   tap(id:number,sync=false) {
     const h=this.hero(id);
     if(!h||h.hp<=0||this.status!=='fighting'||h.moveLock>0||this.time-h.lastTap<.11)return false;
-    const amount=((sync?.88:.64)+(h.talents.includes('momentum')?.2:0))*(h.fatigue>70?.14:h.fatigue>40?.5:1);
+    const amount=((sync?.88:.64)+(h.talents.includes('momentum')?.2:0)+h.perks.tapBonus+(h.equipment.tapBonus??0))*(h.fatigue>70?.14:h.fatigue>40?.5:1);
     h.remaining=Math.max(0,h.remaining-amount);h.fatigue=Math.min(100,h.fatigue+5.5);h.lastTap=this.time;this.taps++;
     this.gainResolve(.3);
     if(this.boons.includes('chorus')&&this.lastTapped!==id)h.buff=Math.max(h.buff,2);
@@ -185,7 +187,7 @@ export class Battle {
     if(effect==='elements'&&s.kind==='aoe')value*=1.3;
     return value;
   }
-  private threatPower(h:Hero) { const s=KITS[h.classId].skills[h.stance];return s.power/this.cooldown(h)*this.power*(h.talents.includes('mastery')?1.18:1)*(h.buff>0?1.3:1); }
+  private threatPower(h:Hero) { const s=KITS[h.classId].skills[h.stance];return s.power/this.cooldown(h)*this.skillPower(h)*(h.buff>0?1.3:1); }
   summon() {
     const lanes=this.heroes.length<=3?[1]:this.heroes.length<=5?[0,2]:[0,1,2];
     for(const lane of lanes){if(this.minions.some(m=>m.lane===lane&&m.hp>0))continue;const hp=Math.round((this.mode==='adventure'?65+this.floor*18:170)*Math.pow(1.1,this.mode==='adventure'?0:this.floor-1));this.minions.push({id:this.eventId++,lane,hp,maxHp:hp,timer:4,enemyId:['wolf','spider','goblin'][(this.stage+lane)%3]});}
@@ -194,7 +196,9 @@ export class Battle {
   act(h:Hero) {
     if(h.hp<=0)return;
     const s=KITS[h.classId].skills[h.stance];h.acts++;
-    const p=s.power*this.skillPower(h)*(h.buff>0?1.3:1),lane=h.slot%3;
+    let p=s.power*this.skillPower(h)*(h.buff>0?1.3:1);const lane=h.slot%3;
+    if(['heal','regen'].includes(s.kind))p*=1+h.perks.heal+(h.equipment.heal??0);
+    if(['shield','partyshield'].includes(s.kind))p*=1+h.perks.shield+(h.equipment.shield??0);
     this.emit({type:'cast',source:h.id,slot:h.slot,kind:s.kind,text:s.name,color:KITS[h.classId].color});
     if(h.talents.includes('resolve')||JOBS[h.job??'']?.effect==='hymn')this.gainResolve(2);
     if(h.job==='hourkeeper')this.attackIn=Math.min(14,this.attackIn+.25);
@@ -209,7 +213,7 @@ export class Battle {
     }else if(s.kind==='buff'){
       this.living().forEach(a=>{a.buff=JOBS[h.job??'']?.effect==='hymn'?10:7;this.emit({type:'buff',source:a.id,slot:a.slot});});
     }else{
-      this.castCount++;
+      this.castCount++;h.offensiveActs++;
       if(s.kind==='interrupt'){
         const active=this.threats.filter(t=>t.type==='all');this.threats=this.threats.filter(t=>t.type!=='all');
         if(active.length)this.emit({type:'break',text:'RITUAL INTERRUPTED'});
@@ -223,6 +227,8 @@ export class Battle {
         else{const enemies=this.minions.filter(m=>m.hp>0);if(enemies.length)enemies.forEach(m=>this.hitMinion(m,p/enemies.length*1.7,h.id,'arrow'));else this.hitBoss(p,h.id,'arrow');}
       }else if(h.classId==='wizard'&&h.stance===2){this.delayed.push({left:1.5,source:h.id,lane:this.targetLane,power:p});this.emit({type:'bomb',source:h.id,lane:this.targetLane});}
       else this.attack(h.id,(h.classId==='archer'||h.classId==='wizard')?this.targetLane:lane,p,h.classId==='archer'?'arrow':h.classId==='wizard'?'magic':'slash');
+      if(h.perks.echo&&h.offensiveActs%5===0)this.hitBoss(p*h.perks.echo,h.id,'magic');
+      if(h.perks.leech)this.heal(h,p*h.perks.leech);
       if(this.boons.includes('storm')&&this.castCount%5===0)this.hitBoss(p*.55,h.id,'magic');
       if(['blade-saint','starshot','archon'].includes(h.job??'')&&h.acts%5===0)this.hitBoss(p*.4,h.id,'magic');
       if(JOBS[h.job??'']?.effect==='leech'||h.job==='warlord')this.heal(h,p*(h.job==='warlord'?.08:.12));
@@ -232,6 +238,7 @@ export class Battle {
   hitMinion(m:Minion,amount:number,source:number,kind:string) {
     if(m.hp<=0||!Number.isFinite(amount)||amount<=0)return;
     if(JOBS[this.hero(source)?.job??'']?.effect==='hunter')amount*=1.45;
+    amount*=1+(this.hero(source)?.perks.minionDamage??0);
     const actual=Math.min(m.hp,amount);m.hp=Math.max(0,m.hp-amount);this.damage+=actual;this.gainResolve(actual*.008);this.emit({type:'projectile',source,lane:m.lane,amount:actual,kind});
     if(m.hp===0&&this.hero(source)?.job==='wildwarden')this.living().forEach(h=>this.heal(h,18));
     if(m.hp===0){this.emit({type:'minionDown',lane:m.lane});if(this.boons.includes('feast'))this.living().forEach(h=>this.heal(h,24));}
@@ -250,16 +257,19 @@ export class Battle {
     if(h.talents.includes('recovery'))amount*=1.15;
     const value=Math.min(amount,h.maxHp-h.hp);h.hp+=value;this.healed+=value;
     if(h.job==='seraph')this.shield(h,(amount-value)*.25);
+    if(h.perks.overheal)this.shield(h,(amount-value)*h.perks.overheal);
     if(this.boons.includes('tide'))this.shield(h,(amount-value)*.35);
     if(value>1)this.emit({type:'heal',source:h.id,slot:h.slot,amount:value});
   }
   hurt(h:Hero,amount:number) {
     if(h.hp<=0||!Number.isFinite(amount)||amount<=0)return;
     if(h.talents.includes('fortitude'))amount*=.9;
+    amount*=1-Math.min(.45,h.perks.reduction+(h.equipment.reduction??0));
     const guard=this.guardLeft>0?amount*.65:0;amount-=guard;
     const absorbed=Math.min(h.shield,amount);h.shield-=absorbed;this.blocked+=absorbed+guard;
     const dmg=Math.round(amount-absorbed);h.hp=Math.max(0,h.hp-dmg);this.gainResolve(amount*.028);
     if(this.boons.includes('thorn'))this.hitBoss((absorbed+guard)*.35,h.id,'thorn');
+    if(h.perks.thorns)this.hitBoss((absorbed+guard)*h.perks.thorns,h.id,'thorn');
     this.emit({type:'hurt',source:h.id,slot:h.slot,amount:dmg,text:absorbed+guard>0?'BLOCK':''});
     if(h.hp===0&&this.boons.includes('lifeline')&&!h.rescued){h.rescued=true;h.hp=Math.round(h.maxHp*.2);this.emit({type:'heal',source:h.id,slot:h.slot,amount:h.hp,text:'NOT YET'});}
     else if(h.hp===0)this.emit({type:'down',source:h.id,slot:h.slot});

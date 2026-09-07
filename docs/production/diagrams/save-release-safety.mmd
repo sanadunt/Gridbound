@@ -1,0 +1,14 @@
+flowchart TD
+  Load[Read primary v3] --> Exists{Present}
+  Exists -->|No| Legacy[Read legacy and normalize compatible data]
+  Exists -->|Yes| Validate{Supported complete envelope}
+  Validate -->|Yes| Normalize[Normalize fields]
+  Validate -->|No| Protect[Preserve original and disable writes]
+  Protect --> Backup[Use compatible legacy fallback for session]
+  Normalize --> Session[Playable session]
+  Legacy --> Session
+  Backup --> Session
+  Session --> Write{Writes permitted}
+  Write -->|Yes| Persist[Persist v3]
+  Write -->|No| Warning[Warn and offer existing export]
+  Import[Proposed import not implemented] -.-> Consent[Validate preview and explicit replace consent]

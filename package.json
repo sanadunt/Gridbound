@@ -1,9 +1,11 @@
 {
   "name": "gridbound-web",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.12.0" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
@@ -13,7 +15,7 @@
     "database": "node --import tsx scripts/export-database.ts",
     "docs": "npm run database && node --import tsx scripts/export-docs.ts",
     "balance": "node --import tsx scripts/balance.ts",
-    "test:browser": "node scripts/browser-smoke.mjs && node scripts/mobile-smoke.mjs && node scripts/campaign-browser.mjs",
+    "test:browser": "node scripts/browser-smoke.mjs && node scripts/mobile-smoke.mjs && node scripts/campaign-browser.mjs && node scripts/progression-browser.mjs",
     "test:production": "node scripts/production-smoke.mjs",
     "test:webapp": "node scripts/node-production-smoke.mjs",
     "package:hostinger": "npm run build && python3 scripts/package-hostinger.py",

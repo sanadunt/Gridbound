@@ -1,0 +1,19 @@
+flowchart TD
+  Home[Town navigation] --> Campaign[Chapter page]
+  Campaign --> Journal[Optional journal detail]
+  Home --> Training[Selected hero]
+  Training --> Overview[Overview]
+  Training --> Skills[Active skills]
+  Training --> Jobs[Job branches]
+  Training --> Talents[Talent branch graph]
+  Talents --> Detail[Selected node detail and learn]
+  Training --> Gear[Item selection]
+  Gear --> Preview[Preview stats restrictions price]
+  Preview --> Confirm{Explicit confirm}
+  Confirm -->|Cancel| Gear
+  Confirm -->|Valid| Equip[Purchase or equip]
+  Training --> Formation[Formation]
+  Home --> Quests[Quest page and manual claim]
+  Home --> Bestiary[Monster page]
+  Home --> Combat[Encounter]
+  Combat --> Inspector[Expandable detail target design]
