@@ -21,8 +21,9 @@ import { Sound } from './audio/sound';
 import { loadSave, saveProfile } from './game/save';
 import { storyBattleOptions, setStoryParty } from './game/story-party';
 import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-build';
+import { createRaidBuild, setRaidJob, setRaidPartySize, normalizeRaidBuild } from './game/raid-build';
 import { QUESTS, questProgress } from './game/quests';
-import { CHALLENGE_SHOP, createRunWallet, creditRun, resetRunWallet, getRaidContractForEnemy, roguelikeMilestoneForFloor, buyRunItem, type RunWallet } from './economy/challenge';
+import { CHALLENGE_SHOP, createRunWallet, creditRun, resetRunWallet, getRaidContractForEnemy, roguelikeMilestoneForFloor, buyRunItem, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const store={getItem:(key:string)=>localStorage.getItem(key),setItem:(key:string,value:string)=>localStorage.setItem(key,value)};
@@ -59,7 +60,7 @@ let offeredBoons: typeof BOONS = [];
 let resumeOnClose = false;
 let resultGeneration: ResultGateGeneration | undefined;
 const townState: TownState = {
-  tab: 'campaign', hero: 0, zone: Math.min(profile.cleared.length, CAMPAIGN.length - 1), raid: 'golem', notice: '',
+  tab: 'campaign', hero: 0, zone: Math.min(profile.cleared.length, CAMPAIGN.length - 1), raid: 'golem', raidTier: 'bronze', raidModifiers: [], raidBuild: createRaidBuild(profile.roster, Math.min(3, profile.roster.length, 6)), notice: '',
   trainingTab: 'talents', campaignPage: 0, questPage: 0, bestiaryPage: 0,
 };
 
@@ -156,7 +157,7 @@ $('town-screen').addEventListener('click', event => {
     townState.campaignPage = townState.zone;
     showTown('campaign');
   }
-  if (button.dataset.raid) { townState.raid = button.dataset.raid; showTown('raid'); }
+  if (button.dataset.raid) { townState.raid = button.dataset.raid; townState.raidSandbox = undefined; showTown('raid'); return; }
   if (button.dataset.bankBuy) {
     const item = buyChallengeUnlock(profile, button.dataset.bankBuy);
     showTown(townState.tab, item ? `${item.name} unlocked. Bank Crystal spent; equip it before a future run.` : 'Not enough bank Crystal or this unlock is already owned.');
@@ -203,7 +204,7 @@ $('town-screen').addEventListener('click', event => {
   }
   if(button.dataset.claimQuest){const q=QUESTS.find(q=>q.id===button.dataset.claimQuest);const ok=claimQuest(profile,button.dataset.claimQuest,townState.hero);showTown('quests',ok?`Reward diterima ${ROSTER[q?.heroId??townState.hero].name}. Equipment hadiah masuk inventory; pasang di Training hall.`:'Quest belum selesai atau sudah diklaim.');}
   if(button.dataset.trackQuest){const q=QUESTS.find(q=>q.id===button.dataset.trackQuest);if(q&&questProgress(profile,q).unlocked){profile.trackedQuest=q.id;showTown('quests','Quest ditandai. Progress dihitung dari kemenangan yang sudah dibank.');}}
-  if(button.dataset.questHunt){townState.raid=button.dataset.questHunt;showTown('raid');}
+  if(button.dataset.questHunt){townState.raid=button.dataset.questHunt;townState.raidSandbox=undefined;showTown('raid');}
   if (button.dataset.depart) depart(button.dataset.depart as Mode);
 });
 $('town-screen').addEventListener('change', event => {
@@ -218,7 +219,44 @@ $('town-screen').addEventListener('change', event => {
     if(Number.isInteger(slot)&&slot>=0&&slot<3){jobs[slot]=el.value as never;if(setRogueJobs(build,jobs))townState.rogueSetup=build;}
     showTown('endless');return;
   }
-  if(el.matches('[data-raid-variant]')){townState.raid=el.value;showTown('raid');return;}
+  if(el.matches('[data-raid-variant]')){townState.raid=el.value;townState.raidSandbox=undefined;showTown('raid');return;}
+  if(el.matches('[data-raid-tier]')){
+    townState.raidTier=el.value as RaidTier;
+    const certified=getRaidContractForEnemy(townState.raid,townState.raidTier,townState.raidModifiers);
+    const sandbox=townState.raidSandbox;
+    const neutral=!sandbox||([sandbox.hpScale,sandbox.damageScale,sandbox.intervalScale].every(value=>value===1));
+    townState.raidSandbox=certified&&neutral?undefined:sandbox??{hpScale:1,damageScale:1,intervalScale:1};
+    showTown('raid');return;
+  }
+  if(el.matches('[data-raid-modifier]')){
+    const input=el as unknown as HTMLInputElement;
+    const id=input.dataset.raidModifier as RaidModifierId;
+    townState.raidModifiers=input.checked?[...townState.raidModifiers,id]:townState.raidModifiers.filter(value=>value!==id);
+    const certified=getRaidContractForEnemy(townState.raid,townState.raidTier,townState.raidModifiers);
+    const sandbox=townState.raidSandbox;
+    const neutral=!sandbox||([sandbox.hpScale,sandbox.damageScale,sandbox.intervalScale].every(value=>value===1));
+    townState.raidSandbox=certified&&neutral?undefined:sandbox??{hpScale:1,damageScale:1,intervalScale:1};
+    showTown('raid');return;
+  }
+  if(el.matches('[data-raid-party-size]')){
+    const build=(townState.raidBuild&&normalizeRaidBuild(townState.raidBuild,profile.roster))??createRaidBuild(profile.roster,Math.min(3,profile.roster.length,6));
+    const ok=setRaidPartySize(build,Number(el.value),profile.roster);
+    if(ok)townState.raidBuild=build;
+    showTown('raid',ok?'Raid party disimpan. Story loadout tidak berubah.':'Raid party harus berisi 1–6 hero yang sudah direkrut.');return;
+  }
+  if(el.matches('[data-raid-job]')){
+    const build=(townState.raidBuild&&normalizeRaidBuild(townState.raidBuild,profile.roster))??createRaidBuild(profile.roster,Math.min(3,profile.roster.length,6));
+    const ok=setRaidJob(build,Number(el.dataset.raidJob),el.value);
+    if(ok)townState.raidBuild=build;
+    showTown('raid',ok?'Raid job disimpan sebagai build sementara.':'Job Raid tidak valid.');return;
+  }
+  if(el.matches('[data-raid-sandbox]')){
+    const input=el as unknown as HTMLInputElement;
+    const key=input.dataset.raidSandbox as keyof RaidSandbox;
+    const current=townState.raidSandbox??{hpScale:1,damageScale:1,intervalScale:1};
+    townState.raidSandbox={...current,[key]:Number(input.value)};
+    showTown('raid','Practice slider aktif: run ini Sandbox dan tidak membayar Crystal.');return;
+  }
   if(el.matches('[data-gear-slot]')){
     const slot = el.dataset.gearSlot as 'weapon' | 'armor' | 'charm';
     townState.trainingTab = 'gear';
@@ -253,7 +291,12 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   battle = new Battle(mode, floor, profileModifiers(profile), {
     roster: [...profile.roster], loadouts: structuredClone(profile.loadouts),
     boons: [...runBoons], settlementId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    ...(mode === 'raid' ? { enemyId: townState.raid, raidContract: getRaidContractForEnemy(townState.raid, 'bronze') } : {}),
+    ...(mode === 'raid' ? {
+      enemyId: townState.raid,
+      raidContract: getRaidContractForEnemy(townState.raid, townState.raidTier, townState.raidModifiers),
+      raidBuild: structuredClone(townState.raidBuild),
+      raidSandbox: townState.raidSandbox ? structuredClone(townState.raidSandbox) : undefined,
+    } : {}),
     ...(mode === 'endless' && milestone ? { runWallet, runAct: milestone.act, runActClear: milestone.actClear, runFinalClear: milestone.finalClear } : {}), ...options,
     ...(mode === 'adventure' ? storyBattleOptions(profile) : {}),
   });

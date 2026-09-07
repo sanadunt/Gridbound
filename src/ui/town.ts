@@ -6,7 +6,8 @@ import { heroProgress } from '../game/levels';
 import { storyPartyCap } from '../game/story-party';
 import { BASIC_JOBS, createRogueBuild, type RogueBuild } from '../game/roguelike-build';
 import { Battle } from '../game/simulation';
-import { BANK_SHOP, CHALLENGE_SHOP, getRaidContractForEnemy } from '../economy/challenge';
+import { BANK_SHOP, CHALLENGE_SHOP, RAID_MODIFIERS, getRaidContractForEnemy, raidReward, type RaidModifierId, type RaidSandbox, type RaidTier } from '../economy/challenge';
+import { createRaidBuild, validRaidBuild, type RaidBuild } from '../game/raid-build';
 import { questBoard } from './quests';
 import { CHARACTERS } from '../game/characters';
 import { heroCanvas } from '../art/pixels';
@@ -20,6 +21,10 @@ export type TownState = {
   hero: number;
   zone: number;
   raid: string;
+  raidTier: RaidTier;
+  raidModifiers: RaidModifierId[];
+  raidBuild?: RaidBuild;
+  raidSandbox?: RaidSandbox;
   questFilter?: 'available'|'all'|'claimed';
   notice: string;
   trainingTab: TrainingTab;
@@ -68,7 +73,7 @@ export function renderTown(root: HTMLElement, p: Profile, state: TownState) {
       <section class="town-content" aria-label="Fasilitas kota">
         <nav class="facility-tabs" aria-label="Fasilitas"><button data-facility="campaign" class="${state.tab === 'campaign' ? 'active' : ''}">War table</button><button data-facility="party" class="${state.tab === 'party' ? 'active' : ''}">Training hall</button><button data-facility="quests" class="${state.tab === 'quests' ? 'active' : ''}">Quest ledger</button><button data-facility="bestiary" class="${state.tab === 'bestiary' ? 'active' : ''}">Bestiary</button><button data-facility="challenge-shop" class="${state.tab === 'challenge-shop' ? 'active' : ''}">Challenge shop</button></nav>
         <p id="town-notice" class="town-notice" role="status" ${state.notice ? '' : 'hidden'}>${escape(state.notice)}</p>
-        ${state.tab === 'campaign' ? campaign(p, state) : state.tab === 'party' ? training(p, state) : state.tab === 'quests' ? questBoard(p, state.hero, state.questFilter, state.questPage) : state.tab === 'bestiary' ? bestiary(state.bestiaryPage) : state.tab === 'raid' ? raids(state) : state.tab === 'challenge-shop' ? challengeShop(p) : endless(p,state)}
+        ${state.tab === 'campaign' ? campaign(p, state) : state.tab === 'party' ? training(p, state) : state.tab === 'quests' ? questBoard(p, state.hero, state.questFilter, state.questPage) : state.tab === 'bestiary' ? bestiary(state.bestiaryPage) : state.tab === 'raid' ? raids(p, state) : state.tab === 'challenge-shop' ? challengeShop(p) : endless(p,state)}
       </section>
     </div>`;
 }
@@ -179,13 +184,20 @@ function bestiary(pageIndex: number) {
   return `<div class="section-heading"><div><span class="eyebrow">KNOW YOUR ENEMY</span><h2>Field bestiary</h2></div><span class="chapter-counter">${records.length} records</span></div><p class="town-copy">Tanda target mengikuti hero yang ditandai. Tanda di tanah tetap di tile. Serangan seluruh grid tidak bisa di-dodge: siapkan Guard atau interrupt.</p><div class="bestiary-list paged-collection" data-page="${page}">${visible.map(e => `<article><img src="${monster(e.id)}" alt="${e.name} pixel art"/><div><small>${e.title}</small><h3>${e.name}</h3><p>${e.description}</p><p class="counter-note"><b>COUNTER</b> ${e.counter}</p></div></article>`).join('')}${pager('bestiary', page, total)}</div>`;
 }
 
-function raids(state: TownState) {
-  const choices = Object.values(ENEMIES).filter(e => e.archetype === e.id).map(e => e.id), selected = ENEMIES[state.raid];
+function raids(p: Profile, state: TownState) {
+  const choices = Object.values(ENEMIES).filter(e => e.archetype === e.id).map(e => e.id);
+  const selected = ENEMIES[state.raid] ?? ENEMIES.golem;
+  const build = state.raidBuild && validRaidBuild(state.raidBuild, p.roster) ? state.raidBuild : createRaidBuild(p.roster, Math.min(3, p.roster.length, 6));
+  const contract = state.raidSandbox ? undefined : getRaidContractForEnemy(state.raid, state.raidTier, state.raidModifiers);
   const tiers = (['bronze', 'silver', 'gold'] as const).map(tier => {
-    const contract = getRaidContractForEnemy(state.raid, tier);
-    return contract ? `<option value="${contract.id}" ${state.raid === contract.bossId && tier === 'bronze' ? 'selected' : ''}>${tier.toUpperCase()} · ${contract.riskPoints} risk · certified Crystal</option>` : '';
+    const tierContract = getRaidContractForEnemy(state.raid, tier, state.raidModifiers);
+    return `<option value="${tier}" ${state.raidTier === tier ? 'selected' : ''} ${tierContract ? '' : 'disabled'}>${tier.toUpperCase()} · ${tierContract ? `${tierContract.riskPoints} risk · ${raidReward(tierContract, state.raid)} Crystal` : 'Sandbox combo'}</option>`;
   }).join('');
-  return `<div class="section-heading"><div><span class="eyebrow">RAID CONTRACTS</span><h2>Choose your quarry.</h2></div><span class="chapter-counter">CERTIFIED ONLY</span></div><p class="town-copy">Contracts use frozen authored boss records. Changing raw enemy fields is not available here; Practice/Sandbox runs pay no Crystal.</p><details><summary>Browse 12 enemy archetypes</summary><div class="raid-roster">${choices.map(id => `<button data-raid="${id}" class="${state.raid === id ? 'chosen' : ''}" aria-pressed="${state.raid === id}"><img src="${monster(id)}" alt=""/><b>${ENEMIES[id].name}</b><small>${ENEMIES[id].title}</small></button>`).join('')}</div></details><label class="raid-variant">Boss variant<select data-raid-variant aria-label="Enemy and variant">${Object.values(ENEMIES).map(e => `<option value="${e.id}" ${state.raid === e.id ? 'selected' : ''}>${e.name} · tier ${e.tier}</option>`).join('')}</select></label><label class="raid-tier">Reward contract<select data-raid-tier aria-label="Raid reward tier">${tiers}</select></label><article class="mission-brief"><span class="eyebrow">${getRaidContractForEnemy(state.raid, 'bronze') ? 'REWARDED CONTRACT' : 'PRACTICE'}</span><h3>${selected.name}</h3><p>${selected.description}</p><p class="counter-note">${selected.counter}</p><p class="mission-reward">Bronze 12 · Silver 18 + risk · Gold 26 + risk. Reward is derived from the immutable contract at settlement.</p><div class="departure-actions"><button class="gold-button" data-depart="raid">Hunt ${selected.name}</button><button class="secondary-button" data-facility="party">Atur loadout</button></div></article>`;
+  const modifiers = RAID_MODIFIERS.map(modifier => `<label class="raid-modifier"><input type="checkbox" data-raid-modifier="${modifier.id}" ${state.raidModifiers.includes(modifier.id) ? 'checked' : ''}/><span><b>${modifier.id} · ${modifier.name}</b><small>${modifier.description}</small></span></label>`).join('');
+  const party = build.slots.map((slot, index) => `<label class="raid-party-slot"><span>${index + 1}. ${ROSTER[slot.heroId].name}</span><select data-raid-job="${index}" aria-label="Raid job ${index + 1}">${['warrior', 'rogue', 'archer', 'healer', 'wizard'].map(job => `<option value="${job}" ${slot.classId === job ? 'selected' : ''}>${KITS[job as keyof typeof KITS].name}</option>`).join('')}</select></label>`).join('');
+  const sandbox = state.raidSandbox;
+  const status = contract && !sandbox ? `REWARDED CONTRACT · ${raidReward(contract, state.raid)} CRYSTAL` : 'SANDBOX · NO CRYSTAL';
+  return `<div class="section-heading"><div><span class="eyebrow">RAID CONTRACTS</span><h2>Choose your quarry.</h2></div><span class="chapter-counter">${status}</span></div><p class="town-copy">Certified runs use frozen boss/modifier records. Raw tuning is useful for practice, but any slider or unsupported modifier combo permanently disables Crystal for that run.</p><details open><summary>Raid party · ${build.slots.length}/6 echo units</summary><label class="raid-party-size">Party size<select data-raid-party-size aria-label="Raid party size">${[1,2,3,4,5,6].map(size => `<option value="${size}" ${build.slots.length === size ? 'selected' : ''} ${size > p.roster.length ? 'disabled' : ''}>${size} hero${size === 1 ? '' : 'es'}</option>`).join('')}</select></label><div class="raid-party-grid">${party}</div><p class="town-note">Raid jobs are temporary and do not overwrite Story loadouts. Duplicate basic jobs are allowed.</p></details><details><summary>Browse ${choices.length} authored boss archetypes</summary><div class="raid-roster">${choices.map(id => `<button data-raid="${id}" class="${state.raid === id ? 'chosen' : ''}" aria-pressed="${state.raid === id}"><img src="${monster(id)}" alt=""/><b>${ENEMIES[id].name}</b><small>${ENEMIES[id].title}</small></button>`).join('')}</div></details><label class="raid-variant">Boss variant<select data-raid-variant aria-label="Enemy and variant">${Object.values(ENEMIES).map(e => `<option value="${e.id}" ${state.raid === e.id ? 'selected' : ''}>${e.name} · tier ${e.tier}</option>`).join('')}</select></label><label class="raid-tier">Reward contract<select data-raid-tier aria-label="Raid reward tier">${tiers}</select></label><fieldset class="raid-modifiers"><legend>Certified modifier allowlist</legend>${modifiers}<small>Only calibrated combinations remain rewarded. Selecting an uncalibrated combination shows Sandbox.</small></fieldset><details class="raid-sandbox"><summary>Practice sliders · always Sandbox</summary><p>Use these to test difficulty. Any value other than the certified contract disables Crystal rewards.</p><label>Boss HP <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.hpScale ?? 1}" data-raid-sandbox="hpScale"/><output>${(sandbox?.hpScale ?? 1).toFixed(1)}×</output></label><label>Incoming damage <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.damageScale ?? 1}" data-raid-sandbox="damageScale"/><output>${(sandbox?.damageScale ?? 1).toFixed(1)}×</output></label><label>Attack interval <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.intervalScale ?? 1}" data-raid-sandbox="intervalScale"/><output>${(sandbox?.intervalScale ?? 1).toFixed(1)}×</output></label></details><article class="mission-brief"><span class="eyebrow">${status}</span><h3>${selected.name}</h3><p>${selected.description}</p><p class="counter-note">${selected.counter}</p><p class="mission-reward">${contract ? `Frozen reward: ${raidReward(contract, state.raid)} Commander Crystal · receipt protected against duplicates.` : 'Practice only. This configuration settles XP/ledger progress but pays 0 Commander Crystal.'}</p><div class="departure-actions"><button class="gold-button" data-depart="raid">Hunt ${selected.name}</button><button class="secondary-button" data-facility="party">Atur Story loadout</button></div></article>`;
 }
 
 function challengeShop(p: Profile) {
