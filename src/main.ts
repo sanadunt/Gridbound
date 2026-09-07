@@ -532,7 +532,11 @@ function result() {
     modal.append(hint);
     window.setTimeout(() => {
       if (!modal.open || request !== resultRequest || battle !== current || battle.stage !== stage || !resultGate.allows(performance.now(), generation)) return;
-      buttons.forEach(button => { button.disabled = false; }); hint.remove();
+      buttons.forEach(button => { button.disabled = false; });
+      delete modal.dataset.result;
+      resultGate.close();
+      resultGeneration = undefined;
+      hint.remove();
     }, RESULT_INPUT_DELAY_MS);
   };
   if (battle.status === 'victory') {

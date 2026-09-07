@@ -48,7 +48,7 @@ try {
     assert.ok(await evaluate('[...document.querySelectorAll("[data-story-toggle]")].every(el=>el.getBoundingClientRect().height>=44)'));
     await screenshot('artifacts/d3-town-mobile.png');
     await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-    await send('Page.reload');await wait('window.gridbound?.profile().storyActive.includes(8)');
+    await send('Page.reload');await wait('window.gridbound?.profile?.()?.storyActive?.includes(8) === true');
     assert.deepEqual(await evaluate('window.gridbound.profile().storyActive'),selected);
     report.checks.push({name:'progressed9 select6, capped controls, swap, reload, retained9 loadouts, mobile390',ids:selected});
     await click('[data-zone="0"]');await click('[data-depart="adventure"]');
