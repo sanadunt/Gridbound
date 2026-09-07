@@ -2,6 +2,7 @@ import { JOBS, gearStats, legalSkill } from './jobs';
 import { TALENTS, talentStats } from './talents';
 import { heroProgress, levelStats } from './levels';
 import { normalizeStoryParty, storyPartyCap } from './story-party';
+import { createRogueBuild, validRogueBuild, normalizeRogueBuild, rewardRogueRoom, promoteRogue, type RogueBuild } from './roguelike-build';
 import { KITS, ROSTER, type ClassId, type Mode } from './content';
 import { CAMPAIGN, ENEMIES, BOONS, type Intent } from './world';
 import { getRaidContractForEnemy, validateRaidContract, type RaidContract, type RunWallet } from '../economy/challenge';
@@ -10,11 +11,12 @@ export type Telegraph = { id:number; name:string; type:'front'|'meteor'|'breath'
 export type Minion = { id:number; lane:number; hp:number; maxHp:number; timer:number; enemyId?:string };
 export type BattleEvent = { type:string; source?:number; slot?:number; lane?:number; amount?:number; color?:string; text?:string; targets?:number[]; kind?:string };
 export type Status = 'ready'|'fighting'|'paused'|'victory'|'defeat';
-export type BattleOptions = { roster?:number[]; storyCleared?:number[]; storyRecruited?:number[]; loadouts?:Record<number,{skills:number[];talents:string[];xp?:number;slot?:number;job?:string;gear?:Record<string,string>}>; boons?:string[]; enemyId?:string; stage?:number; settlementId?:string; raidContract?:RaidContract; runWallet?:RunWallet; runAct?:1|2|3; runActClear?:boolean; runFinalClear?:boolean };
+export type BattleOptions = { rogueBuild?:RogueBuild; roster?:number[]; storyCleared?:number[]; storyRecruited?:number[]; loadouts?:Record<number,{skills:number[];talents:string[];xp?:number;slot?:number;job?:string;gear?:Record<string,string>}>; boons?:string[]; enemyId?:string; stage?:number; settlementId?:string; raidContract?:RaidContract; runWallet?:RunWallet; runAct?:1|2|3; runActClear?:boolean; runFinalClear?:boolean };
 const defaultUpgrades = {power:1,vitality:1,tempo:1};
 export class Battle {
   heroes:Hero[]=[]; threats:Telegraph[]=[]; minions:Minion[]=[]; events:BattleEvent[]=[];
   storyRecruited:readonly number[]=[];
+  rogueBuild?:RogueBuild;
   status:Status='ready'; mode:Mode='raid'; floor=1; stage=0; time=0; stageTime=0;
   bossHp=0; bossMax=0; enemyId='dragon'; enemyName=''; enemyTitle=''; stageName=''; stageCount=1;
   stagger=0; breakLeft=0; phase=1; resolve=25; gold=0; purse=120; potions=2;
@@ -29,6 +31,8 @@ export class Battle {
   constructor(mode:Mode='raid',floor=1,upgrades=defaultUpgrades,options:BattleOptions={}) { this.reset(mode,floor,upgrades,options); }
   random() { this.seed=(Math.imul(1664525,this.seed)+1013904223)>>>0; return this.seed/4294967296; }
   reset(mode:Mode,floor=1,upgrades=defaultUpgrades,options:BattleOptions={}) {
+    if(mode==='endless' && options.rogueBuild!==undefined && !validRogueBuild(options.rogueBuild)) throw new Error('Invalid Roguelike build');
+    this.rogueBuild=mode==='endless'?normalizeRogueBuild(options.rogueBuild??createRogueBuild()):undefined;
     this.mode=mode; this.floor=Math.max(1,Math.min(mode==='adventure'?CAMPAIGN.length:100,Number.isFinite(floor)?Math.floor(floor):1));
     this.power=Number.isFinite(upgrades.power)?Math.max(.1,upgrades.power):1;
     this.vitality=Number.isFinite(upgrades.vitality)?Math.max(.1,upgrades.vitality):1;
@@ -41,9 +45,12 @@ export class Battle {
     this.storyRecruited=Object.freeze(mode==='adventure'?[...new Set(options.storyRecruited??ids)].filter(id=>Number.isInteger(id)&&ROSTER[id]):[]);
     if(mode==='adventure')ids=normalizeStoryParty(ids,this.storyRecruited,options.storyCleared??[]).slice(0,storyPartyCap(options.storyCleared??[]));
     if(!ids.length)ids=[0,4,3];
+    if(mode==='endless')ids=[0,1,2];
     const occupied=new Set<number>();
     this.heroes=ids.map((id,i)=>{
-      const r=ROSTER[id],k=KITS[r.classId],loadout=options.loadouts?.[id];
+      const recruit=this.rogueBuild?.recruits[id];
+      const r=recruit?{name:`Recruit ${id+1}`,classId:recruit.classId,slot:[1,7,6][i]}:ROSTER[id],k=KITS[r.classId];
+      const loadout:NonNullable<BattleOptions['loadouts']>[number]|undefined=recruit?{skills:recruit.job?[0,JOBS[recruit.job].index]:[0,1],talents:[],job:recruit.job}:options.loadouts?.[id];
       const talents=[...new Set(loadout?.talents??[])].filter(t=>TALENTS.some(def=>def.id===t));
       const job=JOBS[loadout?.job??'']?.base===r.classId?loadout?.job:undefined,stats=gearStats(loadout?.gear);
       const perks=talentStats(talents,r.classId),growth=levelStats(loadout?.xp),level=heroProgress(loadout?.xp).level;
@@ -80,6 +87,20 @@ export class Battle {
   nextWave() {
     if(this.mode!=='adventure'||this.status!=='victory'||this.stage+1>=this.stageCount) return false;
     this.stage++; this.events=[]; this.prepareStage(); return true;
+  }
+  upgradeRogue(id:number,jobId:string) {
+    if(this.mode!=='endless'||!this.rogueBuild||!['ready','victory'].includes(this.status)||!this.hero(id))return false;
+    if(!promoteRogue(this.rogueBuild,id,jobId))return false;
+    const h=this.hero(id)!,j=JOBS[jobId];
+    h.job=jobId;h.skills=[0,j.index];h.stance=j.index;h.total=this.cooldown(h);h.remaining=h.total;
+    if(['aegis','veil','bell-oracle'].includes(jobId))h.shield=Math.max(h.shield,h.maxHp*.25);
+    return true;
+  }
+  abandonRogue() {
+    if(this.mode!=='endless')return;
+    this.rogueBuild=undefined;delete this.options.rogueBuild;
+    for(const h of this.heroes){delete h.job;h.skills=[0,1];h.stance=0;h.total=this.cooldown(h);h.remaining=h.total;h.shield=0;}
+    if(['ready','fighting','paused'].includes(this.status))this.status='defeat';
   }
   emit(event:BattleEvent) { this.events.push(event); if(this.events.length>500)this.events.splice(0,this.events.length-500); }
   drain() { return this.events.splice(0); }
@@ -155,8 +176,8 @@ export class Battle {
     this.minions=this.minions.filter(m=>m.hp>0);this.finish();
   }
   private finish() {
-    if(!this.living().length){this.status='defeat';this.emit({type:'defeat'});return true;}
-    if(this.bossHp<=0){this.status='victory';this.gold+=this.mode==='adventure'?20+this.stage*12+this.floor*6:80+this.floor*15;this.emit({type:'victory'});return true;}
+    if(!this.living().length){this.status='defeat';this.abandonRogue();this.emit({type:'defeat'});return true;}
+    if(this.bossHp<=0){this.status='victory';if(this.rogueBuild)rewardRogueRoom(this.rogueBuild,this.floor);this.gold+=this.mode==='adventure'?20+this.stage*12+this.floor*6:80+this.floor*15;this.emit({type:'victory'});return true;}
     return false;
   }
   enemyScale() { return (this.mode==='adventure'?.65+this.floor*.17:this.mode==='endless'?.82:1.05)*Math.pow(1.075,this.mode==='adventure'?0:this.floor-1)*(this.stageTime>150?1.7:1); }
@@ -282,5 +303,5 @@ export class Battle {
     if(h.hp===0&&this.boons.includes('lifeline')&&!h.rescued){h.rescued=true;h.hp=Math.round(h.maxHp*.2);this.emit({type:'heal',source:h.id,slot:h.slot,amount:h.hp,text:'NOT YET'});}
     else if(h.hp===0)this.emit({type:'down',source:h.id,slot:h.slot});
   }
-  snapshot() { return {status:this.status,mode:this.mode,floor:this.floor,stage:this.stage,stageCount:this.stageCount,enemyId:this.enemyId,time:this.time,bossHp:this.bossHp,bossMax:this.bossMax,phase:this.phase,resolve:this.resolve,gold:this.gold,taps:this.taps,relocations:this.relocations,potions:this.potions,guardLeft:this.guardLeft,guardCooldown:this.guardCooldown,boons:[...this.boons],heroes:this.heroes.map(h=>({...h,skills:[...h.skills],talents:[...h.talents]})),threats:this.threats.map(t=>({...t,slots:[...t.slots]})),minions:this.minions.map(m=>({...m}))}; }
+  snapshot() { return {rogueBuild:this.rogueBuild?normalizeRogueBuild(this.rogueBuild):undefined,status:this.status,mode:this.mode,floor:this.floor,stage:this.stage,stageCount:this.stageCount,enemyId:this.enemyId,time:this.time,bossHp:this.bossHp,bossMax:this.bossMax,phase:this.phase,resolve:this.resolve,gold:this.gold,taps:this.taps,relocations:this.relocations,potions:this.potions,guardLeft:this.guardLeft,guardCooldown:this.guardCooldown,boons:[...this.boons],heroes:this.heroes.map(h=>({...h,skills:[...h.skills],talents:[...h.talents]})),threats:this.threats.map(t=>({...t,slots:[...t.slots]})),minions:this.minions.map(m=>({...m}))}; }
 }

@@ -192,7 +192,7 @@ export function settleProgress(p:Profile,b:Battle,runWallet?:RunWallet) {
   // are bounded integer updates, so a settlement either commits as a whole or
   // returns without changing the profile.
   const xp=b.mode==='adventure'?180+b.floor*75+b.stageCount*45:b.mode==='endless'?100+b.floor*35:180+b.floor*45;
-  const rewards=b.heroes.map(h=>{const amount=Math.floor(xp*(h.hp>0?1:.6));const before=heroProgress(p.loadouts[h.id]?.xp).level;return {id:h.id,kind:'active' as 'active'|'bench',bonus:0,xp:amount,before,after:heroProgress((p.loadouts[h.id]?.xp??0)+amount).level};});
+  const rewards=(b.mode==='endless'?[]:b.heroes).map(h=>{const amount=Math.floor(xp*(h.hp>0?1:.6));const before=heroProgress(p.loadouts[h.id]?.xp).level;return {id:h.id,kind:'active' as 'active'|'bench',bonus:0,xp:amount,before,after:heroProgress((p.loadouts[h.id]?.xp??0)+amount).level};});
   if(b.mode==='adventure') {
     const activeXP=b.heroes.map(h=>normalizedXP(p.loadouts[h.id]?.xp)).sort((a,b)=>a-b);
     const mid=Math.floor(activeXP.length/2);

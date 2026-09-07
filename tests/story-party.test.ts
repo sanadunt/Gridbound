@@ -48,7 +48,8 @@ test('D3 Story constructor/reset/replay caps use progression, never requested ch
   const b=new Battle('adventure',1,undefined,storyBattleOptions(p));assert.deepEqual(b.heroes.map(h=>h.id),p.storyActive);
   b.reset('adventure',16,undefined,{roster:p.roster});assert.equal(b.heroes.length,3);
   b.reset('adventure',1,undefined,{...storyBattleOptions(p),roster:p.roster});assert.equal(b.heroes.length,6);
-  for(const mode of ['raid','endless'] as const)assert.equal(new Battle(mode,1,undefined,{roster:p.roster}).heroes.length,9);
+  assert.equal(new Battle('raid',1,undefined,{roster:p.roster}).heroes.length,9);
+  assert.equal(new Battle('endless',1,undefined,{roster:p.roster}).heroes.length,3,'D4 replaces the old Rogue roster');
 });
 
 test('D3 bench formula: half XP, underlevel bonus bounded by active median, no wrong-mode rewards', () => {

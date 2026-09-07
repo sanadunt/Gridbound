@@ -4,6 +4,7 @@ import { TALENTS, canEnterZone, talentReason, availablePoints, gearReason, profi
 import { JOBS, GEAR, GEAR_SETS, legalSkill } from '../game/jobs';
 import { heroProgress } from '../game/levels';
 import { storyPartyCap } from '../game/story-party';
+import { BASIC_JOBS, createRogueBuild, type RogueBuild } from '../game/roguelike-build';
 import { Battle } from '../game/simulation';
 import { BANK_SHOP, CHALLENGE_SHOP, getRaidContractForEnemy } from '../economy/challenge';
 import { questBoard } from './quests';
@@ -28,6 +29,7 @@ export type TownState = {
   talentBranch?: string;
   selectedTalent?: string;
   pendingGear?: PendingGear;
+  rogueSetup?: RogueBuild;
 };
 
 const portraits = new Map<string, string>();
@@ -66,7 +68,7 @@ export function renderTown(root: HTMLElement, p: Profile, state: TownState) {
       <section class="town-content" aria-label="Fasilitas kota">
         <nav class="facility-tabs" aria-label="Fasilitas"><button data-facility="campaign" class="${state.tab === 'campaign' ? 'active' : ''}">War table</button><button data-facility="party" class="${state.tab === 'party' ? 'active' : ''}">Training hall</button><button data-facility="quests" class="${state.tab === 'quests' ? 'active' : ''}">Quest ledger</button><button data-facility="bestiary" class="${state.tab === 'bestiary' ? 'active' : ''}">Bestiary</button><button data-facility="challenge-shop" class="${state.tab === 'challenge-shop' ? 'active' : ''}">Challenge shop</button></nav>
         <p id="town-notice" class="town-notice" role="status" ${state.notice ? '' : 'hidden'}>${escape(state.notice)}</p>
-        ${state.tab === 'campaign' ? campaign(p, state) : state.tab === 'party' ? training(p, state) : state.tab === 'quests' ? questBoard(p, state.hero, state.questFilter, state.questPage) : state.tab === 'bestiary' ? bestiary(state.bestiaryPage) : state.tab === 'raid' ? raids(state) : state.tab === 'challenge-shop' ? challengeShop(p) : endless(p)}
+        ${state.tab === 'campaign' ? campaign(p, state) : state.tab === 'party' ? training(p, state) : state.tab === 'quests' ? questBoard(p, state.hero, state.questFilter, state.questPage) : state.tab === 'bestiary' ? bestiary(state.bestiaryPage) : state.tab === 'raid' ? raids(state) : state.tab === 'challenge-shop' ? challengeShop(p) : endless(p,state)}
       </section>
     </div>`;
 }
@@ -194,6 +196,8 @@ function runShop(purse: number) {
   return `<section class="run-shop"><span class="eyebrow">JOURNEY SHOP · ${purse} RUN CRYSTAL</span>${CHALLENGE_SHOP.map(item => `<div class="shop-item"><div><h3>${item.name}</h3><p>${item.description}</p></div><button class="secondary-button" data-run-buy="${item.id}" ${purse < item.cost ? 'disabled' : ''}>${item.cost} RUN</button></div>`).join('')}</section>`;
 }
 
-function endless(p: Profile) {
-  return `<div class="section-heading"><div><span class="eyebrow">THE SUNKEN BELL</span><h2>A different run.<br>A different build.</h2></div><span class="chapter-counter">BEST ${p.bestFloor}</span></div><p class="town-copy">Turun ke ruang bawah lonceng. Setelah tiap kemenangan, pilih satu dari tiga boon. Efek bisa saling menguatkan: bangun gaya main dari pilihan yang muncul, bukan hanya angka damage.</p><div class="endless-rules"><p><b>Town talents stay.</b> Skill dan talent pilihanmu dibawa masuk.</p><p><b>Boons belong to this run.</b> Kematian atau pulang mengakhiri build sementara.</p><p><b>Every floor pushes back.</b> Musuh berganti, tekanan meningkat. Party pulih saat turun ke floor berikutnya.</p><p><b>Run purse.</b> Room clear memberi journey Crystal untuk temporary shop; act clear memberi bank Crystal lewat receipt. Sisa purse tidak pernah dikonversi.</p></div><div class="departure-actions"><button class="gold-button" data-depart="endless">Descend · floor 1</button><button class="secondary-button" data-facility="challenge-shop">Open Challenge shop</button><button class="secondary-button" data-facility="party">Siapkan build</button></div>`;
+function endless(p: Profile, state: TownState) {
+  const build=state.rogueSetup??createRogueBuild();
+  const setup=`<fieldset class="loadout-slots"><legend>Roguelike recruits: exactly 3</legend>${build.recruits.map((r,i)=>`<label>Recruit ${i+1}<select data-rogue-slot="${i}" aria-label="Recruit ${i+1} basic job">${BASIC_JOBS.map(id=>`<option value="${id}" ${r.classId===id?'selected':''}>${KITS[id].name}</option>`).join('')}</select></label>`).join('')}</fieldset><p>Duplicate jobs allowed. One promotion point per room clear; spend before the next encounter. Jobs and signature skills belong only to this run. Reload starts a fresh setup.</p>`;
+  return `<div class="section-heading"><div><span class="eyebrow">THE SUNKEN BELL</span><h2>A different run.<br>A different build.</h2></div><span class="chapter-counter">BEST ${p.bestFloor}</span></div><p class="town-copy">Turun ke ruang bawah lonceng. Setelah tiap kemenangan, pilih satu dari tiga boon. Efek bisa saling menguatkan: bangun gaya main dari pilihan yang muncul, bukan hanya angka damage.</p><div class="endless-rules"><p><b>Three custom recruits.</b> Story jobs, equipment, XP dan talent tidak dibawa masuk.</p><p><b>Boons belong to this run.</b> Kematian atau pulang mengakhiri build sementara.</p><p><b>Every floor pushes back.</b> Musuh berganti, tekanan meningkat. Party pulih saat turun ke floor berikutnya.</p><p><b>Run purse.</b> Room clear memberi journey Crystal untuk temporary shop; act clear memberi bank Crystal lewat receipt. Sisa purse tidak pernah dikonversi.</p></div>${setup}<div class="departure-actions"><button class="gold-button" data-depart="endless">Descend · floor 1</button><button class="secondary-button" data-facility="challenge-shop">Open Challenge shop</button><button class="secondary-button" data-facility="party">Siapkan build</button></div>`;
 }

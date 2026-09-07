@@ -20,6 +20,7 @@ import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './
 import { Sound } from './audio/sound';
 import { loadSave, saveProfile } from './game/save';
 import { storyBattleOptions, setStoryParty } from './game/story-party';
+import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-build';
 import { QUESTS, questProgress } from './game/quests';
 import { CHALLENGE_SHOP, createRunWallet, creditRun, resetRunWallet, getRaidContractForEnemy, roguelikeMilestoneForFloor, buyRunItem, type RunWallet } from './economy/challenge';
 
@@ -101,6 +102,7 @@ battleInfoToggle.addEventListener('click', () => {
 });
 
 function showTown(tab: TownTab = townState.tab, notice = '') {
+  if(!inTown && battle.mode==='endless'){battle.abandonRogue();townState.rogueSetup=createRogueBuild();resetRunWallet(runWallet);}
   inTown = true;
   if (battle.status === 'fighting') battle.pause();
   townState.tab = tab;
@@ -209,6 +211,13 @@ $('town-screen').addEventListener('change', event => {
   if (!inTown) return;
   if(el.matches('[data-quest-filter]')){townState.questPage=0;townState.questFilter=el.value as 'available'|'all'|'claimed';showTown('quests');return;}
   if(el.matches('[data-quest-recipient]')){townState.hero=Number(el.value);showTown('quests');return;}
+  if(el.matches('[data-rogue-slot]')){
+    const build=townState.rogueSetup??createRogueBuild();
+    const jobs=build.recruits.map(r=>r.classId);
+    const slot=Number(el.dataset.rogueSlot);
+    if(Number.isInteger(slot)&&slot>=0&&slot<3){jobs[slot]=el.value as never;if(setRogueJobs(build,jobs))townState.rogueSetup=build;}
+    showTown('endless');return;
+  }
   if(el.matches('[data-raid-variant]')){townState.raid=el.value;showTown('raid');return;}
   if(el.matches('[data-gear-slot]')){
     const slot = el.dataset.gearSlot as 'weapon' | 'armor' | 'charm';
@@ -229,7 +238,7 @@ function depart(mode: Mode) {
   resetRunWallet(runWallet);
   runWallet = createRunWallet();
   runSeed = Date.now() % 1000000;
-  boot(mode, mode === 'adventure' ? townState.zone + 1 : mode === 'raid' ? profile.cleared.length+1 : 1);
+  boot(mode, mode === 'adventure' ? townState.zone + 1 : mode === 'raid' ? profile.cleared.length+1 : 1, mode === 'endless' ? { rogueBuild: structuredClone(townState.rogueSetup ?? createRogueBuild()) } : {});
 }
 function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOptions> = {}) {
   inTown = false;
