@@ -1,0 +1,14 @@
+sequenceDiagram
+  participant U as Player
+  participant G as Mode state
+  participant D as Local DB
+  U->>G: Resolve node or boss
+  G->>D: Begin transaction with revision and receipt ID
+  D->>D: Validate owner config and unseen receipt
+  D->>D: Write checkpoint wallet receipt and revision
+  D-->>G: Commit acknowledged
+  G-->>U: Saved result
+  U->>G: Reload or retry same result
+  G->>D: Read receipt and latest checkpoint
+  D-->>G: Already settled - no duplicate payment
+  G-->>U: Resume latest or Practice replay

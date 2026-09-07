@@ -1,5 +1,7 @@
 # Gridbound — Production Masterplan
 
+> **Scope addendum R1:** [Target GDD package](game-direction-r1/README.md) and [R0–R10 next-production gates](game-direction-r1/NEXT-PRODUCTION-R1.md) cover the newly requested title/three-mode/economy/profile redesign. They are proposals, not shipped features. This masterplan remains the earlier process baseline; its milestones do not certify R1.
+
 **Dokumen perencanaan, bukan sertifikasi production.**
 
 Working title: Gridbound: Ashes of the Bell. Baseline implementasi adalah kandidat lokal v0.4.0. Status konkret dan bukti terakhir ada di [NEXT-PRODUCTION.md](NEXT-PRODUCTION.md) dan [GUI-VERIFIED.md](GUI-VERIFIED.md). Semua milestone, budget, fitur tambahan dan target di dokumen ini adalah **usulan** sampai disetujui. Dokumen ini tidak mengotorisasi implementasi, pembelian layanan, commit/push, publikasi atau perubahan Hostinger.

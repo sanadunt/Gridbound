@@ -1,0 +1,20 @@
+flowchart LR
+  subgraph Story["Story save slot"]
+    Quest["Chapters and quests"] --> Gold["Gold"]
+    Dungeon["Material dungeon extraction"] --> Mats["Materials"]
+    Gold --> Forge["Forge / supplies / gear"]
+    Mats --> Forge
+  end
+  subgraph Commander["Commander Challenge economy"]
+    Raid["Eligible Raid receipt"] --> Bank["Bank Crystal - shared"]
+    Boss["Rogue act and final receipt"] --> Bank
+    Bank --> Relics["Rule relic and alternative unlocks"]
+    Relics --> Rules["Pre-run choice - no free stats"]
+  end
+  subgraph Run["One Rogue run"]
+    Room["Room win or event"] --> Purse["Run Crystal"]
+    Purse --> Shop["Temporary shop and upgrades"]
+    Shop --> Room
+    Purse --> Reset["Unused purse resets - no conversion"]
+  end
+  Rules -. "rules only" .-> Room

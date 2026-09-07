@@ -1,5 +1,7 @@
 # Gridbound — next production handoff
 
+> **Historical checkpoint:** the implementation/status entries below describe the pre-commit v0.4 handoff. Source was subsequently merged to `main` at `7aced0b`; live Hostinger deployment remains unverified. For the newly requested title/three-mode redesign, use [R1 target GDD](game-direction-r1/README.md) and [R1 production gates](game-direction-r1/NEXT-PRODUCTION-R1.md). Do not treat old branch/status or exclusions below as the current R1 scope.
+
 Full planning package: [PRODUCTION-MASTERPLAN.md](PRODUCTION-MASTERPLAN.md). Dokumen ini tetap baseline handoff; masterplan memperluas rencana sampai launch/maintenance tanpa mengubah status implementasi.
 
 ## 1. Keputusan release

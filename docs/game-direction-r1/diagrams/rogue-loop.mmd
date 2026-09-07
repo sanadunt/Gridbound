@@ -1,0 +1,21 @@
+flowchart TD
+  Build["3 recruits - choose basic jobs and relic rules"] --> New["New runId - seed - RNG - frozen rules"]
+  New --> Node["Select reachable node"]
+  Node --> Fight["Battle or elite"]
+  Node --> Event["Event with preview and fallback"]
+  Node --> Shop["Run-only shop / camp / mastery"]
+  Fight --> Win{"Victory?"}
+  Win -->|No| End["Run terminal - purse reset"]
+  Win -->|Yes| Draft["3 legal choices - take 1"]
+  Draft --> Save["Atomic checkpoint"]
+  Event --> Save
+  Shop --> Save
+  Save --> Boss{"Act boss reached?"}
+  Boss -->|No| Node
+  Boss -->|Yes| ActFight["Boss encounter"]
+  ActFight --> ActWin{"Victory?"}
+  ActWin -->|No| End
+  ActWin -->|Yes| Receipt["Bank act reward once"]
+  Receipt --> Final{"Third act cleared?"}
+  Final -->|No| Node
+  Final -->|Yes| End

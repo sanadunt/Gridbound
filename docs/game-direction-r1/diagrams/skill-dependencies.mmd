@@ -1,0 +1,7 @@
+flowchart TD
+  Root["Root - Stand Fast"] --> Guard["Guard branch"]
+  Root --> Tempo["Tempo branch"]
+  Guard --> AND{"ALL prerequisites"}
+  Tempo --> AND
+  AND --> Keystone["Selected keystone - inspect then learn"]
+  Keystone --> Trial["Ultra trial - progression gate"]

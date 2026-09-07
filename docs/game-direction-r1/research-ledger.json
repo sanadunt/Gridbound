@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": 1,
+      "url": "https://store.steampowered.com/app/1145360/Hades",
+      "title": "",
+      "accessed": "2026-09-07",
+      "quotes": [
+        {
+          "text": "Permanent upgrades mean you don't have to be a god yourself to experience the exciting combat and gripping story.",
+          "added": "2026-09-07"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "url": "https://store.steampowered.com/app/646570/Slay_the_Spire",
+      "title": "",
+      "accessed": "2026-09-07",
+      "quotes": [
+        {
+          "text": "Choose a risky or safe path, face different enemies, choose different cards, discover different relics, and even fight different bosses!",
+          "added": "2026-09-07"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "url": "https://store.steampowered.com/app/590380/Into_the_Breach",
+      "title": "",
+      "accessed": "2026-09-07",
+      "quotes": [
+        {
+          "text": "All enemy attacks are telegraphed in minimalistic, turn-based combat.",
+          "added": "2026-09-07"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "url": "https://store.steampowered.com/app/1971650/OCTOPATH_TRAVELER_II",
+      "title": "",
+      "accessed": "2026-09-07",
+      "quotes": [
+        {
+          "text": "Each traveler possesses a unique latent power, which can be used to turn the tide of battle.",
+          "added": "2026-09-07"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "url": "https://store.steampowered.com/app/262060/Darkest_Dungeon",
+      "title": "",
+      "accessed": "2026-09-07",
+      "quotes": [
+        {
+          "text": "Recruit, train, and lead a team of flawed heroes through twisted forests, forgotten warrens, ruined crypts, and beyond.",
+          "added": "2026-09-07"
+        }
+      ]
+    }
+  ]
+}

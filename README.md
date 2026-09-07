@@ -2,13 +2,19 @@
 
 An offline-first, pixel-art tactical RPG for the browser. Three Bellkeepers leave Emberhollow to restore a broken sanctuary—and discover what its protection costs.
 
+## Target game direction R1 (documentation only)
+
+**D1–D8 approved by the user on 7 September 2026.** [Approval record](docs/game-direction-r1/APPROVAL-D1-D8.md) records the instruction to put the documentation in Git before execution. This commit is documentation-only; implementation has not started.
+
+[New target GDD and mode design](docs/game-direction-r1/README.md): Press Start/title, three distinct mode loops, Story prologue/world map/material dungeons, three-unit Roguelike, customizable 1–6 Raid, Crystal economy, five attributes, unique hero advancement, Ultra progression, and per-mode save profiles. This is **planned, not implemented**; the Included list below still describes v0.4 runtime.
+
 ## Full production planning
 
 [Production Masterplan](docs/PRODUCTION-MASTERPLAN.md): milestone M0–M7, proposed feature roadmap, editable diagrams, QA/device acceptance, release/rollback operations and evidence templates. This is a documentation-only plan, not production certification or approval to deploy.
 
 ## Release status and next production
 
-The local v0.4 candidate is **not deployed or production-approved**. See [docs/NEXT-PRODUCTION.md](docs/NEXT-PRODUCTION.md) for the implemented/tested/pending matrix, release blockers, acceptance criteria, verification commands and Hostinger rollback plan. Latest GUI evidence: [docs/GUI-VERIFIED.md](docs/GUI-VERIFIED.md). Earlier PLAYTEST entries describe prior checkpoints, not automatic acceptance of the current working tree.
+The v0.4 source update was merged to `main` at `7aced0b`. **Actual Hostinger deployment and full production acceptance remain unverified**; repository delivery is not live verification. See [docs/NEXT-PRODUCTION.md](docs/NEXT-PRODUCTION.md) for the implemented/tested/pending matrix, release blockers, acceptance criteria, verification commands and Hostinger rollback plan. Latest GUI evidence: [docs/GUI-VERIFIED.md](docs/GUI-VERIFIED.md). Earlier PLAYTEST entries describe prior checkpoints, not automatic acceptance of the current working tree.
 
 ## Play
 

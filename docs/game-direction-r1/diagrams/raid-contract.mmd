@@ -1,0 +1,15 @@
+flowchart TD
+  Build["Party 1 to 6 / boss / rules"] --> Gate{"Certified config?"}
+  Gate -->|Yes| Freeze["Freeze ruleset, seed, attempt ID"]
+  Gate -->|No| Sand["Sandbox - no Crystal or mastery"]
+  Freeze --> Fight["Telegraphed encounter"]
+  Fight --> Outcome["Outcome intent once"]
+  Outcome --> Death["Death animation readiness"]
+  Outcome --> Tx["Atomic wallet + outcome receipt"]
+  Death --> Results["Results visible / Saving if pending"]
+  Results --> Delay["One-second visible input lock"]
+  Tx --> Ready{"Receipt committed and lock elapsed?"}
+  Delay --> Ready
+  Ready -->|Yes, fresh gesture| Options["Retry / edit / exchange / title"]
+  Ready -->|Save failed| Recover["Keep outcome / Retry save / Export"]
+  Sand --> Practice["Practice results only"]

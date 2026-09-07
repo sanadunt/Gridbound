@@ -1,0 +1,20 @@
+flowchart TD
+  Boot["Boot / local storage check"] --> Start["PRESS START - fresh gesture"]
+  Start --> Menu["Main Menu"]
+  Menu --> Profiles["Commander and mode slot"]
+  Profiles --> Story["Story world map"]
+  Profiles --> Rogue["Rogue build exactly 3"]
+  Profiles --> Raid["Raid build 1 to 6"]
+  Story --> GameMenu["Party - Quests - Skills - Inventory - Status"]
+  GameMenu --> Story
+  Story --> Brief["Mission or material dungeon brief"]
+  Rogue --> Route["Seeded Rogue node map"]
+  Raid --> Contract["Boss and certified rules or Sandbox"]
+  Brief --> Fight["Shared combat - isolated mode state"]
+  Route --> Fight
+  Contract --> Fight
+  Fight --> Results["Death ready then result input lock 1000ms"]
+  Results --> Story
+  Results --> Route
+  Results --> Raid
+  Menu --> Options["Settings / Credits"]
