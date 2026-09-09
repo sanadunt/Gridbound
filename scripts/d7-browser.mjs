@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import { withBrowser } from './browser-harness.mjs';
+await withBrowser(async ({ wait, evaluate, click, errors, screenshot }) => {
+  await evaluate("location.href='http://127.0.0.1:5187/'");
+  await wait('Boolean(document.querySelector("#profiles"))');
+  if (!await evaluate('Boolean(document.querySelector("#commander-name"))')) await click('#profiles');
+  await wait('Boolean(document.querySelector("#commander-name"))');
+  await evaluate(`(()=>{const input=document.querySelector('#commander-name'); input.value='D7 QA'; document.querySelector('#new-commander')?.click(); return true;})()`);
+  await wait('Boolean(document.querySelector("#story-journal"))');
+  await wait('document.querySelectorAll("dialog[open]").length===0');
+  await evaluate('document.querySelector("dialog[open] .modal-close")?.click()');
+  await wait('document.querySelectorAll("dialog[open]").length===0');
+  const initial = await evaluate(`({journal:document.querySelector('#story-journal')?.textContent, dialogs:document.querySelectorAll('dialog[open]').length, errors:0})`);
+  assert.equal(initial.journal, 'Story journal');
+  await click('#story-journal');
+  await wait('Boolean(document.querySelector("dialog[open]"))');
+  const locked = await evaluate(`({text:document.querySelector('dialog[open]')?.textContent||'', choices:document.querySelectorAll('[data-story-choice]').length})`);
+  assert.match(locked.text, /Chapter 3|Chapter 3/);
+  assert.equal(locked.choices, 0);
+  await screenshot('artifacts/d7-journal-locked.png');
+  assert.equal(errors.length, 0);
+  console.log(JSON.stringify({initial, locked}));
+}, { width: 768, height: 900 });

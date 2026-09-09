@@ -32,6 +32,15 @@ export class Battle {
   private delayed:{left:number;source:number;lane:number;power:number}[]=[];
   private options:BattleOptions={};
   constructor(mode:Mode='raid',floor=1,upgrades=defaultUpgrades,options:BattleOptions={}) { this.reset(mode,floor,upgrades,options); }
+  checkpoint() {
+    if (!['ready', 'victory', 'defeat'].includes(this.status)) throw new Error('Checkpoint requires an encounter boundary');
+    return structuredClone({ ...this, events: [] });
+  }
+  restoreCheckpoint(state: ReturnType<Battle['checkpoint']>) {
+    if (!['ready', 'victory', 'defeat'].includes(state.status)) throw new Error('Not an encounter boundary');
+    Object.assign(this, structuredClone(state));
+    this.events = [];
+  }
   random() { this.seed=(Math.imul(1664525,this.seed)+1013904223)>>>0; return this.seed/4294967296; }
   reset(mode:Mode,floor=1,upgrades=defaultUpgrades,options:BattleOptions={}) {
     if(mode==='endless' && options.rogueBuild!==undefined && !validRogueBuild(options.rogueBuild)) throw new Error('Invalid Roguelike build');

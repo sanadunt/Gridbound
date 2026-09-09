@@ -17,8 +17,13 @@ try{
   try { await wait('document.querySelector("canvas") && document.querySelector("#town-screen:not([hidden])")'); }
   catch(error) { console.error('BOOT EVIDENCE', JSON.stringify({errors,page:await evaluate('({url:location.href,ready:document.readyState,text:document.body?.innerText.slice(0,200),resources:performance.getEntriesByType("resource").map(r=>r.name)})')}));throw error; }
   assert.equal(await evaluate('typeof window.gridbound'),'undefined','No QA API in production');
-  await click('[data-facility="party"]');await click('[data-training-tab="talents"]');await click('[data-inspect-talent="active-2"]');await click('[data-talent="active-2"]');
-  await click('[data-facility="campaign"]');await click('[data-depart="adventure"]');await click('#start');
+  await click('#profiles');
+  await wait('Boolean(document.querySelector("#new-commander"))');
+  await evaluate('document.querySelector("#commander-name").value="Production smoke"');
+  await click('#new-commander');await wait('!document.querySelector("dialog[open]") && document.querySelector("#storage-status")?.textContent.includes("local IndexedDB")');
+  await click('[data-facility="party"]');await wait('Boolean(document.querySelector("[data-training-tab=talents]"))');await click('[data-training-tab="talents"]');
+  await wait('document.querySelector("#storage-status")?.textContent.includes("local IndexedDB")');
+  await click('[data-facility="campaign"]');await wait('Boolean(document.querySelector("[data-depart=adventure]"))');await wait('document.querySelector("#storage-status")?.textContent.includes("local IndexedDB")');await click('[data-depart="adventure"]');await wait('document.querySelector("#battle-screen").hidden===false');await click('#start');
   const before=await evaluate('document.querySelector("#boss-hp").style.width');
   await click('[data-tap="0"]');await click('[data-tap="3"]');
   await wait(`document.querySelector('#boss-hp').style.width!==${JSON.stringify(before)}`);

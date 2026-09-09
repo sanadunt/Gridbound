@@ -1,0 +1,665 @@
+/**
+ * GRIDBOUND — CARTOGRAPHY WORLD MAP SYSTEM (ACTS I–IV)
+ * Authentic fantasy map styling with SVG bezier routes, beacon pulses,
+ * wax seals, boss dossiers, and strict single-screen 100dvh responsiveness.
+ */
+
+.world-map-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* --- TOP ACT & STEPPER HEADER --- */
+.map-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.map-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.map-title-block h2 {
+  font: 15px/1.2 var(--pixel);
+  color: #fff2c4;
+  margin: 1px 0 2px;
+  text-shadow: 0 0 10px rgba(255, 242, 196, 0.3);
+}
+
+.map-territory-pill {
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: #deb252;
+  background: rgba(30, 20, 10, 0.6);
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(222, 178, 82, 0.25);
+  align-self: flex-start;
+}
+
+.map-stepper-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-stepper-btn {
+  padding: 4px 8px;
+  font-size: 10px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --- ACT TABS NAVIGATION RIBBON --- */
+.map-act-nav {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.map-act-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  background: rgba(10, 22, 16, 0.7);
+  border: 1px solid #2a3c30;
+  border-radius: 4px;
+  color: #ccd8c5;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  min-height: 48px;
+}
+
+.map-act-tab:hover:not(:disabled) {
+  border-color: #f0c968;
+  background: rgba(22, 38, 30, 0.9);
+  transform: translateY(-1px);
+}
+
+.map-act-tab.active {
+  border-color: #f0c968;
+  background: linear-gradient(180deg, rgba(45, 68, 52, 0.9) 0%, rgba(20, 36, 27, 0.9) 100%);
+  box-shadow: 0 0 12px rgba(240, 201, 104, 0.25), inset 0 1px 0 rgba(255, 235, 170, 0.2);
+}
+
+.map-act-tab.locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.act-tab-roman {
+  font: 8px var(--pixel);
+  letter-spacing: 1px;
+  color: #deb252;
+}
+
+.act-tab-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  margin: 2px 0 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.act-tab-badge {
+  font-size: 8.5px;
+  color: #81926d;
+}
+
+.map-act-tab.active .act-tab-badge {
+  color: #f7c865;
+  font-weight: 600;
+}
+
+/* --- MAIN WORLD MAP SPLIT CONSOLE --- */
+.world-map-layout {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* --- LEFT: VISUAL CARTOGRAPHY MAP CANVAS --- */
+.world-map-canvas-card {
+  position: relative;
+  border-radius: 4px;
+  border: 1px solid #3d4f40;
+  overflow: hidden;
+  background: #08110c;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Biome Atmospheric Themes */
+.biome-act-1 .world-map-canvas-card {
+  background: radial-gradient(circle at 50% 50%, #0e2017 0%, #050d09 100%);
+  border-color: #2e4a38;
+}
+.biome-act-2 .world-map-canvas-card {
+  background: radial-gradient(circle at 50% 50%, #201316 0%, #0c0809 100%);
+  border-color: #522d25;
+}
+.biome-act-3 .world-map-canvas-card {
+  background: radial-gradient(circle at 50% 50%, #0e1c27 0%, #050b10 100%);
+  border-color: #27475a;
+}
+.biome-act-4 .world-map-canvas-card {
+  background: radial-gradient(circle at 50% 50%, #21190d 0%, #0d0a05 100%);
+  border-color: #5c4a22;
+}
+
+.map-chart-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.world-map-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Route SVG Paths */
+.route-underlay {
+  stroke-width: 8;
+  fill: none;
+  stroke-linecap: round;
+  opacity: 0.35;
+}
+.route-underlay.route-cleared {
+  stroke: #e5b954;
+  filter: url(#goldGlow);
+}
+.route-underlay.route-active {
+  stroke: #7bf3ca;
+  filter: url(#goldGlow);
+}
+.route-underlay.route-locked {
+  stroke: #16251d;
+}
+
+.route-main {
+  stroke-width: 3;
+  fill: none;
+  stroke-linecap: round;
+}
+.route-main.route-cleared {
+  stroke: url(#actPathGrad);
+  stroke-dasharray: none;
+}
+.route-main.route-active {
+  stroke: #7bf3ca;
+  stroke-dasharray: 6, 6;
+  animation: mapPathFlow 1.8s linear infinite;
+}
+.route-main.route-locked {
+  stroke: #25392e;
+  stroke-dasharray: 4, 6;
+}
+
+@keyframes mapPathFlow {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* --- INTERACTIVE NODE PINS OVERLAY --- */
+.map-nodes-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.map-node-anchor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10;
+}
+
+.map-node-pin {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border: 2px solid #81926d;
+  background: #0c1813;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  outline: none;
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+
+.map-node-pin:hover:not(:disabled) {
+  transform: scale(1.15);
+  border-color: #f7c865;
+  box-shadow: 0 0 16px rgba(247, 200, 101, 0.6);
+}
+
+.map-node-pin.chosen {
+  transform: scale(1.18);
+  border-color: #ffe694;
+  box-shadow: 0 0 22px rgba(255, 230, 148, 0.8), inset 0 0 8px rgba(255, 230, 148, 0.4);
+  z-index: 12;
+}
+
+.map-node-pin.cleared {
+  border-color: #deb252;
+  background: linear-gradient(135deg, #241d0e 0%, #151006 100%);
+  color: #f5d070;
+}
+
+.map-node-pin.active {
+  border-color: #7bf3ca;
+  background: linear-gradient(135deg, #102d24 0%, #081913 100%);
+  color: #7bf3ca;
+}
+
+.map-node-pin.locked {
+  border-color: #2a3a31;
+  background: #0e1612;
+  color: #4e6155;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.map-node-pin.climax-node {
+  width: 48px;
+  height: 48px;
+  border-width: 2.5px;
+}
+
+.map-node-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.map-node-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  background: #050d09;
+  border: 1px solid #deb252;
+  color: #f0c968;
+  font: 7.5px var(--pixel);
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+
+.map-beacon-pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.map-node-pin.active .map-beacon-pulse,
+.map-node-pin.chosen .map-beacon-pulse {
+  animation: mapBeaconPulse 2s infinite ease-out;
+}
+
+@keyframes mapBeaconPulse {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(247, 200, 101, 0.7); opacity: 1; }
+  70% { transform: scale(1.4); box-shadow: 0 0 0 12px rgba(247, 200, 101, 0); opacity: 0; }
+  100% { transform: scale(1.4); box-shadow: 0 0 0 0 rgba(247, 200, 101, 0); opacity: 0; }
+}
+
+/* Node Title Plate */
+.map-node-plate {
+  position: absolute;
+  top: calc(100% + 4px);
+  white-space: nowrap;
+  text-align: center;
+  background: rgba(5, 13, 9, 0.88);
+  border: 1px solid #233529;
+  padding: 2px 8px;
+  border-radius: 3px;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.map-node-plate.chosen {
+  border-color: #deb252;
+  background: rgba(15, 12, 5, 0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.node-plate-name {
+  display: block;
+  font-size: 10px;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.node-plate-status {
+  display: block;
+  font-size: 8px;
+  color: #deb252;
+  letter-spacing: 0.3px;
+}
+
+/* Bottom Atmosphere Legend */
+.map-atmosphere-footer {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9.5px;
+  color: #81926d;
+  background: rgba(5, 13, 9, 0.75);
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid rgba(129, 146, 109, 0.25);
+  pointer-events: none;
+}
+
+.atmosphere-pip {
+  color: #deb252;
+}
+
+.map-progress-chip {
+  color: #f7c865;
+  font-weight: 600;
+}
+
+/* --- RIGHT: TACTICAL MISSION RECON DOSSIER --- */
+.world-map-dossier {
+  overflow-y: auto;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.dossier-header h3 {
+  margin: 4px 0 2px;
+}
+
+.zone-subtitle {
+  font-size: 11px;
+  color: #a8baa6;
+  margin: 0;
+}
+
+/* Boss Recon Dossier Card */
+.dossier-boss-card {
+  display: flex;
+  gap: 12px;
+  background: rgba(8, 16, 12, 0.75);
+  border: 1px solid #2a3e30;
+  border-radius: 4px;
+  padding: 10px;
+  align-items: flex-start;
+}
+
+.boss-avatar-frame {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  background: #050b08;
+  border: 1px solid #deb252;
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.boss-pixel-avatar {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.boss-tier-tag {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  font: 7px var(--pixel);
+  background: rgba(0, 0, 0, 0.85);
+  color: #f7c865;
+  text-align: center;
+  padding: 1px 0;
+}
+
+.boss-intel {
+  flex: 1;
+  min-width: 0;
+}
+
+.boss-intel h4 {
+  font: 12px/1.3 var(--pixel);
+  color: #fff;
+  margin: 2px 0 1px;
+}
+
+.boss-title {
+  display: block;
+  font-size: 9px;
+  color: #deb252;
+  margin-bottom: 6px;
+}
+
+.boss-intent-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.intent-chip {
+  font-size: 8px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+
+.intent-chip.intent-breath {
+  background: #3b1f1f; color: #ff8c8c; border: 1px solid #6b2f2f;
+}
+.intent-chip.intent-front {
+  background: #38281a; color: #ffbe7a; border: 1px solid #6e4624;
+}
+.intent-chip.intent-meteor {
+  background: #351a3b; color: #d98cff; border: 1px solid #632a6e;
+}
+.intent-chip.intent-all {
+  background: #401414; color: #ff7070; border: 1px solid #822222; font-weight: 700;
+}
+.intent-chip.intent-weakest {
+  background: #1b3028; color: #7bf3ca; border: 1px solid #2d5e4b;
+}
+.intent-chip.intent-strongest {
+  background: #2b3318; color: #d6f37b; border: 1px solid #576b29;
+}
+
+.counter-strategy {
+  font-size: 10px;
+  color: #d6e2d0;
+  line-height: 1.5;
+  margin: 4px 0 0;
+}
+
+/* Narrative Expedition Accordion */
+.dossier-lore-accordion {
+  background: rgba(10, 18, 14, 0.5);
+  border: 1px solid #233428;
+  border-radius: 3px;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.dossier-lore-accordion summary {
+  cursor: pointer;
+  color: #e5cd96;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.zone-narrative-intro {
+  font-size: 11px;
+  color: #c4d4be;
+  line-height: 1.6;
+  margin: 6px 0;
+}
+
+.stage-hp {
+  display: block;
+  font-size: 9px;
+  color: #a8baa6;
+  margin-top: 2px;
+}
+
+/* Recruit Chip Highlight */
+.recruit-chip {
+  background: rgba(74, 144, 226, 0.2);
+  border-color: #4a90e2;
+  color: #8ec3ff;
+}
+
+/* Journal Entries Grid */
+.journal-entries-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.journal-entry-card {
+  background: rgba(8, 16, 12, 0.6);
+  border: 1px solid #25392e;
+  border-radius: 3px;
+  padding: 6px 10px;
+}
+
+.journal-entry-card summary {
+  cursor: pointer;
+  color: #f0c968;
+  font-size: 11px;
+}
+
+.journal-entry-body {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #c4d4be;
+  padding-top: 6px;
+}
+
+.journal-intro {
+  margin: 4px 0;
+}
+
+.journal-outro {
+  margin: 4px 0;
+  color: #deb252;
+}
+
+/* --- MOBILE RESPONSIVENESS (<= 900px) --- */
+@media (max-width: 900px) {
+  .world-map-wrapper {
+    height: auto;
+    overflow: visible;
+  }
+
+  .world-map-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: auto;
+    overflow: visible;
+  }
+
+  .world-map-canvas-card {
+    height: 190px;
+    flex-shrink: 0;
+  }
+
+  .map-chart-viewport {
+    min-height: 180px;
+    height: 180px;
+  }
+
+  .map-node-pin {
+    width: 36px;
+    height: 36px;
+  }
+
+  .map-node-pin.climax-node {
+    width: 40px;
+    height: 40px;
+  }
+
+  .map-node-icon {
+    font-size: 13px;
+  }
+
+  .map-node-plate {
+    display: none; /* Hide floating text plates on mobile to avoid overcrowding */
+  }
+
+  .map-atmosphere-footer {
+    display: none;
+  }
+
+  .world-map-dossier {
+    padding: 10px;
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .dossier-boss-card {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .boss-avatar-frame {
+    width: 50px;
+    height: 50px;
+  }
+
+  .boss-pixel-avatar {
+    width: 48px;
+    height: 48px;
+  }
+}

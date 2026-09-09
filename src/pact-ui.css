@@ -1,0 +1,1022 @@
+/* ==========================================================================
+   GRIDBOUND — PACT OF PUNISHMENT & SUNKEN BELL DESCENT UI (HADES THEME)
+   1. The Pact of Punishment — Raid Hunts (Heat System, Reliquaries & Contracts)
+   2. The Sunken Bell — Roguelike Descent (Four Pillars & Recruits Plinth)
+   3. The Underworld Modals — Obsidian Dialogs, Journal, Profiles & Settings
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. THE PACT OF PUNISHMENT (RAID HUNTS)
+   -------------------------------------------------------------------------- */
+
+/* Details toggles for Raid Party & Boss Archetypes */
+[data-view="raid"] details,
+.town-content details:has(.raid-roster),
+.town-content details:has(.raid-party-grid),
+.town-content details.raid-sandbox {
+  background: radial-gradient(ellipse at 50% 0%, #18242b 0%, #0e171c 70%, #080d10 100%);
+  border: 1px solid rgba(245, 211, 120, 0.25);
+  border-radius: 4px;
+  padding: 16px 18px;
+  margin: 16px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(245, 211, 120, 0.12);
+}
+
+[data-view="raid"] details summary,
+.town-content details:has(.raid-roster) summary,
+.town-content details:has(.raid-party-grid) summary,
+.town-content details.raid-sandbox summary {
+  font-family: var(--pixel);
+  font-size: 11px;
+  color: #f5d378;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  user-select: none;
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+
+[data-view="raid"] details summary:hover,
+.town-content details:has(.raid-roster) summary:hover,
+.town-content details:has(.raid-party-grid) summary:hover,
+.town-content details.raid-sandbox summary:hover {
+  color: #fff2c8;
+  text-shadow: 0 0 10px rgba(245, 211, 120, 0.5);
+}
+
+/* Boss Archetypes Grid (The 12 Authored Quarry) */
+.raid-roster {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 14px !important;
+  margin: 16px 0 !important;
+}
+
+.raid-roster button {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  background: linear-gradient(180deg, #182226 0%, #0d161a 100%) !important;
+  border: 1px solid rgba(245, 211, 120, 0.22) !important;
+  border-radius: 4px;
+  padding: 12px 10px !important;
+  min-height: 160px !important;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(245, 211, 120, 0.1);
+}
+
+/* Corner filigree dots on boss cards */
+.raid-roster button::before {
+  content: '◆';
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 7px;
+  color: #786438;
+  opacity: 0.7;
+  transition: color 0.2s ease;
+}
+
+/* Monster Reliquary Chamber */
+.raid-roster img {
+  width: 100% !important;
+  max-width: 120px !important;
+  height: 88px !important;
+  object-fit: contain !important;
+  image-rendering: pixelated !important;
+  background: radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.12) 0%, rgba(13, 22, 26, 0.9) 80%);
+  border: 1px solid rgba(120, 100, 56, 0.4);
+  border-radius: 4px;
+  padding: 6px;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.8);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.raid-roster b {
+  font-family: var(--pixel) !important;
+  color: #e5c687 !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  margin: 10px 0 4px !important;
+  font-weight: 500 !important;
+  text-align: center;
+  transition: color 0.2s ease;
+}
+
+.raid-roster small {
+  color: #9cb1a4 !important;
+  font-size: 9px !important;
+  line-height: 1.4 !important;
+  text-align: center;
+  display: block;
+}
+
+/* Hover state */
+.raid-roster button:hover {
+  background: linear-gradient(180deg, #223238 0%, #121e23 100%) !important;
+  border-color: #e5c687 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.65), 0 0 14px rgba(245, 211, 120, 0.25) !important;
+}
+
+.raid-roster button:hover img {
+  transform: scale(1.04);
+  border-color: #f5d378;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
+}
+
+.raid-roster button:hover b {
+  color: #fff2c8 !important;
+}
+
+/* Chosen / Selected Boss Archetype — Golden Aura */
+.raid-roster button.chosen,
+.raid-roster button[aria-pressed="true"] {
+  border-color: #f5d378 !important;
+  background: linear-gradient(180deg, #2c291d 0%, #171f22 100%) !important;
+  box-shadow: 0 0 20px rgba(245, 211, 120, 0.45), inset 0 0 16px rgba(245, 211, 120, 0.18), 0 6px 20px rgba(0, 0, 0, 0.7) !important;
+}
+
+.raid-roster button.chosen::before,
+.raid-roster button[aria-pressed="true"]::before {
+  color: #f5d378;
+  text-shadow: 0 0 6px #f5d378;
+}
+
+.raid-roster button.chosen img,
+.raid-roster button[aria-pressed="true"] img {
+  border-color: #f5d378;
+  background: radial-gradient(circle at 50% 50%, rgba(245, 211, 120, 0.25) 0%, rgba(13, 22, 26, 0.95) 80%);
+  box-shadow: 0 0 16px rgba(245, 211, 120, 0.35), inset 0 0 10px rgba(0, 0, 0, 0.8);
+  animation: chosenBossBreath 3s infinite ease-in-out;
+}
+
+.raid-roster button.chosen b,
+.raid-roster button[aria-pressed="true"] b {
+  color: #f5d378 !important;
+  text-shadow: 0 0 8px rgba(245, 211, 120, 0.4);
+}
+
+@keyframes chosenBossBreath {
+  0%, 100% { box-shadow: 0 0 14px rgba(245, 211, 120, 0.3); }
+  50% { box-shadow: 0 0 22px rgba(245, 211, 120, 0.55); }
+}
+
+/* Raid Party Setup & Echo Units */
+.raid-party-size {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: #f5d378;
+  letter-spacing: 0.8px;
+  margin: 10px 0 16px !important;
+  min-height: 44px;
+}
+
+.raid-party-size select {
+  min-height: 44px !important;
+  min-width: 140px;
+  background: #091014 !important;
+  color: #f5d378 !important;
+  border: 1.5px solid #786438 !important;
+  border-radius: 4px;
+  padding: 8px 14px !important;
+  font-family: var(--body);
+  font-size: 12px !important;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.raid-party-size select:hover,
+.raid-party-size select:focus {
+  border-color: #f5d378 !important;
+  box-shadow: 0 0 12px rgba(245, 211, 120, 0.3);
+  outline: none;
+}
+
+.raid-party-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;
+  gap: 12px !important;
+  margin: 14px 0 !important;
+}
+
+.raid-party-slot {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  background: rgba(14, 22, 28, 0.92) !important;
+  border: 1px solid rgba(245, 211, 120, 0.2) !important;
+  border-radius: 4px;
+  padding: 12px 14px !important;
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.raid-party-slot:hover {
+  border-color: rgba(245, 211, 120, 0.45) !important;
+  transform: translateY(-1px);
+}
+
+.raid-party-slot span {
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: #f5d378;
+  letter-spacing: 0.5px;
+}
+
+.raid-party-slot select {
+  min-height: 44px !important;
+  width: 100% !important;
+  background: #080e12 !important;
+  color: #bad1cb !important;
+  border: 1px solid #6b5832 !important;
+  border-radius: 4px;
+  padding: 8px 10px !important;
+  font-family: var(--body);
+  font-size: 11px !important;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.raid-party-slot select:hover,
+.raid-party-slot select:focus {
+  border-color: #f5d378 !important;
+  color: #f5d378 !important;
+  outline: none;
+}
+
+/* Variant & Tier Selectors */
+.raid-variant,
+.raid-tier {
+  display: grid !important;
+  gap: 8px !important;
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: #f5d378;
+  letter-spacing: 0.8px;
+  margin: 18px 0 !important;
+}
+
+.raid-variant select,
+.raid-tier select {
+  min-height: 44px !important;
+  width: 100% !important;
+  background: #091014 !important;
+  color: #e5c687 !important;
+  border: 1.5px solid #786438 !important;
+  border-radius: 4px;
+  padding: 10px 14px !important;
+  font-family: var(--body);
+  font-size: 12px !important;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.raid-variant select:hover,
+.raid-tier select:hover,
+.raid-variant select:focus,
+.raid-tier select:focus {
+  border-color: #f5d378 !important;
+  box-shadow: 0 0 14px rgba(245, 211, 120, 0.28);
+  outline: none;
+}
+
+/* Certified Modifier Allowlist (The Pact of Punishment Heat Tablets) */
+.raid-modifiers {
+  background: radial-gradient(ellipse at 50% 10%, #1e151e 0%, #0f1318 65%, #070a0d 100%) !important;
+  border: 1px solid rgba(239, 83, 80, 0.35) !important;
+  border-radius: 4px;
+  padding: 20px 22px !important;
+  margin: 22px 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(239, 83, 80, 0.2);
+  position: relative;
+}
+
+/* Pact skull insignia ornament */
+.raid-modifiers::before {
+  content: '☠';
+  position: absolute;
+  top: -12px;
+  right: 18px;
+  background: #0d1217;
+  color: #ef5350;
+  font-size: 14px;
+  padding: 2px 8px;
+  border: 1px solid rgba(239, 83, 80, 0.4);
+  border-radius: 3px;
+  text-shadow: 0 0 8px rgba(239, 83, 80, 0.6);
+}
+
+.raid-modifiers legend {
+  font-family: var(--pixel) !important;
+  font-size: 11px !important;
+  color: #ef5350 !important;
+  letter-spacing: 1.2px !important;
+  padding: 0 8px !important;
+  text-shadow: 0 0 10px rgba(239, 83, 80, 0.5);
+}
+
+.raid-modifier {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 12px 16px !important;
+  background: rgba(16, 23, 28, 0.85) !important;
+  border: 1px solid rgba(120, 100, 56, 0.3) !important;
+  border-radius: 4px;
+  cursor: pointer;
+  min-height: 48px !important;
+  transition: all 0.2s ease !important;
+  user-select: none;
+}
+
+.raid-modifier:hover {
+  background: rgba(26, 34, 40, 0.95) !important;
+  border-color: rgba(245, 211, 120, 0.5) !important;
+  transform: translateX(2px);
+}
+
+/* Custom Styled Checkbox */
+.raid-modifier input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  background: #080e12 !important;
+  border: 2px solid #786438 !important;
+  border-radius: 3px !important;
+  margin: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.raid-modifier input[type="checkbox"]:hover {
+  border-color: #f5d378 !important;
+  box-shadow: 0 0 8px rgba(245, 211, 120, 0.4);
+}
+
+.raid-modifier input[type="checkbox"]:checked {
+  background: #b71c1c !important;
+  border-color: #ef5350 !important;
+  box-shadow: 0 0 10px rgba(239, 83, 80, 0.7);
+}
+
+.raid-modifier input[type="checkbox"]:checked::after {
+  content: '✓';
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+  display: block;
+}
+
+/* Active Modifier Row highlight */
+.raid-modifier:has(input:checked) {
+  border-color: rgba(239, 83, 80, 0.6) !important;
+  background: linear-gradient(90deg, rgba(80, 20, 20, 0.35) 0%, rgba(20, 26, 32, 0.9) 100%) !important;
+  box-shadow: inset 3px 0 0 #ef5350, 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+.raid-modifier span {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+}
+
+.raid-modifier b {
+  font-family: var(--body);
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #e5c687 !important;
+  line-height: 1.4 !important;
+}
+
+.raid-modifier:has(input:checked) b {
+  color: #ffcdd2 !important;
+}
+
+.raid-modifier small {
+  color: #9cb1a4 !important;
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+
+.raid-modifiers > small {
+  font-size: 10px !important;
+  color: #889e92 !important;
+  font-style: italic;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+/* Practice Sliders (Sandbox Tuning) */
+.raid-sandbox p {
+  color: #bad1cb;
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 8px 0 14px;
+}
+
+.raid-sandbox label {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  min-height: 44px !important;
+  margin: 10px 0 !important;
+  font-size: 12px !important;
+  color: #d3dfd8 !important;
+}
+
+.raid-sandbox input[type="range"] {
+  flex: 1 1 200px !important;
+  min-width: 140px !important;
+  min-height: 44px !important;
+  cursor: pointer;
+  accent-color: #f5d378;
+}
+
+.raid-sandbox output {
+  font-family: var(--pixel) !important;
+  font-size: 10px !important;
+  color: #f5d378 !important;
+  background: #070d10 !important;
+  border: 1px solid #786438 !important;
+  border-radius: 3px;
+  padding: 4px 8px !important;
+  min-width: 44px;
+  text-align: center;
+}
+
+/* Mission Brief Parchment (Quarry Contract) */
+.mission-brief {
+  position: relative !important;
+  background: radial-gradient(ellipse at 50% 0%, #1e282f 0%, #111a1f 70%, #080d10 100%) !important;
+  border: 1.5px solid rgba(245, 211, 120, 0.35) !important;
+  border-radius: 4px;
+  padding: 24px !important;
+  margin-top: 20px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(245, 211, 120, 0.2) !important;
+}
+
+/* Gold corner glyphs on mission brief */
+.mission-brief::before,
+.mission-brief::after {
+  content: '✦';
+  position: absolute;
+  color: #f5d378;
+  font-size: 10px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.mission-brief::before { top: 8px; left: 10px; }
+.mission-brief::after { bottom: 8px; right: 10px; }
+
+.mission-brief h3 {
+  font-family: var(--pixel) !important;
+  font-size: 17px !important;
+  color: #f5d378 !important;
+  letter-spacing: 0.5px !important;
+  margin: 10px 0 14px !important;
+  text-shadow: 0 0 12px rgba(245, 211, 120, 0.3);
+}
+
+.mission-brief > p {
+  color: #bad1cb !important;
+  font-size: 12px !important;
+  line-height: 1.8 !important;
+}
+
+.mission-brief .counter-note {
+  background: rgba(245, 158, 11, 0.1) !important;
+  border-left: 3px solid #f59e0b !important;
+  padding: 10px 14px !important;
+  border-radius: 0 4px 4px 0;
+  color: #ffe699 !important;
+  font-size: 11px !important;
+  line-height: 1.6 !important;
+  margin: 14px 0 !important;
+}
+
+.mission-brief .mission-reward {
+  background: rgba(85, 227, 199, 0.08) !important;
+  border: 1px solid rgba(85, 227, 199, 0.35) !important;
+  border-radius: 4px;
+  padding: 12px 16px !important;
+  color: #a1ede0 !important;
+  font-size: 12px !important;
+  line-height: 1.6 !important;
+  margin: 16px 0 !important;
+  font-weight: 500;
+  box-shadow: inset 0 0 16px rgba(85, 227, 199, 0.08);
+}
+
+/* Raid Departure CTA Button — Flaming Golden Aura */
+button[data-depart="raid"] {
+  background: linear-gradient(135deg, #c9933b 0%, #a47528 50%, #7e5318 100%) !important;
+  border: 1px solid #f9e5b6 !important;
+  color: #121815 !important;
+  box-shadow: 0 4px 0 #5c3e12, 0 0 24px rgba(245, 211, 120, 0.4) !important;
+  font-family: var(--pixel) !important;
+  font-size: 11px !important;
+  letter-spacing: 1px !important;
+  font-weight: 700 !important;
+  min-height: 48px !important;
+  cursor: pointer;
+  transition: all 0.2s ease !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+button[data-depart="raid"]:hover {
+  background: linear-gradient(135deg, #dfa849 0%, #b88632 50%, #8d5e1e 100%) !important;
+  box-shadow: 0 4px 0 #5c3e12, 0 0 34px rgba(245, 211, 120, 0.65) !important;
+  transform: translateY(-1px);
+}
+
+button[data-depart="raid"]:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #5c3e12, 0 0 16px rgba(245, 211, 120, 0.4) !important;
+}
+
+
+/* --------------------------------------------------------------------------
+   2. THE SUNKEN BELL (ROGUELIKE DESCENT)
+   -------------------------------------------------------------------------- */
+
+/* The Four Pillars of the Descent */
+.endless-rules {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 14px !important;
+  margin: 22px 0 26px !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+.endless-rules p {
+  background: radial-gradient(ellipse at 50% 0%, #152228 0%, #0d171b 80%, #070d10 100%) !important;
+  border: 1px solid rgba(85, 227, 199, 0.25) !important;
+  border-radius: 4px;
+  padding: 16px 18px !important;
+  margin: 0 !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(85, 227, 199, 0.15);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  font-size: 11px !important;
+  line-height: 1.7 !important;
+  color: #bad1cb !important;
+}
+
+.endless-rules p:hover {
+  transform: translateY(-2px);
+  border-color: rgba(85, 227, 199, 0.55) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 0 18px rgba(85, 227, 199, 0.25);
+}
+
+.endless-rules b {
+  display: block !important;
+  font-family: var(--pixel) !important;
+  font-size: 10px !important;
+  color: #55e3c7 !important;
+  letter-spacing: 0.6px !important;
+  margin-bottom: 8px !important;
+  text-shadow: 0 0 8px rgba(85, 227, 199, 0.4);
+}
+
+/* Recruits Plinth (The 3 Custom Roguelike Recruits) */
+.loadout-slots {
+  background: radial-gradient(ellipse at 50% 0%, #17242a 0%, #0c1418 80%, #060a0d 100%) !important;
+  border: 1px solid rgba(245, 211, 120, 0.28) !important;
+  border-radius: 4px;
+  padding: 22px !important;
+  margin: 20px 0 14px !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 16px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(245, 211, 120, 0.15);
+}
+
+.loadout-slots legend {
+  font-family: var(--pixel) !important;
+  font-size: 11px !important;
+  color: #f5d378 !important;
+  letter-spacing: 1px !important;
+  padding: 0 8px !important;
+  text-shadow: 0 0 10px rgba(245, 211, 120, 0.4);
+}
+
+.loadout-slots label {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  background: rgba(12, 19, 24, 0.9) !important;
+  border: 1px solid rgba(120, 100, 56, 0.35) !important;
+  border-radius: 4px;
+  padding: 14px 12px !important;
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: #e5c687;
+  letter-spacing: 0.5px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.loadout-slots label:hover {
+  border-color: rgba(245, 211, 120, 0.5) !important;
+  transform: translateY(-1px);
+}
+
+.loadout-slots select {
+  min-height: 44px !important;
+  width: 100% !important;
+  background: #070d10 !important;
+  color: #f5d378 !important;
+  border: 1.5px solid #786438 !important;
+  border-radius: 4px;
+  padding: 8px 12px !important;
+  font-family: var(--body);
+  font-size: 12px !important;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.loadout-slots select:hover,
+.loadout-slots select:focus {
+  border-color: #f5d378 !important;
+  box-shadow: 0 0 12px rgba(245, 211, 120, 0.3);
+  outline: none;
+}
+
+/* Roguelike rules footnote */
+.loadout-slots + p {
+  color: #8ea89e !important;
+  font-size: 11px !important;
+  line-height: 1.75 !important;
+  margin: 12px 0 20px !important;
+}
+
+/* Descent Departure CTA Button — Oceanic Beacon Pulsating Turquoise */
+button[data-depart="endless"] {
+  background: linear-gradient(135deg, #1b8a8e 0%, #126366 50%, #0a4042 100%) !important;
+  border: 1.5px solid #55e3c7 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 0 #052627, 0 0 24px rgba(85, 227, 199, 0.45) !important;
+  font-family: var(--pixel) !important;
+  font-size: 11px !important;
+  letter-spacing: 1.2px !important;
+  font-weight: 700 !important;
+  min-height: 48px !important;
+  cursor: pointer;
+  transition: all 0.2s ease !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8) !important;
+  animation: endlessBeaconPulse 3.5s infinite ease-in-out;
+}
+
+button[data-depart="endless"]:hover {
+  background: linear-gradient(135deg, #22aab0 0%, #177a7e 50%, #0d4e51 100%) !important;
+  box-shadow: 0 4px 0 #052627, 0 0 36px rgba(85, 227, 199, 0.75) !important;
+  transform: translateY(-1px);
+}
+
+button[data-depart="endless"]:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #052627, 0 0 18px rgba(85, 227, 199, 0.5) !important;
+}
+
+@keyframes endlessBeaconPulse {
+  0%, 100% { box-shadow: 0 4px 0 #052627, 0 0 20px rgba(85, 227, 199, 0.4); }
+  50% { box-shadow: 0 4px 0 #052627, 0 0 34px rgba(85, 227, 199, 0.7); }
+}
+
+
+/* --------------------------------------------------------------------------
+   3. THE UNDERWORLD MODALS (OBSIDIAN DIALOGS, JOURNAL & PROFILES)
+   -------------------------------------------------------------------------- */
+
+/* General Dialog Frame (when not overridden by Boon Draft or Result Ceremony) */
+dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) {
+  background: radial-gradient(ellipse at 50% 0%, #1b262b 0%, #0d161a 70%, #060a0d 100%) !important;
+  color: #d3dfd8 !important;
+  border: 2px solid #786438 !important;
+  border-radius: 6px;
+  box-shadow: 0 0 0 5px #05080a, 0 25px 90px rgba(0, 0, 0, 0.9), 0 0 40px rgba(245, 211, 120, 0.15) !important;
+  padding: 30px 28px !important;
+  width: min(560px, calc(100vw - 32px)) !important;
+  max-height: 86dvh !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+/* Gilded filigree corners on modals */
+dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal))::before,
+dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal))::after {
+  content: '✦';
+  position: absolute;
+  color: #f5d378;
+  font-size: 12px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal))::before { top: 10px; left: 12px; }
+dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal))::after { bottom: 10px; right: 12px; }
+
+/* Modal Backdrop */
+dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal))::backdrop {
+  background: rgba(4, 8, 11, 0.88) !important;
+  backdrop-filter: blur(6px) !important;
+}
+
+/* Modal Typography */
+dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) h2,
+#modal-title {
+  font-family: var(--pixel) !important;
+  font-size: 15px !important;
+  color: #f5d378 !important;
+  letter-spacing: 0.5px !important;
+  line-height: 1.6 !important;
+  margin: 10px 0 14px !important;
+  text-shadow: 0 0 10px rgba(245, 211, 120, 0.35);
+}
+
+dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) h3 {
+  font-family: var(--pixel) !important;
+  font-size: 11px !important;
+  color: #f5d378 !important;
+  margin: 18px 0 10px !important;
+  letter-spacing: 0.5px !important;
+}
+
+dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) > p,
+dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) section p {
+  color: #bad1cb !important;
+  font-size: 12px !important;
+  line-height: 1.8 !important;
+  margin: 0 0 16px !important;
+}
+
+/* Modal Close Button */
+.modal-close {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border: 1px solid #786438 !important;
+  background: rgba(10, 16, 20, 0.85) !important;
+  color: #f5d378 !important;
+  font-size: 22px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease !important;
+}
+
+.modal-close:hover {
+  background: rgba(28, 40, 48, 0.95) !important;
+  border-color: #f5d378 !important;
+  box-shadow: 0 0 14px rgba(245, 211, 120, 0.35) !important;
+  transform: rotate(90deg);
+}
+
+/* Story Journal Sections */
+#modal section {
+  background: rgba(14, 22, 28, 0.9) !important;
+  border: 1px solid rgba(245, 211, 120, 0.22) !important;
+  border-radius: 4px;
+  padding: 16px !important;
+  margin: 14px 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.5);
+}
+
+#modal section h3 {
+  font-family: var(--pixel) !important;
+  font-size: 12px !important;
+  color: #f5d378 !important;
+  margin: 0 0 4px !important;
+}
+
+#modal section p {
+  font-size: 12px !important;
+  line-height: 1.75 !important;
+  color: #bad1cb !important;
+  margin: 0 !important;
+}
+
+#modal button[data-story-choice] {
+  min-height: 44px !important;
+  margin-top: 4px;
+}
+
+/* Commander Profiles & Save Slots */
+#modal label:has(#commander-name) {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: #f5d378;
+  letter-spacing: 0.8px;
+  margin: 14px 0 !important;
+}
+
+#commander-name,
+#delete-word {
+  min-height: 44px !important;
+  background: #080e12 !important;
+  border: 1.5px solid #786438 !important;
+  border-radius: 4px;
+  color: #f5d378 !important;
+  padding: 8px 14px !important;
+  font-family: var(--body);
+  font-size: 13px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#commander-name:focus,
+#delete-word:focus {
+  border-color: #f5d378 !important;
+  box-shadow: 0 0 14px rgba(245, 211, 120, 0.35);
+  outline: none;
+}
+
+/* Setting Rows */
+.setting-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  min-height: 52px !important;
+  padding: 10px 14px !important;
+  background: rgba(14, 22, 28, 0.85) !important;
+  border: 1px solid rgba(120, 100, 56, 0.25) !important;
+  border-radius: 4px;
+  margin: 10px 0 !important;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.setting-row:hover {
+  background: rgba(22, 32, 40, 0.95) !important;
+  border-color: rgba(245, 211, 120, 0.4) !important;
+}
+
+.setting-row span b {
+  font-size: 12px;
+  color: #f5d378;
+  display: block;
+}
+
+.setting-row span small {
+  font-size: 10px;
+  color: #8ea89e;
+  display: block;
+  margin-top: 2px;
+}
+
+.setting-row input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  background: #080e12 !important;
+  border: 2px solid #786438 !important;
+  border-radius: 4px !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.setting-row input[type="checkbox"]:checked {
+  background: #c9933b !important;
+  border-color: #f5d378 !important;
+  box-shadow: 0 0 10px rgba(245, 211, 120, 0.6);
+}
+
+.setting-row input[type="checkbox"]:checked::after {
+  content: '✓';
+  color: #121815;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* Help rows */
+dialog .help-rows {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  margin: 18px 0 !important;
+}
+
+dialog .help-rows p {
+  background: rgba(14, 22, 28, 0.8) !important;
+  border: 1px solid rgba(245, 211, 120, 0.15) !important;
+  border-radius: 4px;
+  padding: 12px 14px !important;
+  margin: 0 !important;
+  font-size: 11px !important;
+  line-height: 1.75 !important;
+  color: #bad1cb !important;
+}
+
+dialog .help-rows b {
+  color: #f5d378 !important;
+  font-size: 12px !important;
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* Generic Modal Buttons (Ensure >=44px) */
+dialog button {
+  min-height: 44px !important;
+}
+
+
+/* --------------------------------------------------------------------------
+   4. RESPONSIVE REFINEMENTS (MOBILE <= 720px & <= 390px)
+   -------------------------------------------------------------------------- */
+@media (max-width: 720px) {
+  .raid-roster {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .raid-roster button {
+    padding: 10px 6px !important;
+    min-height: 140px !important;
+  }
+
+  .raid-roster img {
+    height: 72px !important;
+  }
+
+  .raid-party-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .endless-rules {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .loadout-slots {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    padding: 16px !important;
+  }
+
+  dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) {
+    width: calc(100vw - 20px) !important;
+    padding: 22px 16px !important;
+    max-height: 90dvh !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .raid-roster {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .raid-party-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .raid-party-size {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+  }
+
+  .raid-party-size select {
+    width: 100% !important;
+  }
+
+  .raid-sandbox label {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .raid-sandbox input[type="range"] {
+    width: 100% !important;
+  }
+}

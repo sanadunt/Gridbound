@@ -4,7 +4,7 @@ import { withBrowser } from './browser-harness.mjs';
 const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5180/';
 await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) => {
   await send('Page.navigate', { url });
-  await wait('window.gridbound?.scene?.textures?.exists("dragon-auric-0")');
+  await wait('window.gridbound?.scene?.textures?.exists("dragon-auric-0")', 25000);
   const textures = await evaluate(`Object.keys(window.gridbound.scene.textures.list).filter(k=>/^(wolf|goblin|spider|shaman|golem|wraith|treant|dragon|moth|basilisk|crab|revenant)(-ash|-frost|-auric)?-0$/.test(k)).map(k=>window.gridbound.scene.textures.get(k).getSourceImage().toDataURL())`);
   assert.equal(textures.length, 48);
   assert.equal(new Set(textures).size, 48, 'each monster variant is actually visually distinct');

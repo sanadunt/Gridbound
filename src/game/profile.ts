@@ -9,8 +9,9 @@ import type { Battle } from './simulation';
 import { normalizeStoryParty, benchExperience } from './story-party';
 import { createCurrencyState, creditCurrency, type CurrencyState } from '../economy/currency';
 import { bankRaidReward, bankRoguelikeReward, buyBankItem, normalizeChallengeUnlocks, raidReward, roguelikeBankReward, creditRunRoom, type RunWallet } from '../economy/challenge';
+import { normalizeNarrative } from './narrative';
 export type Loadout = { skills:number[]; talents:string[]; slot:number; xp?:number; job?:string; gear?:Record<string,string>; inventory?:string[] };
-export type Profile = { version:3; gold:number; economy:CurrencyState; settlementReceipts:string[]; challengeUnlocks:string[]; claimedQuests:string[]; trackedQuest?:string; ledger:{raids:number;victories:number;enemies:Record<string,number>}; roster:number[]; storyActive:number[]; cleared:number[]; loadouts:Record<number,Loadout>; bestFloor:number; wins:number; sound:boolean; motion:boolean };
+export type Profile = { narrative?:Record<string,string>; version:3; gold:number; economy:CurrencyState; settlementReceipts:string[]; challengeUnlocks:string[]; claimedQuests:string[]; trackedQuest?:string; ledger:{raids:number;victories:number;enemies:Record<string,number>}; roster:number[]; storyActive:number[]; cleared:number[]; loadouts:Record<number,Loadout>; bestFloor:number; wins:number; sound:boolean; motion:boolean };
 export function createProfile():Profile {
   const economy=createCurrencyState();
   economy.gold=60;
@@ -127,6 +128,7 @@ export function normalizeProfile(raw:unknown,legacy?:unknown):Profile {
   const ledger=record(data.ledger),enemies=record(ledger.enemies);
   p.ledger.raids=bounded(ledger.raids,0,1000000);p.ledger.victories=bounded(ledger.victories,0,1000000);
   for(const e of Object.values(ENEMIES))if(e.archetype===e.id&&enemies[e.id]!==undefined)p.ledger.enemies[e.id]=bounded(enemies[e.id],0,1000000);
+  p.narrative=normalizeNarrative(data.narrative);
   const claims=Array.isArray(data.claimedQuests)?data.claimedQuests:[];
   for(const q of QUESTS)if(claims.includes(q.id)&&(!q.requires||p.claimedQuests.includes(q.requires)))p.claimedQuests.push(q.id);
   if(typeof data.trackedQuest==='string'&&QUESTS.some(q=>q.id===data.trackedQuest)&&!p.claimedQuests.includes(data.trackedQuest))p.trackedQuest=data.trackedQuest;

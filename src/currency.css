@@ -1,0 +1,7 @@
+/* Coin and cut crystal distinguish wallets without long header labels. */
+.currency-amount { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.currency-amount svg { width:18px; height:18px; flex:none; }
+.site-header .header-tools { display:flex; align-items:center; flex-wrap:nowrap; gap:6px; }
+.site-header .wallet { flex:none; }
+.section-heading { flex-wrap:wrap; }
+.section-heading .chapter-counter { white-space:normal; overflow-wrap:anywhere; }

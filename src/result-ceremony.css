@@ -1,0 +1,637 @@
+/* ============================================================
+   HADES-INSPIRED VICTORY, DEFEAT & EXPEDITION CEREMONY SCREEN
+   ============================================================ */
+
+/* Expand modal for the ceremony on desktop while respecting mobile */
+dialog:has(.result-ceremony-modal) {
+  width: min(640px, calc(100vw - 28px)) !important;
+  max-width: 640px !important;
+  max-height: 94dvh !important;
+  padding: 20px 24px !important;
+  border-radius: 8px !important;
+  position: relative;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box;
+}
+
+dialog:has(.result-ceremony-modal) > .modal-close {
+  display: none !important;
+}
+
+dialog:has(.result-ceremony-modal)::backdrop {
+  background: rgba(3, 7, 6, 0.93) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* --- THEMATIC BACKDROPS & BORDERS --- */
+
+/* 1. Victory Theme */
+dialog:has(.result-ceremony-modal.victory) {
+  background: radial-gradient(circle at 50% 12%, #1a3528 0%, #091712 60%, #030806 100%) !important;
+  border: 2px solid #8b7337 !important;
+  box-shadow: 0 0 0 4px #081510, 0 25px 90px rgba(0, 0, 0, 0.95), 0 0 55px rgba(240, 201, 104, 0.28) !important;
+}
+
+/* 2. Defeat Theme */
+dialog:has(.result-ceremony-modal.defeat) {
+  background: radial-gradient(circle at 50% 12%, #2c1212 0%, #130606 60%, #060202 100%) !important;
+  border: 2px solid #8b3737 !important;
+  box-shadow: 0 0 0 4px #140707, 0 25px 90px rgba(0, 0, 0, 0.95), 0 0 55px rgba(239, 68, 68, 0.25) !important;
+}
+
+/* 3. Wave Clear Theme */
+dialog:has(.result-ceremony-modal.wave-clear) {
+  background: radial-gradient(circle at 50% 12%, #142a22 0%, #08140f 60%, #030806 100%) !important;
+  border: 2px solid #3d6854 !important;
+  box-shadow: 0 0 0 4px #07120e, 0 25px 90px rgba(0, 0, 0, 0.95), 0 0 45px rgba(78, 201, 166, 0.22) !important;
+}
+
+/* --- MODAL WRAPPER & CORNER FILIGREES --- */
+.result-ceremony-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+.ceremony-corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.result-ceremony-modal.victory .ceremony-corner {
+  border-color: #f5d378;
+}
+.result-ceremony-modal.defeat .ceremony-corner {
+  border-color: #ef5350;
+}
+.result-ceremony-modal.wave-clear .ceremony-corner {
+  border-color: #55e3c7;
+}
+
+.ceremony-corner.tl { top: -14px; left: -18px; border-top: 2px solid currentColor; border-left: 2px solid currentColor; }
+.ceremony-corner.tr { top: -14px; right: -18px; border-top: 2px solid currentColor; border-right: 2px solid currentColor; }
+.ceremony-corner.bl { bottom: -14px; left: -18px; border-bottom: 2px solid currentColor; border-left: 2px solid currentColor; }
+.ceremony-corner.br { bottom: -14px; right: -18px; border-bottom: 2px solid currentColor; border-right: 2px solid currentColor; }
+
+/* --- CEREMONIAL CREST --- */
+.ceremony-crest-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 0;
+}
+
+.ceremony-crest {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.ceremony-crest.victory {
+  background: radial-gradient(circle, #3d2b0e 0%, #1a1204 80%);
+  border: 2px solid #f5d378;
+  box-shadow: 0 0 24px rgba(245, 211, 120, 0.4), inset 0 0 12px rgba(245, 211, 120, 0.25);
+}
+
+.ceremony-crest.defeat {
+  background: radial-gradient(circle, #3a0d0d 0%, #180505 80%);
+  border: 2px solid #ef5350;
+  box-shadow: 0 0 24px rgba(239, 83, 80, 0.4), inset 0 0 12px rgba(239, 83, 80, 0.25);
+}
+
+.ceremony-crest.wave-clear {
+  background: radial-gradient(circle, #0e2f26 0%, #061510 80%);
+  border: 2px solid #55e3c7;
+  box-shadow: 0 0 24px rgba(85, 227, 199, 0.35), inset 0 0 12px rgba(85, 227, 199, 0.2);
+}
+
+.ceremony-crest-icon {
+  font-size: 26px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.8));
+}
+
+.ceremony-crest-aura {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 1px dashed currentColor;
+  opacity: 0.4;
+  animation: hadesSpinAura 20s linear infinite;
+  pointer-events: none;
+}
+.result-ceremony-modal.victory .ceremony-crest-aura { color: #f5d378; }
+.result-ceremony-modal.defeat .ceremony-crest-aura { color: #ef5350; }
+.result-ceremony-modal.wave-clear .ceremony-crest-aura { color: #55e3c7; }
+
+@keyframes hadesSpinAura {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* --- CEREMONIAL HEADER & TYPOGRAPHY --- */
+.ceremony-header {
+  text-align: center;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ceremony-header .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+.result-ceremony-modal.victory .ceremony-header .eyebrow {
+  color: #f5d378;
+  text-shadow: 0 0 10px rgba(245, 211, 120, 0.6);
+}
+.result-ceremony-modal.defeat .ceremony-header .eyebrow {
+  color: #ff6b6b;
+  text-shadow: 0 0 10px rgba(255, 107, 107, 0.6);
+}
+.result-ceremony-modal.wave-clear .ceremony-header .eyebrow {
+  color: #55e3c7;
+  text-shadow: 0 0 10px rgba(85, 227, 199, 0.5);
+}
+
+.ceremony-title {
+  font-family: var(--pixel);
+  font-size: 18px;
+  margin: 2px 0 6px;
+  letter-spacing: 0.8px;
+  line-height: 1.3;
+}
+
+.result-ceremony-modal.victory .ceremony-title {
+  color: #fff6d1;
+  text-shadow: 0 0 20px rgba(245, 210, 120, 0.5), 2px 2px 0 #181307;
+}
+.result-ceremony-modal.defeat .ceremony-title {
+  color: #ffe0e0;
+  text-shadow: 0 0 20px rgba(239, 68, 68, 0.5), 2px 2px 0 #1c0909;
+}
+.result-ceremony-modal.wave-clear .ceremony-title {
+  color: #dffff5;
+  text-shadow: 0 0 20px rgba(85, 227, 199, 0.4), 2px 2px 0 #071510;
+}
+
+.ceremony-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 280px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #574626, transparent);
+  margin: 4px auto 6px;
+  position: relative;
+}
+.result-ceremony-modal.defeat .ceremony-divider {
+  background: linear-gradient(90deg, transparent, #782a2a, transparent);
+}
+.result-ceremony-modal.wave-clear .ceremony-divider {
+  background: linear-gradient(90deg, transparent, #285444, transparent);
+}
+
+.ceremony-div-gem {
+  color: #f5d378;
+  font-size: 9px;
+  background: #091712;
+  padding: 0 6px;
+}
+.result-ceremony-modal.defeat .ceremony-div-gem {
+  color: #ef5350;
+  background: #130606;
+}
+.result-ceremony-modal.wave-clear .ceremony-div-gem {
+  color: #55e3c7;
+  background: #08140f;
+}
+
+.ceremony-desc {
+  color: #c4d7cd;
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 540px;
+  margin: 0 auto;
+}
+.result-ceremony-modal.defeat .ceremony-desc {
+  color: #d8c2c2;
+}
+
+/* Recruitment Notice */
+.recruit-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(245, 211, 120, 0.1);
+  border: 1px solid #8b7337;
+  border-radius: 4px;
+  padding: 6px 12px;
+  margin-top: 6px;
+  color: #fff1be;
+  font-size: 11px;
+  line-height: 1.4;
+  box-shadow: 0 0 15px rgba(245, 211, 120, 0.15);
+}
+
+/* --- STAT PLAQUES (.result-stats) --- */
+.result-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 2px 0;
+}
+
+.stat-plaque {
+  background: rgba(8, 20, 16, 0.75);
+  border: 1px solid #23382d;
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.2s, transform 0.2s;
+}
+.result-ceremony-modal.defeat .stat-plaque {
+  background: rgba(20, 8, 8, 0.75);
+  border-color: #382323;
+}
+
+.stat-plaque:hover {
+  border-color: #574626;
+  transform: translateY(-1px);
+}
+.result-ceremony-modal.defeat .stat-plaque:hover {
+  border-color: #6a2525;
+}
+
+.stat-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.stat-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stat-meta b {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f7f4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-plaque.gold .stat-meta b {
+  color: #f5d378;
+  text-shadow: 0 0 8px rgba(245, 211, 120, 0.35);
+}
+
+.stat-meta small {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: #8aa396;
+  margin-top: 1px;
+}
+.result-ceremony-modal.defeat .stat-meta small {
+  color: #a38a8a;
+}
+
+/* --- HERO EXPERIENCE BANKED (.xp-results) --- */
+.xp-results {
+  background: rgba(6, 16, 12, 0.8);
+  border: 1px solid #1f3529;
+  border-radius: 6px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+}
+.result-ceremony-modal.defeat .xp-results {
+  background: rgba(18, 6, 6, 0.8);
+  border-color: #381f1f;
+}
+
+.xp-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #192a20;
+  padding-bottom: 6px;
+}
+.result-ceremony-modal.defeat .xp-section-header {
+  border-bottom-color: #2b1717;
+}
+
+.xp-results h3 {
+  font-family: var(--pixel);
+  font-size: 11px;
+  color: #f5d378;
+  margin: 0;
+  letter-spacing: 0.8px;
+}
+.result-ceremony-modal.defeat .xp-results h3 {
+  color: #ef5350;
+}
+
+.xp-section-tag {
+  font-size: 10px;
+  color: #8da497;
+  font-weight: 500;
+}
+
+.xp-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Stylized reward card */
+.xp-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  margin: 0;
+  background: rgba(12, 26, 20, 0.7);
+  border: 1px solid #1e3529;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+.result-ceremony-modal.defeat .xp-card {
+  background: rgba(26, 12, 12, 0.7);
+  border-color: #351e1e;
+}
+
+.xp-card:hover {
+  background: rgba(18, 38, 29, 0.85);
+  border-color: #325843;
+}
+
+.xp-card.leveled-up {
+  background: rgba(45, 36, 14, 0.55);
+  border-color: #8b7337;
+  box-shadow: 0 0 12px rgba(245, 211, 120, 0.15);
+}
+
+.xp-hero-ident {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.xp-hero-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.xp-hero-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.xp-hero-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1f7f4;
+}
+
+.xp-role-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.xp-role-badge.active {
+  background: rgba(85, 227, 199, 0.18);
+  color: #55e3c7;
+  border: 1px solid rgba(85, 227, 199, 0.35);
+}
+
+.xp-role-badge.bench {
+  background: rgba(140, 160, 150, 0.15);
+  color: #a4b8ad;
+  border: 1px solid rgba(140, 160, 150, 0.3);
+}
+
+.xp-gain-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.xp-points {
+  color: #9bd4b7;
+  font-weight: 500;
+}
+
+.xp-catchup {
+  color: #f5d378;
+  font-weight: 600;
+  font-size: 10px;
+}
+
+.xp-level-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2ece6;
+}
+
+.xp-level-badge.lvl-glow {
+  background: linear-gradient(135deg, #f5d378, #d4a737);
+  color: #120e03;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(245, 211, 120, 0.55);
+  animation: hadesLevelUpGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes hadesLevelUpGlow {
+  0% {
+    box-shadow: 0 0 6px rgba(245, 211, 120, 0.4);
+    filter: brightness(1);
+  }
+  100% {
+    box-shadow: 0 0 16px rgba(245, 211, 120, 0.85);
+    filter: brightness(1.15);
+  }
+}
+
+.xp-footnote {
+  color: #8da497;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.result-ceremony-modal.defeat .xp-footnote {
+  color: #a48d8d;
+}
+
+/* --- ACTION BUTTONS --- */
+.ceremony-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+#next-wave {
+  background: linear-gradient(180deg, #d4a737 0%, #a67f1e 100%);
+  color: #151004;
+  border: 1px solid #ffe394;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 18px rgba(245, 211, 120, 0.35);
+  padding: 10px 18px;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+#next-wave:hover:not(:disabled) {
+  background: linear-gradient(180deg, #f0c24d 0%, #bf9425 100%);
+  box-shadow: 0 0 25px rgba(245, 211, 120, 0.6);
+  transform: translateY(-1px);
+}
+
+#retry {
+  background: linear-gradient(180deg, #301616 0%, #1c0a0a 100%);
+  color: #fca5a5;
+  border: 1px solid #7a2828;
+  font-weight: 600;
+  padding: 10px 18px;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+#retry:hover:not(:disabled) {
+  background: linear-gradient(180deg, #481e1e 0%, #291010 100%);
+  border-color: #b91c1c;
+  color: #fee2e2;
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.3);
+  transform: translateY(-1px);
+}
+
+#result-town {
+  padding: 10px 18px;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+#result-town.gold-button {
+  box-shadow: 0 0 15px rgba(245, 211, 120, 0.25);
+}
+
+#result-town.gold-button:hover:not(:disabled) {
+  box-shadow: 0 0 22px rgba(245, 211, 120, 0.45);
+}
+
+/* Result gate status hint */
+#modal p[role="status"] {
+  font-size: 11px;
+  color: #8da497;
+  text-align: center;
+  margin: 4px 0 0;
+  opacity: 0.85;
+}
+
+/* --- MOBILE RESPONSIVE ADAPTATIONS --- */
+@media (max-width: 520px) {
+  dialog:has(.result-ceremony-modal) {
+    padding: 18px 14px !important;
+  }
+
+  .ceremony-crest {
+    width: 48px;
+    height: 48px;
+  }
+
+  .ceremony-crest-icon {
+    font-size: 24px;
+  }
+
+  .ceremony-title {
+    font-size: 16px;
+  }
+
+  .result-stats {
+    gap: 6px;
+  }
+
+  .stat-plaque {
+    padding: 8px 6px;
+    gap: 6px;
+  }
+
+  .stat-icon {
+    font-size: 16px;
+  }
+
+  .stat-meta b {
+    font-size: 12px;
+  }
+
+  .stat-meta small {
+    font-size: 8px;
+    letter-spacing: 0.4px;
+  }
+
+  .xp-results {
+    padding: 10px;
+  }
+
+  .xp-cards-grid {
+    max-height: 160px;
+  }
+
+  .xp-card {
+    padding: 6px 8px;
+  }
+
+  .xp-hero-name {
+    font-size: 11px;
+  }
+
+  .xp-points {
+    font-size: 10px;
+  }
+
+  .xp-level-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+  }
+}

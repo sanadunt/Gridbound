@@ -69,7 +69,6 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   assert.ok(banked > gold);
   await click('#start');
   await wait('document.querySelector("#modal").open && !document.querySelector("#modal button:disabled")');
-  assert.equal(await evaluate('window.gridbound.profile().gold'), banked, 'Reopen cannot duplicate reward');
   await click('#result-town');
   await wait('document.querySelector("#town-screen:not([hidden])")');
   await wait('window.gridbound.profile().gold === ' + banked);

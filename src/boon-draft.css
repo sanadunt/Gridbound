@@ -1,0 +1,368 @@
+/* ============================================================
+   HADES-INSPIRED 3-CARD BOON DRAFT STYLING
+   ============================================================ */
+
+/* Expand modal for the 3-card draft on wider screens */
+dialog:has(.boon-draft-modal) {
+  width: min(980px, calc(100vw - 28px)) !important;
+  max-width: 980px !important;
+  background: radial-gradient(circle at 50% 10%, #0d221c 0%, #050d0a 90%) !important;
+  border: 2px solid #574626 !important;
+  box-shadow: 0 0 0 5px #07120e, 0 25px 90px rgba(0, 0, 0, 0.95), 0 0 40px rgba(240, 201, 104, 0.15) !important;
+  padding: 28px 32px !important;
+  border-radius: 6px !important;
+}
+
+dialog:has(.boon-draft-modal)::backdrop {
+  background: rgba(3, 8, 7, 0.92) !important;
+  backdrop-filter: blur(6px) !important;
+}
+
+.boon-draft-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  position: relative;
+}
+
+/* --- MODAL HEADER --- */
+.boon-modal-header {
+  text-align: center;
+  position: relative;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #23352b;
+}
+
+.boon-modal-header .eyebrow {
+  justify-content: center;
+  color: #55e3c7;
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-shadow: 0 0 8px rgba(85, 227, 199, 0.5);
+  font-weight: 600;
+}
+
+.boon-modal-title {
+  font-family: var(--pixel);
+  font-size: 24px;
+  margin: 10px 0 6px;
+  color: #fff4cb;
+  letter-spacing: 1px;
+  text-shadow: 0 0 16px rgba(245, 210, 120, 0.45), 2px 2px 0 #181307;
+}
+
+.boon-modal-subtitle {
+  color: #b5c7b3;
+  font-size: 13px;
+  margin: 0 auto;
+  max-width: 650px;
+  line-height: 1.7;
+}
+
+.boon-run-wallet {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: #e5be59;
+}
+
+.boon-run-wallet b {
+  color: #fff2c4;
+  font-family: var(--pixel);
+  font-size: 12px;
+}
+
+.boon-reroll-btn {
+  font-family: var(--sans, 'Space Grotesk', sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 6px 14px;
+  min-height: 34px;
+  border-color: #8b7337;
+  color: #fff1c4;
+}
+
+.boon-reroll-btn:hover:not(:disabled) {
+  border-color: #f0c968;
+  background: #1e3328;
+}
+
+/* --- 3-CARD GRID --- */
+.boon-draft-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  align-items: stretch;
+  margin: 4px 0 8px;
+}
+
+/* --- INDIVIDUAL BOON CARD --- */
+.boon-card {
+  --card-accent: #f5c462;
+  --card-glow: rgba(245, 196, 98, 0.35);
+  position: relative;
+  background: linear-gradient(170deg, #11231c 0%, #0a1612 100%);
+  border: 2px solid #3d4f42;
+  border-radius: 6px;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.22s ease,
+              box-shadow 0.22s ease,
+              background 0.22s ease;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  min-height: 380px;
+}
+
+.boon-card:hover,
+.boon-card:focus-visible {
+  transform: translateY(-8px) scale(1.025);
+  border-color: var(--card-accent);
+  background: linear-gradient(170deg, #183329 0%, #0f201a 100%);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 25px var(--card-glow);
+  outline: none;
+  z-index: 5;
+}
+
+.boon-card:active {
+  transform: translateY(-2px) scale(0.99);
+}
+
+.boon-card-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 22px 20px 20px;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+}
+
+/* Corner filigree brackets on cards */
+.boon-card-corner {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--card-accent);
+  opacity: 0.7;
+  pointer-events: none;
+  transition: opacity 0.2s ease, width 0.2s ease, height 0.2s ease;
+}
+.boon-card-corner.tl { top: 6px; left: 6px; border-right: none; border-bottom: none; }
+.boon-card-corner.tr { top: 6px; right: 6px; border-left: none; border-bottom: none; }
+.boon-card-corner.bl { bottom: 6px; left: 6px; border-right: none; border-top: none; }
+.boon-card-corner.br { bottom: 6px; right: 6px; border-left: none; border-top: none; }
+
+.boon-card:hover .boon-card-corner {
+  opacity: 1;
+  width: 14px;
+  height: 14px;
+}
+
+/* --- CARD HEADER --- */
+.boon-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.boon-patron-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.boon-patron-icon {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 20px;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px var(--card-accent));
+}
+
+.boon-patron-name {
+  font-family: var(--sans, 'Space Grotesk', sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--card-accent);
+  text-shadow: 0 0 8px var(--card-glow);
+  text-transform: uppercase;
+}
+
+.boon-rarity-pill {
+  align-self: flex-start;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #fff3c9;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--card-accent);
+  border-radius: 10px;
+  padding: 3px 9px;
+  box-shadow: 0 0 8px var(--card-glow);
+}
+
+/* --- CARD BODY --- */
+.boon-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 18px;
+}
+
+.boon-name {
+  font-family: var(--pixel);
+  font-size: 14px;
+  line-height: 1.5;
+  color: #fff4cb;
+  margin: 6px 0 10px;
+  text-shadow: 0 0 10px rgba(255, 244, 203, 0.35);
+  font-weight: 400;
+}
+
+.boon-card-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--card-accent), transparent);
+  margin: 6px 0 14px;
+  position: relative;
+}
+
+.card-div-gem {
+  color: var(--card-accent);
+  font-size: 8px;
+  background: #0d1a15;
+  padding: 0 4px;
+  position: relative;
+  top: -1px;
+}
+
+.boon-desc {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #c9d8c5;
+  margin: 0;
+  flex: 1;
+}
+
+/* --- CARD FOOTER ACTION --- */
+.boon-card-footer {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.boon-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: #0a1611;
+  border: 1px solid #3b4e40;
+  border-radius: 4px;
+  color: #cbd8c8;
+  font-family: var(--sans, 'Space Grotesk', sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all 0.18s ease;
+}
+
+.boon-cta-gem {
+  color: var(--card-accent);
+  font-size: 8px;
+}
+
+.boon-card:hover .boon-cta {
+  background: linear-gradient(180deg, #e5b954 0%, #9e7421 100%);
+  border-color: #fff2c4;
+  color: #120c02;
+  box-shadow: 0 0 14px rgba(229, 185, 84, 0.4);
+}
+
+.boon-card:hover .boon-cta-gem {
+  color: #120c02;
+}
+
+/* --- MODAL FOOTER --- */
+.boon-modal-footer {
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid #23352b;
+  padding-top: 16px;
+  margin-top: 4px;
+}
+
+.boon-modal-footer #result-town {
+  min-height: 40px;
+  font-size: 11px;
+  padding: 8px 22px;
+}
+
+/* --- RESPONSIVE MOBILE BEHAVIOR --- */
+@media (max-width: 768px) {
+  dialog:has(.boon-draft-modal) {
+    width: calc(100vw - 20px) !important;
+    padding: 20px 16px !important;
+    max-height: 90dvh !important;
+  }
+
+  .boon-modal-title {
+    font-size: 18px;
+  }
+
+  .boon-modal-subtitle {
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .boon-draft-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .boon-card {
+    min-height: auto;
+  }
+
+  .boon-card-frame {
+    padding: 16px 14px;
+  }
+
+  .boon-name {
+    font-size: 13px;
+    margin: 4px 0 8px;
+  }
+
+  .boon-desc {
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .boon-cta {
+    padding: 8px 12px;
+    font-size: 10px;
+  }
+}
+
+dialog:has(.boon-draft-modal) > [role="status"] {
+  text-align: center;
+  font-size: 11px;
+  color: #a3c2b1;
+  margin: 6px 0 0;
+}
