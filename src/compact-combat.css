@@ -75,18 +75,6 @@
   margin-top: 8px;
 }
 
-/* Lane targets remain thumb-sized, but move above the unit hit regions. */
-#battle-screen .lane-targets {
-  /* The original 44.1% anchor plus a 44px control box reached into hero
-     hit regions. Lift it just enough to leave a visible breathing gap. */
-  top: calc(44.1% - 26px);
-  height: 44px;
-}
-
-#battle-screen .lane-targets button {
-  min-height: 44px;
-  height: 44px;
-}
 
 /* The inspector is content-bearing: it may scroll only in a genuinely short phone viewport. */
 #battle-screen #inspector {

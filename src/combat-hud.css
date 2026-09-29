@@ -496,25 +496,6 @@
   box-shadow: 0 0 12px rgba(240, 201, 104, 0.45);
 }
 
-.unit-stance {
-  border-radius: 3px;
-  font-weight: 700;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.unit-health {
-  border-radius: 2px;
-  overflow: hidden;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.unit-health i {
-  background: linear-gradient(90deg, #22c55e 0%, #4ade80 100%) !important;
-}
-
-.unit-health em {
-  background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%) !important;
-}
 
 /* Responsive adjustments */
 @media (max-width: 768px) {

@@ -12,7 +12,7 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
   try {
     profile = await mkdtemp(join(tmpdir(), 'gridbound-qa-'));
     const executable = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-    child = spawn(executable, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', 'about:blank'], { stdio: 'ignore' });
+    child = spawn(executable, ['--headless=new', '--mute-audio', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', 'about:blank'], { stdio: 'ignore' });
     let launchError;
     child.on('error', error => { launchError = error; });
     const deadline = Date.now() + 15000;

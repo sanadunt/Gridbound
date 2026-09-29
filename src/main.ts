@@ -22,6 +22,8 @@ import './result-ceremony.css';
 import './archives-ui.css';
 import './pact-ui.css';
 import './world-map.css';
+import './portrait-layout.css';
+import { townCanvas } from './art/monsters';
 import { Battle, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CAMPAIGN, BOONS, boonChoices } from './game/world';
@@ -42,6 +44,7 @@ import { CHALLENGE_SHOP, createRunWallet, creditRun, resetRunWallet, getRaidCont
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const store = { getItem: (key: string) => localStorage.getItem(key), setItem: (key: string, value: string) => localStorage.setItem(key, value) };
+const titleWorld = townCanvas().toDataURL();
 const saved=loadSave(store);
 let profile = saved.profile;
 const commander = new CommanderSession();
@@ -140,6 +143,10 @@ let runWallet: RunWallet = createRunWallet();
 let runSeed = Date.now() % 1000000;
 let offeredBoons: typeof BOONS = [];
 let resumeOnClose = false;
+let pauseForDetails = false;
+type PartyHealthView = { button: HTMLButtonElement; hp: HTMLElement; shield: HTMLElement; cooldown: HTMLElement; healthFill: HTMLElement; shieldFill: HTMLElement };
+type PartyHero = (typeof battle.heroes)[number];
+const partyHealthViews = new Map<number, PartyHealthView[]>();
 let resultGeneration: ResultGateGeneration | undefined;
 const townState: TownState = {
   tab: 'campaign', hero: 0, zone: Math.min(profile.cleared.length, CAMPAIGN.length - 1), raid: 'golem', raidTier: 'bronze', raidModifiers: [], raidBuild: createRaidBuild(profile.roster, Math.min(3, profile.roster.length, 6)), notice: '',
@@ -149,6 +156,7 @@ const townState: TownState = {
 $('app').innerHTML = `
 <section id="title-screen" class="title-screen" hidden>
   <div class="title-backdrop" aria-hidden="true">
+    <img class="title-world-art" src="${titleWorld}" alt="" />
     <div class="title-vignette"></div>
     <div class="title-crest-glow"></div>
     <div class="title-embers">
@@ -223,12 +231,32 @@ $('app').innerHTML = `
   <div class="header-tools"><button id="profiles" class="secondary-button">Profiles / slots</button><b id="wallet" class="wallet">${currencyAmount('gold', profile.gold)}</b><b id="bank-wallet" class="wallet bank-wallet">${currencyAmount('crystal', profile.economy.commanderCrystal)}</b><button id="sound" class="icon-button" aria-label="Toggle audio" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="Settings">⚙</button></div>
 </header>
   <main id="town-screen" class="town-screen"></main>
-  <main id="battle-screen" class="game-layout" hidden>
-    <aside class="left-sidebar"><span class="eyebrow" id="expedition-label">EXPEDITION</span><h1 id="journey-title">Beyond<br>the bell.</h1><p class="intro-copy" id="journey-copy"></p><ol id="stage-list" class="expedition-stages"></ol>
-      <section class="field-guide"><div class="section-label">READ. REACT. SURVIVE.</div><p>Tap hero untuk mengisi skill lebih cepat. Ganti fokus saat fatigue naik.</p><p>Ground: pindah tile. Marked: lindungi hero yang diincar. All-grid: Guard atau interrupt.</p><button id="howto" class="secondary-button">Field guide</button></section>
-      <section class="run-boons"><h3>Run boons</h3><div id="boon-list"></div></section><section class="run-shop-panel"><h3>Journey shop</h3><div id="run-shop-host"></div><small>Journey Crystal resets on abandon, defeat, or clear. It never enters the bank.</small></section><button id="retreat" class="secondary-button">Pulang ke town</button>
+  <main id="battle-screen" class="game-layout" data-battle-view="arena" hidden>
+    <nav class="battle-view-tabs" aria-label="Battle views">
+      <button type="button" data-battle-view="arena" aria-controls="battle-arena-panel" aria-pressed="true">Arena</button>
+      <button type="button" data-battle-view="hero" aria-controls="battle-details-panel" aria-pressed="false">Hero</button>
+      <button type="button" data-battle-view="log" aria-controls="battle-details-panel" aria-pressed="false">Log</button>
+    </nav>
+    <aside class="left-sidebar">
+      <span class="eyebrow" id="expedition-label">EXPEDITION</span>
+      <h1 id="journey-title">Beyond<br>the bell.</h1>
+      <p class="intro-copy" id="journey-copy"></p>
+      <ol id="stage-list" class="expedition-stages"></ol>
+      <section class="field-guide">
+        <div class="section-label">READ. REACT. SURVIVE.</div>
+        <p>Tap hero untuk mengisi skill lebih cepat. Ganti fokus saat fatigue naik.</p>
+        <p>Ground: pindah tile. Marked: lindungi hero yang diincar. All-grid: Guard atau interrupt.</p>
+        <button id="howto" class="secondary-button">Field guide</button>
+      </section>
+      <section class="run-boons"><h3>Run boons</h3><div id="boon-list"></div></section>
+      <section class="run-shop-panel">
+        <h3>Journey shop</h3>
+        <div id="run-shop-host"></div>
+        <small>Journey Crystal resets on abandon, defeat, or clear. It never enters the bank.</small>
+      </section>
+      <button id="retreat" class="secondary-button">Pulang ke town</button>
     </aside>
-    <section class="arena-column" aria-label="Arena pertarungan">
+    <section id="battle-arena-panel" class="arena-column" aria-label="Arena pertarungan">
       <div class="arena-heading">
         <span><b id="mode-label"></b><span id="encounter-label"></span></span>
         <div class="arena-heading-controls">
@@ -236,32 +264,69 @@ $('app').innerHTML = `
           <button id="pause" class="icon-button" aria-label="Jeda permainan">Ⅱ</button>
         </div>
       </div>
-      <div id="arena" class="arena"><div id="game-canvas"></div>
-        <div class="boss-hud"><div class="boss-crest-corner tl"></div><div class="boss-crest-corner tr"></div><div class="boss-crest-corner bl"></div><div class="boss-crest-corner br"></div><div class="boss-hud-inner"><div class="boss-caption"><span class="boss-title-prefix">✦ ADVERSARY ✦</span><span id="boss-title"></span><span id="phase" class="boss-phase-badge"></span></div><div class="boss-title"><h2 id="boss-name"></h2><span id="boss-health"></span></div><div class="boss-meter"><div id="boss-hp-ghost" class="boss-hp-ghost"></div><div id="boss-hp"></div><div class="boss-phase-notch p1"></div><div class="boss-phase-notch p2"></div></div><div class="stagger-row"><span id="stagger-label">ARMOR</span><div class="stagger-track"><i id="stagger"></i></div><span id="clock">00:00</span></div></div></div>
+      <div class="threat-band" aria-label="Threat and target controls">
+        <div class="boss-hud">
+          <div class="boss-crest-corner tl"></div><div class="boss-crest-corner tr"></div>
+          <div class="boss-crest-corner bl"></div><div class="boss-crest-corner br"></div>
+          <div class="boss-hud-inner">
+            <div class="boss-caption"><span class="boss-title-prefix">✦ ADVERSARY ✦</span><span id="boss-title"></span><span id="phase" class="boss-phase-badge"></span></div>
+            <div class="boss-title"><h2 id="boss-name"></h2><span id="boss-health"></span></div>
+            <div class="boss-meter"><div id="boss-hp-ghost" class="boss-hp-ghost"></div><div id="boss-hp"></div><div class="boss-phase-notch p1"></div><div class="boss-phase-notch p2"></div></div>
+            <div class="stagger-row"><span id="stagger-label">ARMOR</span><div class="stagger-track"><i id="stagger"></i></div><span id="clock">00:00</span></div>
+          </div>
+        </div>
         <div id="banner" class="battle-banner" aria-live="polite"></div>
+        <div id="intent" class="intent-panel" role="status" aria-live="polite"><b>No hostile intent</b><span>Perhatikan pola berikutnya.</span></div>
         <div class="lane-targets" aria-label="Pilih lane target">${['I', 'II', 'III'].map((label, i) => `<button data-lane="${i}" aria-label="Target lane ${i + 1}" aria-pressed="false">${label} <span>${['LEFT', 'CENTER', 'RIGHT'][i]}</span></button>`).join('')}</div>
-        <div id="unit-layer"></div><div class="rank-label front">FRONT</div><div class="rank-label middle">MID</div><div class="rank-label back">BACK</div>
-        <div class="board-bottom"><span id="standing"></span><span id="move-tip">DRAG TO REPOSITION</span></div>
-        <div id="start-overlay" class="start-overlay"><div><span class="eyebrow" id="ready-label">BEYOND THE GATE</span><h3 id="ready-title">Ready, Bellkeepers?</h3><p id="ready-copy">Skill dan formasi telah disiapkan. Perhatikan tanda serangan.</p><button id="start" class="gold-button">Begin encounter</button></div></div>
       </div>
-      <p class="tap-instruction"><b>Tap badan karakter</b> → cooldown lebih cepat · tombol kecil ↻ untuk ganti skill · drag untuk pindah</p><div id="intent" class="intent-panel" role="status"><b>No hostile intent</b><span>Perhatikan pola berikutnya.</span></div>
-      <div class="action-bar"><button id="guard" class="guard-button"><span>Party Guard<small id="guard-label">G · READY</small></span></button><button id="potion" class="potion-button"><span>Mending mist<small id="potions">H · 2 CHARGES</small></span><b>2</b></button><button id="ultimate" class="ultimate-button" disabled><i id="resolve-fill"></i><span>Ninefold Dawn<small id="resolve-label">R · RESOLVE</small></span></button></div>
+      <section id="start-overlay" class="start-overlay" aria-labelledby="ready-title">
+        <div>
+          <span class="eyebrow" id="ready-label">BEYOND THE GATE</span>
+          <h3 id="ready-title">Ready, Bellkeepers?</h3>
+          <p id="ready-copy">Skill dan formasi telah disiapkan. Perhatikan tanda serangan.</p>
+        </div>
+        <button id="start" class="gold-button">Begin encounter</button>
+      </section>
+      <div id="arena" class="arena">
+        <div id="game-canvas"></div>
+        <div id="unit-layer"></div>
+        <div class="rank-label front">FRONT</div><div class="rank-label middle">MID</div><div class="rank-label back">BACK</div>
+        <div class="board-bottom"><span id="standing"></span><span id="move-tip">DRAG TO REPOSITION</span></div>
+      </div>
+      <section id="party-health-tray" class="party-health-tray" aria-label="Party health"></section>
+      <p class="tap-instruction"><b>Tap badan karakter</b> → cooldown lebih cepat · tombol kecil ↻ untuk ganti skill · drag untuk pindah</p>
+      <div class="action-bar">
+        <button id="guard" class="guard-button"><span>Party Guard<small id="guard-label">G · READY</small></span></button>
+        <button id="potion" class="potion-button"><span>Mending mist<small id="potions">H · 2 CHARGES</small></span><b>2</b></button>
+        <button id="ultimate" class="ultimate-button" disabled><i id="resolve-fill"></i><span>Ninefold Dawn<small id="resolve-label">R · RESOLVE</small></span></button>
+      </div>
       <div class="arena-footnote"><button id="battle-home">Return to town</button><button id="help-shortcut">Controls & counters</button></div>
     </section>
-    <aside class="right-sidebar"><button id="battle-info-toggle" class="battle-info-toggle" aria-expanded="false">Battle info <span>＋</span></button><div id="battle-info-panel"><div class="section-label">PARTY INSPECTOR <span id="party-size"></span></div><div id="inspector"></div><section class="battle-notes"><div class="section-label">BATTLE NOTES</div><div id="combat-log"></div></section><div class="session-stats"><div><small>DAMAGE</small><b id="damage">0</b></div><div><small>BLOCKED</small><b id="blocked">0</b></div><div><small>CARRIED LOOT</small><b id="loot">0g</b></div></div></div></aside>
+    <aside id="battle-details-panel" class="right-sidebar">
+      <p id="battle-detail-pause-note" class="battle-detail-pause-note" role="status" hidden>
+        Combat pauses while Hero or Log is open.
+        <button id="battle-detail-resume" type="button">Return to Arena &amp; resume</button>
+      </p>
+      <section class="battle-detail-panel battle-detail-health" aria-label="Party health">
+        <div class="section-label">PARTY HEALTH</div>
+        <div id="details-party-health-tray" class="party-health-tray"></div>
+      </section>
+      <section id="battle-hero-panel" class="battle-detail-panel">
+        <div class="section-label">PARTY INSPECTOR <span id="party-size"></span></div>
+        <div id="inspector"></div>
+      </section>
+      <section id="battle-log-panel" class="battle-detail-panel">
+        <section class="battle-notes"><div class="section-label">BATTLE NOTES</div><div id="combat-log"></div></section>
+        <div class="session-stats"><div><small>DAMAGE</small><b id="damage">0</b></div><div><small>BLOCKED</small><b id="blocked">0</b></div><div><small>CARRIED LOOT</small><b id="loot">0g</b></div></div>
+      </section>
+    </aside>
   </main>
   <footer id="storage-status" class="storage-status" role="status"></footer>
   <dialog id="modal" aria-labelledby="modal-title"></dialog>`;
 const modal = $<HTMLDialogElement>('modal');
-const battleInfoToggle = $<HTMLButtonElement>('battle-info-toggle');
-battleInfoToggle.addEventListener('click', () => {
-  const sidebar = battleInfoToggle.closest<HTMLElement>('.right-sidebar');
-  const open = sidebar?.classList.toggle('info-open') ?? false;
-  battleInfoToggle.setAttribute('aria-expanded', String(open));
-  battleInfoToggle.querySelector('span')!.textContent = open ? '−' : '＋';
-});
 
 function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
+  const resetTownScroll = !inTown || tab !== townState.tab;
   const nextMode: CommanderMode = tab === 'raid' ? 'raid' : tab === 'endless' ? 'roguelike' : 'story';
   if (commander.document && nextMode !== commander.mode) {
     commander.mode = nextMode;
@@ -269,6 +334,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
     void persist();
   }
   inTown = true;
+  pauseForDetails = false;
   if (battle.status === 'fighting') battle.pause();
   townState.tab = tab;
   townState.notice = notice;
@@ -276,6 +342,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   $('battle-screen').hidden = true;
   document.querySelectorAll<HTMLElement>('[data-view]').forEach(el => el.classList.toggle('active', el.dataset.view === (['party', 'bestiary', 'quests'].includes(tab) ? 'campaign' : tab)));
   renderTown($('town-screen'), profile, townState);
+  if (resetTownScroll) $('town-screen').scrollTop = 0;
   persist();
   if (animate && profile.motion) {
     const panel = document.querySelector<HTMLElement>('.facility-panel-wrap');
@@ -544,10 +611,10 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   resultRequest++;
   presentingResult = false;
   resultGeneration = undefined;
-  const sidebar = battleInfoToggle.closest<HTMLElement>('.right-sidebar');
-  sidebar?.classList.remove('info-open');
-  battleInfoToggle.setAttribute('aria-expanded', 'false');
-  battleInfoToggle.querySelector('span')!.textContent = '＋';
+  pauseForDetails = false;
+  $('battle-screen').dataset.battleView = 'arena';
+  document.querySelectorAll<HTMLButtonElement>('.battle-view-tabs [data-battle-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.battleView === 'arena')));
+  $('battle-detail-pause-note').hidden = true;
   const milestone = mode === 'endless' ? roguelikeMilestoneForFloor(floor) : undefined;
   battle = new Battle(mode, floor, profileModifiers(profile), {
     roster: [...profile.roster], loadouts: structuredClone(profile.loadouts),
@@ -578,7 +645,7 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   document.querySelectorAll<HTMLElement>('[data-lane]').forEach(el => { el.classList.remove('active'); el.setAttribute('aria-pressed', 'false'); });
   frame(1);
   requestAnimationFrame(() => scene.scale?.refresh());
-  $('battle-screen').scrollIntoView({ block: 'start' });
+  $('battle-screen').scrollTop = 0;
 }
 function updateExpedition() {
   const c = CAMPAIGN[battle.floor - 1];
@@ -604,7 +671,13 @@ function showReady() {
   $('start-overlay').hidden = false;
   $('ready-label').textContent = battle.stageName;
   $('ready-title').textContent = battle.stage > 0 ? 'Keep the ember alive.' : 'Ready, Bellkeepers?';
-  $('ready-copy').textContent = battle.mode==='adventure' ? (CAMPAIGN[battle.floor-1].stages[battle.stage].beat??(battle.stage===0?CAMPAIGN[battle.floor-1].intro:'Jalur berikutnya terbuka. HP dan potion dibawa; siapkan stance dan baca intent sebelum menyerang.')) : battle.stage > 0 ? 'HP dan potion tersisa dibawa ke wave ini. Periksa stance sebelum lanjut.' : 'Skill dan formasi sudah siap. Tap mempercepat; strategi menjaga party tetap hidup.';
+  $('ready-copy').textContent = battle.mode === 'adventure'
+    ? battle.stage > 0
+      ? 'Jalur berikutnya terbuka. HP dan potion dibawa; baca intent sebelum memilih lane.'
+      : 'Baca intent musuh, pilih lane, dan lindungi party sebelum serangan.'
+    : battle.stage > 0
+      ? 'HP dan potion tersisa dibawa ke wave ini. Periksa stance sebelum lanjut.'
+      : 'Skill dan formasi siap. Tap hero untuk mempercepat cooldown.';
   $('start').textContent = 'Begin encounter';
 }
 async function begin() {
@@ -619,24 +692,65 @@ async function begin() {
   void ensureCommander().then(() => commander.flush()).then(() => checkpoint(true));
 }
 
+function renderPartyHealthTray() {
+  partyHealthViews.clear();
+  for (const trayId of ['party-health-tray', 'details-party-health-tray']) {
+    const host = $(trayId);
+    host.innerHTML = battle.heroes.map(h => `<button type="button" class="party-health-card" data-party-hero="${h.id}" aria-pressed="false" aria-label="${h.name}">
+      <span class="party-hero-name">${h.name}</span><span class="party-cooldown">READY</span>
+      <span class="party-health-values"><span>HP <b class="party-hp-value">${Math.ceil(h.hp)} / ${h.maxHp}</b></span><span>SH <b class="party-shield-value">${Math.round(h.shield)}</b></span></span>
+      <span class="party-health-meter" aria-hidden="true"><i></i><em></em></span>
+    </button>`).join('');
+    host.querySelectorAll<HTMLButtonElement>('[data-party-hero]').forEach(button => {
+      const id = Number(button.dataset.partyHero);
+      const views = partyHealthViews.get(id) ?? [];
+      views.push({
+        button,
+        hp: button.querySelector<HTMLElement>('.party-hp-value')!,
+        shield: button.querySelector<HTMLElement>('.party-shield-value')!,
+        cooldown: button.querySelector<HTMLElement>('.party-cooldown')!,
+        healthFill: button.querySelector<HTMLElement>('.party-health-meter i')!,
+        shieldFill: button.querySelector<HTMLElement>('.party-health-meter em')!,
+      });
+      partyHealthViews.set(id, views);
+      button.addEventListener('click', () => {
+        battle.selected = id;
+        renderInspector();
+      });
+    });
+  }
+}
+function updatePartyHealthView(h: PartyHero) {
+  const views = partyHealthViews.get(h.id);
+  if (!views) return;
+  const ratio = h.maxHp > 0 ? Math.min(1, Math.max(0, h.hp / h.maxHp)) : 0;
+  const hp = Math.ceil(h.hp);
+  const shield = Math.round(h.shield);
+  const cooldownSeconds = h.remaining > 0 ? Math.max(.1, h.remaining).toFixed(1) : '';
+  const cooldown = cooldownSeconds ? `CD ${cooldownSeconds}s` : 'READY';
+  const status = h.hp <= 0 ? 'DOWN' : ratio <= .35 ? `LOW HP · ${cooldown}` : cooldown;
+  const skillStatus = h.hp <= 0 ? 'unavailable' : cooldownSeconds ? `cooldown ${cooldownSeconds} seconds` : 'ready';
+  for (const view of views) {
+    view.hp.textContent = `${hp} / ${h.maxHp}`;
+    view.shield.textContent = String(shield);
+    view.cooldown.textContent = status;
+    view.healthFill.style.width = `${ratio * 100}%`;
+    view.shieldFill.style.width = `${Math.min(1, Math.max(0, h.shield / Math.max(1, h.maxHp))) * 100}%`;
+    view.button.classList.toggle('downed', h.hp <= 0);
+    view.button.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
+    view.button.setAttribute('aria-pressed', String(h.id === battle.selected));
+    view.button.setAttribute('aria-label', `${h.name}, HP ${hp} of ${h.maxHp}, shield ${shield}, skill ${skillStatus}${ratio <= .35 && h.hp > 0 ? ', low health' : ''}${h.id === battle.selected ? ', selected' : ''}`);
+  }
+}
 function makeUnits() {
   $('unit-layer').innerHTML = battle.heroes.map(h => {
     const p = cell(h.slot);
-    return `<div class="unit-card" data-hero="${h.id}" style="left:${p.x / 6}%;top:${p.y / 7.6}%;width:24%;height:${120 / 7.6}%;--class-color:${KITS[h.classId].color}"><button class="unit-tap" data-tap="${h.id}" aria-label="Tap ${h.name} untuk mempercepat"><span class="unit-name">${h.name}</span><span class="tap-hint">TAP ↓ CD</span><span class="unit-cd"></span><span class="tap-flash">TEMPO</span></button><button class="unit-stance" data-stance="${h.id}" aria-label="Ganti skill ${h.name}"></button><div class="unit-health"><i></i><em></em></div><div class="unit-cooldown"><i></i></div></div>`;
+    return `<div class="unit-card" data-hero="${h.id}" style="left:${p.x / 6}%;top:${p.y / 7.6}%;width:24%;height:${120 / 7.6}%;--class-color:${KITS[h.classId].color}"><button class="unit-tap" data-tap="${h.id}" aria-label="Tap ${h.name} untuk mempercepat"><span class="unit-name">${h.name}</span><span class="tap-hint">TAP ↓ CD</span><span class="tap-flash">TEMPO</span></button></div>`;
   }).join('');
   $('unit-layer').querySelectorAll<HTMLElement>('[data-tap]').forEach(el => bindPointer(el, Number(el.dataset.tap)));
-  $('unit-layer').querySelectorAll<HTMLElement>('[data-stance]').forEach(el => el.addEventListener('click', () => cycleSkill(Number(el.dataset.stance))));
+  renderPartyHealthTray();
   $('party-size').textContent = `${battle.heroes.length} HEROES`;
   selectedKey = '';
-  renderInspector();
-}
-function cycleSkill(id: number, direction = 1) {
-  const h = battle.hero(id);
-  if (!h) return;
-  const skills = battle.availableSkills(id);
-  battle.selected = id;
-  battle.stance(id, skills[(skills.indexOf(h.stance) + direction + skills.length) % skills.length]);
-  sound.unlock();
   renderInspector();
 }
 type Touch = { id: number; x: number; y: number; started: number; drag: boolean; el: HTMLElement };
@@ -700,17 +814,64 @@ function bindPointer(el: HTMLElement, id: number) {
   el.addEventListener('lostpointercapture', e => finish(e as PointerEvent, true));
   el.addEventListener('click', e => { if (e.detail === 0) tapHero(id); });
 }
+function setBattleView(view: 'arena' | 'hero' | 'log') {
+  if (view !== 'arena' && battle.status === 'fighting') {
+    battle.pause();
+    pauseForDetails = true;
+  } else if (view === 'arena' && pauseForDetails && battle.status === 'paused') {
+    battle.pause();
+    pauseForDetails = false;
+  }
+  $('battle-screen').dataset.battleView = view;
+  document.querySelectorAll<HTMLButtonElement>('.battle-view-tabs [data-battle-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.battleView === view)));
+  $('battle-detail-pause-note').hidden = !pauseForDetails || view === 'arena';
+  if (view === 'hero') renderInspector();
+  frame(1);
+}
+function cycleSkill(id: number, direction = 1) {
+  const h = battle.hero(id);
+  if (!h) return;
+  const skills = battle.availableSkills(id);
+  battle.selected = id;
+  withDetailsPausedAction(() => battle.stance(id, skills[(skills.indexOf(h.stance) + direction + skills.length) % skills.length]));
+  sound.unlock();
+  renderInspector();
+  frame(1);
+}
+function withDetailsPausedAction<T>(action: () => T): T {
+  const restorePause = pauseForDetails && battle.status === 'paused';
+  if (restorePause) battle.pause();
+  try {
+    return action();
+  } finally {
+    if (restorePause && battle.status === 'fighting') battle.pause();
+  }
+}
 function renderInspector() {
+  for (const hero of battle.heroes) updatePartyHealthView(hero);
   const h = battle.hero(battle.selected);
   if (!h) return;
   const k = KITS[h.classId];
+  const canModify = ['ready', 'fighting'].includes(battle.status) || (battle.status === 'paused' && pauseForDetails);
   const key = `${h.id}-${h.stance}-${moveMode}-${battle.status}`;
   if (key === selectedKey) return;
   selectedKey = key;
   $('inspector').innerHTML = `<div class="hero-identity"><div class="portrait-frame"><img src="${portrait(h.classId)}" alt="${h.name}"/><span>LV. ${h.level}</span></div><div><span class="hero-class">${k.name}</span><h2>${h.name}</h2><p>${k.role}</p></div></div><div class="hero-stats"><span>HP <b id="selected-hp"></b></span><span>SHIELD <b id="selected-shield"></b></span></div><div class="section-label stance-label">EQUIPPED SKILLS <span>AUTO-CAST</span></div><div class="stance-options">${battle.availableSkills(h.id).map(i => { const s = k.skills[i]; return `<button data-select-stance="${i}" class="stance-option ${h.stance === i ? 'chosen' : ''}" aria-pressed="${h.stance === i}" ${!['ready', 'fighting'].includes(battle.status) || h.hp <= 0 ? 'disabled' : ''}><span><b>${s.name}</b><small>${s.label} · ${s.cooldown.toFixed(1)}s</small></span><i>${h.stance === i ? '●' : '○'}</i></button>`; }).join('')}</div><p class="skill-description">${k.skills[h.stance].description}</p><div class="focus-meter"><div><span>TAP FATIGUE</span><span id="fatigue-label">FRESH</span></div><span><i id="fatigue-fill"></i></span></div><button id="move-selected" class="move-button">${moveMode ? 'Pilih grid tujuan · Esc batal' : 'Pindahkan karakter'}<small>+0.9s</small></button><div class="move-grid" ${moveMode ? '' : 'hidden'}>${Array.from({ length: 9 }, (_, i) => `<button data-move-slot="${i}" aria-label="Pindah ke grid ${i + 1}" ${i === h.slot ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>`;
-  $('inspector').querySelectorAll<HTMLElement>('[data-select-stance]').forEach(el => el.addEventListener('click', () => { battle.stance(h.id, Number(el.dataset.selectStance)); renderInspector(); }));
+  $('inspector').querySelectorAll<HTMLButtonElement>('[data-select-stance]').forEach(el => {
+    el.disabled = !canModify || h.hp <= 0;
+    el.addEventListener('click', () => {
+      withDetailsPausedAction(() => battle.stance(h.id, Number(el.dataset.selectStance)));
+      renderInspector();
+      frame(1);
+    });
+  });
   $('move-selected').addEventListener('click', () => { moveMode = !moveMode; renderInspector(); });
-  $('inspector').querySelectorAll<HTMLElement>('[data-move-slot]').forEach(el => el.addEventListener('click', () => { battle.move(battle.selected, Number(el.dataset.moveSlot)); moveMode = false; renderInspector(); }));
+  $('inspector').querySelectorAll<HTMLElement>('[data-move-slot]').forEach(el => el.addEventListener('click', () => {
+    withDetailsPausedAction(() => battle.move(battle.selected, Number(el.dataset.moveSlot)));
+    moveMode = false;
+    renderInspector();
+    frame(1);
+  }));
 }
 function formatTime(t: number) { return `${Math.floor(t / 60).toString().padStart(2, '0')}:${Math.floor(t % 60).toString().padStart(2, '0')}`; }
 function frame(dt: number) {
@@ -762,13 +923,7 @@ function frame(dt: number) {
     el.classList.toggle('selected', h.id === battle.selected);
     el.classList.toggle('downed', h.hp <= 0);
     el.classList.toggle('buffed', h.buff > 0);
-    el.querySelector('.unit-cd')!.textContent = h.hp <= 0 ? 'DOWN' : h.moveLock > 0 ? 'MOVE' : `${h.remaining.toFixed(1)}s`;
-    const stance = el.querySelector<HTMLButtonElement>('.unit-stance')!;
-    stance.textContent = `${KITS[h.classId].skills[h.stance].label} ⟳`;
-    stance.disabled = h.hp <= 0 || !['ready', 'fighting'].includes(battle.status);
-    (el.querySelector('.unit-health i') as HTMLElement).style.width = `${h.hp / h.maxHp * 100}%`;
-    (el.querySelector('.unit-health em') as HTMLElement).style.width = `${h.shield / h.maxHp * 100}%`;
-    (el.querySelector('.unit-cooldown i') as HTMLElement).style.width = `${Math.min(100, Math.max(0, 1 - h.remaining / h.total) * 100)}%`;
+    updatePartyHealthView(h);
   }
   const h = battle.hero(battle.selected);
   if (h && $('selected-hp')) {
@@ -793,7 +948,11 @@ window.addEventListener('battle-banner', event => {
   $('banner').textContent = e.text ?? '';
   $('banner').className = `battle-banner visible ${e.type === 'warning' ? 'danger' : ''}`;
   clearTimeout(bannerTimer);
-  bannerTimer = window.setTimeout(() => $('banner').classList.remove('visible'), 1800);
+  bannerTimer = window.setTimeout(() => {
+    const banner = $('banner');
+    banner.className = 'battle-banner';
+    banner.textContent = '';
+  }, 1800);
   if (e.text) addLog(e.text);
 });
 
@@ -1575,14 +1734,8 @@ $('title-journal').addEventListener('click', () => { void storyJournal(); });
 $('title-settings').addEventListener('click', settings);
 $('retreat').addEventListener('click', () => navigateTown());
 $('battle-home').addEventListener('click', () => navigateTown());
-$('battle-info-toggle').addEventListener('click', () => {
-  const toggle = $('battle-info-toggle');
-  const panel = $('battle-info-panel');
-  const expanded = toggle.getAttribute('aria-expanded') === 'true';
-  toggle.setAttribute('aria-expanded', String(!expanded));
-  panel.hidden = expanded;
-  toggle.querySelector('span')!.textContent = expanded ? '＋' : '−';
-});
+document.querySelectorAll<HTMLButtonElement>('.battle-view-tabs [data-battle-view]').forEach(button => button.addEventListener('click', () => setBattleView(button.dataset.battleView as 'arena' | 'hero' | 'log')));
+$('battle-detail-resume').addEventListener('click', () => setBattleView('arena'));
 document.querySelectorAll<HTMLElement>('[data-view]').forEach(el => el.addEventListener('click', () => navigateTown(el.dataset.view as TownTab)));
 $('start').addEventListener('click', begin);
 $('pause').addEventListener('click', pauseMenu);

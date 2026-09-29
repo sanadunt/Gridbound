@@ -310,7 +310,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
           </div>
 
           <!-- Narrative Expedition Accordion -->
-          <details class="dossier-lore-accordion" open>
+          <details class="dossier-lore-accordion">
             <summary>Mission Intelligence & Expedition Log</summary>
             <p class="zone-narrative-intro">${zone.intro}</p>
             <ol class="stage-route">

@@ -635,3 +635,112 @@ dialog:has(.result-ceremony-modal.wave-clear) {
     padding: 1px 5px;
   }
 }
+
+@media (max-width: 240px) {
+  dialog:has(.result-ceremony-modal) {
+    width: calc(100vw - 16px) !important;
+    padding: 10px 8px !important;
+  }
+
+  .result-ceremony-modal {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    gap: 8px;
+  }
+
+  .result-ceremony-modal .ceremony-corner {
+    display: none;
+  }
+
+  .result-ceremony-modal .result-stats {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    margin: 0;
+  }
+
+  .result-ceremony-modal .stat-plaque {
+    min-width: 0;
+    padding: 6px 8px;
+    gap: 8px;
+  }
+
+  .result-ceremony-modal .stat-meta {
+    min-width: 0;
+  }
+
+  .result-ceremony-modal .ceremony-actions {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .result-ceremony-modal .ceremony-actions button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px;
+    font-size: 11px;
+    letter-spacing: 0;
+    line-height: 1.35;
+    white-space: normal;
+  }
+
+  .result-ceremony-modal .xp-results {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 8px;
+  }
+
+  .result-ceremony-modal .xp-section-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .result-ceremony-modal .xp-results h3 {
+    max-width: 100%;
+    font-size: 9px;
+    letter-spacing: 0;
+  }
+
+  .result-ceremony-modal .xp-section-tag {
+    font-size: 8px;
+  }
+
+  .result-ceremony-modal .xp-cards-grid {
+    max-height: none;
+    min-width: 0;
+    padding-right: 0;
+    overflow: visible;
+  }
+
+  .result-ceremony-modal .xp-card {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .result-ceremony-modal .xp-hero-ident,
+  .result-ceremony-modal .xp-hero-info,
+  .result-ceremony-modal .xp-gain-group {
+    max-width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .result-ceremony-modal .xp-hero-ident {
+    gap: 6px;
+  }
+
+  .result-ceremony-modal .xp-hero-info,
+  .result-ceremony-modal .xp-gain-group {
+    gap: 4px;
+  }
+}

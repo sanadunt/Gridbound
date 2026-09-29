@@ -262,9 +262,6 @@
 .bestiary-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .bestiary-list article { min-width:0; }
 .bestiary-list article img { width:84px; height:84px; object-fit:contain; image-rendering:pixelated; }
-/* Mobile combat exposes the arena first. Inspector, notes and session data remain reachable from one explicit panel. */
-.battle-info-toggle { display:none; }
-#battle-info-panel { display:block; min-width:0; }
 @media(max-width:720px) {
   .training-tabs { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .training-tabs button { min-height:44px; font-size:10px; }
@@ -274,13 +271,240 @@
   .page-controls { gap:7px; font-size:10px; }
   .page-controls button { flex:1 1 0; padding-inline:7px; }
   .bestiary-list { grid-template-columns:minmax(0,1fr); }
-  .battle-info-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:48px; margin-top:10px; padding:10px 12px; border:1px solid var(--line); color:var(--gold); background:#172c23; }
-  #battle-info-panel { display:none; margin-top:10px; }
-  .right-sidebar.info-open #battle-info-panel { display:block; }
   #battle-screen .right-sidebar { width:100%; }
 }
 @media(max-width:380px) {
   .training-tabs { gap:3px; }
   .training-tabs button { padding-inline:3px; font-size:9px; }
   .talent-tree { grid-template-columns:minmax(0,1fr); }
+}
+/* Portrait shell reflow for training, collections, and long town panels. */
+@media (max-width: 720px) {
+  #town-screen .training-identity {
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+  #town-screen .training-identity > img {
+    width: 60px;
+    height: 70px;
+    flex: 0 0 auto;
+  }
+  #town-screen .training-identity > div {
+    min-width: 0;
+  }
+  #town-screen .training-identity h2 {
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+  #town-screen .training-identity p {
+    line-height: 1.5;
+  }
+  #town-screen .training-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin: 14px 0 18px;
+  }
+  #town-screen .training-tabs button {
+    min-width: 0;
+    min-height: 48px;
+    padding: 9px 8px;
+    line-height: 1.3;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+  #town-screen .training-overview-grid,
+  #town-screen .loadout-slots,
+  #town-screen .gear-slots {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #town-screen .story-party {
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+  #town-screen .story-party summary {
+    min-height: 44px;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  #town-screen .story-party .departure-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #town-screen .talent-workspace {
+    padding: 14px 12px;
+    gap: 14px;
+  }
+  #town-screen .talent-workspace-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  #town-screen .branch-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  #town-screen .branch-tabs button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  #town-screen .talent-flow {
+    flex-direction: column;
+    overflow: visible;
+    gap: 12px;
+  }
+  #town-screen .talent-flow-lane {
+    width: 100%;
+    min-width: 0;
+  }
+  #town-screen .page-controls {
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  #town-screen .page-controls button {
+    flex: 1 1 120px;
+    min-width: 0;
+  }
+  #town-screen .page-controls span {
+    flex: 1 1 100%;
+    order: -1;
+    text-align: center;
+  }
+  #town-screen .bestiary-list,
+  #town-screen .quest-list,
+  #town-screen .challenge-shop-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #town-screen .bestiary-list article > div {
+    min-width: 0;
+  }
+  #town-screen .zone-route {
+    max-height: none;
+    overflow: visible;
+  }
+  #town-screen .bestiary-list {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@container gridbound (max-width: 480px) {
+  #town-screen .training-identity {
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+  #town-screen .training-identity > img {
+    width: 60px;
+    height: 70px;
+    flex: 0 0 auto;
+  }
+  #town-screen .training-identity > div {
+    min-width: 0;
+  }
+  #town-screen .training-identity h2 {
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+  #town-screen .training-identity p {
+    line-height: 1.5;
+  }
+  #town-screen .training-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin: 14px 0 18px;
+  }
+  #town-screen .training-tabs button {
+    min-width: 0;
+    min-height: 48px;
+    padding: 9px 8px;
+    line-height: 1.3;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+  #town-screen .training-overview-grid,
+  #town-screen .loadout-slots,
+  #town-screen .gear-slots {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #town-screen .story-party {
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+  #town-screen .story-party summary {
+    min-height: 44px;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  #town-screen .story-party .departure-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #town-screen .talent-workspace {
+    padding: 14px 12px;
+    gap: 14px;
+  }
+  #town-screen .talent-workspace-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  #town-screen .branch-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  #town-screen .branch-tabs button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  #town-screen .talent-flow {
+    flex-direction: column;
+    overflow: visible;
+    gap: 12px;
+  }
+  #town-screen .talent-flow-lane {
+    width: 100%;
+    min-width: 0;
+  }
+  #town-screen .page-controls {
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  #town-screen .page-controls button {
+    flex: 1 1 120px;
+    min-width: 0;
+  }
+  #town-screen .page-controls span {
+    flex: 1 1 100%;
+    order: -1;
+    text-align: center;
+  }
+  #town-screen .bestiary-list,
+  #town-screen .quest-list,
+  #town-screen .challenge-shop-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #town-screen .bestiary-list article > div {
+    min-width: 0;
+  }
+  #town-screen .zone-route {
+    max-height: none;
+    overflow: visible;
+  }
+  #town-screen .bestiary-list {
+    max-height: none;
+    overflow: visible;
+  }
 }

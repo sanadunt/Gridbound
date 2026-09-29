@@ -16,7 +16,7 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
         await click('[data-campaign-page="1"]');
         await wait(`Boolean(document.querySelector('[data-zone="${chapter}"]'))`);
       }
-      assert.equal(await evaluate('document.querySelectorAll("[data-zone]").length'), 1);
+      assert.equal(await evaluate('document.querySelectorAll("[data-zone]").length'), 4);
     }
 
     if (chapter === 3 || chapter === 9) {
@@ -40,7 +40,7 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
         await click('[data-campaign-page="1"]');
         await wait(`Boolean(document.querySelector('[data-zone="${chapter}"]'))`);
       }
-      assert.equal(await evaluate('document.querySelectorAll("[data-zone]").length'), 1);
+      assert.equal(await evaluate('document.querySelectorAll("[data-zone]").length'), 4);
     }
     await click(`[data-zone="${chapter}"]`);
     await click('[data-depart="adventure"]');

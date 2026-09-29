@@ -13,8 +13,12 @@ for(const width of [360,390])await withBrowser(async({send,evaluate,wait,click,k
  await screenshot(`artifacts/training-${width}.png`);
  await click('[data-facility="campaign"]');await click('[data-depart="adventure"]');await click('#start');
  await wait('window.gridbound.battle.status==="fighting"');await fits();
- const sizes=await evaluate(`(()=>{const a=document.querySelector('[data-tap="0"]').getBoundingClientRect(),s=document.querySelector('[data-stance="0"]').getBoundingClientRect();return {tap:{w:a.width,h:a.height},skill:{w:s.width,h:s.height},overlap:a.bottom-s.top}})()`);
- assert.ok(sizes.skill.h<=28&&sizes.skill.h>=24,JSON.stringify(sizes));assert.ok(sizes.tap.h>sizes.skill.h,JSON.stringify(sizes));
+ const tap=await evaluate(`(()=>{const r=document.querySelector('[data-tap="0"]').getBoundingClientRect();return {w:r.width,h:r.height}})()`);
+ await click('[data-battle-view="hero"]');
+ const skill=await evaluate(`(()=>{const r=document.querySelector('[data-select-stance="0"]').getBoundingClientRect();return {h:r.height}})()`);
+ const sizes={tap,skill};
+ assert.ok(sizes.skill.h>=44,JSON.stringify(sizes));assert.ok(sizes.tap.h>sizes.skill.h,JSON.stringify(sizes));
+ await click('[data-battle-view="arena"]');await wait('window.gridbound.battle.status==="fighting"');
  const position=async selector=>evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
  await position('#arena');
  const a=await position('[data-tap="0"]'),b=await position('[data-tap="3"]');

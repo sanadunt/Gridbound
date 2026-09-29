@@ -367,3 +367,145 @@ dialog[open]::backdrop {
   z-index: 999 !important;
 }
 
+/* Portrait title composition keeps the menu legible without changing the shell position. */
+@media (max-width: 480px) {
+  .title-screen {
+    padding: 22px 14px calc(18px + env(safe-area-inset-bottom));
+  }
+  .title-content {
+    width: 100%;
+    max-width: 360px;
+  }
+  .title-brand {
+    margin-bottom: 24px;
+  }
+  .title-logo {
+    font-size: clamp(24px, 11vw, 40px);
+    letter-spacing: 1px;
+  }
+  .title-eyebrow {
+    font-size: 8px;
+    letter-spacing: 1.8px;
+  }
+  .title-subtitle-wrap {
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 2px;
+  }
+  .title-flourish {
+    max-width: 38px;
+  }
+  .title-menu {
+    gap: 8px;
+  }
+  .title-menu-item {
+    min-height: 52px;
+    padding: 10px 12px;
+  }
+  .title-menu-item.primary {
+    min-height: 56px;
+  }
+  .title-menu-item .menu-title,
+  .title-menu-item.primary .menu-title {
+    font-size: 10px;
+    line-height: 1.35;
+    letter-spacing: 1px;
+    white-space: normal;
+  }
+  .title-menu-item .menu-subtext {
+    max-width: 100%;
+    font-size: 10px;
+    line-height: 1.4;
+    white-space: normal;
+  }
+  .title-menu-item:focus-visible {
+    outline: 2px solid #f7e0b5;
+    outline-offset: 3px;
+  }
+  .title-footer {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .title-meta-info {
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 7px;
+    line-height: 1.5;
+  }
+}
+
+@container gridbound (max-width: 480px) {
+  .title-screen {
+    padding: 22px 14px calc(18px + env(safe-area-inset-bottom));
+  }
+  .title-content {
+    width: 100%;
+    max-width: 360px;
+  }
+  .title-brand {
+    margin-bottom: 24px;
+  }
+  .title-logo {
+    font-size: clamp(24px, 11cqw, 40px);
+    letter-spacing: 1px;
+  }
+  .title-eyebrow {
+    font-size: clamp(8px, 2.2cqw, 10px);
+    letter-spacing: 1.8px;
+  }
+  .title-subtitle-wrap {
+    gap: 8px;
+    font-size: clamp(11px, 3.2cqw, 14px);
+    letter-spacing: 2px;
+  }
+  .title-flourish {
+    max-width: 38px;
+  }
+  .title-menu {
+    gap: 8px;
+  }
+  .title-menu-item {
+    min-height: 52px;
+    padding: 10px 12px;
+  }
+  .title-menu-item.primary {
+    min-height: 56px;
+  }
+  .title-menu-item .menu-title,
+  .title-menu-item.primary .menu-title {
+    font-size: 10px;
+    line-height: 1.35;
+    letter-spacing: 1px;
+    white-space: normal;
+  }
+  .title-menu-item .menu-subtext {
+    max-width: 100%;
+    font-size: 10px;
+    line-height: 1.4;
+    white-space: normal;
+  }
+  .title-menu-item:focus-visible {
+    outline: 2px solid #f7e0b5;
+    outline-offset: 3px;
+  }
+  .title-footer {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .title-meta-info {
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 7px;
+    line-height: 1.5;
+  }
+}
+.title-menu-item:focus-visible {
+  outline: 2px solid #f7e0b5;
+  outline-offset: 3px;
+}
