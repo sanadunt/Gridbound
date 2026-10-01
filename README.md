@@ -4,9 +4,9 @@ An offline-first, pixel-art tactical RPG for the browser. Three Bellkeepers leav
 
 ## Target game direction R1 (documentation only)
 
-**D1–D8 approved by the user on 7 September 2026.** [Approval record](docs/game-direction-r1/APPROVAL-D1-D8.md) records the instruction to put the documentation in Git before execution. This commit is documentation-only; implementation has not started.
+**D1–D8 approval record:** [Approval record](docs/game-direction-r1/APPROVAL-D1-D8.md) captures the R1 target and documentation-first boundary. Approval does not mean every target feature is shipped.
 
-[New target GDD and mode design](docs/game-direction-r1/README.md): Press Start/title, three distinct mode loops, Story prologue/world map/material dungeons, three-unit Roguelike, customizable 1–6 Raid, Crystal economy, five attributes, unique hero advancement, Ultra progression, and per-mode save profiles. This is **planned, not implemented**; the Included list below still describes v0.4 runtime.
+The [new target GDD and mode designs](docs/game-direction-r1/README.md) propose a redesign beyond v0.4; they are not the source of truth for shipped behavior. Some foundations named in R1 already exist in v0.4, including title and Commander screens, campaign map, Raid, Roguelike, and per-mode Commander state. R1-only targets such as five visible attributes, Ultra progression, and material dungeons remain planned. Check [the current-runtime GDD](docs/GDD-GRIDBOUND-V0.4.md) and `src/` for implemented behavior.
 
 ## Full production planning
 
@@ -93,16 +93,19 @@ The private repository does not itself create a public game URL. Deployment is a
 | `src/game/simulation.ts` | Seeded combat, targeting, threat resolution, job/gear/boon effects |
 | `src/game/content.ts`, `jobs.ts`, `characters.ts` | Skills, progression classes, gear, hero biographies |
 | `src/game/world.ts`, `story.ts` | Encounters, monster variants, boons, campaign narrative |
-| `src/game/profile.ts`, `save.ts` | Validated saves/migration, purchases, reward settlement, recruitment and respec |
+| `src/game/profile.ts`, `src/game/commander.ts`, `src/game/commander-session.ts`, `src/game/save.ts` | Profile progression, Commander persistence, legacy migration, purchases, settlement, recruitment and respec |
 | `src/game/levels.ts`, `talents.ts`, `quests.ts` | XP curve, skill trees, quest definitions/objectives |
 | `src/ui/town.ts`, `src/main.ts` | Town/training/forge, journal, combat controls and dialogs |
 | `src/art/`, `src/render/`, `src/audio/` | Procedural visuals, Phaser renderer and Web Audio |
 | `data/database.json` | Regeneratable content database, including actual scaled encounter HP |
-| `Gridbound_GDD_GRID_RAID.md` | Current implemented design and system rules |
-| `docs/GDD-PROTOTYPE-ARCHIVE.md` | Earlier design preserved for context, not current acceptance criteria |
+| `docs/GDD-GRIDBOUND-V0.4.md` | Human-readable GDD for current runtime behavior, including modes, combat, story, saves, and verification limits |
+| `Gridbound_GDD_GRID_RAID.md` | Generated content catalog; some older cross-system notes may lag runtime |
+| `docs/game-direction-r1/` | Future-target proposal, not shipped behavior; source code remains the implementation authority |
+| `docs/README.md` | Index for current-runtime, future-target, production, hosting, and historical documentation |
+| `docs/GDD-PROTOTYPE-ARCHIVE.md` | Earlier design retained for context, not current acceptance criteria |
 
 ## Save and release boundaries
 
-Progress uses browser `localStorage` under **`gridbound.v3`**. Existing v2 saves migrate automatically; the original v2 value is left untouched. Migrated heroes receive a campaign-rank-based starting level. Corrupt or future-version saves disable writes instead of overwriting their source. Settings can download a JSON backup. The older prototype migrates only compatible currency/settings. Save data is per-browser **and per-origin**: moving to another domain does not automatically move progress. In-progress fights are not saved; finish the current chapter before reloading.
+Progress has two storage boundaries. The legacy `gridbound.v3` Profile uses `localStorage`; Commander profiles and run checkpoints use IndexedDB through `CommanderRepository`. `CommanderSession` serializes writes and checks revisions. If IndexedDB is unavailable, Commander storage falls back to session-only memory and is lost when the tab closes. Run checkpoints are saved at encounter boundaries, not as live combat frames. Legacy v2/v1 data migrates where compatible; malformed or unsupported legacy saves disable writes rather than overwriting their source. Settings can download a JSON backup. Saves are local to the browser and origin; there is no cloud sync or automatic transfer when the domain changes.
 
 This is a complete playable campaign slice, not a claim of production certification. Physical iOS/Android, Safari/Firefox, low-end performance and human difficulty/usability testing remain unverified. There is no cloud sync, controller support, voice acting or multiplayer. Phaser still emits a large-engine-chunk warning; application and engine chunks are split for caching.
