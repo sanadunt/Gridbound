@@ -1,8 +1,32 @@
-# GUI verification — local, not deployed
+# GUI verification — game-first redesign (local, not deployed)
 
-## Portrait implementation pass — local verification
+## Current implementation pass — local verification
 
-Applied to the v0.4 runtime; no deployment performed.
+Implemented in the v0.4 source; no live deployment.
+
+### Viewport and navigation evidence
+
+- The latest full `npm run test:browser` run passed desktop/mobile, all 16 chapters / 76 stage transitions, 48 unique monster textures, RPG progression and persistence, Commander flows, World Map, Town navigation, combat HUD, results, and the complete GUI layout matrix.
+- `scripts/gui-layout-smoke.mjs`: passed 15 routes/states at 360×640, 360×740, 390×844, 430×932, 768×1024, 1280×720, and 1440×900. Document dimensions, primary actions, and storage-status footer stayed in bounds; a separate 180×370 2× CSS viewport proxy kept header controls and Camp’s primary Expedition action reachable without overlap.
+- `scripts/town-screen-browser.mjs`: passed 1440×900, 390×844, and 360×640; checked Town navigation, keyboard focus, Settings visibility, map selection, dossier, and Deploy targets.
+- `node scripts/d6-browser.mjs`: passed Commander creation/three-profile limit, save/load/reload/switch, Raid/Roguelike checkpoint suspend/resume/abandon, Raid replay without duplicate payout, defeat without bank reward, and zero browser console errors. At 390×500 reduced-height emulation, the focused 44 px Commander-name input stayed visible without document overflow; see `artifacts/d6-profiles-short-viewport.png`.
+- `scripts/world-map-browser.mjs`: passed desktop/mobile act navigation and dossier return, plus map scrolling and route-pin reachability at 360×390.
+- `scripts/mode-switch-browser.mjs`: passed Story → Raid → Story persistence, same-mode Party/Progression navigation retaining hero/chapter selection, respec refunds and base-skill reset, quest claims from Raid saved in Story, and Challenge Shop purchases from Story using shared bank Crystal.
+- `scripts/viewport-game-browser.mjs`: verified boss, lane, party-health, Guard, Potion, Ultimate, and 44 px battle-view targets without scrolling at 360×640, 360×740, 390×844, 430×932, 721×500, 768×1024, 1280×720, and 1440×900. Desktop battle uses a widened board with a dedicated threat/action rail; the checked board minimums were 320 px at 1280×720 and 420 px at 1440×900. Exercised lane targeting and Hero pause/resume.
+- `scripts/combat-hud-browser.mjs`: verified the Hades threat/health HUD and 44 px combat targets at 360×640, 390×844, and 1440×900; the short-phone state stayed within viewport bounds.
+- `scripts/pact-browser.mjs` passed desktop/mobile Raid and Roguelike recruit selection with the 44 px minimum target. D2/D3/D4/D7, currency UI, boon-draft, and combat-feedback browser checks passed in focused runs; the campaign smoke also verifies the Roguelike return action is at least 44 px tall and within the viewport.
+- `npm run test:production`: passed the nested `/subdir/Gridbound/` route, local-resource checks, active combat, and absence of the dev QA API.
+- `npm test`: 128 passed. `npm run build`: passed; Vite reports the Phaser engine chunk at 1,208.06 kB minified, above its 500 kB warning threshold. `npm run balance`: passed 16 chapters / 76 stages and 48 expanded Raid wins.
+
+### Verification limits
+
+- Browser emulation only. Native browser zoom at 200%, physical Android Chrome, iPhone Safari, and an actual OS on-screen keyboard were not tested. The 390×500 profile check is a reduced-height viewport proxy, not a keyboard test.
+- No live deployment.
+
+
+## Superseded historical record — portrait-only implementation
+
+Applied to the earlier portrait-only v0.4 layout; superseded by the game-first implementation above. No deployment performed.
 
 ### Viewport and state evidence
 
@@ -26,7 +50,7 @@ Applied to the v0.4 runtime; no deployment performed.
 - Actual 200% browser zoom, physical Android Chrome, and iPhone Safari were not tested.
 - Town vertical overflow is materially above the plan's provisional targets; content is preserved rather than clipped.
 
-## Earlier GUI verification record
+## Older implementation history (superseded)
 
 Executed directly in the main Astra session without new subagents.
 

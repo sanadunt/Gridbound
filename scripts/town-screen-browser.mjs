@@ -1,86 +1,76 @@
 import assert from 'node:assert/strict';
 import { withBrowser } from './browser-harness.mjs';
 
-const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5173/';
+const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5180/';
 
-console.log('--- TESTING TOWN SCREEN (EMBERHOLLOW) ---');
-
-// 1. Desktop Viewport (1440x900)
-await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
-  await send('Page.navigate', { url });
-  await wait('window.gridbound && document.querySelector("#town-screen")');
-  
-  // Show Title Screen and trigger GSAP Enter transition into town
-  await evaluate('window.gridbound.showTitle()');
-  await wait('!document.querySelector("#title-screen").hidden');
-  await click('#title-enter');
-  await wait('document.querySelector("#title-screen").hidden && !document.querySelector("#town-screen").hidden', 5000);
-  await wait('window.getComputedStyle(document.querySelector(".facility-panel-wrap")).opacity === "1"');
-  
-  // Verify Town Panorama & Embers
-  assert.equal(await evaluate('Boolean(document.querySelector(".town-panorama"))'), true, 'Panorama must exist');
-  assert.equal(await evaluate('document.querySelectorAll(".town-ember").length >= 6'), true, 'Embers must exist');
-  assert.equal(await evaluate('Boolean(document.querySelector("#town-title"))'), true, 'Town title must exist');
-  assert.equal(await evaluate('document.querySelector("#town-title").textContent'), 'Emberhollow');
-  
-  // Capture Town Desktop
-  await screenshot('artifacts/town-hades-desktop.png');
-  console.log('✓ Captured artifacts/town-hades-desktop.png');
-
-  // Verify Facility Tabs Navigation
-  const facilities = ['campaign', 'party', 'quests', 'bestiary', 'challenge-shop'];
-  for (const fac of facilities) {
-    await click(`[data-facility="${fac}"]`);
-    await wait(`document.querySelector('[data-facility="${fac}"].active')`);
-    await wait('window.getComputedStyle(document.querySelector(".facility-panel-wrap")).opacity === "1"');
-    assert.equal(await evaluate(`Boolean(document.querySelector('[data-facility="${fac}"].active'))`), true, `Facility ${fac} must be active`);
-    if (fac === 'party') {
-      await screenshot('artifacts/town-facility-training.png');
-      console.log('✓ Captured artifacts/town-facility-training.png');
-    } else if (fac === 'quests') {
-      await screenshot('artifacts/town-facility-quests.png');
-      console.log('✓ Captured artifacts/town-facility-quests.png');
-    }
-  }
-
-  // Verify Hero Selection in Roster
-  await click('[data-town-hero="4"]');
-  await wait('Boolean(document.querySelector(\'[data-town-hero="4"].chosen\'))');
-  assert.equal(await evaluate('Boolean(document.querySelector(\'[data-town-hero="4"].chosen\'))'), true, 'Hero 4 must be chosen');
-
-  // Return to Campaign / War Table
-  await click('[data-facility="campaign"]');
-  await wait('Boolean(document.querySelector("[data-depart=\'adventure\']"))');
-  await wait('window.getComputedStyle(document.querySelector(".facility-panel-wrap")).opacity === "1"');
-  assert.equal(await evaluate('Boolean(document.querySelector("[data-depart=\'adventure\']"))'), true, 'Depart button must exist');
-
-  console.log('✓ Desktop Town tests passed');
-}, { width: 1440, height: 900 });
-
-// 2. Mobile Viewports (390x844 and 360x780)
-for (const [w, h] of [[390, 844], [360, 780]]) {
-  await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
+for (const [width, height] of [[1440, 900], [390, 844], [360, 640]]) {
+  await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors }) => {
     await send('Page.navigate', { url });
-    await wait('window.gridbound && document.querySelector("#town-screen")');
-    
-    // Show Title Screen and enter Emberhollow
+    await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")');
     await evaluate('window.gridbound.showTitle()');
     await wait('!document.querySelector("#title-screen").hidden');
     await click('#title-enter');
-    await wait('document.querySelector("#title-screen").hidden && !document.querySelector("#town-screen").hidden', 5000);
-    await wait('window.getComputedStyle(document.querySelector(".facility-panel-wrap")).opacity === "1"');
+    await wait('document.querySelector("#title-screen").hidden && document.querySelector("#town-screen:not([hidden]) .camp-scene")', 5000);
 
-    // Verify zero horizontal overflow
-    const fits = await evaluate('document.documentElement.scrollWidth <= innerWidth + 1');
-    assert.equal(fits, true, `No horizontal overflow at ${w}x${h}`);
+    const camp = await evaluate(`(() => {
+      const nav = [...document.querySelectorAll('.game-nav button')].map(button => {
+        const rect = button.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      });
+      return {
+        title: document.querySelector('.camp-scene h1')?.textContent,
+        document: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
+        nav
+      };
+    })()`);
+    assert.equal(camp.title, 'Emberhollow');
+    assert.ok(camp.document.width <= width + 1 && camp.document.height <= height + 1, `Camp must fit ${width}×${height}: ${JSON.stringify(camp)}`);
+    assert.equal(camp.nav.length, 4, 'Camp exposes four primary destinations');
+    assert.ok(camp.nav.every(button => button.width >= 44 && button.height >= 44), 'Primary navigation targets remain at least 44×44');
+    const settings = await evaluate(`(() => {
+      const rect = document.querySelector('#settings').getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
+    })()`);
+    assert.ok(settings.width > 0 && settings.height > 0 && settings.left >= 0 && settings.right <= width,
+      `Settings remains visible inside the ${width}×${height} header: ${JSON.stringify(settings)}`);
+    await screenshot(`artifacts/camp-gridbound-${width}x${height}.png`);
+    await key('Tab');
+    const focused = await evaluate(`(() => {
+      const element = document.activeElement;
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return { focusVisible: element.matches(':focus-visible'), visible: rect.width > 0 && rect.height > 0,
+        outline: style.outlineStyle, outlineWidth: style.outlineWidth };
+    })()`);
+    assert.ok(focused.focusVisible && focused.visible && focused.outline !== 'none' && focused.outlineWidth !== '0px',
+      `Keyboard focus stays visible on an actionable control: ${JSON.stringify(focused)}`);
 
-    // Verify touch targets
-    const tabHeight = await evaluate('document.querySelector(".facility-tabs button").getBoundingClientRect().height');
-    assert.ok(tabHeight >= 32, `Tab touch target height ${tabHeight} >= 32px`);
+    await evaluate('document.querySelector(".game-nav [data-facility=campaign]").focus()');
+    await key('Enter');
+    await wait('document.querySelector(".world-map-wrapper.map-view")');
+    await evaluate(`document.querySelector('[data-zone="0"]').focus()`);
+    await key(' ', 'Space');
+    await wait('document.querySelector(".world-map-wrapper.mission-view .world-map-dossier")');
+    const deploy = await evaluate(`(() => {
+      const rect = document.querySelector('.mission-brief [data-depart="adventure"]').getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
+    })()`);
+    assert.ok(deploy.width >= 44 && deploy.height >= 44 && deploy.left >= 0 && deploy.right <= width && deploy.top >= 0 && deploy.bottom <= height,
+      `Mission Deploy remains visible at ${width}×${height}: ${JSON.stringify(deploy)}`);
+    assert.ok(await evaluate('document.documentElement.scrollHeight <= innerHeight + 1 && document.documentElement.scrollWidth <= innerWidth + 1'),
+      'Mission selection does not create document scrolling');
 
-    await screenshot(`artifacts/town-hades-mobile-${w}.png`);
-    console.log(`✓ Captured artifacts/town-hades-mobile-${w}.png`);
-  }, { width: w, height: h, mobile: true });
+    await click('.mission-map-return');
+    await click('.game-nav [data-facility="more"]');
+    await wait('document.querySelector(".more-scene")');
+    const menu = await evaluate(`(() => ({
+      journal: Boolean(document.querySelector('.more-scene [data-open-action="journal"]')),
+      profiles: Boolean(document.querySelector('.more-scene [data-open-action="profiles"]')),
+      challengeShop: Boolean(document.querySelector('.more-scene [data-facility="challenge-shop"]')),
+      settings: Boolean(document.querySelector('.more-scene [data-open-action="settings"]'))
+    }))()`);
+    assert.ok(menu.journal && menu.profiles && menu.challengeShop && menu.settings, `More exposes journal, profile, challenge shop, and settings actions: ${JSON.stringify(menu)}`);
+    assert.deepEqual(errors, []);
+    console.log(`PASS Town entry and navigation ${width}×${height}`);
+  }, { width, height, mobile: width < 500 });
 }
-
-console.log('ALL TOWN SCREEN TESTS PASSED!');

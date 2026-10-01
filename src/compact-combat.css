@@ -53,11 +53,6 @@
   padding-right: 8px;
 }
 
-/* Keep the lower combat controls close to the board without reducing hit areas. */
-#battle-screen .tap-instruction {
-  margin: 5px 0;
-  line-height: 1.4;
-}
 
 #battle-screen .intent-panel {
   min-height: 60px;
@@ -69,10 +64,6 @@
   position: relative;
   inset: auto;
   margin-top: 10px;
-}
-
-#battle-screen .arena-footnote {
-  margin-top: 8px;
 }
 
 
@@ -149,11 +140,6 @@
     margin-bottom: 7px;
   }
 
-  #battle-screen .tap-instruction {
-    font-size: 11px;
-    margin-block: 4px;
-  }
-
   #battle-screen .intent-panel {
     min-height: 56px;
     margin-top: 7px;
@@ -169,10 +155,6 @@
   #battle-screen .action-bar > button {
     min-height: 56px;
     padding-block: 8px;
-  }
-
-  #battle-screen .arena-footnote {
-    margin-top: 6px;
   }
 
   #battle-screen .right-sidebar > .section-label {
@@ -236,10 +218,6 @@
     margin-bottom: 7px;
   }
 
-  #battle-screen .tap-instruction {
-    margin-block: 4px;
-  }
-
   #battle-screen .intent-panel {
     min-height: 60px;
     margin-top: 7px;
@@ -247,10 +225,6 @@
 
   #battle-screen .action-bar {
     margin-top: 8px;
-  }
-
-  #battle-screen .arena-footnote {
-    margin-top: 6px;
   }
 
   #battle-screen .right-sidebar > .section-label {
@@ -306,10 +280,6 @@
     overflow-y: auto;
     flex-shrink: 0;
     padding-top: 0;
-  }
-
-  #battle-screen .arena-footnote {
-    margin-top: 7px;
   }
 
   #battle-screen .action-bar {

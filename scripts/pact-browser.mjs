@@ -33,7 +33,9 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await wait('Boolean(window.gridbound && document.querySelector("#town-screen:not([hidden])"))');
 
   // Navigate to Raid Hunts (Pact of Punishment)
-  await click('[data-view="raid"]');
+  await click('.game-nav [data-facility="campaign"]');
+  await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+  await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
   await wait('document.querySelectorAll("[data-raid]").length === 12');
 
   const bossCount = await evaluate('document.querySelectorAll("[data-raid]").length');
@@ -63,7 +65,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   console.log('PASS: Desktop Raid Hunts (Pact of Punishment) verified and captured.');
 
   // Navigate to The Sunken Bell (Roguelike Descent)
-  await click('[data-view="endless"]');
+  await click('.secondary-scene .expedition-mode-nav [data-facility="endless"]');
   await wait('Boolean(document.querySelector(".endless-rules"))');
 
   const ruleCount = await evaluate('document.querySelectorAll(".endless-rules p").length');
@@ -78,8 +80,10 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await screenshot('artifacts/sunken-bell-hades-desktop.png');
   console.log('PASS: Desktop The Sunken Bell (Descent) verified and captured.');
 
-  // Open Story Journal Modal
-  await click('#story-journal');
+  // Open Story Journal Modal from More.
+  await click('.game-nav [data-facility="more"]');
+  await wait('Boolean(document.querySelector(".more-scene"))');
+  await click('.more-scene [data-open-action="journal"]');
   await wait('Boolean(document.querySelector("#modal")?.open)');
   const journalTitle = await evaluate('document.querySelector("#modal h2#modal-title").textContent');
   assert.match(journalTitle, /Story journal/i, 'Modal title must indicate Story Journal');
@@ -92,7 +96,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await wait('!document.querySelector("#modal")?.open');
 
   // Open Commander Profiles Modal
-  await click('#profiles');
+  await click('.more-scene [data-open-action="profiles"]');
   await wait('Boolean(document.querySelector("#modal")?.open && document.querySelector("#commander-name"))');
   const profilesTitle = await evaluate('document.querySelector("#modal h2#modal-title").textContent');
   assert.match(profilesTitle, /Commander profiles/i, 'Modal title must indicate Commander profiles');
@@ -122,7 +126,9 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   };
 
   // Test Raid Hunts on mobile
-  await click('[data-view="raid"]');
+  await click('.game-nav [data-facility="campaign"]');
+  await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+  await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
   await wait('document.querySelectorAll("[data-raid]").length === 12');
   await fits('Mobile Raid Hunts');
 
@@ -137,7 +143,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   console.log('PASS: Mobile Raid Hunts verified and captured.');
 
   // Test Sunken Bell on mobile
-  await click('[data-view="endless"]');
+  await click('.secondary-scene .expedition-mode-nav [data-facility="endless"]');
   await wait('Boolean(document.querySelector(".endless-rules"))');
   await fits('Mobile Sunken Bell');
 

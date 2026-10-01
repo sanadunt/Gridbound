@@ -67,19 +67,8 @@
   box-shadow: 0 0 24px rgba(245, 158, 11, 0.18), inset 0 0 16px rgba(0, 0, 0, 0.8);
   justify-self: center;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  animation: bestiaryMonsterAura 4s infinite ease-in-out;
 }
 
-@keyframes bestiaryMonsterAura {
-  0%, 100% {
-    box-shadow: 0 0 16px rgba(245, 158, 11, 0.15), inset 0 0 16px rgba(0, 0, 0, 0.8);
-    border-color: #786438;
-  }
-  50% {
-    box-shadow: 0 0 28px rgba(245, 158, 11, 0.35), inset 0 0 20px rgba(245, 158, 11, 0.15);
-    border-color: #f5d378;
-  }
-}
 
 .bestiary-list article > div {
   display: flex;
@@ -472,19 +461,8 @@
   color: #1a1205;
   border: 1px solid #ffe89e;
   box-shadow: 0 0 16px rgba(245, 211, 120, 0.45);
-  animation: claimPulse 2.2s infinite ease-in-out;
 }
 
-@keyframes claimPulse {
-  0%, 100% {
-    box-shadow: 0 0 14px rgba(245, 211, 120, 0.4);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow: 0 0 24px rgba(245, 211, 120, 0.7);
-    transform: scale(1.02);
-  }
-}
 
 .quest-actions button[data-claim-quest].gold-button:hover {
   background: linear-gradient(135deg, #ffe89e 0%, #e6b847 100%);

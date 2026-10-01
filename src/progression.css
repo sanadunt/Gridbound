@@ -37,5 +37,4 @@
  .quest-entry { padding:15px; }
  .quest-actions { flex-direction:column; }
  .quest-actions button { width:100%; }
- .facility-tabs { gap:18px; }
 }

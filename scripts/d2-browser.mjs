@@ -10,18 +10,28 @@ try {
   assert.equal((await fetch(url)).status,200);
   await withBrowser(async({send,wait,evaluate,click,errors})=>{
     await send('Page.navigate',{url}); await wait('window.gridbound?.profile?.()');
-    assert.equal(await evaluate('document.querySelector("#wallet")?.textContent?.includes("g")'),true);
-    await click('[data-view="raid"]');
+    const gold = await evaluate(`(() => {
+      const amount = document.querySelector("#wallet .currency-amount");
+      const expected = Math.floor(window.gridbound.profile().gold).toLocaleString("en-US");
+      return { label: amount?.getAttribute("aria-label"), value: amount?.querySelector("span")?.textContent, expected };
+    })()`);
+    assert.equal(gold.value, gold.expected);
+    assert.equal(gold.label, `Story Gold: ${gold.expected}`);
+    await click('.game-nav [data-facility="campaign"]');
+    await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+    await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
     assert.equal(await evaluate('Boolean(document.querySelector("[data-raid-tier]"))'),true);
     assert.equal(await evaluate('document.querySelector(".mission-brief")?.textContent?.includes("REWARDED CONTRACT")'),true);
+    await click('.game-nav [data-facility="more"]');
     await click('[data-facility="challenge-shop"]');
     assert.equal(await evaluate('Boolean(document.querySelector("[data-bank-buy]"))'),true);
     assert.equal(await evaluate('document.querySelector(".challenge-shop-grid")?.textContent?.includes("CRYSTAL")'),true);
-    await click('[data-view="endless"]');
+    await click('.game-nav [data-facility="campaign"]');
+    await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+    await click('.world-map-wrapper .expedition-mode-nav [data-facility="endless"]');
     assert.equal(await evaluate('document.body.textContent.includes("Run purse")'),true);
     await click('[data-depart="endless"]'); await wait('window.gridbound?.battle?.mode === "endless"');
     assert.equal(await evaluate('document.querySelector("#loot")?.textContent?.includes("RUN")'),true);
-    assert.equal(await evaluate('document.querySelector("#loot")?.textContent?.includes("g")'),false);
     assert.deepEqual(errors,[]);
     console.log('PASS D2 browser smoke: bank shop, raid contract, roguelike run purse, no console errors');
   });

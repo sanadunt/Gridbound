@@ -562,7 +562,9 @@ dialog > .text-button {
   color: var(--muted);
   line-height: 1.5;
 }
-@keyframes tapflash{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-22px)}}@keyframes ultpulse{50%{box-shadow:0 0 20px #d6bd7930}}.reduced-motion *{animation:none!important;scroll-behavior:auto!important;transition:none!important}
+@keyframes tapflash{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-22px)}}@keyframes ultpulse{50%{box-shadow:0 0 20px #d6bd7930}}.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after{animation:none!important;scroll-behavior:auto!important;transition:none!important}
 @media(min-width:1500px){.game-layout{gap:55px;padding-top:43px}.arena-column{max-width:590px}}
 @media(max-width:1180px){.game-layout{gap:22px;padding-inline:3%;grid-template-columns:185px minmax(360px,560px) minmax(180px,1fr)}h1{font-size:20px}.brand{font-size:13px}.brand small{font-size:8px;letter-spacing:1px}.mode-tabs{gap:22px}.hero-identity{gap:9px}.portrait-frame{width:56px}.portrait-frame img{width:56px}.hero-identity h2{font-size:14px}.hero-identity p{font-size:9px}.stance-option{padding:10px 8px;gap:8px}.skill-icon{width:24px;height:28px}.stance-option b{font-size:11px}.potion-button,.ultimate-button{padding:0 10px;gap:8px}}
 @media(max-width:1000px){.left-sidebar{display:none}.game-layout{max-width:860px;grid-template-columns:minmax(350px,550px) 220px;gap:28px;padding:23px 24px}.site-header{padding:0 24px;height:74px}.brand small{display:none}.header-tools{gap:8px}.mode-tabs{gap:20px}.wallet{padding-right:10px}}

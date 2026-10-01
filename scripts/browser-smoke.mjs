@@ -13,10 +13,12 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   await screenshot('artifacts/town-desktop.png');
 
   await click('[data-facility="party"]');
+  await click('[data-facility="party-advanced"]');
   await click('[data-training-tab="talents"]');
   await screenshot('artifacts/training-desktop.png');
   await click('[data-inspect-talent="active-2"]');await click('[data-talent="active-2"]');
   assert.ok((await evaluate('window.gridbound.profile().loadouts[0].talents')).includes('active-2'));
+  await click('[data-facility="party"]');
   await click('[data-training-tab="skills"]');
   await evaluate(`(() => { const select = document.querySelector('[data-equip-slot="1"]'); select.value = '2'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   assert.deepEqual(await evaluate('window.gridbound.profile().loadouts[0].skills'), [0, 2]);
@@ -30,6 +32,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   assert.ok(await evaluate('window.gridbound.profile().loadouts[0].inventory.includes("ember-charm")'));
 
   await click('[data-facility="campaign"]');
+  await click('[data-zone="0"]');
   await click('[data-depart="adventure"]');
   await wait('window.gridbound.battle.status === "ready" && document.querySelector("#start")');
   await screenshot('artifacts/battle-ready-desktop.png');
@@ -42,22 +45,44 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
 
   await click('#pause');
   await wait('window.gridbound.battle.status === "paused"');
+  assert.equal(await evaluate(`['Resume', 'Controls', 'Sound & motion', 'Retreat · return to Camp'].every(label =>
+    [...document.querySelectorAll('#modal button')].some(button => button.textContent.trim() === label))`), true,
+  'Pause menu exposes Resume, Controls, Sound & motion, and Retreat to Camp');
   const time = await evaluate('window.gridbound.battle.time');
   await evaluate('window.gridbound.step(5)');
   assert.equal(await evaluate('window.gridbound.battle.time'), time);
   await key('Escape');
+  await wait('window.gridbound.battle.status === "fighting"');
+  await click('#pause');
+  await wait('window.gridbound.battle.status === "paused"');
+  await click('#pause-settings');
+  await wait('document.querySelector("#setting-sound") && document.querySelector("#setting-motion")');
+  if (await evaluate('document.querySelector("#setting-sound").checked')) await click('#setting-sound');
+  if (await evaluate('document.querySelector("#setting-motion").checked')) await click('#setting-motion');
+  assert.equal(await evaluate(`!window.gridbound.profile().sound && !window.gridbound.profile().motion
+    && document.body.classList.contains('reduced-motion') && document.querySelector('#intent').textContent.trim().length > 0`), true,
+  'Sound-off and reduced-motion settings preserve battle cues and a readable threat');
+  await click('#modal [data-close]');
+  await wait('window.gridbound.battle.status === "fighting"');
+  await click('#pause');
+  await wait('window.gridbound.battle.status === "paused"');
+  await click('#pause-retreat');
+  await wait('document.querySelector("#modal #abandon-run")');
+  assert.equal(await evaluate(`document.querySelector('#modal').textContent.includes('Leave this encounter?')`), true,
+    'Retreat opens a confirmation instead of abandoning the run immediately');
+  await click('#modal [data-close]');
   await wait('window.gridbound.battle.status === "fighting"');
 
   const gold = await evaluate('window.gridbound.profile().gold');
   for (let stage = 0; stage < 4; stage += 1) {
     await evaluate('window.gridbound.battle.bossHp = 0; window.gridbound.step(.1)');
     await wait('window.gridbound.battle.status === "victory"');
-    await wait('document.querySelector("#modal").open', 15000);
-    await wait('document.querySelector("#modal").open && !document.querySelector("#modal button:disabled")', 15000);
+    await wait('document.querySelector("#result-screen:not([hidden])")', 15000);
+    await wait('document.querySelector("#result-screen:not([hidden]) button") && !document.querySelector("#result-screen button:disabled")', 15000);
     if (stage < 3) {
       assert.equal(await evaluate('window.gridbound.profile().gold'), gold, 'Intermission must not bank expedition gold');
       await click('#next-wave');
-      await wait('window.gridbound.battle.status === "ready" && !document.querySelector("#modal").open');
+      await wait('window.gridbound.battle.status === "ready" && document.querySelector("#result-screen").hidden');
       await click('#start');
       await wait('window.gridbound.battle.status === "fighting"');
       assert.equal(await evaluate('window.gridbound.battle.stage'), stage + 1);
@@ -67,19 +92,21 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   assert.ok((await evaluate('window.gridbound.profile().roster')).includes(2), 'First clear recruits Sable');
   const banked = await evaluate('window.gridbound.profile().gold');
   assert.ok(banked > gold);
-  await click('#start');
-  await wait('document.querySelector("#modal").open && !document.querySelector("#modal button:disabled")');
   await click('#result-town');
   await wait('document.querySelector("#town-screen:not([hidden])")');
   await wait('window.gridbound.profile().gold === ' + banked);
+  await click('[data-facility="campaign"]');
   await click('[data-campaign-page="1"]');await click('[data-zone="1"]');
   assert.match(await evaluate('document.querySelector(".mission-brief h3").textContent'), /Sunken/);
   await send('Page.reload');
-  await wait('window.gridbound && document.querySelector("[data-zone]")');
+  await wait('window.gridbound && document.querySelector("#town-screen")');
   assert.equal(await evaluate('window.gridbound.profile().gold'), banked);
   assert.deepEqual(await evaluate('window.gridbound.profile().loadouts[0].skills'), [0, 2]);
+  assert.equal(await evaluate('window.gridbound.profile().sound'), false, 'Sound-off setting survives reload');
+  assert.equal(await evaluate('window.gridbound.profile().motion'), false, 'Reduced-motion setting survives reload');
 
-  await click('[data-view="endless"]');
+  await click('[data-facility="campaign"]');
+  await click('[data-facility="endless"]');
   await click('[data-depart="endless"]');
   await click('#start');
   await evaluate('window.gridbound.battle.bossHp = 0; window.gridbound.step(.1)');

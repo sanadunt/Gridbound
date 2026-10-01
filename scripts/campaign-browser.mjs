@@ -8,6 +8,7 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
   const textures = await evaluate(`Object.keys(window.gridbound.scene.textures.list).filter(k=>/^(wolf|goblin|spider|shaman|golem|wraith|treant|dragon|moth|basilisk|crab|revenant)(-ash|-frost|-auric)?-0$/.test(k)).map(k=>window.gridbound.scene.textures.get(k).getSourceImage().toDataURL())`);
   assert.equal(textures.length, 48);
   assert.equal(new Set(textures).size, 48, 'each monster variant is actually visually distinct');
+  await click('[data-facility="campaign"]');
 
   for (let chapter = 0; chapter < 16; chapter += 1) {
     if (!(await evaluate(`Boolean(document.querySelector('[data-zone="${chapter}"]'))`))) {
@@ -20,12 +21,14 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
     }
 
     if (chapter === 3 || chapter === 9) {
-      await click('[data-facility="party"]');
+      await click('.game-nav [data-facility="party"]');
+      await click('[data-facility="party-advanced"]');
       await click('[data-training-tab="jobs"]');
       const job = chapter === 3 ? 'paladin' : 'aegis';
       await wait(`Boolean(document.querySelector('[data-promote="${job}"]'))`);
       await click(`[data-promote="${job}"]`);
       assert.equal(await evaluate('window.gridbound.profile().loadouts[0].job'), job);
+      await click('[data-facility="party"]');
       await click('[data-training-tab="skills"]');
       const skill = chapter === 3 ? 4 : 6;
       await evaluate(`(() => { const select = document.querySelector('[data-equip-slot="0"]'); select.value = '${skill}'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
@@ -42,6 +45,7 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
       }
       assert.equal(await evaluate('document.querySelectorAll("[data-zone]").length'), 4);
     }
+    await click('[data-facility="campaign"]');
     await click(`[data-zone="${chapter}"]`);
     await click('[data-depart="adventure"]');
     await click('#start');
@@ -49,10 +53,51 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
     const count = await evaluate('window.gridbound.battle.stageCount');
     for (let stage = 0; stage < count; stage += 1) {
       await evaluate('window.gridbound.battle.bossHp = 0; window.gridbound.step(.05)');
-      await wait('document.querySelector("#modal").open && !document.querySelector("#modal button:disabled")');
+      try {
+        await wait('document.querySelector("#result-screen:not([hidden])")?.dataset.result === "true" && document.querySelector("#result-screen button:disabled")', 15000);
+        await wait('document.querySelector("#result-screen:not([hidden])") && !document.querySelector("#result-screen").dataset.result && document.querySelector("#result-screen button") && !document.querySelector("#result-screen button:disabled")', 15000);
+      } catch (error) {
+        const state = await evaluate(`(() => {
+          const scene = window.gridbound.scene;
+          return {
+            visibilityState: document.visibilityState,
+            performanceNow: performance.now(),
+            status: window.gridbound.battle.status,
+            stage: window.gridbound.battle.stage,
+            bossHp: window.gridbound.battle.bossHp,
+            resultHidden: document.querySelector("#result-screen").hidden,
+            resultGate: document.querySelector("#result-screen").dataset.result,
+            sceneActive: scene?.sys?.isActive?.(),
+            sceneStatus: scene?.sys?.settings?.status,
+            documentHidden: document.hidden,
+            pageHasFocus: document.hasFocus(),
+            gameHasFocus: scene?.game?.hasFocus,
+            gamePaused: scene?.game?.isPaused,
+            loop: {
+              started: scene?.game?.loop?.started,
+              running: scene?.game?.loop?.running,
+              inFocus: scene?.game?.loop?.inFocus,
+              actualFps: scene?.game?.loop?.actualFps
+            },
+            loopFrame: scene?.game?.loop?.frame,
+            deathAnimation: {
+              started: scene?.enemyDeathStarted,
+              complete: scene?.enemyDeathComplete,
+              elapsed: scene?.enemyDeathElapsed,
+              duration: scene?.enemyDeathDuration,
+              waiters: scene?.enemyDeathWaiters?.length
+            },
+            buttons: [...document.querySelectorAll("#result-screen button")].map(button => ({ id: button.id, disabled: button.disabled })),
+            modal: document.querySelector("#modal").textContent
+          };
+        })()`);
+        console.error(`Campaign result input did not unlock at chapter ${chapter}, stage ${stage + 1}/${count}: ${JSON.stringify(state)}`);
+        console.error('Campaign browser console errors:', JSON.stringify(errors));
+        throw error;
+      }
       if (stage < count - 1) {
         await click('#next-wave');
-        await wait('window.gridbound.battle.status === "ready" && !document.querySelector("#modal").open');
+        await wait('window.gridbound.battle.status === "ready" && document.querySelector("#result-screen").hidden');
         await click('#start');
         await wait('window.gridbound.battle.status === "fighting"');
       }
@@ -60,6 +105,7 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
     await click('#result-town');
     await wait('document.querySelector("#town-screen:not([hidden])")');
     assert.equal((await evaluate('window.gridbound.profile().cleared')).length, chapter + 1);
+    await click('[data-facility="campaign"]');
   }
 
   await screenshot('artifacts/campaign-complete.png');
@@ -70,12 +116,57 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
   assert.equal(await evaluate('window.gridbound.profile().loadouts[0].job'), 'aegis');
   assert.ok((await evaluate('window.gridbound.profile().loadouts[0].skills')).includes(6));
 
-  await click('[data-view="endless"]');
+  await click('[data-facility="campaign"]');
+  await click('[data-facility="endless"]');
   await click('[data-depart="endless"]');
   for (let floor = 1; floor <= 13; floor += 1) {
     await click('#start');
+    await wait('window.gridbound.battle.status === "fighting"');
     await evaluate('window.gridbound.battle.bossHp = 0; window.gridbound.step(.05)');
-    await wait('document.querySelector("#modal").open && !document.querySelector("#modal button:disabled")');
+    try {
+      await wait('document.querySelector("#result-screen:not([hidden])") && document.querySelector("#result-screen button") && !document.querySelector("#result-screen button:disabled")', 15000);
+    } catch (error) {
+      const state = await evaluate(`(() => {
+        const scene = window.gridbound.scene;
+        return {
+          floor: window.gridbound.battle.floor,
+          status: window.gridbound.battle.status,
+          visibilityState: document.visibilityState,
+          documentHidden: document.hidden,
+          pageHasFocus: document.hasFocus(),
+          gameHasFocus: scene?.game?.hasFocus,
+          gamePaused: scene?.game?.isPaused,
+          sceneActive: scene?.sys?.isActive?.(),
+          loop: {
+            frame: scene?.game?.loop?.frame,
+            started: scene?.game?.loop?.started,
+            running: scene?.game?.loop?.running,
+            inFocus: scene?.game?.loop?.inFocus,
+            actualFps: scene?.game?.loop?.actualFps
+          },
+          deathAnimation: {
+            started: scene?.enemyDeathStarted,
+            complete: scene?.enemyDeathComplete,
+            elapsed: scene?.enemyDeathElapsed,
+            duration: scene?.enemyDeathDuration,
+            waiters: scene?.enemyDeathWaiters?.length
+          },
+          resultHidden: document.querySelector("#result-screen").hidden
+        };
+      })()`);
+      console.error(`Roguelike result did not unlock at floor ${floor}: ${JSON.stringify(state)}`);
+      console.error('Campaign browser console errors:', JSON.stringify(errors));
+      throw error;
+    }
+    if (floor === 1) {
+      const returnAction = await evaluate(`(() => {
+        const button = document.querySelector('#result-town');
+        const rect = button.getBoundingClientRect();
+        return { height: rect.height, bottom: rect.bottom, viewport: innerHeight };
+      })()`);
+      assert.ok(returnAction.height >= 43.5 && returnAction.bottom <= returnAction.viewport,
+        `Roguelike return action remains a visible 44px target: ${JSON.stringify(returnAction)}`);
+    }
     if (floor <= 12) await click('[data-boon]');
     else await click('#next-floor');
   }

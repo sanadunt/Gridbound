@@ -2,22 +2,6 @@
    HADES-INSPIRED 3-CARD BOON DRAFT STYLING
    ============================================================ */
 
-/* Expand modal for the 3-card draft on wider screens */
-dialog:has(.boon-draft-modal) {
-  width: min(980px, calc(100vw - 28px)) !important;
-  max-width: 980px !important;
-  background: radial-gradient(circle at 50% 10%, #0d221c 0%, #050d0a 90%) !important;
-  border: 2px solid #574626 !important;
-  box-shadow: 0 0 0 5px #07120e, 0 25px 90px rgba(0, 0, 0, 0.95), 0 0 40px rgba(240, 201, 104, 0.15) !important;
-  padding: 28px 32px !important;
-  border-radius: 6px !important;
-}
-
-dialog:has(.boon-draft-modal)::backdrop {
-  background: rgba(3, 8, 7, 0.92) !important;
-  backdrop-filter: blur(6px) !important;
-}
-
 .boon-draft-modal {
   display: flex;
   flex-direction: column;
@@ -309,19 +293,13 @@ dialog:has(.boon-draft-modal)::backdrop {
 }
 
 .boon-modal-footer #result-town {
-  min-height: 40px;
+  min-height: 44px;
   font-size: 11px;
   padding: 8px 22px;
 }
 
 /* --- RESPONSIVE MOBILE BEHAVIOR --- */
 @media (max-width: 768px) {
-  dialog:has(.boon-draft-modal) {
-    width: calc(100vw - 20px) !important;
-    padding: 20px 16px !important;
-    max-height: 90dvh !important;
-  }
-
   .boon-modal-title {
     font-size: 18px;
   }
@@ -358,11 +336,4 @@ dialog:has(.boon-draft-modal)::backdrop {
     padding: 8px 12px;
     font-size: 10px;
   }
-}
-
-dialog:has(.boon-draft-modal) > [role="status"] {
-  text-align: center;
-  font-size: 11px;
-  color: #a3c2b1;
-  margin: 6px 0 0;
 }

@@ -10,10 +10,7 @@
    -------------------------------------------------------------------------- */
 
 /* Details toggles for Raid Party & Boss Archetypes */
-[data-view="raid"] details,
-.town-content details:has(.raid-roster),
-.town-content details:has(.raid-party-grid),
-.town-content details.raid-sandbox {
+.secondary-content > details {
   background: radial-gradient(ellipse at 50% 0%, #18242b 0%, #0e171c 70%, #080d10 100%);
   border: 1px solid rgba(245, 211, 120, 0.25);
   border-radius: 4px;
@@ -22,10 +19,7 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(245, 211, 120, 0.12);
 }
 
-[data-view="raid"] details summary,
-.town-content details:has(.raid-roster) summary,
-.town-content details:has(.raid-party-grid) summary,
-.town-content details.raid-sandbox summary {
+.secondary-content > details > summary {
   font-family: var(--pixel);
   font-size: 11px;
   color: #f5d378;
@@ -39,10 +33,7 @@
   transition: color 0.2s ease, text-shadow 0.2s ease;
 }
 
-[data-view="raid"] details summary:hover,
-.town-content details:has(.raid-roster) summary:hover,
-.town-content details:has(.raid-party-grid) summary:hover,
-.town-content details.raid-sandbox summary:hover {
+.secondary-content > details > summary:hover {
   color: #fff2c8;
   text-shadow: 0 0 10px rgba(245, 211, 120, 0.5);
 }
@@ -154,7 +145,6 @@
   border-color: #f5d378;
   background: radial-gradient(circle at 50% 50%, rgba(245, 211, 120, 0.25) 0%, rgba(13, 22, 26, 0.95) 80%);
   box-shadow: 0 0 16px rgba(245, 211, 120, 0.35), inset 0 0 10px rgba(0, 0, 0, 0.8);
-  animation: chosenBossBreath 3s infinite ease-in-out;
 }
 
 .raid-roster button.chosen b,
@@ -163,10 +153,6 @@
   text-shadow: 0 0 8px rgba(245, 211, 120, 0.4);
 }
 
-@keyframes chosenBossBreath {
-  0%, 100% { box-shadow: 0 0 14px rgba(245, 211, 120, 0.3); }
-  50% { box-shadow: 0 0 22px rgba(245, 211, 120, 0.55); }
-}
 
 /* Raid Party Setup & Echo Units */
 .raid-party-size {
@@ -684,7 +670,6 @@ button[data-depart="endless"] {
   cursor: pointer;
   transition: all 0.2s ease !important;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8) !important;
-  animation: endlessBeaconPulse 3.5s infinite ease-in-out;
 }
 
 button[data-depart="endless"]:hover {
@@ -698,18 +683,14 @@ button[data-depart="endless"]:active {
   box-shadow: 0 2px 0 #052627, 0 0 18px rgba(85, 227, 199, 0.5) !important;
 }
 
-@keyframes endlessBeaconPulse {
-  0%, 100% { box-shadow: 0 4px 0 #052627, 0 0 20px rgba(85, 227, 199, 0.4); }
-  50% { box-shadow: 0 4px 0 #052627, 0 0 34px rgba(85, 227, 199, 0.7); }
-}
 
 
 /* --------------------------------------------------------------------------
    3. THE UNDERWORLD MODALS (OBSIDIAN DIALOGS, JOURNAL & PROFILES)
    -------------------------------------------------------------------------- */
 
-/* General Dialog Frame (when not overridden by Boon Draft or Result Ceremony) */
-dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) {
+/* General dialog frame */
+dialog {
   background: radial-gradient(ellipse at 50% 0%, #1b262b 0%, #0d161a 70%, #060a0d 100%) !important;
   color: #d3dfd8 !important;
   border: 2px solid #786438 !important;
@@ -722,8 +703,8 @@ dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) {
 }
 
 /* Gilded filigree corners on modals */
-dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal))::before,
-dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal))::after {
+dialog::before,
+dialog::after {
   content: '✦';
   position: absolute;
   color: #f5d378;
@@ -731,18 +712,17 @@ dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal))::after {
   opacity: 0.6;
   pointer-events: none;
 }
-dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal))::before { top: 10px; left: 12px; }
-dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal))::after { bottom: 10px; right: 12px; }
+dialog::before { top: 10px; left: 12px; }
+dialog::after { bottom: 10px; right: 12px; }
 
 /* Modal Backdrop */
-dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal))::backdrop {
+dialog::backdrop {
   background: rgba(4, 8, 11, 0.88) !important;
   backdrop-filter: blur(6px) !important;
 }
 
 /* Modal Typography */
-dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) h2,
-#modal-title {
+dialog h2 {
   font-family: var(--pixel) !important;
   font-size: 15px !important;
   color: #f5d378 !important;
@@ -752,7 +732,7 @@ dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) h2,
   text-shadow: 0 0 10px rgba(245, 211, 120, 0.35);
 }
 
-dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) h3 {
+dialog h3 {
   font-family: var(--pixel) !important;
   font-size: 11px !important;
   color: #f5d378 !important;
@@ -760,8 +740,8 @@ dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) h3 {
   letter-spacing: 0.5px !important;
 }
 
-dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) > p,
-dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) section p {
+dialog > p,
+dialog section p {
   color: #bad1cb !important;
   font-size: 12px !important;
   line-height: 1.8 !important;
@@ -984,7 +964,7 @@ dialog button {
     padding: 16px !important;
   }
 
-  dialog:not(:has(.boon-draft-modal)):not(:has(.result-ceremony-modal)) {
+  dialog {
     width: calc(100vw - 20px) !important;
     padding: 22px 16px !important;
     max-height: 90dvh !important;

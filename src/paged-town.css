@@ -1,113 +1,3 @@
-/* Town layout: Clean spatial layout, sanctuary banner, and facility stations */
-.town-panorama {
-  position: relative;
-  height: 84px;
-  overflow: hidden;
-  background: #142921;
-  border: 1px solid var(--frame-border);
-  box-shadow: inset 0 0 24px rgba(0,0,0,0.5);
-  margin-bottom: 16px;
-}
-.town-panorama > img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  image-rendering: pixelated;
-  object-position: center 48%;
-  opacity: 0.65;
-  filter: brightness(0.9);
-}
-.town-caption {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 0 24px;
-  background: linear-gradient(90deg, rgba(12, 24, 20, 0.95) 0%, rgba(12, 24, 20, 0.7) 50%, transparent 100%);
-}
-.town-caption h1 {
-  font-size: 18px;
-  color: var(--gold);
-  margin: 2px 0 0;
-  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
-}
-.town-caption p {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-}
-.town-rest {
-  position: absolute;
-  right: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(18, 36, 29, 0.9);
-  border: 1px solid var(--green-dim);
-  color: var(--green-bright);
-  padding: 6px 12px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.town-rest::before {
-  content: '✦';
-  color: var(--green);
-}
-
-.town-layout {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 28px;
-}
-.town-sidebar {
-  padding: 0;
-  min-width: 0;
-}
-.town-sidebar > summary {
-  min-height: 44px;
-  cursor: pointer;
-  color: var(--gold);
-  padding: 10px;
-  font-weight: 600;
-}
-.town-content {
-  min-width: 0;
-}
-
-.facility-tabs {
-  display: flex;
-  gap: 8px;
-  border-bottom: 2px solid var(--line);
-  margin-bottom: 20px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.facility-tabs::-webkit-scrollbar {
-  display: none;
-}
-.facility-tabs button {
-  padding: 10px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-  border-bottom: 3px solid transparent;
-  white-space: nowrap;
-  min-height: 44px;
-}
-.facility-tabs button:hover {
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.03);
-}
-.facility-tabs button.active {
-  color: var(--gold);
-  border-bottom-color: var(--gold);
-  background: rgba(229, 198, 135, 0.08);
-}
-
 .section-heading {
   display: flex;
   justify-content: space-between;
@@ -201,27 +91,7 @@
   min-width: 140px;
 }
 
-@media(max-width:768px) {
-  .town-layout {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  .town-panorama {
-    height: 64px;
-  }
-  .town-caption {
-    padding: 0 14px;
-  }
-  .town-caption p {
-    display: none;
-  }
-  .town-rest {
-    display: none;
-  }
-}
 /* Town pages keep one decision visible at a time; collections use explicit pagination instead of a tall wall. */
-.town-content { min-width: 0; }
 .training-identity { display:flex; align-items:center; gap:18px; border-bottom:1px solid var(--line); padding-bottom:18px; }
 .training-identity > img { width:72px; height:78px; object-fit:contain; image-rendering:pixelated; background:#1c342b; border:1px solid #657553; }
 .training-identity h2 { margin:5px 0; }
@@ -384,10 +254,6 @@
   #town-screen .bestiary-list article > div {
     min-width: 0;
   }
-  #town-screen .zone-route {
-    max-height: none;
-    overflow: visible;
-  }
   #town-screen .bestiary-list {
     max-height: none;
     overflow: visible;
@@ -498,10 +364,6 @@
   }
   #town-screen .bestiary-list article > div {
     min-width: 0;
-  }
-  #town-screen .zone-route {
-    max-height: none;
-    overflow: visible;
   }
   #town-screen .bestiary-list {
     max-height: none;

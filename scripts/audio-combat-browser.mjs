@@ -38,6 +38,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
 
   // Enter Campaign encounter to test combat HUD and juice
   await click('[data-facility="campaign"]');
+  await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+  await click('[data-zone="0"]');
   await click('[data-depart="adventure"]');
   await wait('Boolean(window.gridbound.battle.status === "ready" && document.querySelector("#start"))');
 
@@ -119,6 +121,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
 
   // Depart into combat
   await click('[data-facility="campaign"]');
+  await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+  await click('[data-zone="0"]');
   await click('[data-depart="adventure"]');
   await wait('Boolean(window.gridbound.battle.status === "ready" && document.querySelector("#start"))');
 

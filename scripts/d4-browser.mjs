@@ -15,7 +15,6 @@ const freshBaseline = {
   storyClasses: ['warrior', 'healer', 'archer'],
 };
 const duplicateSelection = ['warrior', 'warrior', 'archer'];
-const defaultSelection = ['warrior', 'healer', 'archer'];
 
 const report = {
   test: 'D4 focused browser smoke',
@@ -170,7 +169,9 @@ async function runBrowserScenario() {
       });
 
       const leaveBattle = async () => {
-        await click('#battle-home');
+        await click('#retreat');
+        await wait('Boolean(document.querySelector("#modal #abandon-run"))', 10000);
+        await click('#abandon-run');
         await wait(townReady(), 10000);
       };
       const battleSummary = () => evaluate(`(() => {
@@ -197,6 +198,9 @@ async function runBrowserScenario() {
       })()`);
 
       const storyStarted = await action('depart Story baseline', async () => {
+        await click('.game-nav [data-facility="campaign"]');
+        await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+        await click('[data-zone="0"]');
         await click('[data-depart="adventure"]');
         await wait(battleReady('adventure'), 10000);
       });
@@ -215,7 +219,9 @@ async function runBrowserScenario() {
       }
 
       const raidOpened = await action('open Raid baseline', async () => {
-        await click('[data-view="raid"]');
+        await click('.game-nav [data-facility="campaign"]');
+        await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+        await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
         await wait('Boolean(document.querySelector("[data-depart=raid]"))', 10000);
       });
       const raidStarted = raidOpened && await action('depart Raid baseline', async () => {
@@ -237,7 +243,9 @@ async function runBrowserScenario() {
       }
 
       const rogueOpened = await action('open Roguelike setup', async () => {
-        await click('[data-view="endless"]');
+        await click('.game-nav [data-facility="campaign"]');
+        await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+        await click('.world-map-wrapper .expedition-mode-nav [data-facility="endless"]');
         await wait('document.querySelectorAll("[data-rogue-slot]").length === 3', 10000);
       });
       if (!rogueOpened) return;
@@ -366,7 +374,7 @@ async function runBrowserScenario() {
         addCheck('in-run Roguelike promotion/upgrade is available or its exact runtime blocker is reported', 'BLOCKED', exactRuntimeBlocker);
       }
 
-      const leftFirstRogue = await action('leave Roguelike and reset its disposable setup', leaveBattle);
+      const leftFirstRogue = await action('leave Roguelike and return to camp', leaveBattle);
       if (leftFirstRogue) {
         await check('leaving Roguelike does not mutate the Story profile', async () => {
           const after = await evaluate('window.gridbound.profile()');
@@ -374,41 +382,46 @@ async function runBrowserScenario() {
           return { unchanged: true, storyActive: after.storyActive, roster: after.roster };
         });
 
-        const resetSetup = await action('reopen Roguelike after leave', async () => {
-          await click('[data-view="endless"]');
+        const reopenedRogue = await action('reopen Roguelike after leaving', async () => {
+          await click('.game-nav [data-facility="campaign"]');
+          await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+          await click('.world-map-wrapper .expedition-mode-nav [data-facility="endless"]');
           await wait('document.querySelectorAll("[data-rogue-slot]").length === 3', 10000);
         });
-        if (resetSetup) {
-          await check('leaving Roguelike resets the disposable setup to defaults', async () => {
+        if (reopenedRogue) {
+          await check('leaving Roguelike preserves the selected recruit build', async () => {
             const values = await selectValues()(evaluate);
-            requireEqual(values, defaultSelection, 'fresh Roguelike setup after leave');
+            requireEqual(values, duplicateSelection, 'saved Roguelike build');
             return { values };
           });
 
-          const secondRun = await action('start and immediately leave a reset Roguelike run', async () => {
+          const secondRun = await action('start and immediately abandon the saved Roguelike build', async () => {
             await click('[data-depart="endless"]');
             await wait(battleReady('endless'), 10000);
-            await click('#battle-home');
+            await click('#retreat');
+            await wait('Boolean(document.querySelector("#modal #abandon-run"))', 10000);
+            await click('#abandon-run');
             await wait(townReady(), 10000);
           });
           if (secondRun) {
-            await check('resetting Roguelike does not mutate the Story profile', async () => {
+            await check('abandoning the repeat Roguelike run does not mutate the Story profile', async () => {
               const afterReset = await evaluate('window.gridbound.profile()');
-              requireEqual(afterReset, storyProfileBeforeRogue, 'persistent profile after Roguelike reset');
+              requireEqual(afterReset, storyProfileBeforeRogue, 'persistent profile after repeat Roguelike run');
               return { unchanged: true, storyActive: afterReset.storyActive, roster: afterReset.roster };
             });
           }
         }
       }
 
-      const postRogueStory = await action('recheck Story after Roguelike leave/reset', async () => {
-        await click('[data-view="campaign"]');
-        await wait('Boolean(document.querySelector("[data-depart=adventure]"))', 10000);
+      const postRogueStory = await action('recheck Story after abandoning Roguelike', async () => {
+        await click('.game-nav [data-facility="campaign"]');
+        await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+        await click('[data-zone="0"]');
         await click('[data-depart="adventure"]');
         await wait(battleReady('adventure'), 10000);
       });
       if (postRogueStory) {
-        await check('Story baseline remains intact after Roguelike reset', async () => {
+        await check('Story baseline remains intact after Roguelike abandonment', async () => {
           const actual = await battleSummary();
           requireEqual(actual.ids, freshBaseline.storyIds, 'post-Roguelike Story hero IDs');
           requireEqual(actual.names, freshBaseline.storyNames, 'post-Roguelike Story hero names');
@@ -419,14 +432,16 @@ async function runBrowserScenario() {
         await action('leave post-Roguelike Story check', leaveBattle);
       }
 
-      const postRogueRaid = await action('recheck Raid after Roguelike leave/reset', async () => {
-        await click('[data-view="raid"]');
+      const postRogueRaid = await action('recheck Raid after abandoning Roguelike', async () => {
+        await click('.game-nav [data-facility="campaign"]');
+        await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+        await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
         await wait('Boolean(document.querySelector("[data-depart=raid]"))', 10000);
         await click('[data-depart="raid"]');
         await wait(battleReady('raid'), 10000);
       });
       if (postRogueRaid) {
-        await check('Raid baseline remains intact after Roguelike reset', async () => {
+        await check('Raid baseline remains intact after Roguelike abandonment', async () => {
           const actual = await battleSummary();
           requireEqual(actual.ids, freshBaseline.storyIds, 'post-Roguelike Raid hero IDs');
           requireEqual(actual.names, freshBaseline.storyNames, 'post-Roguelike Raid hero names');

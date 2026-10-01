@@ -1,6 +1,6 @@
 /**
  * Procedural audio for Gridbound's forest-ruin combat.
- * Multi-oscillator synthesis, short impact cues, tactile UI tones, and an ambient battle drone.
+ * Short procedural combat and interface cues; background music is disabled.
  */
 
 export class Sound {
@@ -8,10 +8,6 @@ export class Sound {
   private ctx?: AudioContext;
   private last = -Infinity;
   private lastSupport = -Infinity;
-  private nextMusic = 0;
-  private note = 0;
-  private ambientOsc?: OscillatorNode;
-  private ambientGain?: GainNode;
 
   private castCue(kind: string) {
     if (kind === 'heal' || kind === 'regen') {
@@ -398,31 +394,4 @@ export class Sound {
     }
   }
 
-  /** Ambient Underworld melody and sub-drone */
-  music(active: boolean) {
-    if (!active || !this.enabled) {
-      if (this.ambientOsc) {
-        try {
-          this.ambientOsc.stop();
-          this.ambientOsc.disconnect();
-        } catch { /* cleanup */ }
-        this.ambientOsc = undefined;
-        this.ambientGain = undefined;
-      }
-      return;
-    }
-
-    const now = performance.now();
-    if (now < this.nextMusic) return;
-    this.nextMusic = now + 520;
-
-    const melody = [147, 0, 220, 0, 196, 0, 165, 0, 131, 0, 196, 0, 220, 0, 165, 196];
-    const n = melody[this.note++ % melody.length];
-    if (n) {
-      this.synthNote(n, 0.5, { type: 'triangle', volume: 0.01, attack: 0.02 });
-    }
-    if (this.note % 4 === 0) {
-      this.synthNote(73, 0.45, { type: 'sine', volume: 0.02, attack: 0.03 });
-    }
-  }
 }

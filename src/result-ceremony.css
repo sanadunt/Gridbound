@@ -1,53 +1,6 @@
-/* ============================================================
-   HADES-INSPIRED VICTORY, DEFEAT & EXPEDITION CEREMONY SCREEN
-   ============================================================ */
+/* Victory, defeat, and intermission result screens. */
 
-/* Expand modal for the ceremony on desktop while respecting mobile */
-dialog:has(.result-ceremony-modal) {
-  width: min(640px, calc(100vw - 28px)) !important;
-  max-width: 640px !important;
-  max-height: 94dvh !important;
-  padding: 20px 24px !important;
-  border-radius: 8px !important;
-  position: relative;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  box-sizing: border-box;
-}
-
-dialog:has(.result-ceremony-modal) > .modal-close {
-  display: none !important;
-}
-
-dialog:has(.result-ceremony-modal)::backdrop {
-  background: rgba(3, 7, 6, 0.93) !important;
-  backdrop-filter: blur(8px) !important;
-}
-
-/* --- THEMATIC BACKDROPS & BORDERS --- */
-
-/* 1. Victory Theme */
-dialog:has(.result-ceremony-modal.victory) {
-  background: radial-gradient(circle at 50% 12%, #1a3528 0%, #091712 60%, #030806 100%) !important;
-  border: 2px solid #8b7337 !important;
-  box-shadow: 0 0 0 4px #081510, 0 25px 90px rgba(0, 0, 0, 0.95), 0 0 55px rgba(240, 201, 104, 0.28) !important;
-}
-
-/* 2. Defeat Theme */
-dialog:has(.result-ceremony-modal.defeat) {
-  background: radial-gradient(circle at 50% 12%, #2c1212 0%, #130606 60%, #060202 100%) !important;
-  border: 2px solid #8b3737 !important;
-  box-shadow: 0 0 0 4px #140707, 0 25px 90px rgba(0, 0, 0, 0.95), 0 0 55px rgba(239, 68, 68, 0.25) !important;
-}
-
-/* 3. Wave Clear Theme */
-dialog:has(.result-ceremony-modal.wave-clear) {
-  background: radial-gradient(circle at 50% 12%, #142a22 0%, #08140f 60%, #030806 100%) !important;
-  border: 2px solid #3d6854 !important;
-  box-shadow: 0 0 0 4px #07120e, 0 25px 90px rgba(0, 0, 0, 0.95), 0 0 45px rgba(78, 201, 166, 0.22) !important;
-}
-
-/* --- MODAL WRAPPER & CORNER FILIGREES --- */
+/* --- RESULT PANEL & CORNER FILIGREES --- */
 .result-ceremony-modal {
   display: flex;
   flex-direction: column;
@@ -127,17 +80,12 @@ dialog:has(.result-ceremony-modal.wave-clear) {
   border-radius: 50%;
   border: 1px dashed currentColor;
   opacity: 0.4;
-  animation: hadesSpinAura 20s linear infinite;
   pointer-events: none;
 }
 .result-ceremony-modal.victory .ceremony-crest-aura { color: #f5d378; }
 .result-ceremony-modal.defeat .ceremony-crest-aura { color: #ef5350; }
 .result-ceremony-modal.wave-clear .ceremony-crest-aura { color: #55e3c7; }
 
-@keyframes hadesSpinAura {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
 
 /* --- CEREMONIAL HEADER & TYPOGRAPHY --- */
 .ceremony-header {
@@ -260,6 +208,21 @@ dialog:has(.result-ceremony-modal.wave-clear) {
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   margin: 2px 0;
+}
+.result-summary .result-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.result-details-stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.result-details-toggle {
+  padding: 8px 14px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
 }
 
 .stat-plaque {
@@ -478,19 +441,8 @@ dialog:has(.result-ceremony-modal.wave-clear) {
   color: #120e03;
   font-weight: 800;
   box-shadow: 0 0 10px rgba(245, 211, 120, 0.55);
-  animation: hadesLevelUpGlow 2s ease-in-out infinite alternate;
 }
 
-@keyframes hadesLevelUpGlow {
-  0% {
-    box-shadow: 0 0 6px rgba(245, 211, 120, 0.4);
-    filter: brightness(1);
-  }
-  100% {
-    box-shadow: 0 0 16px rgba(245, 211, 120, 0.85);
-    filter: brightness(1.15);
-  }
-}
 
 .xp-footnote {
   color: #8da497;
@@ -560,20 +512,9 @@ dialog:has(.result-ceremony-modal.wave-clear) {
   box-shadow: 0 0 22px rgba(245, 211, 120, 0.45);
 }
 
-/* Result gate status hint */
-#modal p[role="status"] {
-  font-size: 11px;
-  color: #8da497;
-  text-align: center;
-  margin: 4px 0 0;
-  opacity: 0.85;
-}
 
 /* --- MOBILE RESPONSIVE ADAPTATIONS --- */
 @media (max-width: 520px) {
-  dialog:has(.result-ceremony-modal) {
-    padding: 18px 14px !important;
-  }
 
   .ceremony-crest {
     width: 48px;
@@ -637,10 +578,6 @@ dialog:has(.result-ceremony-modal.wave-clear) {
 }
 
 @media (max-width: 240px) {
-  dialog:has(.result-ceremony-modal) {
-    width: calc(100vw - 16px) !important;
-    padding: 10px 8px !important;
-  }
 
   .result-ceremony-modal {
     width: 100%;

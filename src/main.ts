@@ -77,12 +77,8 @@ function animateTownEntrance() {
   if (!profile.motion) return;
   const town = $('town-screen');
   if (!town || town.hidden) return;
-  const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
-  tl.fromTo('.town-panorama', { opacity: 0, y: -16 }, { opacity: 1, y: 0, duration: 0.3, clearProps: 'all' })
-    .fromTo('.town-caption', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.25, clearProps: 'all' }, '-=0.15')
-    .fromTo('.facility-tabs button', { opacity: 0, y: -8 }, { opacity: 1, y: 0, stagger: 0.03, duration: 0.2, ease: 'back.out(1.4)', clearProps: 'all' }, '-=0.15')
-    .fromTo('.town-hero', { opacity: 0, x: -12 }, { opacity: 1, x: 0, stagger: 0.02, duration: 0.22, clearProps: 'all' }, '-=0.15')
-    .fromTo('.facility-panel-wrap', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.22, clearProps: 'all' }, '-=0.12');
+  gsap.fromTo('.camp-art', { opacity: 0.55, scale: 1.03 }, { opacity: 1, scale: 1, duration: 0.65, ease: 'power2.out', clearProps: 'all' });
+  gsap.fromTo('.camp-copy > *', { opacity: 0, y: 12 }, { opacity: 1, y: 0, stagger: 0.055, duration: 0.28, ease: 'power2.out', clearProps: 'all' });
 }
 function enterEmberhollow() {
   const titleScreen = $('title-screen');
@@ -149,8 +145,8 @@ type PartyHero = (typeof battle.heroes)[number];
 const partyHealthViews = new Map<number, PartyHealthView[]>();
 let resultGeneration: ResultGateGeneration | undefined;
 const townState: TownState = {
-  tab: 'campaign', hero: 0, zone: Math.min(profile.cleared.length, CAMPAIGN.length - 1), raid: 'golem', raidTier: 'bronze', raidModifiers: [], raidBuild: createRaidBuild(profile.roster, Math.min(3, profile.roster.length, 6)), notice: '',
-  trainingTab: 'talents', campaignPage: 0, questPage: 0, bestiaryPage: 0,
+  tab: 'camp', hero: 0, zone: Math.min(profile.cleared.length, CAMPAIGN.length - 1), raid: 'golem', raidTier: 'bronze', raidModifiers: [], raidBuild: createRaidBuild(profile.roster, Math.min(3, profile.roster.length, 6)), notice: '',
+  trainingTab: 'formation', campaignPage: 0, questPage: 0, bestiaryPage: 0,
 };
 
 $('app').innerHTML = `
@@ -159,16 +155,6 @@ $('app').innerHTML = `
     <img class="title-world-art" src="${titleWorld}" alt="" />
     <div class="title-vignette"></div>
     <div class="title-crest-glow"></div>
-    <div class="title-embers">
-      <span class="title-ember"></span>
-      <span class="title-ember"></span>
-      <span class="title-ember"></span>
-      <span class="title-ember"></span>
-      <span class="title-ember"></span>
-      <span class="title-ember"></span>
-      <span class="title-ember"></span>
-      <span class="title-ember"></span>
-    </div>
   </div>
   <div class="title-content">
     <div class="title-brand">
@@ -226,9 +212,8 @@ $('app').innerHTML = `
     </div>
   </footer>
 </section>
-<header class="site-header"><button class="brand" id="home" aria-label="Pulang ke Emberhollow"><span class="brand-mark" aria-hidden="true">${'<i></i>'.repeat(9)}</span><span>GRIDBOUND<small>ASHES OF THE BELL</small></span></button>
-  <nav class="mode-tabs" aria-label="Mode permainan"><button data-view="campaign" class="active">Town & story</button><button data-view="raid">Raid hunts</button><button data-view="endless">Roguelike</button></nav>
-  <div class="header-tools"><button id="profiles" class="secondary-button">Profiles / slots</button><b id="wallet" class="wallet">${currencyAmount('gold', profile.gold)}</b><b id="bank-wallet" class="wallet bank-wallet">${currencyAmount('crystal', profile.economy.commanderCrystal)}</b><button id="sound" class="icon-button" aria-label="Toggle audio" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="Settings">⚙</button></div>
+<header class="site-header"><button class="brand" id="home" aria-label="Return to Emberhollow"><span class="brand-mark" aria-hidden="true">${'<i></i>'.repeat(9)}</span><span>GRIDBOUND<small>ASHES OF THE BELL</small></span></button>
+  <div class="header-tools"><b id="wallet" class="wallet" aria-label="Gold">${currencyAmount('gold', profile.gold)}</b><b id="bank-wallet" class="wallet bank-wallet" aria-label="Commander Crystal">${currencyAmount('crystal', profile.economy.commanderCrystal)}</b><button id="sound" class="icon-button" aria-label="Toggle sound effects" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="Settings">⚙</button></div>
 </header>
   <main id="town-screen" class="town-screen"></main>
   <main id="battle-screen" class="game-layout" data-battle-view="arena" hidden>
@@ -275,7 +260,6 @@ $('app').innerHTML = `
             <div class="stagger-row"><span id="stagger-label">ARMOR</span><div class="stagger-track"><i id="stagger"></i></div><span id="clock">00:00</span></div>
           </div>
         </div>
-        <div id="banner" class="battle-banner" aria-live="polite"></div>
         <div id="intent" class="intent-panel" role="status" aria-live="polite"><b>No hostile intent</b><span>Perhatikan pola berikutnya.</span></div>
         <div class="lane-targets" aria-label="Pilih lane target">${['I', 'II', 'III'].map((label, i) => `<button data-lane="${i}" aria-label="Target lane ${i + 1}" aria-pressed="false">${label} <span>${['LEFT', 'CENTER', 'RIGHT'][i]}</span></button>`).join('')}</div>
       </div>
@@ -288,19 +272,18 @@ $('app').innerHTML = `
         <button id="start" class="gold-button">Begin encounter</button>
       </section>
       <div id="arena" class="arena">
+        <div id="banner" class="battle-banner" aria-live="polite"></div>
         <div id="game-canvas"></div>
         <div id="unit-layer"></div>
         <div class="rank-label front">FRONT</div><div class="rank-label middle">MID</div><div class="rank-label back">BACK</div>
         <div class="board-bottom"><span id="standing"></span><span id="move-tip">DRAG TO REPOSITION</span></div>
       </div>
       <section id="party-health-tray" class="party-health-tray" aria-label="Party health"></section>
-      <p class="tap-instruction"><b>Tap badan karakter</b> → cooldown lebih cepat · tombol kecil ↻ untuk ganti skill · drag untuk pindah</p>
       <div class="action-bar">
         <button id="guard" class="guard-button"><span>Party Guard<small id="guard-label">G · READY</small></span></button>
         <button id="potion" class="potion-button"><span>Mending mist<small id="potions">H · 2 CHARGES</small></span><b>2</b></button>
         <button id="ultimate" class="ultimate-button" disabled><i id="resolve-fill"></i><span>Ninefold Dawn<small id="resolve-label">R · RESOLVE</small></span></button>
       </div>
-      <div class="arena-footnote"><button id="battle-home">Return to town</button><button id="help-shortcut">Controls & counters</button></div>
     </section>
     <aside id="battle-details-panel" class="right-sidebar">
       <p id="battle-detail-pause-note" class="battle-detail-pause-note" role="status" hidden>
@@ -321,13 +304,24 @@ $('app').innerHTML = `
       </section>
     </aside>
   </main>
+  <main id="result-screen" class="result-screen" aria-labelledby="result-title" hidden></main>
   <footer id="storage-status" class="storage-status" role="status"></footer>
   <dialog id="modal" aria-labelledby="modal-title"></dialog>`;
 const modal = $<HTMLDialogElement>('modal');
+const resultScreen = $<HTMLElement>('result-screen');
+
+function modeForTownTab(tab: TownTab, fallback = commander.mode): CommanderMode {
+  if (tab === 'raid') return 'raid';
+  if (tab === 'endless') return 'roguelike';
+  if (tab === 'quests') return 'story';
+  if (tab === 'challenge-shop') return fallback === 'story' ? 'raid' : fallback;
+  if (tab === 'camp' || tab === 'more' || tab === 'bestiary') return fallback;
+  return 'story';
+}
 
 function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
-  const resetTownScroll = !inTown || tab !== townState.tab;
-  const nextMode: CommanderMode = tab === 'raid' ? 'raid' : tab === 'endless' ? 'roguelike' : 'story';
+  const routeChanged = tab !== townState.tab;
+  const nextMode = modeForTownTab(tab);
   if (commander.document && nextMode !== commander.mode) {
     commander.mode = nextMode;
     commander.document.activeMode = nextMode;
@@ -340,28 +334,28 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   townState.notice = notice;
   $('town-screen').hidden = false;
   $('battle-screen').hidden = true;
-  document.querySelectorAll<HTMLElement>('[data-view]').forEach(el => el.classList.toggle('active', el.dataset.view === (['party', 'bestiary', 'quests'].includes(tab) ? 'campaign' : tab)));
   renderTown($('town-screen'), profile, townState);
-  if (resetTownScroll) $('town-screen').scrollTop = 0;
+  if (routeChanged) {
+    const scene = $('town-screen').querySelector<HTMLElement>('.town-scene');
+    const heading = scene?.querySelector<HTMLElement>('h1') ?? scene;
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
+  }
   persist();
   if (animate && profile.motion) {
-    const panel = document.querySelector<HTMLElement>('.facility-panel-wrap');
-    if (panel) {
-      gsap.fromTo(panel, { opacity: 0, x: 16 }, { opacity: 1, x: 0, duration: 0.28, ease: 'power2.out', clearProps: 'all' });
-      if (tab === 'party') {
-        animateMirrorTalents();
-      } else if (tab === 'bestiary') {
-        animateCodexEntry();
-      } else if (tab === 'quests') {
-        animateProphecies();
-      } else if (tab === 'challenge-shop') {
-        animateChallengeShop();
-      } else if (tab === 'raid') {
-        animatePactRaid();
-      } else if (tab === 'endless') {
-        animateSunkenDescent();
-      }
+    if (tab === 'camp') animateTownEntrance();
+    else {
+      const panel = document.querySelector<HTMLElement>('.town-scene');
+      if (panel) gsap.fromTo(panel, { opacity: 0.7, y: 8 }, { opacity: 1, y: 0, duration: 0.24, ease: 'power2.out', clearProps: 'all' });
     }
+    if (tab === 'party' || tab === 'party-advanced') animateMirrorTalents();
+    else if (tab === 'bestiary') animateCodexEntry();
+    else if (tab === 'quests') animateProphecies();
+    else if (tab === 'challenge-shop') animateChallengeShop();
+    else if (tab === 'raid') animatePactRaid();
+    else if (tab === 'endless') animateSunkenDescent();
   }
 }
 $('town-screen').addEventListener('click', event => {
@@ -369,6 +363,12 @@ $('town-screen').addEventListener('click', event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
   if (!button || button.disabled || !inTown || commander.stale || pendingSettlement) return;
   sound.unlock();
+  if (button.dataset.openAction) {
+    if (button.dataset.openAction === 'journal') void storyJournal();
+    else if (button.dataset.openAction === 'profiles') void profilesMenu();
+    else if (button.dataset.openAction === 'settings') settings();
+    return;
+  }
   if (button.dataset.storyToggle !== undefined) {
     const id=Number(button.dataset.storyToggle);
     const ids=profile.storyActive.includes(id)?profile.storyActive.filter(hero=>hero!==id):[...profile.storyActive,id];
@@ -378,22 +378,24 @@ $('town-screen').addEventListener('click', event => {
   }
   if (button.dataset.facility) {
     townState.pendingGear = undefined;
-    showTown(button.dataset.facility as TownTab, '', true);
+    void navigateTown(button.dataset.facility as TownTab);
+    return;
   }
   if (button.dataset.talent) {
     const ok = buyTalent(profile, townState.hero, button.dataset.talent);
-    showTown('party', ok ? 'Talent dipelajari. Efek akan dibawa ke expedition berikutnya.' : 'Talent belum tersedia atau gold tidak cukup.', true);
+    showTown('party-advanced', ok ? 'Talent learned. Its effect will apply to the next expedition.' : 'Talent is unavailable or gold is insufficient.', true);
     return;
   }
   if (button.dataset.inspectTalent) {
     townState.selectedTalent = button.dataset.inspectTalent;
-    showTown('party');
+    showTown('party-advanced');
     return;
   }
-  if (button.dataset.branch) { townState.talentBranch = button.dataset.branch; townState.selectedTalent = undefined; showTown('party', '', true); return; }
+  if (button.dataset.branch) { townState.talentBranch = button.dataset.branch; townState.selectedTalent = undefined; showTown('party-advanced', '', true); return; }
   if (button.dataset.trainingTab) {
     townState.trainingTab = button.dataset.trainingTab as TownState['trainingTab'];
-    showTown('party', '', true);
+    townState.tab = button.dataset.trainingTab === 'overview' || button.dataset.trainingTab === 'jobs' || button.dataset.trainingTab === 'talents' ? 'party-advanced' : 'party';
+    showTown(townState.tab, '', true);
   }
   if (button.dataset.campaignPage) {
     const delta = Number(button.dataset.campaignPage);
@@ -416,7 +418,7 @@ $('town-screen').addEventListener('click', event => {
   if (button.dataset.townHero) {
     townState.hero = Number(button.dataset.townHero);
     townState.pendingGear = undefined;
-    showTown('party', '', true);
+    showTown(townState.tab === 'party-advanced' ? 'party-advanced' : 'party', '', true);
     if (profile.motion) {
       const heroBtn = document.querySelector<HTMLElement>(`[data-town-hero="${townState.hero}"]`);
       if (heroBtn) gsap.fromTo(heroBtn, { scale: 0.93 }, { scale: 1, duration: 0.22, ease: 'back.out(2)', clearProps: 'transform' });
@@ -437,11 +439,7 @@ $('town-screen').addEventListener('click', event => {
     townState.zone = Number(button.dataset.zone);
     townState.campaignPage = townState.zone;
     sound.clink();
-    showTown('campaign', '', true);
-    if (profile.motion) {
-      const pin = document.querySelector<HTMLElement>(`[data-zone="${townState.zone}"]`);
-      if (pin) gsap.fromTo(pin, { scale: 0.9 }, { scale: 1.18, duration: 0.22, ease: 'back.out(2)' });
-    }
+    showTown('mission', '', true);
     return;
   }
   if (button.dataset.raid) { townState.raid = button.dataset.raid; townState.raidSandbox = undefined; showTown('raid', '', true); return; }
@@ -476,15 +474,17 @@ $('town-screen').addEventListener('click', event => {
     showTown('party');
     return;
   }
-  if (button.dataset.promote) { const ok=promote(profile,townState.hero,button.dataset.promote);showTown('party',ok?'Job baru dipelajari. Pasang signature skill di slot aktif.':'Persyaratan promosi belum terpenuhi.'); }
+  if (button.dataset.promote) { const ok=promote(profile,townState.hero,button.dataset.promote);showTown('party-advanced',ok?'Job learned. Equip its signature skill in an active slot.':'Promotion requirements are not met.'); }
 
   if (button.dataset.formation) {
     moveFormation(profile, townState.hero, Number(button.dataset.formation));
     showTown('party', 'Formasi disimpan.');
   }
   if (button.hasAttribute('data-respec')) {
-    respecHero(profile, townState.hero);
-    showTown('party', 'Talent direset, gold dikembalikan. Dua skill dasar dipasang kembali.');
+    const reset = respecHero(profile, townState.hero);
+    showTown('party-advanced', reset
+      ? 'Talents and jobs reset. Gold refunded; two basic skills equipped.'
+      : 'No talents or job to reset.');
   }
   if(button.dataset.claimQuest){
     const questId = button.dataset.claimQuest;
@@ -679,6 +679,9 @@ function showReady() {
       ? 'HP dan potion tersisa dibawa ke wave ini. Periksa stance sebelum lanjut.'
       : 'Skill dan formasi siap. Tap hero untuk mempercepat cooldown.';
   $('start').textContent = 'Begin encounter';
+  if (profile.motion) {
+    gsap.fromTo('#start-overlay', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.26, ease: 'power2.out', clearProps: 'opacity,transform' });
+  }
 }
 async function begin() {
   if (inTown) return;
@@ -967,23 +970,21 @@ function openModal(content: string, pause = true) {
     sound.modalReveal();
     if (profile.motion) {
       gsap.fromTo(modal, { opacity: 0, scale: 0.94, y: -10 }, { opacity: 1, scale: 1, y: 0, duration: 0.22, ease: 'back.out(1.2)', clearProps: 'transform' });
-      if (!modal.querySelector('.result-ceremony-modal') && !modal.querySelector('.boon-draft-modal')) {
-        const targets = modal.querySelectorAll('h2, .help-rows p, .setting-row, section, .gold-button, .secondary-button');
-        if (targets.length) {
-          gsap.fromTo(targets, { opacity: 0, y: 8 }, { opacity: 1, y: 0, stagger: 0.03, duration: 0.2, ease: 'power2.out', clearProps: 'opacity,transform' });
-        }
+      const targets = modal.querySelectorAll('h2, .help-rows p, .setting-row, section, .gold-button, .secondary-button');
+      if (targets.length) {
+        gsap.fromTo(targets, { opacity: 0, y: 8 }, { opacity: 1, y: 0, stagger: 0.03, duration: 0.2, ease: 'power2.out', clearProps: 'opacity,transform' });
       }
     }
   }
   modal.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => modal.close()));
 }
-modal.addEventListener('close', () => { if (resumeOnClose && !inTown && battle.status === 'paused') battle.pause(); resumeOnClose = false; clearResultState(); });
+modal.addEventListener('close', () => { if (resumeOnClose && !inTown && battle.status === 'paused') battle.pause(); resumeOnClose = false; });
 function closeWithoutResume() { resumeOnClose = false; clearResultState(); if (modal.open) modal.close(); }
 function help() {
   openModal(`<span class="eyebrow">COMMANDER'S FIELD GUIDE</span><h2 id="modal-title">Every intent has an answer.</h2><div class="help-rows"><p><b>Tap / angka 1–9</b><br>Percepat cooldown hero di tile tersebut. Berganti fokus saat fatigue naik. Dua pointer didukung; drag tidak dihitung sebagai tap.</p><p><b>Skill / Q dan E</b><br>Ganti antara dua skill yang dipasang di town. Persentase cooldown dipertahankan, bukan direset.</p><p><b>Drag / Pindahkan karakter</b><br>Keluar dari ground AoE. Relokasi menambah cooldown 0,9 detik. Serangan marked tetap mengikuti hero: gunakan shield, heal, atau Guard.</p><p><b>Party Guard / G</b><br>Mitigasi seluruh party untuk window singkat. Tekan menjelang all-grid impact, jangan terlalu dini. Skill interrupt dapat membatalkan ritual.</p><p><b>Mending mist / H · Ninefold Dawn / R</b><br>Potion terbatas per expedition. Resolve mengisi serangan party. Jangan menunggu healer tumbang.</p><p><b>Lane I, II, III</b><br>Arahkan ranged skill ke minion. Klik lane yang sama lagi untuk kembali ke boss.</p></div><button class="gold-button" data-close>Kembali memimpin</button>`);
 }
 function settings() {
-  openModal(`<span class="eyebrow">CAMP SETTINGS</span><h2 id="modal-title">Your kind of adventure.</h2><label class="setting-row"><span><b>Suara & musik</b><small>Chiptune dan feedback skill.</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label><label class="setting-row"><span><b>Full motion & particles</b><small>Matikan untuk mengurangi gerakan dan screen shake.</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label><p>Save v3 menyimpan XP tiap hero, quest, talent, inventory dan formasi. Save v2 lama tetap utuh untuk rollback. Pertarungan berjalan tidak disimpan.</p><button id="export-save" class="secondary-button">Download backup save JSON</button><button class="gold-button" data-close>Kembali</button>`);
+  openModal(`<span class="eyebrow">CAMP SETTINGS</span><h2 id="modal-title">Your kind of adventure.</h2><label class="setting-row"><span><b>Efek suara pertarungan</b><small>Nada singkat untuk aksi; musik latar nonaktif.</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label><label class="setting-row"><span><b>Full motion & particles</b><small>Matikan untuk mengurangi gerakan dan screen shake.</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label><p>Save v3 menyimpan XP tiap hero, quest, talent, inventory dan formasi. Save v2 lama tetap utuh untuk rollback. Pertarungan berjalan tidak disimpan.</p><button id="export-save" class="secondary-button">Download backup save JSON</button><button class="gold-button" data-close>Kembali</button>`);
   $('export-save').addEventListener('click',exportCommander);
   $('setting-sound').addEventListener('change', e => { profile.sound = (e.target as HTMLInputElement).checked; updateSound(); });
   $('setting-motion').addEventListener('change', e => { profile.motion = (e.target as HTMLInputElement).checked; scene.reducedMotion = !profile.motion; document.body.classList.toggle('reduced-motion', !profile.motion); persist(); });
@@ -993,8 +994,9 @@ function pauseMenu() {
   if (inTown) return;
   if (['victory', 'defeat'].includes(battle.status)) { result(); return; }
   if (modal.open) { modal.close(); return; }
-  openModal(`<span class="eyebrow">TAKE A BREATH</span><h2 id="modal-title">The forest can wait.</h2><p>Simulasi berhenti selama dialog terbuka.</p><button class="gold-button" data-close>Lanjutkan</button><button id="pause-help" class="secondary-button">Kontrol & counter</button><button id="pause-retreat" class="secondary-button">Akhiri expedition · pulang</button>`);
+  openModal(`<span class="eyebrow">TAKE A BREATH</span><h2 id="modal-title">The forest can wait.</h2><p>Combat pauses while this menu is open.</p><button class="gold-button" data-close>Resume</button><button id="pause-help" class="secondary-button">Controls</button><button id="pause-settings" class="secondary-button">Sound & motion</button><button id="pause-retreat" class="secondary-button">Retreat · return to Camp</button>`);
   $('pause-help').addEventListener('click', help);
+  $('pause-settings').addEventListener('click', settings);
   $('pause-retreat').addEventListener('click', () => navigateTown());
 }
 const escapeUI = (value: string) => value.replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]!));
@@ -1066,39 +1068,51 @@ function showBoonTray() {
 
   openModal(content);
 }
-function navigateTown(tab: TownTab = 'campaign') {
+async function navigateTown(tab: TownTab = 'camp') {
+  const activateTargetMode = () => {
+    const activeCommander = commander.document;
+    if (!activeCommander) return;
+    const mode = modeForTownTab(tab);
+    if (mode !== commander.mode) activateCommander(activeCommander, mode, false);
+  };
   if (inTown) {
     if (commander.document) {
-      const mode: CommanderMode = tab === 'raid' ? 'raid' : tab === 'endless' ? 'roguelike' : 'story';
-      activateCommander(commander.document, mode);
+      if (!(await commander.flush())) { storageStatus(); return; }
+      activateTargetMode();
     }
-    showTown(tab);
+    showTown(tab, '', true);
     return;
   }
   void leaveSafely(async () => {
-    if (commander.document) {
-      await commander.flush();
-      const mode: CommanderMode = tab === 'raid' ? 'raid' : tab === 'endless' ? 'roguelike' : 'story';
-      activateCommander(commander.document, mode);
-    }
-    showTown(tab);
+    activateTargetMode();
+    showTown(tab, '', true);
   });
 }
 const resultGate = new ResultGate();
 let presentingResult = false;
 let resultRequest = 0;
 function clearResultState() {
-  delete modal.dataset.result;
+  delete resultScreen.dataset.result;
+  delete resultScreen.dataset.detailsOpen;
   resultGeneration = undefined;
   resultGate.close();
+  resultScreen.hidden = true;
+  resultScreen.innerHTML = '';
+  $('battle-screen').inert = false;
 }
-modal.addEventListener('click', event => {
-  if (modal.dataset.result === 'true' && !resultGate.allows(performance.now(), resultGeneration)) {
+function showResultScreen(content: string) {
+  clearResultState();
+  resultScreen.innerHTML = content;
+  resultScreen.hidden = false;
+  resultScreen.tabIndex = -1;
+  $('battle-screen').inert = true;
+  resultScreen.focus({ preventScroll: true });
+}
+resultScreen.addEventListener('click', event => {
+  if (resultScreen.dataset.result === 'true' && !resultGate.allows(performance.now(), resultGeneration)) {
     event.preventDefault(); event.stopImmediatePropagation();
   }
 }, true);
-modal.addEventListener('close', clearResultState);
-modal.addEventListener('cancel', event => { if(modal.dataset.result === 'true' && !resultGate.allows(performance.now(), resultGeneration)) event.preventDefault(); });
 
 type BoonMeta = {
   icon: string;
@@ -1140,7 +1154,7 @@ function getBoonMeta(id: string): BoonMeta {
 
 function animateBoonDraft() {
   if (!profile.motion) return;
-  const cards = modal.querySelectorAll('.boon-card');
+  const cards = resultScreen.querySelectorAll('.boon-card');
   if (!cards.length) return;
   gsap.fromTo(
     cards,
@@ -1159,7 +1173,7 @@ function animateBoonDraft() {
 
 function animateCeremony() {
   if (!profile.motion) return;
-  const modalEl = modal.querySelector('.result-ceremony-modal');
+  const modalEl = resultScreen.querySelector('.result-ceremony-modal');
   if (!modalEl) return;
   const crest = modalEl.querySelector('.ceremony-crest');
   const plaques = modalEl.querySelectorAll('.stat-plaque');
@@ -1222,6 +1236,8 @@ function animatePactRaid() {
   if (brief) {
     gsap.fromTo(brief, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.25, ease: 'power2.out', clearProps: 'opacity,transform' });
   }
+  const deploy = document.querySelector<HTMLElement>('.secondary-deploy');
+  if (deploy) gsap.fromTo(deploy, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.24, ease: 'power2.out', clearProps: 'opacity,transform' });
 }
 
 function animateSunkenDescent() {
@@ -1232,7 +1248,7 @@ function animateSunkenDescent() {
   }
   const slots = document.querySelectorAll<HTMLElement>('.loadout-slots label');
   if (slots.length) {
-    gsap.fromTo(slots, { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, stagger: 0.06, duration: 0.25, ease: 'back.out(1.2)', clearProps: 'opacity,transform' });
+    gsap.fromTo(slots, { opacity: 0 }, { opacity: 1, stagger: 0.06, duration: 0.25, ease: 'power2.out', clearProps: 'opacity' });
   }
   const cta = document.querySelector<HTMLElement>('button[data-depart="endless"]');
   if (cta) {
@@ -1249,19 +1265,22 @@ function result() {
     if (request !== resultRequest || inTown || battle !== current || battle.stage !== stage) return;
     if (await presentResult() === false) { presentingResult = false; return; }
     presentingResult = false;
-    modal.dataset.result = 'true';
+    resultScreen.dataset.result = 'true';
     const generation = resultGate.open(performance.now());
     resultGeneration = generation;
-    const buttons = Array.from(modal.querySelectorAll<HTMLButtonElement>('button'));
+    const buttons = Array.from(resultScreen.querySelectorAll<HTMLButtonElement>('button'));
     buttons.forEach(button => { button.disabled = true; });
-    const hint = document.createElement('p'); hint.setAttribute('role','status'); hint.textContent = 'Sebentar… opsi aktif dalam 1 detik.';
-    modal.append(hint);
-    modal.scrollTop = 0;
+    const hint = document.createElement('p');
+    hint.className = 'result-input-hint';
+    hint.setAttribute('role', 'status');
+    hint.textContent = 'Preparing the next step…';
+    resultScreen.append(hint);
+    resultScreen.scrollTop = 0;
     window.setTimeout(() => {
-      if (!modal.open || request !== resultRequest || battle !== current || battle.stage !== stage || !resultGate.allows(performance.now(), generation)) return;
+      if (resultScreen.hidden || request !== resultRequest || battle !== current || battle.stage !== stage || !resultGate.allows(performance.now(), generation)) return;
       buttons.forEach(button => { button.disabled = false; });
-      modal.scrollTop = 0;
-      delete modal.dataset.result;
+      resultScreen.scrollTop = 0;
+      delete resultScreen.dataset.result;
       resultGate.close();
       resultGeneration = undefined;
       hint.remove();
@@ -1356,10 +1375,10 @@ async function presentResult() {
       </button>`;
     }).join('');
 
-    openModal(`<div class="boon-draft-modal">
+    showResultScreen(`<div class="boon-draft-modal">
       <header class="boon-modal-header">
         <span class="eyebrow">✦ DIVINE OFFERING · FLOOR ${battle.floor} CLEARED ✦</span>
-        <h2 id="modal-title" class="boon-modal-title">THE PATRONS BESTOW THEIR FAVOR</h2>
+        <h2 id="result-title" class="boon-modal-title">THE PATRONS BESTOW THEIR FAVOR</h2>
         <p class="boon-modal-subtitle">Choose one divine blessing to guide the Bellkeepers deeper into the Sunken Bell. Its power endures until the expedition ends.</p>
         <div class="boon-run-wallet">
           <span>Purse: <b>${runWallet.crystal}</b> Crystal</span>
@@ -1376,7 +1395,7 @@ async function presentResult() {
       <footer class="boon-modal-footer">
         <button id="result-town" class="secondary-button">Abandon Run & Return to Emberhollow</button>
       </footer>
-    </div>`, false);
+    </div>`);
     animateBoonDraft();
   } else {
     const outcomeClass = won ? (moreWaves ? 'wave-clear' : 'victory') : 'defeat';
@@ -1417,7 +1436,7 @@ async function presentResult() {
         <small class="xp-footnote">Hero tumbang mendapat 60% XP. Bonus stat baru aktif expedition berikutnya. ${QUESTS.filter(q=>questProgress(profile,q).ready).length} quest siap diklaim di town.</small>
       </section>` : '';
 
-    openModal(`<div class="result-ceremony-modal ${outcomeClass}">
+    showResultScreen(`<div class="result-ceremony-modal ${outcomeClass}">
       <div class="ceremony-corner tl"></div>
       <div class="ceremony-corner tr"></div>
       <div class="ceremony-corner bl"></div>
@@ -1432,43 +1451,65 @@ async function presentResult() {
 
       <header class="ceremony-header">
         <span class="eyebrow">${eyebrowText}</span>
-        <h2 id="modal-title" class="ceremony-title">${titleText}</h2>
+        <h2 id="result-title" class="ceremony-title">${titleText}</h2>
         <div class="ceremony-divider"><span class="ceremony-div-gem">◆</span></div>
         <p class="ceremony-desc">${description}</p>
         ${recruited.length ? `<p class="recruit-notice">${recruited.join(' dan ')} bergabung dengan Bellkeepers. Rekan baru mengikuti level tengah party.</p>` : ''}
       </header>
 
-      ${xpCardsHtml}
 
-      <div class="result-stats">
-        <div class="stat-plaque">
-          <span class="stat-icon">⏱️</span>
-          <div class="stat-meta">
-            <b>${formatTime(battle.time)}</b>
-            <small>ELAPSED</small>
+      <section class="result-summary" aria-label="Outcome summary">
+        <div class="result-stats">
+          <div class="stat-plaque">
+            <span class="stat-icon">🛡️</span>
+            <div class="stat-meta">
+              <b>${battle.living().length}/${battle.heroes.length}</b>
+              <small>SURVIVORS</small>
+            </div>
+          </div>
+          <div class="stat-plaque gold">
+            <span class="stat-icon">🪙</span>
+            <div class="stat-meta">
+              <b>${goldDisplay}</b>
+              <small>${goldLabel}</small>
+            </div>
           </div>
         </div>
-        <div class="stat-plaque">
-          <span class="stat-icon">🛡️</span>
-          <div class="stat-meta">
-            <b>${battle.living().length}/${battle.heroes.length}</b>
-            <small>STANDING</small>
+      </section>
+
+      <section class="result-details" id="result-details" aria-label="Expedition details" hidden>
+        <div class="result-details-stats">
+          <div class="stat-plaque">
+            <span class="stat-icon">⏱️</span>
+            <div class="stat-meta">
+              <b>${formatTime(battle.time)}</b>
+              <small>ELAPSED</small>
+            </div>
           </div>
         </div>
-        <div class="stat-plaque gold">
-          <span class="stat-icon">🪙</span>
-          <div class="stat-meta">
-            <b>${goldDisplay}</b>
-            <small>${goldLabel}</small>
-          </div>
-        </div>
-      </div>
+        ${xpCardsHtml}
+      </section>
+
+      <button id="result-details-toggle" class="secondary-button result-details-toggle" type="button" aria-controls="result-details" aria-expanded="false">Details</button>
 
       <div class="ceremony-actions">
         ${moreWaves ? '<button id="next-wave" class="gold-button">Lanjut ke encounter berikutnya</button>' : '<button id="retry" class="secondary-button">Ulang expedition dari awal</button>'}
         <button id="result-town" class="${moreWaves ? 'secondary-button' : 'gold-button'}">${moreWaves ? 'Abandon loot & pulang' : 'Kembali ke Emberhollow'}</button>
       </div>
-    </div>`, false);
+
+
+    </div>`);
+    const detailsToggle = resultScreen.querySelector<HTMLButtonElement>('#result-details-toggle');
+    const detailsPanel = resultScreen.querySelector<HTMLElement>('#result-details');
+    detailsToggle?.addEventListener('click', () => {
+      const expanded = resultScreen.dataset.detailsOpen !== 'true';
+      resultScreen.dataset.detailsOpen = String(expanded);
+      detailsToggle.setAttribute('aria-expanded', String(expanded));
+      detailsToggle.textContent = expanded ? 'Back to result' : 'Details';
+      if (detailsPanel) detailsPanel.hidden = !expanded;
+      if (!expanded) resultScreen.scrollTop = 0;
+    });
+
     animateCeremony();
   }
   $('next-wave')?.addEventListener('click', () => {
@@ -1483,7 +1524,7 @@ async function presentResult() {
       frame(1);
     }
   });
-  modal.querySelectorAll<HTMLElement>('[data-boon]').forEach(el => el.addEventListener('click', () => {
+  resultScreen.querySelectorAll<HTMLElement>('[data-boon]').forEach(el => el.addEventListener('click', () => {
     const id = el.dataset.boon!;
     if (!offeredBoons.some(b => b.id === id)) return;
     runBoons.push(id);
@@ -1494,7 +1535,7 @@ async function presentResult() {
     void nextFloor();
   }));
   $('next-floor')?.addEventListener('click',()=>{closeWithoutResume();void nextFloor();});
-  modal.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
+  resultScreen.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
     const item = buyRunItem(runWallet, el.dataset.runBuy!);
     if (!item) return;
     if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
@@ -1505,7 +1546,7 @@ async function presentResult() {
     if (battle.mode === 'endless' && battle.status === 'paused') battle.pause();
     frame(1);
   }));
-  modal.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
+  resultScreen.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
     const item = buyRunItem(runWallet, el.dataset.runBuy!);
     if (!item) return;
     if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
@@ -1516,11 +1557,11 @@ async function presentResult() {
     if (battle.mode === 'endless' && battle.status === 'paused') battle.pause();
     frame(1);
   }));
-  modal.querySelector('[data-open-run-shop]')?.addEventListener('click', () => {
+  resultScreen.querySelector('[data-open-run-shop]')?.addEventListener('click', () => {
     const shop = document.createElement('section');
     shop.className = 'run-shop-modal';
     shop.innerHTML = `<h3>Journey shop · ${runWallet.crystal} Crystal</h3>${CHALLENGE_SHOP.map(item => `<button class="secondary-button" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${item.cost} RUN</button>`).join('')}`;
-    modal.querySelector('[data-open-run-shop]')?.replaceWith(shop);
+    resultScreen.querySelector('[data-open-run-shop]')?.replaceWith(shop);
     shop.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
       const item = buyRunItem(runWallet, el.dataset.runBuy!);
       if (!item) return;
@@ -1538,16 +1579,15 @@ async function presentResult() {
     void clearEncounter();
   });
   $('result-town').addEventListener('click', () => {
-    runBoons = [];
-    const tab: TownTab = battle.mode === 'adventure' ? 'campaign' : battle.mode === 'raid' ? 'raid' : 'endless';
-    if (battle.mode === 'adventure') {
-      if (commander.document) activateCommander(commander.document, 'story');
-      inTown = true;
-      closeWithoutResume();
-      showTown('campaign');
-    } else {
-      navigateTown(tab);
+    if (moreWaves || won && battle.mode === 'endless') {
+      navigateTown('camp');
+      return;
     }
+    runBoons = [];
+    if (battle.mode === 'adventure' && commander.document) activateCommander(commander.document, 'story');
+    closeWithoutResume();
+    inTown = true;
+    showTown('camp', '', true);
   });
 }
 
@@ -1610,7 +1650,7 @@ async function clearEncounter() {
       state.activeRun = undefined;
     }
   });
-  if (ok) { encounter = undefined; resetRunWallet(runWallet); }
+  if (ok) { encounter = undefined; runBoons = []; resetRunWallet(runWallet); }
   return ok;
 }
 async function nextFloor() {
@@ -1620,7 +1660,7 @@ async function nextFloor() {
   townState.rogueSetup = build;
   await checkpoint();
 }
-function activateCommander(document: CommanderDocument, mode = document.activeMode) {
+function activateCommander(document: CommanderDocument, mode = document.activeMode, renderTownAfterActivation = true) {
   profile = commander.select(document, mode);
   encounter = undefined; runBoons = []; runWallet = createRunWallet(); recorded = false; pendingSettlement = false;
   const rogue = storedStateFor(document, 'roguelike', 'auto');
@@ -1634,21 +1674,32 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
   sound.enabled = profile.sound; scene.reducedMotion = !profile.motion;
   $('sound').setAttribute('aria-pressed', String(profile.sound)); window.document.body.classList.toggle('reduced-motion', !profile.motion);
   updateTitleStatus();
-  if (inTown) showTown(mode === 'story' ? 'campaign' : mode === 'raid' ? 'raid' : 'endless');
+  if (inTown && renderTownAfterActivation) showTown(mode === 'story' ? 'camp' : mode === 'raid' ? 'raid' : 'endless');
 }
 async function leaveSafely(action: () => void | Promise<void>) {
   if (pendingSettlement || presentingResult || commander.stale) { storageStatus(); return; }
   if (!(await commander.flush())) { storageStatus(); return; }
-  if (inTown || !commander.document) { inTown = true; closeWithoutResume(); await action(); return; }
-  openModal('<h2 id="modal-title">Leave this encounter?</h2><p>Save & Suspend keeps the encounter-start checkpoint (same HP, supplies and RNG). Abandon ends this run without a new reward. Opening this menu changes nothing.</p><button id="suspend-run" class="gold-button">Save & Suspend</button><button id="abandon-run" class="secondary-button">Abandon run</button><button data-close class="secondary-button">Cancel</button>');
-  $('suspend-run').onclick = async () => {
-    if (commander.busy) return;
+  if (inTown) { closeWithoutResume(); await action(); return; }
+  const hasCommander = Boolean(commander.document);
+  openModal(hasCommander
+    ? '<h2 id="modal-title">Leave this encounter?</h2><p>Save & Suspend keeps the encounter-start checkpoint (same HP, supplies and RNG). Abandon ends this run without a new reward. Opening this menu changes nothing.</p><button id="suspend-run" class="gold-button">Save & Suspend</button><button id="abandon-run" class="secondary-button">Abandon run</button><button data-close class="secondary-button">Cancel</button>'
+    : '<h2 id="modal-title">Leave this encounter?</h2><p>There is no saved Commander checkpoint. Abandon ends this run without a reward; Cancel keeps the in-memory run active.</p><button id="abandon-run" class="secondary-button">Abandon run</button><button data-close class="secondary-button">Cancel</button>');
+  $('suspend-run')?.addEventListener('click', async () => {
+    if (!commander.document || commander.busy) return;
     if (await persist('auto', doc => { if (commander.mode !== 'story') { const state=commander.mode==='raid'?doc.raid:doc.rogue; if (state.activeRun) state.activeRun.status='suspended'; } })) { closeWithoutResume(); inTown = true; await action(); }
-  };
-  $('abandon-run').onclick = async () => {
+  });
+  $('abandon-run').addEventListener('click', async () => {
     if (commander.busy) return;
-    if (await clearEncounter()) { closeWithoutResume(); inTown = true; await action(); }
-  };
+    let cleared = true;
+    if (commander.document) cleared = await clearEncounter();
+    else {
+      encounter = undefined;
+      runBoons = [];
+      offeredBoons = [];
+      resetRunWallet(runWallet);
+    }
+    if (cleared) { closeWithoutResume(); inTown = true; await action(); }
+  });
 }
 function download(data: unknown, filename: string) {
   const url = URL.createObjectURL(new Blob([typeof data === 'string' ? data : JSON.stringify(data,null,2)], { type: 'application/json' }));
@@ -1714,34 +1765,28 @@ async function profilesMenu() {
   } catch(error) { console.error('PROFILES_MENU_ERROR:', error); openModal(`<h2 id="modal-title">Protected storage</h2><p>${escapeUI(String(error))}</p><p>No existing save was overwritten. Refresh with a compatible build.</p>`); }
 }
 commander.onStatus = () => { storageStatus(); if (commander.stale && battle.status === 'fighting') battle.pause(); };
-$('profiles').onclick = () => { void profilesMenu(); };
 window.addEventListener('beforeunload', () => {
   delete (window as unknown as { gridbound?: unknown }).gridbound;
 });
 if (typeof navigator !== 'undefined' && !navigator.webdriver) {
   window.addEventListener('beforeunload', event => { if (commander.busy || commander.dirty || pendingSettlement) event.preventDefault(); });
 }
-$('home').addEventListener('click', () => {
-  if (inTown) {
-    showTitleScreen();
-  } else {
-    navigateTown();
-  }
+ $('home').addEventListener('click', () => {
+  if (inTown) showTown('camp');
+  else navigateTown('camp');
 });
 $('title-enter').addEventListener('click', enterEmberhollow);
 $('title-profiles').addEventListener('click', () => { void profilesMenu(); });
 $('title-journal').addEventListener('click', () => { void storyJournal(); });
 $('title-settings').addEventListener('click', settings);
 $('retreat').addEventListener('click', () => navigateTown());
-$('battle-home').addEventListener('click', () => navigateTown());
 document.querySelectorAll<HTMLButtonElement>('.battle-view-tabs [data-battle-view]').forEach(button => button.addEventListener('click', () => setBattleView(button.dataset.battleView as 'arena' | 'hero' | 'log')));
 $('battle-detail-resume').addEventListener('click', () => setBattleView('arena'));
-document.querySelectorAll<HTMLElement>('[data-view]').forEach(el => el.addEventListener('click', () => navigateTown(el.dataset.view as TownTab)));
+// Expedition and preparation routes are handled by the Town screen's delegated actions.
 $('start').addEventListener('click', begin);
 $('pause').addEventListener('click', pauseMenu);
 $('combat-boons').addEventListener('click', showBoonTray);
 $('howto').addEventListener('click', help);
-$('help-shortcut').addEventListener('click', help);
 $('settings').addEventListener('click', settings);
 $('sound').addEventListener('click', () => { profile.sound = !profile.sound; updateSound(); });
 $('guard').addEventListener('click', () => battle.guard());
@@ -1766,7 +1811,11 @@ window.addEventListener('keydown', e => {
     }
     return;
   }
-  if (modal.open) { if (modal.dataset.result === 'true' && !resultGate.allows(performance.now(), resultGeneration)) { e.preventDefault(); return; } if (e.code === 'Escape' || (e.code === 'KeyB' && modal.querySelector('.boon-tray-modal'))) { e.preventDefault(); modal.close(); } return; }
+  if (modal.open) { if (e.code === 'Escape' || (e.code === 'KeyB' && modal.querySelector('.boon-tray-modal'))) { e.preventDefault(); modal.close(); } return; }
+  if (!resultScreen.hidden) {
+    if (e.code === 'Escape' && resultScreen.dataset.detailsOpen === 'true') resultScreen.querySelector<HTMLButtonElement>('#result-details-toggle')?.click();
+    return;
+  }
   if (inTown) return;
   const controlFocused = (e.target as HTMLElement).closest('button,a');
   if (e.code === 'Space' && !controlFocused) { e.preventDefault(); pauseMenu(); }

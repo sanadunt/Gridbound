@@ -25,6 +25,9 @@ try {
     await wait('window.gridbound?.scene?.textures?.exists("dragon-auric-0")');
 
     assert.deepEqual(await evaluate('window.gridbound.profile().storyActive'),[0,4,3]);
+    await click('.game-nav [data-facility="campaign"]');
+    await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+    await click('[data-zone="0"]');
     await click('[data-depart="adventure"]');
     assert.deepEqual(await evaluate('window.gridbound.battle.heroes.map(h=>h.id)'),[0,4,3]);
     await click('#start');
@@ -32,14 +35,30 @@ try {
     assert.ok(await evaluate('window.gridbound.battle.heroes.some(h=>h.acts>0)'));
     report.checks.push({name:'fresh3 real combat',ids:[0,4,3]});
     // Seed only this disposable origin, through the actual profile/recruitment functions.
-    await evaluate(`(async()=>{const {createProfile,completeZone}=await import('/src/game/profile.ts');const p=createProfile();for(let i=0;i<4;i++)completeZone(p,i);p.storyActive=[0,4,3,2,7,1];for(const id of p.storyActive)p.loadouts[id].xp=1000;localStorage.setItem('gridbound.v3',JSON.stringify(p));})()`);
+    await evaluate(`(async()=>{const {createProfile,completeZone}=await import('/src/game/profile.ts');const p=createProfile();p.motion=false;for(let i=0;i<4;i++)completeZone(p,i);p.storyActive=[0,4,3,2,7,1];for(const id of p.storyActive)p.loadouts[id].xp=1000;localStorage.setItem('gridbound.v3',JSON.stringify(p));})()`);
     await send('Page.reload');await wait('window.gridbound?.profile().roster.length===9');
+    await click('.game-nav [data-facility="more"]');
+    await wait('Boolean(document.querySelector(".more-scene"))');
+    await click('.more-scene [data-open-action="profiles"]');
+    await wait('Boolean(document.querySelector("#legacy-preview"))');
+    await click('#legacy-preview');
+    await wait('Boolean(document.querySelector("#legacy-confirm"))');
+    assert.equal(await evaluate('document.querySelector("#legacy-confirm").disabled'),false);
+    await click('#legacy-confirm');
+    await wait('!document.querySelector("dialog[open]")');
+    await wait('document.querySelector("#storage-status")?.textContent.includes("Commander revision") || document.querySelector("#storage-status")?.textContent.includes("Session-only: export")');
+    await wait('window.gridbound.profile().storyActive.length===6');
     const originalLoads=await evaluate('window.gridbound.profile().loadouts');
     await click('[data-facility="party"]');
     assert.equal(await evaluate('document.querySelectorAll("[data-story-toggle]").length'),9);
     assert.equal(await evaluate('document.querySelectorAll("[data-story-toggle]")[8].disabled'),true);
-    await click('[data-story-toggle="0"]');await click('[data-story-toggle="8"]');
     const selected=[4,3,2,7,1,8];
+    if(!await evaluate('Boolean(document.querySelector(".story-party")?.open)'))await click('.story-party summary');
+    await click('[data-story-toggle="0"]');
+    await wait('window.gridbound.profile().storyActive.length===5');
+    if(!await evaluate('Boolean(document.querySelector(".story-party")?.open)'))await click('.story-party summary');
+    await click('[data-story-toggle="8"]');
+    await wait(`JSON.stringify(window.gridbound.profile().storyActive)===${JSON.stringify(JSON.stringify(selected))}`);
     assert.deepEqual(await evaluate('window.gridbound.profile().storyActive'),selected);
     assert.deepEqual(await evaluate('window.gridbound.profile().loadouts'),originalLoads);
     await screenshot('artifacts/d3-town.png');
@@ -51,7 +70,12 @@ try {
     await send('Page.reload');await wait('window.gridbound?.profile?.()?.storyActive?.includes(8) === true');
     assert.deepEqual(await evaluate('window.gridbound.profile().storyActive'),selected);
     report.checks.push({name:'progressed9 select6, capped controls, swap, reload, retained9 loadouts, mobile390',ids:selected});
-    await click('[data-zone="0"]');await click('[data-depart="adventure"]');
+    await click('.game-nav [data-facility="campaign"]');
+    await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+    await click('.map-act-tab:nth-child(1)');
+    await wait('Boolean(document.querySelector(".biome-act-1"))');
+    await click('[data-zone="0"]');
+    await click('[data-depart="adventure"]');
     assert.deepEqual(await evaluate('window.gridbound.battle.heroes.map(h=>h.id)'),selected);
     assert.deepEqual(await evaluate('[...document.querySelectorAll(".unit-card")].map(el=>Number(el.dataset.hero))'),selected);
     const before=await evaluate('window.gridbound.profile()');
@@ -60,9 +84,14 @@ try {
       await click('#start');
       // Deterministic terminal fixture, not a balance or natural-victory claim.
       await evaluate('window.gridbound.battle.bossHp=0;window.gridbound.step(.05)');
-      await wait('document.querySelector("#modal").open && !document.querySelector("#modal button:disabled")');
-      if(stage<count-1)await click('#next-wave');
+      await wait('document.querySelector("#result-screen:not([hidden])") && document.querySelector("#result-screen button") && !document.querySelector("#result-screen button:disabled")');
+      if(stage<count-1) {
+        await click('#next-wave');
+        await wait('window.gridbound.battle.status === "ready" && document.querySelector("#result-screen").hidden');
+      }
     }
+    await click('#result-details-toggle');
+    assert.equal(await evaluate('!document.querySelector("#result-details").hidden'), true);
     assert.equal(await evaluate('document.querySelectorAll("[data-xp-kind=active]").length'),6);
     assert.equal(await evaluate('document.querySelectorAll("[data-xp-kind=bench]").length'),3);
     const after=await evaluate('window.gridbound.profile()');
@@ -75,16 +104,34 @@ try {
     await screenshot('artifacts/d3-results.png');
     report.checks.push({name:'replay chapter1 six active IDs, four wave transitions, active/bench result distinction, settlement once',deltas});
     await click('#retry');assert.deepEqual(await evaluate('window.gridbound.battle.heroes.map(h=>h.id)'),selected);
-    await click('#battle-home');
+    await click('#retreat');
+    await wait('Boolean(document.querySelector("#modal")?.open && document.querySelector("#modal #abandon-run")?.getBoundingClientRect().width > 0 && document.querySelector("#modal #abandon-run")?.getBoundingClientRect().height > 0 && !document.querySelector("#modal #abandon-run")?.disabled)');
+    await click('#abandon-run');
+    await wait('window.gridbound?.inTown');
     await send('Page.reload');await wait('window.gridbound?.inTown');
     assert.deepEqual(await evaluate('window.gridbound.profile().loadouts'),after.loadouts);
     assert.deepEqual(await evaluate('window.gridbound.profile().storyActive'),selected);
     for(const mode of ['raid','endless']) {
-      await click(`[data-view="${mode}"]`);await click(`[data-depart="${mode}"]`);
-      assert.equal(await evaluate('window.gridbound.battle.heroes.length'),9);
-      await click('#battle-home');
+      await click('.game-nav [data-facility="campaign"]');
+      await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+      await click(`.world-map-wrapper .expedition-mode-nav [data-facility="${mode}"]`);
+      await wait(`Boolean(document.querySelector('[data-depart="${mode}"]'))`);
+      await click(`[data-depart="${mode}"]`);
+      await wait(`window.gridbound.battle.mode===${JSON.stringify(mode)}`);
+      if(mode==='raid') {
+        const raid=await evaluate('({heroes:window.gridbound.battle.heroes.length,slots:window.gridbound.battle.raidBuild?.slots.length})');
+        assert.equal(raid.heroes,raid.slots);
+        assert.ok(raid.heroes>0&&raid.heroes<=6);
+      } else {
+        const rogue=await evaluate('({heroes:window.gridbound.battle.heroes.length,recruits:window.gridbound.battle.rogueBuild?.recruits.length})');
+        assert.deepEqual([rogue.heroes,rogue.recruits],[3,3]);
+      }
+      await click('#retreat');
+      await wait('Boolean(document.querySelector("#modal")?.open && document.querySelector("#modal #abandon-run")?.getBoundingClientRect().width > 0 && document.querySelector("#modal #abandon-run")?.getBoundingClientRect().height > 0 && !document.querySelector("#modal #abandon-run")?.disabled)');
+      await click('#abandon-run');
+      await wait('window.gridbound?.inTown');
     }
-    report.checks.push({name:'retry/reload XP persistence; Raid and Rogue retain baseline nine'});
+    report.checks.push({name:'retry/reload XP persistence; Raid configured roster limit and three-recruit Roguelike'});
     assert.deepEqual(errors,[]);
     report.consoleErrors=[...errors];
   });

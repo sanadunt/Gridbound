@@ -91,7 +91,7 @@ export class BattleScene extends Phaser.Scene {
  update(_time:number,delta:number){
   const dt=Math.min(delta/1000,.1);this.age+=dt;
   if(this.battle.status==='fighting'){this.accumulator+=dt;while(this.accumulator>=1/60){this.battle.tick(1/60);this.accumulator-=1/60;}}
-  const events=this.battle.drain();events.forEach(e=>{this.event(e);this.soundBox.play(this.soundKind(e));});this.soundBox.music(this.battle.status==='fighting');
+  const events=this.battle.drain();events.forEach(e=>{this.event(e);this.soundBox.play(this.soundKind(e));});
   this.advanceEnemyDeathAnimation(dt);
   this.draw(dt);this.onFrame(dt);
  }

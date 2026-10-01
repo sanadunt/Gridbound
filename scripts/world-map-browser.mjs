@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { withBrowser } from './browser-harness.mjs';
 
-const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5173/';
+const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5180/';
 const qaProfile = {
   version: 3,
   gold: 1500,
@@ -38,6 +38,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await send('Page.reload');
   await wait('window.gridbound && document.querySelector("canvas")');
   await wait('Boolean(document.querySelector("#town-screen:not([hidden])"))');
+  await click('.game-nav [data-facility="campaign"]');
+  await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
 
   const cleared = await evaluate('window.gridbound.profile().cleared');
   console.log('Profile cleared:', JSON.stringify(cleared));
@@ -68,34 +70,44 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   const bossAdversary = await evaluate('document.querySelector(".boss-intel h4").textContent');
   assert.match(bossAdversary, /Vharok/, 'Boss adversary must be Vharok');
 
-  // Navigate back to Act II
-  await click('.map-act-tab:nth-child(2)');
-  await wait('document.querySelector(".biome-act-2")');
+  // Return from the dossier, then switch to Act II.
+  await click('.mission-map-return');
+  await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
+  await click('[data-act="1"]');
+  await wait('Boolean(document.querySelector(".world-map-wrapper.biome-act-2"))');
 
   // In Act II, Ch 5 (zone 4) is cleared, Ch 6 (zone 5) is active
   const ch6TitleAttr = await evaluate('document.querySelector("[data-zone=\\"5\\"]").title');
   assert.match(ch6TitleAttr, /Glass Ferry/, 'Chapter 6 must be Glass Ferry');
 
-  // Click on Chapter 6
+  // Click on Chapter 6 to open its dossier.
   await click('[data-zone="5"]');
+  await wait('document.querySelector(".mission-brief h3")?.textContent.includes("Glass Ferry")');
   const ch6Title = await evaluate('document.querySelector(".mission-brief h3").textContent');
   assert.match(ch6Title, /Glass Ferry/);
 
+  // Return to the route map; chapter steppers are hidden in the mission dossier.
+  await click('.mission-map-return');
+  await wait('Boolean(document.querySelector(".world-map-wrapper.map-view"))');
+
   // Test chapter stepper buttons
   await click('[data-campaign-page="-1"]');
+  await wait('document.querySelector(".mission-brief h3")?.textContent.includes("Empty Census")');
   const prevTitle = await evaluate('document.querySelector(".mission-brief h3").textContent');
   assert.match(prevTitle, /Empty Census/, 'Stepper must move back to Empty Census');
 
   await click('[data-campaign-page="1"]');
+  await wait('document.querySelector(".mission-brief h3")?.textContent.includes("Glass Ferry")');
   const nextTitle = await evaluate('document.querySelector(".mission-brief h3").textContent');
   assert.match(nextTitle, /Glass Ferry/, 'Stepper must move forward to Glass Ferry');
-
   // Check zero document scroll
   const scrollH = await evaluate('document.documentElement.scrollHeight');
   const innerH = await evaluate('window.innerHeight');
   assert.ok(scrollH <= innerH + 1, `Desktop scrollHeight (${scrollH}) must fit innerHeight (${innerH})`);
 
-  // Verify departure from world map works
+  // Open the mission dossier before using its departure action.
+  await click('[data-zone="5"]');
+  await wait('Boolean(document.querySelector(".world-map-wrapper.mission-view"))');
   await click('[data-depart="adventure"]');
   await wait('window.gridbound.battle.status === "ready" && document.querySelector("#start")');
   console.log('PASS: Successfully entered expedition from World Map selection');
@@ -113,6 +125,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await send('Page.reload');
   await wait('window.gridbound && document.querySelector("canvas")');
   await wait('Boolean(document.querySelector("#town-screen:not([hidden])"))');
+  await click('.game-nav [data-facility="campaign"]');
+  await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
 
   // Assert mobile fit
   const scrollW = await evaluate('document.documentElement.scrollWidth');
@@ -132,5 +146,35 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   assert.deepEqual(errors, []);
   console.log('PASS Mobile World Map');
 }, { width: 390, height: 844, mobile: true });
+
+console.log('--- Testing World Map System (Short Mobile 360x390) ---');
+await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) => {
+  await send('Page.navigate', { url });
+  await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")');
+  await evaluate('window.gridbound.hideTitle()');
+  await wait('document.querySelector("#title-screen").hidden');
+  await click('.game-nav [data-facility="campaign"]');
+  await wait('Boolean(document.querySelector(".world-map-wrapper.map-view"))');
+
+  const clippedMap = await evaluate(`(() => {
+    const wrapper = document.querySelector('.world-map-wrapper');
+    return { overflowY: getComputedStyle(wrapper).overflowY, scrollHeight: wrapper.scrollHeight, clientHeight: wrapper.clientHeight };
+  })()`);
+  assert.equal(clippedMap.overflowY, 'auto', `Short map viewport must offer vertical scrolling: ${JSON.stringify(clippedMap)}`);
+  assert.ok(clippedMap.scrollHeight > clippedMap.clientHeight, `Map content must retain its scroll range: ${JSON.stringify(clippedMap)}`);
+  await evaluate(`(() => { const wrapper = document.querySelector('.world-map-wrapper'); wrapper.scrollTop = wrapper.scrollHeight; })()`);
+  const pin = await evaluate(`(() => {
+    const wrapper = document.querySelector('.world-map-wrapper').getBoundingClientRect();
+    const target = document.querySelector('[data-zone="0"]').getBoundingClientRect();
+    return { left: target.left, right: target.right, top: target.top, bottom: target.bottom, wrapperTop: wrapper.top, wrapperBottom: wrapper.bottom };
+  })()`);
+  assert.ok(pin.top >= pin.wrapperTop && pin.bottom <= pin.wrapperBottom,
+    `A route pin remains reachable after scrolling at 360×390: ${JSON.stringify(pin)}`);
+  await screenshot('artifacts/world-map-short-mobile-360x390.png');
+  await click('[data-zone="0"]');
+  await wait('Boolean(document.querySelector(".world-map-wrapper.mission-view .world-map-dossier"))');
+  assert.deepEqual(errors, []);
+  console.log('PASS Short mobile World Map 360×390');
+}, { width: 360, height: 390, mobile: true });
 
 console.log('ALL WORLD MAP BROWSER TESTS PASSED!');

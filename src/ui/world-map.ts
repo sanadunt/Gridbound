@@ -115,8 +115,9 @@ export function renderWorldMap(p: Profile, state: TownState): string {
   const totalCleared = p.cleared.length;
 
   return `
-    <div class="world-map-wrapper ${act.biomeClass}" aria-label="Campaign World Map">
-      <!-- Top Act Navigation Bar -->
+    <div class="world-map-wrapper ${act.biomeClass} ${state.tab === 'mission' ? 'mission-view' : 'map-view'}" aria-label="Campaign World Map">
+      <nav class="expedition-mode-nav" aria-label="Expedition mode"><button data-facility="campaign" aria-current="page">Campaign</button><button data-facility="raid">Raid hunts</button><button data-facility="endless">Roguelike</button></nav>
+      ${state.tab === 'mission' ? '<button class="mission-map-return" data-facility="campaign"><span aria-hidden="true">←</span> Back to route map</button>' : ''}
       <div class="map-top-bar">
         <div class="map-title-block">
           <div class="eyebrow"><span class="eyebrow-pip">◆</span> CARTOGRAPHY WAR TABLE · ${act.roman} <span class="eyebrow-pip">◆</span></div>
@@ -243,7 +244,6 @@ export function renderWorldMap(p: Profile, state: TownState): string {
                             ${isUnlocked ? '' : 'disabled'}
                             aria-label="Chapter ${zoneIdx + 1}: ${zDef.name} (${stateClass})"
                             title="${zDef.name} · ${isCleared ? 'SEAL RESTORED' : isUnlocked ? 'AVAILABLE' : 'LOCKED'}">
-                      <span class="map-beacon-pulse" aria-hidden="true"></span>
                       <span class="map-node-icon" aria-hidden="true">
                         ${isCleared ? '⚜' : isClimax ? '👑' : isUnlocked ? '✦' : '🔒'}
                       </span>
@@ -297,7 +297,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
             <div class="boss-intel">
               <span class="eyebrow"><span class="eyebrow-pip">◆</span> CLIMAX ADVERSARY <span class="eyebrow-pip">◆</span></span>
               <h4>${bossDef.name}</h4>
-              <small class="boss-title">${bossDef.title}</small>
+              <small class="dossier-boss-title">${bossDef.title}</small>
               <div class="boss-intent-flow" aria-label="Intent sequence">
                 ${bossDef.patterns.map((intent, i) => `
                   <span class="intent-chip intent-${intent}">

@@ -689,13 +689,8 @@
   font-size: 28px;
   color: #4a6c58;
   margin-bottom: 8px;
-  animation: emptySigilPulse 2.5s infinite ease-in-out;
 }
 
-@keyframes emptySigilPulse {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.15); color: #7ee0bb; }
-}
 
 .boon-tray-empty p {
   font-family: var(--pixel);

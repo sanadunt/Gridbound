@@ -67,7 +67,7 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
     };
     const key = async (key, code = key) => {
       const virtual = ({Escape:27,Enter:13,' ':32,Tab:9,ArrowLeft:37,ArrowRight:39})[key] || (key.length===1 ? key.toUpperCase().charCodeAt(0) : 0);
-      await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode:virtual, nativeVirtualKeyCode:virtual });
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, text: key === 'Enter' ? '\r' : key === ' ' ? ' ' : undefined, windowsVirtualKeyCode:virtual, nativeVirtualKeyCode:virtual });
       await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode:virtual, nativeVirtualKeyCode:virtual });
     };
     const screenshot = async path => {

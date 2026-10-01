@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import {withBrowser} from './browser-harness.mjs';
-for(const width of [390,768,1440]) await withBrowser(async({send,wait,evaluate,screenshot,errors})=>{
+for(const width of [390,768,1440]) await withBrowser(async({send,wait,evaluate,screenshot,click,errors})=>{
  await send('Page.navigate',{url:'http://127.0.0.1:5187/'});
  await wait('Boolean(document.querySelector("#wallet"))');
- if (!await evaluate('Boolean(document.querySelector("#commander-name"))')) await evaluate('document.querySelector("#profiles")?.click()');
+ if (!await evaluate('Boolean(document.querySelector("#commander-name"))')) {
+  if (await evaluate('Boolean(document.querySelector("#title-screen:not([hidden])"))')) await click('#title-profiles');
+  else { await click('.game-nav [data-facility="more"]'); await wait('Boolean(document.querySelector(".more-scene"))'); await click('.more-scene [data-open-action="profiles"]'); }
+ }
  await wait('Boolean(document.querySelector("#commander-name"))');
  await evaluate('document.fonts.ready');
  await evaluate('document.querySelectorAll("dialog[open]").forEach(d=>d.close())');
