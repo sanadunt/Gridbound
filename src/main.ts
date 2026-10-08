@@ -42,6 +42,8 @@ let encounter: NonNullable<CommanderDocument['encounters']>[CommanderMode];
 let pendingSettlement = false;
 if (matchMedia('(prefers-reduced-motion: reduce)').matches) profile.motion = false;
 let storageFailed = false;
+const heroName = (h: { name: string }) => eventText(h.name, lang());
+const stageLabel = () => eventText(battle.stageName, lang());
 const modeName = (mode: CommanderMode) => t(mode === 'story' ? 'mode.campaign' : mode === 'raid' ? 'mode.raid' : 'mode.endless');
 function updateTitleStatus() {
   const nameEl = $('title-commander-name');
@@ -584,7 +586,7 @@ function updateExpedition() {
   const runShopHost = document.getElementById('run-shop-host');
   if (runShopHost) runShopHost.innerHTML = battle.mode === 'endless' && battle.status === 'ready' ? CHALLENGE_SHOP.map(item => `<button class="btn" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${item.cost} ◇</button>`).join('') : '';
   $('mode-label').textContent = battle.mode === 'adventure' ? t('battle.chapter', { n: battle.floor }) : battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : t('mode.raid');
-  $('encounter-label').textContent = battle.stageName;
+  $('encounter-label').textContent = stageLabel();
   $('boss-name').textContent = battle.enemyName;
   $('boss-title').textContent = battle.enemyTitle;
   $('expedition-label').textContent = battle.mode === 'adventure' ? t('mode.campaign') : battle.mode === 'endless' ? t('route.endless') : t('mode.raid');
@@ -600,7 +602,7 @@ function updateExpedition() {
 }
 function showReady() {
   $('start-overlay').hidden = false;
-  $('ready-label').textContent = battle.stageCount > 1 ? `${t('map.wave', { n: battle.stage + 1 })}/${battle.stageCount} · ${battle.stageName}` : battle.stageName;
+  $('ready-label').textContent = battle.stageCount > 1 ? `${t('map.wave', { n: battle.stage + 1 })}/${battle.stageCount} · ${stageLabel()}` : stageLabel();
   $('ready-title').textContent = battle.stage > 0 ? t('ready.title.next') : t('ready.title.first', { name: battle.enemyName });
   $('ready-copy').textContent = battle.stage > 0 ? t('ready.copy.next') : battle.mode === 'adventure' ? t('ready.copy.story') : t('ready.copy.other');
   $('start').textContent = t('battle.begin');
@@ -626,9 +628,9 @@ function renderPartyHealthTray() {
   for (const trayId of ['party-health-tray', 'details-party-health-tray']) {
     const host = $(trayId);
     host.dataset.count = String(battle.heroes.length);
-    host.innerHTML = battle.heroes.map(h => `<button type="button" class="party-health-card" data-party-hero="${h.id}" aria-pressed="false" aria-label="${h.name}">
+    host.innerHTML = battle.heroes.map(h => `<button type="button" class="party-health-card" data-party-hero="${h.id}" aria-pressed="false" aria-label="${heroName(h)}">
       <img class="party-face" src="${portrait(h.classId)}" alt=""/>
-      <span class="party-hero-name">${h.name}</span>
+      <span class="party-hero-name">${heroName(h)}</span>
       <span class="party-health-values"><span class="party-hp"><small>HP</small> <b class="party-hp-value">${Math.ceil(h.hp)}</b><small>/${h.maxHp}</small></span><span class="party-sh">SH <b class="party-shield-value">${Math.round(h.shield)}</b></span></span>
       <span class="party-health-meter" aria-hidden="true"><i></i><em></em></span>
       <span class="party-atb" aria-hidden="true"><i></i></span><span class="party-cooldown"></span>
@@ -673,13 +675,13 @@ function updatePartyHealthView(h: PartyHero) {
     view.button.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
     view.button.classList.toggle('charged', h.hp > 0 && charge > .97);
     view.button.setAttribute('aria-pressed', String(h.id === battle.selected));
-    view.button.setAttribute('aria-label', t('battle.hero.aria', { name: h.name, hp, max: h.maxHp, shield, status }));
+    view.button.setAttribute('aria-label', t('battle.hero.aria', { name: heroName(h), hp, max: h.maxHp, shield, status }));
   }
 }
 function makeUnits() {
   $('unit-layer').innerHTML = battle.heroes.map(h => {
     const p = cell(h.slot);
-    return `<div class="unit-card" data-hero="${h.id}" style="left:${p.x / 6}%;top:${p.y / 7.6}%;width:24%;height:${120 / 7.6}%;--class-color:${KITS[h.classId].color}"><button class="unit-tap" data-tap="${h.id}" aria-label="${t('battle.tap.aria', { name: h.name })}"><span class="unit-name">${h.name}</span><span class="tap-flash">${t('battle.tempo')}</span></button></div>`;
+    return `<div class="unit-card" data-hero="${h.id}" style="left:${p.x / 6}%;top:${p.y / 7.6}%;width:24%;height:${120 / 7.6}%;--class-color:${KITS[h.classId].color}"><button class="unit-tap" data-tap="${h.id}" aria-label="${t('battle.tap.aria', { name: heroName(h) })}"><span class="unit-name">${heroName(h)}</span><span class="tap-flash">${t('battle.tempo')}</span></button></div>`;
   }).join('');
   $('unit-layer').querySelectorAll<HTMLElement>('[data-tap]').forEach(el => bindPointer(el, Number(el.dataset.tap)));
   renderPartyHealthTray();
@@ -790,7 +792,7 @@ function renderInspector() {
   const key = `${h.id}-${h.stance}-${moveMode}-${battle.status}`;
   if (key === selectedKey) return;
   selectedKey = key;
-  $('inspector').innerHTML = `<div class="hero-identity"><div class="portrait-frame"><img src="${portrait(h.classId)}" alt="${h.name}"/><span>LV ${h.level}</span></div><div><small class="hero-class">${k.name}</small><h2>${h.name}</h2><p>${k.role}</p></div></div><div class="hero-stats"><span>HP <b id="selected-hp"></b></span><span>SH <b id="selected-shield"></b></span></div><h4 class="subheading stance-label">${t('battle.skills')} <span>${t('battle.autocast')}</span></h4><div class="stance-options">${battle.availableSkills(h.id).map(i => { const s = k.skills[i]; return `<button data-select-stance="${i}" class="stance-option ${h.stance === i ? 'chosen' : ''}" aria-pressed="${h.stance === i}" ${!['ready', 'fighting'].includes(battle.status) || h.hp <= 0 ? 'disabled' : ''}><span><b>${s.name}</b><small>${s.label} · ${s.cooldown.toFixed(1)}s</small></span><i>${h.stance === i ? '●' : '○'}</i></button>`; }).join('')}</div><p class="skill-description">${k.skills[h.stance].description}</p><div class="focus-meter"><div><span>${t('battle.fatigue')}</span><span id="fatigue-label"></span></div><span class="gauge"><i id="fatigue-fill"></i></span></div><button id="move-selected" class="btn move-button">${moveMode ? t('battle.move.pick') : t('battle.move')}<small>+0.9s</small></button><div class="move-grid" ${moveMode ? '' : 'hidden'}>${Array.from({ length: 9 }, (_, i) => `<button data-move-slot="${i}" aria-label="${t('formation.tile', { n: i + 1 })}" ${i === h.slot ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>`;
+  $('inspector').innerHTML = `<div class="hero-identity"><div class="portrait-frame"><img src="${portrait(h.classId)}" alt="${heroName(h)}"/><span>LV ${h.level}</span></div><div><small class="hero-class">${k.name}</small><h2>${heroName(h)}</h2><p>${k.role}</p></div></div><div class="hero-stats"><span>HP <b id="selected-hp"></b></span><span>SH <b id="selected-shield"></b></span></div><h4 class="subheading stance-label">${t('battle.skills')} <span>${t('battle.autocast')}</span></h4><div class="stance-options">${battle.availableSkills(h.id).map(i => { const s = k.skills[i]; return `<button data-select-stance="${i}" class="stance-option ${h.stance === i ? 'chosen' : ''}" aria-pressed="${h.stance === i}" ${!['ready', 'fighting'].includes(battle.status) || h.hp <= 0 ? 'disabled' : ''}><span><b>${s.name}</b><small>${s.label} · ${s.cooldown.toFixed(1)}s</small></span><i>${h.stance === i ? '●' : '○'}</i></button>`; }).join('')}</div><p class="skill-description">${k.skills[h.stance].description}</p><div class="focus-meter"><div><span>${t('battle.fatigue')}</span><span id="fatigue-label"></span></div><span class="gauge"><i id="fatigue-fill"></i></span></div><button id="move-selected" class="btn move-button">${moveMode ? t('battle.move.pick') : t('battle.move')}<small>+0.9s</small></button><div class="move-grid" ${moveMode ? '' : 'hidden'}>${Array.from({ length: 9 }, (_, i) => `<button data-move-slot="${i}" aria-label="${t('formation.tile', { n: i + 1 })}" ${i === h.slot ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>`;
   $('inspector').querySelectorAll<HTMLButtonElement>('[data-select-stance]').forEach(el => {
     el.disabled = !canModify || h.hp <= 0;
     el.addEventListener('click', () => {
@@ -942,7 +944,7 @@ function showBoonTray() {
   sound.cardDeal();
   const activeBoonIds = (runBoons.length > 0 ? runBoons : battle.boons) ?? [];
   const boons = activeBoonIds.map(id => BOONS.find(b => b.id === id)).filter(Boolean) as typeof BOONS;
-  const modeBadge = battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : battle.mode === 'raid' ? t('mode.raid') : battle.stageName;
+  const modeBadge = battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : battle.mode === 'raid' ? t('mode.raid') : stageLabel();
   const raidModifiers = battle.raidContract?.modifiers?.length ?? 0;
   openModal(`<div class="boon-tray-modal"><h2 id="modal-title">${t('boons.title', { n: boons.length })}</h2><p class="hint"><span class="boon-tray-mode-tag">${escapeUI(modeBadge)}</span>${raidModifiers ? ` · ${t('boons.pact', { n: raidModifiers })}` : ''}</p>
     ${boons.length ? `<div class="boon-tray-list">${boons.map(b => `<div class="boon-tray-card"><small class="boon-patron-badge">${escapeUI(b.patron)}</small><h3 class="boon-name">${escapeUI(b.name)}</h3><p class="boon-desc">${escapeUI(b.description)}</p></div>`).join('')}</div>` : `<div class="boon-tray-empty"><p>${t('boons.empty')}</p><small>${t('boons.empty.hint')}</small></div>`}

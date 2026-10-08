@@ -132,7 +132,7 @@ function moreScene(p: Profile) {
     <div class="win menu-party">${party.map(id => { const r = ROSTER[id], lv = heroProgress(p.loadouts[id].xp); return `<div class="menu-hero"><img src="${portrait(r.classId)}" alt=""/><div><b>${r.name}</b><small>${escape(JOBS[p.loadouts[id].job ?? '']?.name ?? className(r.classId))}</small></div><div class="menu-hero-stats"><span>LV <b>${lv.level}</b></span><span class="gauge xp" aria-hidden="true"><i style="width:${lv.needed ? lv.current / lv.needed * 100 : 100}%"></i></span></div></div>`; }).join('')}</div>
     <div class="menu-columns">
       <nav class="win menu-list more-grid" aria-label="${t('route.menu')}">${items.map(([attr, title, detail]) => `<button class="menu-item more-card" ${attr}><b>${t(title)}</b><span>${t(detail)}</span></button>`).join('')}</nav>
-      <div class="win menu-summary"><dl><div><dt>${t('menu.seals')}</dt><dd>${p.cleared.length}/${CAMPAIGN.length}</dd></div><div><dt>${t('menu.heroes')}</dt><dd>${p.roster.length}/9</dd></div><div><dt>${t('menu.victories')}</dt><dd>${p.wins}</dd></div><div><dt>${t('menu.quests.done')}</dt><dd>${p.claimedQuests.length}/${QUESTS.length}</dd></div><div><dt>${t('menu.bestfloor')}</dt><dd>${p.bestFloor}</dd></div></dl></div>
+      <div class="win menu-summary"><dl class="stat-table"><div><dt>${t('menu.seals')}</dt><dd>${p.cleared.length}/${CAMPAIGN.length}</dd></div><div><dt>${t('menu.heroes')}</dt><dd>${p.roster.length}/9</dd></div><div><dt>${t('menu.victories')}</dt><dd>${p.wins}</dd></div><div><dt>${t('menu.quests.done')}</dt><dd>${p.claimedQuests.length}/${QUESTS.length}</dd></div><div><dt>${t('menu.bestfloor')}</dt><dd>${p.bestFloor}</dd></div></dl></div>
     </div>
   </section>`;
 }

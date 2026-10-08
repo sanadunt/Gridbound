@@ -134,7 +134,8 @@ small { font-size: 13px; }
 /* Tabs */
 .tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 6px; scrollbar-width: none; }
 .tabs > button { flex: 1 0 auto; min-height: 44px; padding: 6px 10px; font-size: 14px; }
-.tabs > button.active, .tabs > button[aria-current="page"], .tabs > button[aria-pressed="true"] { background: linear-gradient(180deg, #fff1a8, var(--gold) 45%, var(--gold-deep)); border-color: #fff8dc; color: #3b2400; text-shadow: none; }
+.tabs > button.active, .tabs > button[aria-current="page"], .tabs > button[aria-pressed="true"],
+.tabs > button.active:hover, .tabs > button[aria-current="page"]:hover, .tabs > button[aria-pressed="true"]:hover { background: linear-gradient(180deg, #fff1a8, var(--gold) 45%, var(--gold-deep)); border-color: #fff8dc; color: #3b2400; text-shadow: none; }
 
 /* Gauges */
 .gauge { display: block; height: 8px; border: 1px solid #ffffffaa; border-radius: 2px; background: #060a2a; box-shadow: 0 0 0 1px #000; overflow: hidden; }
@@ -185,6 +186,8 @@ body[data-screen="camp"] .brand-back { display: none; }
 .brand-back { color: var(--gold); }
 .header-tools { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .header-tools .icon-button { min-width: 44px; min-height: 44px; padding: 4px; }
+/* Narrow phones: the sound toggle lives in Config, so the location title keeps its room. */
+@media (max-width: 420px) { .header-tools #sound { display: none; } }
 .header-tools { gap: 4px; }
 .wallet + .wallet { margin-right: 2px; }
 
