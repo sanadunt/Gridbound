@@ -370,6 +370,15 @@ export class Sound {
         this.victoryCue();
         break;
 
+      case 'encounter':
+        this.noiseBurst(0.35, 0.02, 2400, 'bandpass');
+        [880, 660, 494, 330].forEach((n, i) => setTimeout(() => this.synthNote(n, 0.09, { type: 'square', volume: 0.012 }), i * 45));
+        break;
+
+      case 'levelup':
+        [523, 659, 784, 1047, 1319].forEach((n, i) => setTimeout(() => this.synthNote(n, i === 4 ? 0.3 : 0.1, { type: 'square', volume: 0.011, attack: 0.004 }), i * 70));
+        break;
+
       case 'text':
         this.synthNote(740, 0.022, { type: 'square', volume: 0.004 });
         break;

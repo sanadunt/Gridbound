@@ -586,9 +586,11 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   moveMode = false;
   touches.clear();
   if (initialized) { scene.dragId = -1; scene.dragPoint = undefined; scene.hoverSlot = -1; scene.replace(battle); }
+  const fromTown = !$('town-screen').hidden;
   $('town-screen').hidden = true;
   $('battle-screen').hidden = false;
   document.body.dataset.screen = 'battle';
+  if (fromTown) battleWipe();
   makeUnits();
   updateExpedition();
   showReady();
@@ -598,6 +600,17 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   frame(1);
   requestAnimationFrame(() => scene.scale?.refresh());
   $('battle-screen').scrollTop = 0;
+}
+/** Classic encounter transition: the screen shatters into blocks that fall away from the centre. */
+function battleWipe() {
+  sound.play('encounter');
+  if (!profile.motion) return;
+  const cols = 8, rows = 14, wipe = document.createElement('div');
+  wipe.className = 'battle-wipe';
+  wipe.setAttribute('aria-hidden', 'true');
+  wipe.innerHTML = Array.from({ length: cols * rows }, (_, i) => { const x = i % cols, y = Math.floor(i / cols), d = Math.hypot(x - (cols - 1) / 2, (y - (rows - 1) / 2) * .6); return `<i style="animation-delay:${Math.round(d * 45)}ms"></i>`; }).join('');
+  $('app').append(wipe);
+  window.setTimeout(() => wipe.remove(), 900);
 }
 function updateExpedition() {
   const c = CAMPAIGN[battle.floor - 1];
@@ -1315,6 +1328,7 @@ async function presentResult() {
       if (!expanded) resultScreen.scrollTop = 0;
     });
     if (won && !moreWaves) sound.play('fanfare'); else if (!won) sound.play('defeat');
+    if (experienceRewards.some(r => r.after > r.before)) window.setTimeout(() => sound.play('levelup'), 1300);
     animateCeremony();
   }
   $('next-wave')?.addEventListener('click', () => {

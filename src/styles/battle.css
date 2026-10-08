@@ -190,3 +190,8 @@
   .action-bar { grid-column: 2; grid-row: 3; }
   #party-health-tray[data-count="4"], #party-health-tray[data-count="5"], #party-health-tray[data-count="6"] { grid-template-columns: 1fr; }
 }
+
+/* Encounter transition */
+.battle-wipe { position: absolute; inset: 0; z-index: 70; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(14, 1fr); pointer-events: none; }
+.battle-wipe i { background: #fff; animation: wipe-block 0.42s steps(4) forwards; }
+@keyframes wipe-block { 0% { background: #fff; } 30% { background: #0b1030; transform: scale(1); } 100% { background: #0b1030; transform: scale(0); } }
