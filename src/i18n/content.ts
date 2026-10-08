@@ -155,6 +155,10 @@ const EVENT_TEXT: ContentText[] = [
   { en: 'VENOM WEB', id: 'JARING BISA' },
   { en: 'FALLING SHARDS', id: 'HUJAN SERPIHAN' },
   { en: 'AFTERSHOCK', id: 'GEMPA SUSULAN' },
+  // Item and party banners.
+  { en: 'MENDING MIST', id: 'KABUT PEMULIH' },
+  { en: 'NINEFOLD DAWN', id: 'FAJAR SEMBILAN' },
+  { en: 'SYNC!', id: 'SINKRON!' },
   // Threat counters.
   { en: 'MARKED: follows the hero. Heal the target, ready a shield or Party Guard.', id: 'MARKED: mengikuti hero. Heal target, siapkan shield atau Party Guard.' },
   { en: 'GROUND: leave the marked row once the telegraph appears.', id: 'GROUND: keluar dari row yang ditandai setelah telegraph muncul.' },

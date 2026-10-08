@@ -32,6 +32,11 @@ try {
     assert.equal(await evaluate('document.body.textContent.includes("Run purse")'),true);
     await click('[data-depart="endless"]'); await wait('window.gridbound?.battle?.mode === "endless"');
     assert.equal(await evaluate('document.querySelector("#loot")?.textContent?.includes("◇")'),true);
+    await evaluate('window.gridbound.battle.runWallet.crystal = 30; window.gridbound.setRunBoons([])');
+    await click('[data-battle-view="log"]');
+    await click('#run-shop-host [data-run-buy="run-upgrade"]');
+    assert.equal(await evaluate('window.gridbound.battle.power'), 1.1, 'Journey shop purchase applies during a run');
+    assert.equal(await evaluate('window.gridbound.battle.runWallet.crystal'), 12, 'Journey shop spends journey Crystal');
     assert.deepEqual(errors,[]);
     console.log('PASS D2 browser smoke: bank shop, raid contract, roguelike run purse, no console errors');
   });

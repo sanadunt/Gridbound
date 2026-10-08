@@ -195,7 +195,7 @@ body[data-screen="camp"] .brand-back { display: none; }
 .currency-amount { display: inline-flex; align-items: center; gap: 4px; font-family: var(--pixel); font-size: 10px; }
 .currency-amount svg { width: 16px; height: 16px; }
 .menu-button { font-size: 9px; padding: 6px 8px; }
-body[data-screen="battle"] .site-header, body[data-screen="result"] .site-header { display: none; }
+body[data-screen="battle"] .site-header { display: none; }
 
 /* Status toast */
 .storage-status { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); max-width: calc(100% - 24px); padding: 4px 10px; border: 2px solid var(--win-edge); border-radius: 5px; background: #0b1245ee; font-size: 12px; color: var(--ink-soft); pointer-events: none; z-index: 30; opacity: 0; transition: opacity 0.3s; }

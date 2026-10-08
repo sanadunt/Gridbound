@@ -51,6 +51,8 @@ export function gameText(text: string) {
   if (text in GAME_TEXT) return GAME_TEXT[text];
   const level = /^Perlu hero Lv\.(\d+)$/.exec(text);
   if (level) return `Needs hero LV ${level[1]}`;
+  const storage = /^Penyimpanan Commander gagal \((.*)\)\. Mode session-only aktif; jangan anggap autosave permanen\.$/.exec(text);
+  if (storage) return `Commander storage failed (${storage[1]}). Session-only mode is active; autosave is not permanent.`;
   const needs = /^Perlu (.+)$/.exec(text);
   if (needs) return `Requires ${needs[1]}`;
   return text;

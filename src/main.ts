@@ -29,7 +29,7 @@ import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-
 import { createRaidBuild, setRaidJob, setRaidPartySize, normalizeRaidBuild } from './game/raid-build';
 import { QUESTS, questProgress } from './game/quests';
 import { CHALLENGE_SHOP, createRunWallet, creditRun, resetRunWallet, getRaidContractForEnemy, roguelikeMilestoneForFloor, buyRunItem, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
-import { t, lang, setLang, onLangChange, gameText, type Lang } from './i18n';
+import { t, lang, setLang, gameText, type Lang } from './i18n';
 import { localizeContent, eventText } from './i18n/content';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -267,6 +267,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   $('battle-screen').hidden = true;
   document.body.dataset.screen = tab === 'camp' ? 'camp' : 'town';
   $('hud-title').textContent = routeTitle(tab);
+  $('home').setAttribute('aria-label', tab === 'camp' ? t('menu.title.sub') : t('hud.home'));
   renderTown($('town-screen'), profile, townState);
   if (routeChanged) {
     const scene = $('town-screen').querySelector<HTMLElement>('.town-scene');
@@ -383,14 +384,7 @@ $('town-screen').addEventListener('click', event => {
     return;
   }
   if (button.dataset.runBuy) {
-    const item = buyRunItem(runWallet, button.dataset.runBuy);
-    if (item) {
-      if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
-      if (item.id === 'run-upgrade') battle.power *= 1.1;
-      if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
-      updateExpedition();
-      frame(1);
-    }
+    const item = buyForRun(button.dataset.runBuy);
     if (item && inTown) showTown(townState.tab, t('notice.run.ok', { name: item.name }));
     return;
   }
@@ -519,6 +513,10 @@ async function ensureCommander() {
 }
 
 let playingScene = false;
+const INTRO_KEY = 'gridbound.introsSeen';
+/** Intros already shown in this browser; kept outside the save so retries after a defeat go straight to battle. */
+function introSeen(zone: number) { try { return (JSON.parse(localStorage.getItem(INTRO_KEY) ?? '[]') as number[]).includes(zone); } catch { return false; } }
+function markIntroSeen(zone: number) { try { const seen = JSON.parse(localStorage.getItem(INTRO_KEY) ?? '[]') as number[]; if (!seen.includes(zone)) localStorage.setItem(INTRO_KEY, JSON.stringify([...seen, zone])); } catch { /* storage blocked */ } }
 /** Chapter intro as a JRPG scene: title card, then the speaker's lines in a message box. */
 function chapterIntro(zoneIndex: number) {
   const zone = CAMPAIGN[zoneIndex];
@@ -527,7 +525,7 @@ function chapterIntro(zoneIndex: number) {
   const pages = paginate(zone.intro).map(text => ({ speaker: name?.trim(), place: place?.trim(), portrait: hero ? portrait(hero.classId) : undefined, text }));
   playingScene = true;
   return playDialogue($('app'), { kicker: t('battle.chapter', { n: zoneIndex + 1 }), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(Math.floor(zoneIndex / 4)), pages, motion: profile.motion, onBlip: () => sound.play('text') })
-    .finally(() => { playingScene = false; });
+    .finally(() => { playingScene = false; markIntroSeen(zoneIndex); });
 }
 function depart(mode: Mode) {
   if (playingScene) return;
@@ -536,7 +534,7 @@ function depart(mode: Mode) {
   if (mode === 'adventure' && !canEnterZone(profile, townState.zone)) return;
   const existing = commander.document?.encounters?.[commander.mode];
   if (existing && !existing.settled) { restoreEncounter(existing); return; }
-  const firstVisit = mode === 'adventure' && !profile.cleared.includes(townState.zone);
+  const firstVisit = mode === 'adventure' && !profile.cleared.includes(townState.zone) && !introSeen(townState.zone);
   if (firstVisit && typeof navigator !== 'undefined' && !navigator.webdriver) { sound.unlock(); void chapterIntro(townState.zone).then(() => startDeparture(mode)); return; }
   startDeparture(mode);
 }
@@ -600,6 +598,18 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   frame(1);
   requestAnimationFrame(() => scene.scale?.refresh());
   $('battle-screen').scrollTop = 0;
+}
+/** Spend journey Crystal on a run item and apply its effect to the current battle. */
+function buyForRun(id: string) {
+  const item = buyRunItem(runWallet, id);
+  if (!item) return undefined;
+  if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
+  if (item.id === 'run-upgrade') battle.power *= 1.1;
+  if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
+  sound.play('coin');
+  updateExpedition();
+  frame(1);
+  return item;
 }
 /** Classic encounter transition: the screen shatters into blocks that fall away from the centre. */
 function battleWipe() {
@@ -953,7 +963,7 @@ function help() {
 }
 function settings() {
   openModal(`<h2 id="modal-title">${t('settings.title')}</h2>
-    <div class="setting-row" role="group" aria-label="${t('settings.language')}"><span><b>${t('settings.language')}</b><small>${t('settings.language.sub')}</small></span><span class="lang-switch">${(['en', 'id'] as Lang[]).map(code => `<button type="button" class="btn" data-lang="${code}" aria-pressed="${lang() === code}">${code === 'en' ? 'English' : 'Indonesia'}</button>`).join('')}</span></div>
+    <div class="setting-row" role="group" aria-label="${t('settings.language')}"><span><b>${t('settings.language')}</b><small>${inTown ? t('settings.language.sub') : t('settings.language.town')}</small></span><span class="lang-switch">${(['en', 'id'] as Lang[]).map(code => `<button type="button" class="btn" data-lang="${code}" aria-pressed="${lang() === code}" ${inTown ? '' : 'disabled'}>${code === 'en' ? 'English' : 'Indonesia'}</button>`).join('')}</span></div>
     <label class="setting-row"><span><b>${t('settings.sound')}</b><small>${t('settings.sound.sub')}</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.motion')}</b><small>${t('settings.motion.sub')}</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label>
     <p class="hint">${t('settings.save.note')}</p><button id="export-save" class="btn">${t('settings.export')}</button><button class="btn primary" data-close>${t('common.back')}</button>`);
@@ -1354,42 +1364,6 @@ async function presentResult() {
     void nextFloor();
   }));
   $('next-floor')?.addEventListener('click',()=>{closeWithoutResume();void nextFloor();});
-  resultScreen.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
-    const item = buyRunItem(runWallet, el.dataset.runBuy!);
-    if (!item) return;
-    if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
-    if (item.id === 'run-upgrade') battle.power *= 1.1;
-    if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
-    closeWithoutResume();
-    updateExpedition();
-    if (battle.mode === 'endless' && battle.status === 'paused') battle.pause();
-    frame(1);
-  }));
-  resultScreen.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
-    const item = buyRunItem(runWallet, el.dataset.runBuy!);
-    if (!item) return;
-    if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
-    if (item.id === 'run-upgrade') battle.power *= 1.1;
-    if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
-    closeWithoutResume();
-    updateExpedition();
-    if (battle.mode === 'endless' && battle.status === 'paused') battle.pause();
-    frame(1);
-  }));
-  resultScreen.querySelector('[data-open-run-shop]')?.addEventListener('click', () => {
-    const shop = document.createElement('section');
-    shop.className = 'run-shop-modal';
-    shop.innerHTML = `<h3>${t('shop.journey')} · ${runWallet.crystal} ◇</h3>${CHALLENGE_SHOP.map(item => `<button class="btn" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${item.cost} ◇</button>`).join('')}`;
-    resultScreen.querySelector('[data-open-run-shop]')?.replaceWith(shop);
-    shop.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
-      const item = buyRunItem(runWallet, el.dataset.runBuy!);
-      if (!item) return;
-      if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
-      if (item.id === 'run-upgrade') battle.power *= 1.1;
-      if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
-      closeWithoutResume(); updateExpedition(); frame(1);
-    }));
-  });
   $('retry')?.addEventListener('click', () => {
     const mode = battle.mode, floor = battle.mode === 'endless' ? 1 : battle.floor;
     runBoons = [];
@@ -1564,7 +1538,7 @@ async function profilesMenu() {
       <div class="save-files">${documents.map((doc,index) => `<div class="save-file ${current?.commanderId === doc.commanderId ? 'current' : ''}"><div><b>${escapeUI(doc.name)}</b><small>${t('profiles.file', { ch: doc.story.slots[3].state?.cleared.length ?? 0, crystal: doc.shared.bankCrystal, rev: doc.revision })}</small></div><button data-commander="${index}" class="btn">${current?.commanderId === doc.commanderId ? t('profiles.current') : t('profiles.switch')}</button></div>`).join('') || `<p>${t('profiles.empty')}</p>`}</div>
       <label class="name-field">${t('profiles.name')} <input id="commander-name" maxlength="32" value="${escapeUI(current?.name ?? 'Commander')}"></label>
       <div class="departure-actions"><button id="new-commander" class="btn primary" ${documents.length >= 3 ? 'disabled' : ''}>${t('profiles.new')}</button>${current ? `<button id="rename-commander" class="btn">${t('profiles.rename')}</button><button id="export-commander" class="btn">${t('profiles.export')}</button><button id="delete-commander" class="btn danger">${t('profiles.delete')}</button><button id="save-retry" class="btn">${t('result.unsaved.retry')}</button>` : ''}<button id="legacy-preview" class="btn">${t('profiles.legacy')}</button></div>
-      ${current ? `<h3 class="subheading">${t('profiles.slots', { mode: modeName(commander.mode) })}</h3><p class="hint">${t('profiles.slots.hint')}</p><div class="save-files">${slots.map(slot => `<div class="save-file"><div><b>${slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) })}</b><small>${slot.status} · ${slot.savedAt ? new Date(slot.savedAt).toLocaleString() : t('profiles.emptyslot')}</small></div><span>${slot.slotId !== 'auto' ? `<button data-save-slot="${slot.slotId}" class="btn">${t('profiles.save')}</button>` : ''}<button data-load-slot="${slot.slotId}" class="btn" ${!slot.state ? 'disabled' : ''}>${t('profiles.load')}</button></span></div>`).join('')}</div><button id="continue-latest" class="btn primary">${t('profiles.continue')}</button>` : ''}
+      ${current ? `<h3 class="subheading">${t('profiles.slots', { mode: modeName(commander.mode) })}</h3><p class="hint">${t('profiles.slots.hint')}</p><div class="save-files">${slots.map(slot => `<div class="save-file"><div><b>${slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) })}</b><small>${t(`profiles.status.${slot.status}` as never)} · ${slot.savedAt ? new Date(slot.savedAt).toLocaleString() : t('profiles.emptyslot')}</small></div><span>${slot.slotId !== 'auto' ? `<button data-save-slot="${slot.slotId}" class="btn">${t('profiles.save')}</button>` : ''}<button data-load-slot="${slot.slotId}" class="btn" ${!slot.state ? 'disabled' : ''}>${t('profiles.load')}</button></span></div>`).join('')}</div><button id="continue-latest" class="btn primary">${t('profiles.continue')}</button>` : ''}
       <p id="profile-error" role="status">${escapeUI(gameText(commander.error || commander.repository?.warning || ''))}</p><button data-close class="btn">${t('common.close')}</button>`);
     const attempt = async (task: () => Promise<void>) => { try { await task(); } catch(error) { $('profile-error').textContent = error instanceof Error ? error.message : String(error); } };
     modal.querySelectorAll<HTMLElement>('[data-commander]').forEach(button => button.onclick = () => { const target = documents[Number(button.dataset.commander)]; if (target.commanderId !== current?.commanderId) void leaveSafely(() => { activateCommander(target); closeWithoutResume(); }); else closeWithoutResume(); });
@@ -1586,7 +1560,7 @@ async function profilesMenu() {
     modal.querySelectorAll<HTMLElement>('[data-save-slot]').forEach(button => button.onclick = () => { void attempt(async () => { if (!inTown && encounter && !pendingSettlement) { const frozen=structuredClone(encounter); await persist(button.dataset.saveSlot as SlotId, doc => { const state=commander.mode==='story'?doc.story:commander.mode==='raid'?doc.raid:doc.rogue; const auto=state.slots[3]; const index=state.slots.findIndex(slot=>slot.slotId===button.dataset.saveSlot); state.slots[index]=structuredClone({...auto,slotId:button.dataset.saveSlot as SlotId}); doc.encounters ??={}; doc.encounters[commander.mode]=frozen; }); } else await persist(button.dataset.saveSlot as SlotId); sound.play('save'); await profilesMenu(); }); });
     modal.querySelectorAll<HTMLElement>('[data-load-slot]').forEach(button => button.onclick = () => {
       const slot=slots.find(item=>item.slotId===button.dataset.loadSlot)!;
-      openModal(`<h2 id="modal-title">${t('profiles.preview', { slot: slot.slotId })}</h2><pre class="slot-preview">${escapeUI(JSON.stringify(slot.state,null,2))}</pre><p class="hint">${t('profiles.preview.hint')}</p><button id="load-confirm" class="btn primary">${t('profiles.load.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button><p id="load-error" role="status"></p>`);
+      openModal(`<h2 id="modal-title">${t('profiles.preview', { slot: slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) }) })}</h2><pre class="slot-preview">${escapeUI(JSON.stringify(slot.state,null,2))}</pre><p class="hint">${t('profiles.preview.hint')}</p><button id="load-confirm" class="btn primary">${t('profiles.load.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button><p id="load-error" role="status"></p>`);
       $('load-confirm').onclick = async () => { if (!inTown || pendingSettlement) { $('load-error').textContent=t('profiles.load.blocked'); return; } try { profile=await commander.loadSlot(slot.slotId); activateCommander(commander.document!,commander.mode); closeWithoutResume(); } catch(error) { $('load-error').textContent=String(error); } };
     });
     $('continue-latest')?.addEventListener('click', () => { const savedEncounter=commander.document?.encounters?.[commander.mode]; if (!savedEncounter) { $('profile-error').textContent=t('profiles.nocheckpoint'); return; } closeWithoutResume(); restoreEncounter(savedEncounter); });
@@ -1613,7 +1587,18 @@ document.addEventListener('click', event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-lang]');
   if (!button || button.dataset.lang === lang()) return;
   if (!inTown || pendingSettlement || commander.busy) { storageStatus(); return; }
-  void commander.flush().then(() => { setLang(button.dataset.lang as Lang); location.reload(); });
+  const next = button.dataset.lang as Lang;
+  void commander.flush().then(saved => {
+    if (!saved) { storageStatus(); return; }
+    const apply = () => { setLang(next); location.reload(); };
+    if (commander.document && !commander.repository?.persistent) {
+      openModal(`<h2 id="modal-title">${t('lang.session.title')}</h2><p>${t('lang.session.copy')}</p><button id="lang-export" class="btn">${t('profiles.export')}</button><button id="lang-anyway" class="btn danger">${t('lang.session.confirm')}</button><button data-close class="btn primary">${t('common.cancel')}</button>`, false);
+      $('lang-export').addEventListener('click', exportCommander);
+      $('lang-anyway').addEventListener('click', apply);
+      return;
+    }
+    apply();
+  });
 });
 document.addEventListener('pointerdown', event => {
   const target = (event.target as HTMLElement).closest('button,[role="button"]');
@@ -1623,6 +1608,10 @@ const titleScreenEl = $('title-screen');
 const leavePressPhase = () => { if (!titleScreenEl.classList.contains('press-phase')) return false; titleScreenEl.classList.remove('press-phase'); sound.unlock(); sound.play('confirm'); requestAnimationFrame(() => $('title-enter').focus({ preventScroll: true })); return true; };
 titleScreenEl.addEventListener('pointerdown', event => { if (titleScreenEl.classList.contains('press-phase')) { event.preventDefault(); leavePressPhase(); } });
 $('retreat').addEventListener('click', () => navigateTown());
+$('battle-screen').addEventListener('click', event => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-run-buy]');
+  if (button && !button.disabled && !inTown) buyForRun(button.dataset.runBuy!);
+});
 document.querySelectorAll<HTMLButtonElement>('.battle-view-tabs [data-battle-view]').forEach(button => button.addEventListener('click', () => setBattleView(button.dataset.battleView as 'arena' | 'hero' | 'log')));
 $('battle-detail-resume').addEventListener('click', () => setBattleView('arena'));
 // Expedition and preparation routes are handled by the Town screen's delegated actions.

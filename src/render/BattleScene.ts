@@ -247,7 +247,7 @@ export class BattleScene extends Phaser.Scene {
   if(e.type==='buff')this.ring(pos.x,pos.y,0x96f2be,13,2.1);
   if(e.type==='break'){this.setBossCue('break',0xffd54f,.52);this.freeze(.1);this.screenFlash(0xffe6a0,.4);this.floating(300,150,t('battle.break'),'#ffe082',true,true);this.burst(300,200,0xf5d378,20);this.ring(300,200,0x55e3c7,19,2.4);this.ring(300,200,0xffd54f,13,2.8);this.shake=.3;}
   if(e.type==='coin'){this.floating(pos.x,pos.y-20,`+${e.amount}g`);this.burst(pos.x,pos.y,0xe9c56d,5);}
-  if(e.type==='move')this.floating(pos.x,pos.y-25,e.text??'MOVE','#eed69a');
+  if(e.type==='move')this.floating(pos.x,pos.y-25,e.text??t('battle.fx.move'),'#eed69a');
   if(e.type==='impact'){
    for(const slot of e.targets??[]){const p=center(slot),color=e.kind==='breath'?0x8ceeaa:0xf49b70;this.burst(p.x,p.y,color,12);this.ring(p.x,p.y,0xf4c07e,12,1.9);if(e.kind==='breath'&&!this.reducedMotion)for(let n=0;n<8;n++){const ratio=n/8;this.particle(305+(p.x-305)*ratio,215+(p.y-215)*ratio,0xa6e1a0,5,.38,15,70,10);}}
    this.shake=.3;
