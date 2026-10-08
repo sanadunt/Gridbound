@@ -15,6 +15,8 @@ import { KITS, ROSTER, type Mode } from './game/content';
 import { CAMPAIGN, BOONS, boonChoices } from './game/world';
 import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock } from './game/profile';
 import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
+import { actArt } from './ui/world-map';
+import { playDialogue, paginate } from './ui/dialogue';
 import { BattleScene, ARENA, cell } from './render/BattleScene';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
@@ -84,7 +86,7 @@ function animateTownEntrance() {
   if (!profile.motion) return;
   const town = $('town-screen');
   if (!town || town.hidden) return;
-  gsap.fromTo('.town-map', { opacity: 0, scale: 1.04 }, { opacity: 1, scale: 1, duration: 0.6, ease: 'power2.out', clearProps: 'opacity,transform' });
+  gsap.fromTo('.town-map', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', clearProps: 'opacity' });
   gsap.fromTo('.camp-copy', { opacity: 0, y: 16 }, { opacity: 1, y: 0, delay: 0.25, duration: 0.3, ease: 'power2.out', clearProps: 'all' });
 }
 function enterEmberhollow() {
@@ -516,12 +518,29 @@ async function ensureCommander() {
   return ensureCommanderPromise;
 }
 
+let playingScene = false;
+/** Chapter intro as a JRPG scene: title card, then the speaker's lines in a message box. */
+function chapterIntro(zoneIndex: number) {
+  const zone = CAMPAIGN[zoneIndex];
+  const [name, place] = zone.speaker.split(' · ');
+  const hero = ROSTER.find(r => r.name.toUpperCase() === name?.trim().toUpperCase());
+  const pages = paginate(zone.intro).map(text => ({ speaker: name?.trim(), place: place?.trim(), portrait: hero ? portrait(hero.classId) : undefined, text }));
+  playingScene = true;
+  return playDialogue($('app'), { kicker: t('battle.chapter', { n: zoneIndex + 1 }), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(Math.floor(zoneIndex / 4)), pages, motion: profile.motion, onBlip: () => sound.play('text') })
+    .finally(() => { playingScene = false; });
+}
 function depart(mode: Mode) {
+  if (playingScene) return;
   commander.mode = mode === 'raid' ? 'raid' : mode === 'endless' ? 'roguelike' : 'story';
   if (commander.document) commander.document.activeMode = commander.mode;
   if (mode === 'adventure' && !canEnterZone(profile, townState.zone)) return;
   const existing = commander.document?.encounters?.[commander.mode];
   if (existing && !existing.settled) { restoreEncounter(existing); return; }
+  const firstVisit = mode === 'adventure' && !profile.cleared.includes(townState.zone);
+  if (firstVisit && typeof navigator !== 'undefined' && !navigator.webdriver) { sound.unlock(); void chapterIntro(townState.zone).then(() => startDeparture(mode)); return; }
+  startDeparture(mode);
+}
+function startDeparture(mode: Mode) {
   runBoons = [];
   resetRunWallet(runWallet);
   runWallet = createRunWallet();
@@ -604,7 +623,9 @@ function showReady() {
   $('start-overlay').hidden = false;
   $('ready-label').textContent = battle.stageCount > 1 ? `${t('map.wave', { n: battle.stage + 1 })}/${battle.stageCount} · ${stageLabel()}` : stageLabel();
   $('ready-title').textContent = battle.stage > 0 ? t('ready.title.next') : t('ready.title.first', { name: battle.enemyName });
-  $('ready-copy').textContent = battle.stage > 0 ? t('ready.copy.next') : battle.mode === 'adventure' ? t('ready.copy.story') : t('ready.copy.other');
+  const beat = battle.mode === 'adventure' ? CAMPAIGN[battle.floor - 1]?.stages[battle.stage]?.beat : undefined;
+  $('ready-copy').textContent = beat ?? (battle.stage > 0 ? t('ready.copy.next') : battle.mode === 'adventure' ? t('ready.copy.story') : t('ready.copy.other'));
+  $('ready-copy').classList.toggle('story-beat', Boolean(beat));
   $('start').textContent = t('battle.begin');
   if (profile.motion) {
     gsap.fromTo('#start-overlay .start-window', { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
@@ -907,7 +928,7 @@ function openModal(content: string, pause = true) {
   if (!alreadyOpen) {
     try { modal.showModal(); } catch { modal.show(); }
     sound.modalReveal();
-    if (profile.motion) gsap.fromTo(modal, { opacity: 0, scaleY: 0.2 }, { opacity: 1, scaleY: 1, duration: 0.18, ease: 'power2.out', clearProps: 'transform' });
+    if (profile.motion) gsap.fromTo(modal, { opacity: 0 }, { opacity: 1, duration: 0.15, ease: 'power2.out', clearProps: 'opacity' });
   }
   modal.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => modal.close()));
 }
@@ -1495,7 +1516,7 @@ function exportCommander() {
 import { STORY_CHOICES, narrativeChoice, epilogue } from './game/narrative';
 function chapterChronicle() {
   if (!profile.cleared.length) return '';
-  return `<section class="journal-chronicle"><h3>${t('journal.chronicle', { n: profile.cleared.length })}</h3>${[...profile.cleared].sort((a, b) => a - b).map(i => `<details class="journal-entry-card"><summary>CH ${i + 1} · ${escapeUI(CAMPAIGN[i].name)}</summary><p>${escapeUI(CAMPAIGN[i].intro).replace(/\n/g, '<br>')}</p><p>${escapeUI(CAMPAIGN[i].outro).replace(/\n/g, '<br>')}</p></details>`).join('')}</section>`;
+  return `<section class="journal-chronicle"><h3>${t('journal.chronicle', { n: profile.cleared.length })}</h3>${[...profile.cleared].sort((a, b) => a - b).map(i => `<details class="journal-entry-card"><summary>CH ${i + 1} · ${escapeUI(CAMPAIGN[i].name)}</summary><button class="btn journal-replay" data-replay-chapter="${i}">▶ ${t('journal.watch')}</button><p>${escapeUI(CAMPAIGN[i].intro).replace(/\n/g, '<br>')}</p><p>${escapeUI(CAMPAIGN[i].outro).replace(/\n/g, '<br>')}</p></details>`).join('')}</section>`;
 }
 async function storyJournal() {
   if (commander.document && commander.mode !== 'story') {
@@ -1508,6 +1529,7 @@ async function storyJournal() {
  const scenes=STORY_CHOICES.filter(s=>Array.from({length:s.chapter},(_,i)=>i).every(i=>profile.cleared.includes(i)));
  const ending=epilogue(state,profile.cleared);
  openModal(`<h2 id="modal-title">${t('journal.title')}</h2><p class="hint">${t('journal.intro')}</p>${scenes.length?'':`<p>${t('journal.locked')}</p>`}${scenes.map(s=>`<section class="journal-scene"><h3>${s.title}</h3><p>${s.text}</p>${state[s.id]?`<p class="journal-outcome">${s.options.find(o=>o.id===state[s.id])?.outcome}</p>`:`<nav class="menu-list">${s.options.map(o=>`<button class="menu-item" data-story-choice="${s.id}" data-story-option="${o.id}">${o.label}</button>`).join('')}<button class="menu-item" data-story-choice="${s.id}" data-story-option="${s.options[0].id}">${t('journal.skip', { label: s.options[0].label })}</button></nav>`}</section>`).join('')}${chapterChronicle()}${ending.map(text=>`<p>${text}</p>`).join('')}<button class="btn primary" data-close>${t('common.back')}</button>`);
+ modal.querySelectorAll<HTMLElement>('[data-replay-chapter]').forEach(button=>button.onclick=()=>{ closeWithoutResume(); void chapterIntro(Number(button.dataset.replayChapter)); });
  modal.querySelectorAll<HTMLElement>('[data-story-choice]').forEach(button=>button.onclick=async()=>{
   if(commander.busy||commander.stale)return;
   profile.narrative??={};
@@ -1662,5 +1684,5 @@ if (import.meta.env.DEV) Object.assign(window, { gridbound: {
   get runBoons() { return runBoons; },
   setRunBoons: (b: string[]) => { runBoons = [...b]; battle.boons = [...b]; updateExpedition(); },
   step: (seconds: number) => { for (let t = 0; t < Math.min(600, Math.max(0, seconds)); t += 1 / 60) battle.tick(1 / 60); frame(1); },
-  boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray,
+  boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro,
 } });

@@ -490,6 +490,9 @@ export const ID: Record<keyof typeof EN, string> = {
   'journal.locked': 'Pilihan pertama muncul setelah Chapter 3. Ceritanya sendiri tetap linear.',
   'journal.skip': 'Lewati — {label}',
   'journal.chronicle': 'Kronik · {n} chapter',
+  'journal.watch': 'Putar ulang pembuka',
+  'dialogue.label': 'Adegan cerita',
+  'dialogue.skip': 'Lewati',
 
   // Profil
   'profiles.title': 'File save',

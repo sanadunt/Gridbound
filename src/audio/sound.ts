@@ -370,6 +370,10 @@ export class Sound {
         this.victoryCue();
         break;
 
+      case 'text':
+        this.synthNote(740, 0.022, { type: 'square', volume: 0.004 });
+        break;
+
       case 'cursor':
         this.synthNote(1320, 0.035, { type: 'square', volume: 0.008 });
         break;

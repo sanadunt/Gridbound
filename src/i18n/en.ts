@@ -488,6 +488,9 @@ export const EN = {
   'journal.locked': 'The first choice appears after Chapter 3. The story itself is linear.',
   'journal.skip': 'Skip — {label}',
   'journal.chronicle': 'Chronicle · {n} chapter(s)',
+  'journal.watch': 'Replay intro',
+  'dialogue.label': 'Story scene',
+  'dialogue.skip': 'Skip',
 
   // Profiles
   'profiles.title': 'Save files',

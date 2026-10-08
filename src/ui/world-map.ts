@@ -16,6 +16,9 @@ const images = new Map<string, string>();
 const cached = (key: string, draw: () => HTMLCanvasElement) => { if (!images.has(key)) images.set(key, draw().toDataURL()); return images.get(key)!; };
 const escape = (text: string) => text.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
 
+/** Cached pixel overworld for an act, also used as the chapter-intro backdrop. */
+export const actArt = (act: number) => cached(`act-${act}`, () => overworldCanvas(act, NODES));
+
 export function renderWorldMap(p: Profile, state: TownState): string {
   const actId = Math.min(3, Math.max(0, Math.floor(state.zone / 4))) as ActId;
   const act = ACTS[actId];
@@ -24,7 +27,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
   const finalStage = zone.stages[zone.stages.length - 1];
   const boss = ENEMIES[finalStage.enemy];
   const mission = state.tab === 'mission';
-  const art = cached(`act-${actId}`, () => overworldCanvas(actId, NODES));
+  const art = actArt(actId);
   const nodes = act.zones.map((zoneIdx, nodeIdx) => {
     const z = CAMPAIGN[zoneIdx], cleared = p.cleared.includes(zoneIdx), open = canEnterZone(p, zoneIdx), climax = nodeIdx === 3;
     const status = cleared ? 'cleared' : open ? 'active' : 'locked';
