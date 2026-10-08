@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
 import gsap from 'gsap';
 import '@fontsource/press-start-2p/latin-400.css';
-import '@fontsource/dotgothic16/latin-400.css';
+import '@fontsource/space-grotesk/latin-400.css';
+import '@fontsource/space-grotesk/latin-500.css';
+import '@fontsource/space-grotesk/latin-600.css';
+import '@fontsource/space-grotesk/latin-700.css';
 import './styles/base.css';
 import './styles/title.css';
 import './styles/town.css';
@@ -1673,7 +1676,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && !in
 scene = new BattleScene(battle, sound, frame);
 scene.reducedMotion = !profile.motion;
 document.body.classList.toggle('reduced-motion', !profile.motion);
-new Phaser.Game({ type: Phaser.AUTO, parent: 'game-canvas', width: ARENA.width, height: ARENA.height, backgroundColor: '#0b1030', pixelArt: true, roundPixels: true, antialias: false, scene: [scene], scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, input: { activePointers: 3 }, audio: { noAudio: true }, render: { preserveDrawingBuffer: true }, banner: false });
+new Phaser.Game({ type: Phaser.AUTO, parent: 'game-canvas', width: ARENA.width, height: ARENA.height, backgroundColor: '#0e1e19', pixelArt: true, roundPixels: true, antialias: false, scene: [scene], scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, input: { activePointers: 3 }, audio: { noAudio: true }, render: { preserveDrawingBuffer: true }, banner: false });
 initialized = true;
 showTown();
 if (typeof navigator !== 'undefined' && !navigator.webdriver) {
