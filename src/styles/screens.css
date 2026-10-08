@@ -1,0 +1,149 @@
+/* Menu screens: party, jobs, talents, equipment, bestiary, raid, shop, roguelike, quests. */
+.party-scene, .secondary-scene { display: flex; flex-direction: column; gap: 10px; }
+.secondary-content { display: flex; flex-direction: column; gap: 10px; }
+
+.party-roster { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; }
+.party-roster button { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; min-width: 64px; padding: 4px 6px; border: 2px solid #ffffff66; border-radius: 5px; background: #0a1145; color: var(--ink); }
+.party-roster button img { width: 34px; height: 37px; }
+.party-roster button span { font-size: 13px; }
+.party-roster button small { font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); }
+.party-roster button.active { border-color: var(--gold); background: linear-gradient(180deg, #3149b8, #121c5c); }
+.party-roster button.active span { color: var(--gold); }
+
+.training-identity { display: flex; gap: 12px; align-items: center; }
+.training-identity img { width: 64px; height: 70px; flex-shrink: 0; }
+.training-identity small { color: var(--ink-dim); }
+.training-identity h2 { font-family: var(--pixel); font-size: 14px; color: var(--gold); margin: 4px 0; }
+.training-identity p { margin: 0 0 4px; font-size: 14px; color: var(--ink-soft); }
+.stat-line { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; }
+.stat-line b { font-family: var(--pixel); font-size: 10px; color: var(--gold); font-weight: 400; }
+.party-advanced-link { flex: 0 0 auto !important; }
+.training-panel { min-height: 160px; }
+
+.formation-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.formation-grid button { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 82px; padding: 4px; border: 2px dashed #ffffff55; border-radius: 5px; background: #0007; color: var(--ink); }
+.formation-grid button small { font-family: var(--pixel); font-size: 7px; color: var(--ink-dim); }
+.formation-grid button img { width: 34px; height: 37px; }
+.formation-grid button span { font-size: 13px; }
+.formation-grid button.chosen { border-style: solid; border-color: var(--gold); background: #ffd75e22; }
+.formation-grid .empty { color: #ffffff44; }
+.story-party { margin-top: 10px; }
+
+.hero-progression label { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.hero-progression label span:first-child { color: var(--ink-soft); font-size: 14px; }
+
+.loadout-slots { display: flex; flex-direction: column; gap: 10px; border: 0; margin: 0; }
+.loadout-slots legend { color: var(--gold); padding: 0; margin-bottom: 6px; }
+.loadout-slots label { display: flex; flex-direction: column; gap: 4px; }
+.loadout-slots label > span { font-family: var(--pixel); font-size: 9px; color: var(--gold); }
+.loadout-slots label small { color: var(--ink-soft); }
+
+/* Talents */
+.talent-workspace-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.talent-workspace-heading h3 { font-family: var(--pixel); font-size: 12px; color: var(--gold); }
+.talent-count { font-size: 13px; color: var(--ink-dim); }
+.branch-tabs { margin: 8px 0; }
+.branch-tabs > button { font-size: 13px; padding: 4px 8px; }
+.talent-flow { display: flex; flex-direction: column; gap: 6px; }
+.talent-flow-lane { display: grid; grid-template-columns: 64px 1fr; gap: 6px; align-items: center; }
+.talent-flow-label { font-family: var(--pixel); font-size: 7px; color: var(--ink-dim); text-transform: uppercase; }
+.talent-flow-cards { display: flex; flex-wrap: wrap; gap: 6px; }
+.talent-flow-node { flex: 1 1 110px; display: flex; flex-direction: column; align-items: flex-start; min-height: 46px; padding: 4px 8px; border: 2px solid #ffffff66; border-radius: 5px; background: #0a1145; color: var(--ink); text-align: left; }
+.talent-flow-node b { font-weight: 400; font-size: 14px; }
+.talent-flow-node span { font-size: 12px; color: var(--ink-dim); }
+.talent-flow-node.learned { border-color: var(--hp); }
+.talent-flow-node.learned span { color: var(--hp); }
+.talent-flow-node.keystone { border-style: double; border-width: 4px; }
+.talent-flow-node.chosen { border-color: var(--gold); background: linear-gradient(180deg, #3149b8, #121c5c); box-shadow: 0 0 0 2px #000, 0 0 10px #ffd75e66; }
+.talent-inspector-section { margin-top: 10px; }
+.talent-arrow { font-size: 13px; color: var(--ink-dim); margin-bottom: 4px; }
+.talent-node { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; padding: 10px 12px; border: 3px solid var(--gold); border-radius: 6px; background: #0009; color: var(--ink); text-align: left; }
+.talent-node small { font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); }
+.talent-node b { font-weight: 400; font-size: 17px; color: var(--gold); }
+.talent-node span { font-size: 14px; color: var(--ink-soft); }
+.talent-node strong { align-self: stretch; margin-top: 4px; padding: 6px 10px; border-radius: 4px; background: linear-gradient(180deg, #fff1a8, var(--gold) 45%, var(--gold-deep)); color: #3b2400; font-weight: 400; text-align: center; text-shadow: none; }
+.talent-node:disabled strong { background: #ffffff22; color: var(--ink-soft); }
+.talent-node.learned { border-color: var(--hp); }
+.talent-node.learned strong { background: #2fa24c55; color: var(--hp); }
+.talent-node:disabled { cursor: default; }
+
+/* Jobs */
+.job-paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.job-paths section { display: flex; flex-direction: column; align-items: stretch; }
+.job-node { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 8px 10px; border: 2px solid #ffffff77; border-radius: 6px; background: #0a1145; color: var(--ink); text-align: left; }
+.job-node small { font-family: var(--pixel); font-size: 7px; color: var(--ink-dim); }
+.job-node b { font-weight: 400; font-size: 16px; color: var(--gold); }
+.job-node span { font-size: 13px; color: var(--ink-soft); }
+.job-node em { font-style: normal; font-size: 13px; color: var(--mana); }
+.job-node strong { font-weight: 400; font-family: var(--pixel); font-size: 9px; color: var(--gold); }
+.job-node.learned { border-color: var(--hp); }
+.job-node:disabled { opacity: 0.6; cursor: default; }
+.job-connector { align-self: center; color: var(--ink-dim); font-size: 12px; }
+
+/* Equipment */
+.gear-slots { display: flex; flex-direction: column; gap: 10px; }
+.gear-slots label { display: flex; flex-direction: column; gap: 4px; font-family: var(--pixel); font-size: 9px; color: var(--gold); }
+.gear-slots small { font-family: var(--text); font-size: 13px; color: var(--ink-soft); }
+.gear-preview { margin-top: 10px; padding: 10px; border: 3px solid var(--gold); border-radius: 6px; background: #0009; }
+.gear-preview small { font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); }
+.gear-preview h3 { color: var(--gold); font-size: 18px; margin: 4px 0; }
+.gear-preview-status { color: var(--ink-soft); }
+.gear-preview-actions { display: flex; gap: 8px; }
+.gear-preview-actions .btn { flex: 1; }
+.gear-set-status { margin-top: 10px; font-size: 14px; }
+
+/* Bestiary */
+.bestiary-list article { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: left; }
+.bestiary-art { display: grid; place-items: center; width: 100%; padding: 8px; border-radius: 5px; background: radial-gradient(ellipse at 50% 70%, #2a3a7a, #070b22 70%); }
+.bestiary-art img { width: min(60vw, 200px); height: auto; }
+.bestiary-list article small { color: var(--ink-dim); }
+.bestiary-list article h3 { font-family: var(--pixel); font-size: 14px; color: var(--gold); margin: 4px 0 8px; }
+
+/* Raid */
+.mission-brief { display: flex; gap: 12px; align-items: center; }
+.mission-brief small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
+.mission-brief h3 { font-family: var(--pixel); font-size: 13px; color: var(--gold); margin: 6px 0; line-height: 1.5; }
+.mission-brief.world-map-dossier { display: block; }
+.brief-art { width: 92px; height: 92px; object-fit: contain; flex-shrink: 0; }
+.raid-roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; margin-bottom: 10px; }
+.raid-roster button { display: flex; flex-direction: column; align-items: center; padding: 4px; border: 2px solid #ffffff55; border-radius: 5px; background: #0008; color: var(--ink); }
+.raid-roster button img { width: 56px; height: 56px; object-fit: contain; }
+.raid-roster button b { font-weight: 400; font-size: 12px; }
+.raid-roster button.chosen { border-color: var(--gold); background: #ffd75e22; }
+.raid-variant, .raid-tier, .raid-party-size { margin-top: 8px; color: var(--ink-soft); }
+.raid-party-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 8px 0; }
+.raid-party-slot span { font-size: 14px; }
+.raid-modifiers { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.raid-modifier { display: flex; gap: 10px; align-items: flex-start; }
+.raid-modifier small { display: block; color: var(--ink-dim); }
+.raid-sandbox label { margin: 8px 0; display: grid; grid-template-columns: 1fr 50px; gap: 4px 8px; align-items: center; }
+.raid-sandbox label input { grid-column: 1 / -1; }
+
+/* Shop */
+.shop-keeper p { margin: 0 0 6px; }
+.shop-purse { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+.challenge-shop-grid { display: flex; flex-direction: column; gap: 10px; }
+.shop-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dotted #ffffff40; }
+.shop-item h4 { color: var(--gold); font-size: 16px; }
+.shop-item p { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); }
+.shop-item .btn { flex-shrink: 0; }
+.shop-cost { font-family: var(--pixel); font-size: 10px; color: var(--mana); white-space: nowrap; }
+
+/* Roguelike */
+.endless-rules p { margin: 0; padding: 6px 0; border-bottom: 1px dotted #ffffff30; font-size: 14px; }
+.endless-rules b { color: var(--gold); font-weight: 400; }
+
+/* Quests */
+.quest-head p { margin: 0 0 8px; }
+.quest-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.quest-recipient { font-size: 14px; color: var(--ink-soft); }
+.quest-entry { display: flex; flex-direction: column; gap: 8px; }
+.quest-entry small { font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); }
+.quest-entry h3 { color: var(--gold); font-size: 18px; margin: 4px 0; }
+.quest-entry > div > b { display: block; font-weight: 400; color: var(--mana); margin: 4px 0; }
+.quest-entry .gauge { margin: 4px 0; }
+.quest-entry.ready { border-color: var(--gold); box-shadow: 0 0 0 2px var(--win-shadow), 0 0 14px #ffd75e66; }
+.quest-entry.claimed { opacity: 0.7; }
+.quest-reward { font-size: 14px; color: var(--ink-soft); }
+.quest-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.quest-actions .btn { flex: 1 1 auto; }

@@ -370,6 +370,28 @@ export class Sound {
         this.victoryCue();
         break;
 
+      case 'cursor':
+        this.synthNote(1320, 0.035, { type: 'square', volume: 0.008 });
+        break;
+
+      case 'confirm':
+        this.synthNote(988, 0.05, { type: 'square', volume: 0.01 });
+        setTimeout(() => this.synthNote(1480, 0.08, { type: 'square', volume: 0.01 }), 50);
+        break;
+
+      case 'save':
+        [784, 988, 1175, 1568].forEach((n, i) => setTimeout(() => this.synthNote(n, 0.16, { type: 'triangle', volume: 0.016, attack: 0.006 }), i * 70));
+        break;
+
+      case 'fanfare': {
+        // An original short victory jingle: square lead over a triangle bass.
+        const lead: [number, number, number][] = [[523, 0, .12], [659, 120, .12], [784, 240, .12], [1047, 360, .36], [988, 760, .12], [1047, 880, .5]];
+        const bass: [number, number, number][] = [[131, 0, .34], [196, 360, .34], [262, 760, .6]];
+        lead.forEach(([n, at, d]) => setTimeout(() => this.synthNote(n, d, { type: 'square', volume: 0.012, attack: 0.004 }), at));
+        bass.forEach(([n, at, d]) => setTimeout(() => this.synthNote(n, d, { type: 'triangle', volume: 0.03, attack: 0.01 }), at));
+        break;
+      }
+
       case 'defeat':
         [196, 174, 155].forEach((n, i) => {
           setTimeout(() => this.synthNote(n, 0.45, { type: 'sawtooth', volume: 0.022, slide: -30 }), i * 105);
