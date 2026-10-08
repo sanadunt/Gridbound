@@ -1,5 +1,15 @@
 # GUI verification — game-first redesign (local, not deployed)
 
+## JRPG overhaul + English/Indonesian — local verification (latest)
+
+Branch `claude/tender-brown-j7bmek`; local headless Chromium only. No live deployment, no physical device, Safari or Firefox testing, and no human playtest.
+
+- All 25 browser scripts passed in one sequential run against the dev server: the 13 in `npm run test:browser` (now including `language-browser` and `story-scene-browser`) plus title-screen, training, archives, pact, boon-draft, audio-combat, currency-ui, D2, D3, D4, D6 and D7. Before the overhaul, title-screen, training, archives, currency-ui and D7 were already failing (stale selectors, or no server on port 5187); they were updated and now pass, with currency-ui and D7 still needing a dev server on 5187 that nothing in the scripts starts.
+- `scripts/gui-layout-smoke.mjs` passed every route at 360×640, 360×740, 390×844, 430×932, 768×1024, 1280×720 and 1440×900, plus the 180×370 narrow-header check; `viewport-game-browser` passed the battle layout at the same sizes plus 721×500 (landscape two-column layout).
+- `npm run test:production` and `npm run test:webapp` passed (nested subpath, local resources, no dev QA API).
+- `npm test`: 138 passed (includes the new `tests/i18n-content.test.ts`). `npm run database` left `data/database.json` unchanged. `npm run build` passed (Phaser chunk warning unchanged). `npm run balance` cleared 16 chapters / 76 stages and 48 Raid variants; game logic in `src/game/` was not modified.
+- Indonesian and English screens were reviewed visually at 390×844; the language switch is covered by `language-browser`.
+
 ## Current implementation pass — local verification
 
 Implemented in the v0.4 source; no live deployment.
