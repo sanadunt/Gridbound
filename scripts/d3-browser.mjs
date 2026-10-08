@@ -50,6 +50,7 @@ try {
     await wait('window.gridbound.profile().storyActive.length===6');
     const originalLoads=await evaluate('window.gridbound.profile().loadouts');
     await click.nav('party');
+    await click('[data-training-tab="formation"]');
     assert.equal(await evaluate('document.querySelectorAll("[data-story-toggle]").length'),9);
     assert.equal(await evaluate('document.querySelectorAll("[data-story-toggle]")[8].disabled'),true);
     const selected=[4,3,2,7,1,8];
@@ -104,7 +105,7 @@ try {
     await screenshot('artifacts/d3-results.png');
     report.checks.push({name:'replay chapter1 six active IDs, four wave transitions, active/bench result distinction, settlement once',deltas});
     await click('#retry');assert.deepEqual(await evaluate('window.gridbound.battle.heroes.map(h=>h.id)'),selected);
-    await click('#retreat');
+    await click.retreat();
     await wait('Boolean(document.querySelector("#modal")?.open && document.querySelector("#modal #abandon-run")?.getBoundingClientRect().width > 0 && document.querySelector("#modal #abandon-run")?.getBoundingClientRect().height > 0 && !document.querySelector("#modal #abandon-run")?.disabled)');
     await click('#abandon-run');
     await wait('window.gridbound?.inTown');
@@ -126,7 +127,7 @@ try {
         const rogue=await evaluate('({heroes:window.gridbound.battle.heroes.length,recruits:window.gridbound.battle.rogueBuild?.recruits.length})');
         assert.deepEqual([rogue.heroes,rogue.recruits],[3,3]);
       }
-      await click('#retreat');
+      await click.retreat();
       await wait('Boolean(document.querySelector("#modal")?.open && document.querySelector("#modal #abandon-run")?.getBoundingClientRect().width > 0 && document.querySelector("#modal #abandon-run")?.getBoundingClientRect().height > 0 && !document.querySelector("#modal #abandon-run")?.disabled)');
       await click('#abandon-run');
       await wait('window.gridbound?.inTown');

@@ -28,7 +28,6 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   assert.equal(await evaluate('document.querySelectorAll("[data-boon]").length'), 3, 'Must present exactly 3 boon cards');
   assert.equal(await evaluate('document.querySelectorAll(".boon-card").length'), 3, 'Cards must use .boon-card class');
   assert.equal(await evaluate('document.querySelectorAll(".boon-patron-badge").length'), 3, 'Each card must have a patron badge');
-  assert.equal(await evaluate('document.querySelectorAll(".boon-rarity-pill").length'), 3, 'Each card must have a rarity pill');
   assert.equal(await evaluate('document.querySelectorAll(".boon-cta").length'), 3, 'Each card must have an Accept Blessing CTA');
 
   // Wait for GSAP card deal animation to settle

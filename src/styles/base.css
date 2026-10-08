@@ -149,7 +149,7 @@ small { font-size: 13px; }
 
 /* Form controls */
 select, input[type="text"], input:not([type]), .name-field input {
-  min-height: 40px;
+  min-height: 44px;
   width: 100%;
   padding: 6px 10px;
   border: 2px solid var(--win-edge);
@@ -180,8 +180,8 @@ details > summary::-webkit-details-marker { display: none; }
 }
 .brand { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: var(--touch); padding: 4px 6px; border: 0; background: none; color: var(--ink); font-family: var(--pixel); font-size: 10px; text-shadow: 2px 2px 0 #000; white-space: nowrap; }
 #hud-title { overflow: hidden; text-overflow: ellipsis; }
-.brand:disabled { cursor: default; }
-.brand:disabled .brand-back { display: none; }
+body[data-screen="camp"] .brand { cursor: default; }
+body[data-screen="camp"] .brand-back { display: none; }
 .brand-back { color: var(--gold); }
 .header-tools { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .header-tools .icon-button { min-width: 44px; min-height: 44px; padding: 4px; }

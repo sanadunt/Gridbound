@@ -13,8 +13,8 @@ await withBrowser(async ({ wait, evaluate, click, errors, screenshot }) => {
   await evaluate(`document.querySelector('#commander-name').value='D7 QA'`);
   await click('#new-commander');
   await wait('document.querySelectorAll("dialog[open]").length===0');
-  await wait('Boolean(document.querySelector("#story-journal"))');
-  await click('#story-journal');
+  await click.nav('more');
+  await click('.more-scene [data-open-action="journal"]');
   await wait('Boolean(document.querySelector("dialog[open]"))');
   const locked = await evaluate(`({text:document.querySelector('dialog[open]')?.textContent||'', choices:document.querySelectorAll('[data-story-choice]').length})`);
   assert.match(locked.text, /Chapter 3/);

@@ -169,7 +169,7 @@ async function runBrowserScenario() {
       });
 
       const leaveBattle = async () => {
-        await click('#retreat');
+        await click('#pause'); await wait('Boolean(document.querySelector("#pause-retreat"))'); await click('#pause-retreat');
         await wait('Boolean(document.querySelector("#modal #abandon-run"))', 10000);
         await click('#abandon-run');
         await wait(townReady(), 10000);
@@ -398,7 +398,7 @@ async function runBrowserScenario() {
           const secondRun = await action('start and immediately abandon the saved Roguelike build', async () => {
             await click('[data-depart="endless"]');
             await wait(battleReady('endless'), 10000);
-            await click('#retreat');
+            await click('#pause'); await wait('Boolean(document.querySelector("#pause-retreat"))'); await click('#pause-retreat');
             await wait('Boolean(document.querySelector("#modal #abandon-run"))', 10000);
             await click('#abandon-run');
             await wait(townReady(), 10000);

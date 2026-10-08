@@ -68,18 +68,32 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
     // Navigate the way a player does: town buildings, the MENU screen, and the gate's mode tabs.
     click.nav = async facility => {
       const route = () => evaluate('document.querySelector(".town-game-shell")?.dataset.townRoute ?? ""');
-      const toCamp = async () => { if (await route() !== 'camp') await click('#home'); await wait('Boolean(document.querySelector(".town-spot"))'); };
+      const toCamp = async () => {
+        for (let attempt = 0; attempt < 3 && await route() !== 'camp'; attempt++) {
+          await click('#home');
+          try { await wait('Boolean(document.querySelector(".town-spot"))', 2000); } catch { /* a click landing mid-transition is retried */ }
+        }
+        await wait('Boolean(document.querySelector(".town-spot"))');
+      };
       if (facility === 'camp') return toCamp();
       if (facility === 'more') { await click('#menu-button'); return wait('Boolean(document.querySelector(".more-scene"))'); }
       if (['party', 'party-advanced', 'quests', 'bestiary', 'challenge-shop'].includes(facility)) {
         await click('#menu-button');
         await wait('Boolean(document.querySelector(".more-scene"))');
-        return click(`.more-scene [data-facility="${facility}"]`);
+        await click(`.more-scene [data-facility="${facility}"]`);
+        return wait(`document.querySelector(".town-game-shell")?.dataset.townRoute === ${JSON.stringify(facility)}`);
       }
       await toCamp();
       await click('.town-spot[data-facility="campaign"]');
       await wait('Boolean(document.querySelector(".expedition-mode-nav"))');
       if (facility !== 'campaign') await click(`.expedition-mode-nav [data-facility="${facility}"]`);
+      await wait(`document.querySelector(".town-game-shell")?.dataset.townRoute === ${JSON.stringify(facility)}`);
+    };
+    // Leave a battle the way a player does: pause menu → Retreat.
+    click.retreat = async () => {
+      await click('#pause');
+      await wait('Boolean(document.querySelector("#pause-retreat"))');
+      await click('#pause-retreat');
     };
     const key = async (key, code = key) => {
       const virtual = ({Escape:27,Enter:13,' ':32,Tab:9,ArrowLeft:37,ArrowRight:39})[key] || (key.length===1 ? key.toUpperCase().charCodeAt(0) : 0);

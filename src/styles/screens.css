@@ -114,7 +114,7 @@
 .raid-party-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 8px 0; }
 .raid-party-slot span { font-size: 14px; }
 .raid-modifiers { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
-.raid-modifier { display: flex; gap: 10px; align-items: flex-start; }
+.raid-modifier { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; padding: 4px 0; }
 .raid-modifier small { display: block; color: var(--ink-dim); }
 .raid-sandbox label { margin: 8px 0; display: grid; grid-template-columns: 1fr 50px; gap: 4px 8px; align-items: center; }
 .raid-sandbox label input { grid-column: 1 / -1; }

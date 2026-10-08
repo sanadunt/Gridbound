@@ -263,7 +263,6 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   $('battle-screen').hidden = true;
   document.body.dataset.screen = tab === 'camp' ? 'camp' : 'town';
   $('hud-title').textContent = routeTitle(tab);
-  $<HTMLButtonElement>('home').disabled = tab === 'camp';
   renderTown($('town-screen'), profile, townState);
   if (routeChanged) {
     const scene = $('town-screen').querySelector<HTMLElement>('.town-scene');
@@ -1231,7 +1230,7 @@ async function presentResult() {
       const meta = getBoonMeta(b.id);
       return `<button class="boon-card" data-boon="${b.id}" style="--card-accent:${meta.color}" aria-label="${escapeUI(b.name)} - ${escapeUI(b.patron)}">
         <span class="boon-card-gem" aria-hidden="true"></span>
-        <small class="boon-patron-name">${escapeUI(b.patron)}</small>
+        <small class="boon-patron-badge boon-patron-name">${escapeUI(b.patron)}</small>
         <h4 class="boon-name">${escapeUI(b.name)}</h4>
         <p class="boon-desc">${escapeUI(b.description)}</p>
         <span class="boon-cta">${t('boon.take')}</span>
@@ -1273,7 +1272,6 @@ async function presentResult() {
         ${readyQuests && !moreWaves && won ? `<p class="hint">${t('result.quests', { n: readyQuests })}</p>` : ''}
       </section>
       <section class="win result-details" id="result-details" aria-label="${t('result.details')}" hidden>
-        ${xpRows ? `<div class="xp-results">${xpRows}</div>` : ''}
         <p class="hint">${t('result.xp.note')}</p>
         <dl class="stat-table"><div><dt>${t('battle.stat.damage')}</dt><dd>${Math.round(battle.damage).toLocaleString()}</dd></div><div><dt>${t('battle.stat.blocked')}</dt><dd>${Math.round(battle.blocked).toLocaleString()}</dd></div></dl>
       </section>
@@ -1564,7 +1562,8 @@ if (typeof navigator !== 'undefined' && !navigator.webdriver) {
   window.addEventListener('beforeunload', event => { if (commander.busy || commander.dirty || pendingSettlement) event.preventDefault(); });
 }
  $('home').addEventListener('click', () => {
-  if (inTown) showTown('camp');
+  if (inTown && townState.tab === 'camp') showTitleScreen();
+  else if (inTown) showTown('camp');
   else navigateTown('camp');
 });
 $('title-enter').addEventListener('click', enterEmberhollow);
