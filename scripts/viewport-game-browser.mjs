@@ -9,7 +9,7 @@ for (const [width, height] of viewports) {
     await send('Page.navigate', { url });
     await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")');
     await evaluate('document.fonts.ready');
-    await click('.game-nav [data-facility="campaign"]');
+    await click.nav('campaign');
     await click('[data-zone="0"]');
     await click('[data-depart="adventure"]');
     await wait('window.gridbound.battle.status === "ready" && document.querySelector("#start")');
@@ -111,8 +111,8 @@ for (const [width, height] of viewports) {
     ], `Every boss, lane, party, and action control is present at ${width}×${height}`);
     const clipped = active.controls.filter(control => !control.visible || !control.withinViewport || control.clippedBy.length);
     assert.deepEqual(clipped, [], `Every combat control remains visible without scrolling at ${width}×${height}: ${JSON.stringify(clipped)}`);
-    assert.match(active.standing, /^\d+ \/ \d+ STANDING$/);
-    assert.ok(active.health.length === 3 && active.health.every(value => /^\d+\s*\/\s*\d+$/.test(value)),
+    assert.match(active.standing, /^\d+\/\d+ standing$/);
+    assert.ok(active.health.length === 3 && active.health.every(value => /^\d+$/.test(value)),
       `Every party health value remains visible and numeric at ${width}×${height}: ${JSON.stringify(active.health)}`);
     assert.equal(active.bossHealthLines, 1, `Boss health remains on one readable line at ${width}×${height}`);
     assert.ok(active.threat.length > 0, 'Active battle retains a readable threat/counter cue');

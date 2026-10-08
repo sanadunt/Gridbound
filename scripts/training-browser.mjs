@@ -14,7 +14,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
   // Open Training Hall (Party facility)
-  await click('[data-facility="party"]');
+  await click.nav('party');
   await wait('Boolean(document.querySelector(".training-identity"))');
 
   // Verify Hero Sanctum Header
@@ -90,7 +90,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
-  await click('[data-facility="party"]');
+  await click.nav('party');
   await wait('Boolean(document.querySelector(".training-identity"))');
 
   // Verify zero horizontal overflow on mobile

@@ -30,10 +30,10 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
 
   await send('Page.reload');
   await wait('window.gridbound && document.querySelector(".camp-scene")');
-  await wait('document.querySelector("#storage-status")?.textContent.includes("local IndexedDB")');
+  await wait('document.querySelector("#storage-status")?.textContent.startsWith("Saved")');
   await evaluate('window.gridbound.hideTitle()');
   await wait('document.querySelector("#title-screen").hidden');
-  await click('.game-nav [data-facility="party"]');
+  await click.nav('party');
   await wait('document.querySelector(".party-scene [data-respec]")');
   await click('.party-scene [data-respec]');
   await wait('window.gridbound.profile().gold === 2400 && window.gridbound.profile().loadouts[0].talents.length === 0');
@@ -54,19 +54,19 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
       && JSON.stringify(state.loadouts[0].skills) === '[0,1]';
   })()`);
   await click('.party-advanced-link');
-  await wait('document.querySelector(".party-scene h1")?.textContent.trim() === "Prepare the party"');
+  await wait('document.querySelector(".party-scene h1")?.textContent.trim() === "Party"');
   const alternateHero = await evaluate('Number([...document.querySelectorAll(".party-roster button")].find(button => !button.classList.contains("active")).dataset.townHero)');
   await click(`[data-town-hero="${alternateHero}"]`);
   await wait(`Number(document.querySelector(".party-roster .active")?.dataset.townHero) === ${alternateHero}`);
   await click('.party-advanced-link');
-  await wait('document.querySelector(".party-scene h1")?.textContent.trim() === "Progression"');
+  await wait('document.querySelector(".party-scene h1")?.textContent.trim() === "Jobs & Talents"');
   assert.equal(await evaluate('Number(document.querySelector(".party-roster .active")?.dataset.townHero)'), alternateHero,
     'Opening Jobs & talents preserves the selected hero');
   await click('.party-advanced-link');
-  await wait('document.querySelector(".party-scene h1")?.textContent.trim() === "Prepare the party"');
+  await wait('document.querySelector(".party-scene h1")?.textContent.trim() === "Party"');
   assert.equal(await evaluate('Number(document.querySelector(".party-roster .active")?.dataset.townHero)'), alternateHero,
     'Returning to preparation preserves the selected hero');
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper.map-view"))');
   await click('.map-node-pin[data-zone="2"]');
   await wait('Boolean(document.querySelector(".world-map-wrapper.mission-view"))');
@@ -77,10 +77,10 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
 
   await send('Page.reload');
   await wait('window.gridbound && document.querySelector(".camp-scene")');
-  await wait('document.querySelector("#storage-status")?.textContent.includes("local IndexedDB")');
+  await wait('document.querySelector("#storage-status")?.textContent.startsWith("Saved")');
   await evaluate('window.gridbound.hideTitle()');
   await wait('document.querySelector("#title-screen").hidden');
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper.map-view"))');
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
   await wait('Boolean(document.querySelector(".secondary-scene [data-depart=raid]"))');
@@ -128,7 +128,7 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
   })()`);
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
   await wait('Boolean(document.querySelector(".secondary-scene [data-depart=raid]"))');
-  await click('.game-nav [data-facility="more"]');
+  await click.nav('more');
   await wait('Boolean(document.querySelector(".more-scene"))');
   await click('.more-card[data-facility="quests"]');
   await wait(`Boolean(document.querySelector('.secondary-scene [data-claim-quest="hunt-wolf"]:not(:disabled)'))`);
@@ -151,7 +151,7 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
       claimedQuests: document.story.slots[3].state.claimedQuests };
   })()`);
 
-  await click('.game-nav [data-facility="more"]');
+  await click.nav('more');
   await wait('Boolean(document.querySelector(".more-scene"))');
   await click('.more-card[data-facility="challenge-shop"]');
   await wait('window.gridbound.profile().economy.commanderCrystal === 57');
@@ -159,7 +159,7 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
     const button = document.querySelector('.secondary-scene [data-bank-buy="bank-relic-ward"]');
     return { disabled: button.disabled, label: button.textContent.trim() };
   })()`);
-  assert.deepEqual(shopButton, { disabled: false, label: '24 CRYSTAL' },
+  assert.deepEqual(shopButton, { disabled: false, label: '24 ◆' },
     'Challenge shop opened from Story uses the shared bank');
   await click('.secondary-scene [data-bank-buy="bank-relic-ward"]');
   await wait(`(async () => {

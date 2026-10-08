@@ -14,7 +14,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key }) => {
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
   // Start Chapter 1 Adventure
-  await click('[data-facility="campaign"]');
+  await click.nav('campaign');
   await click('[data-zone="0"]');
   await click('[data-depart="adventure"]');
   await click('#start');
@@ -34,9 +34,9 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key }) => {
 
   // Verify full-screen victory scene
   assert.equal(await evaluate('Boolean(document.querySelector("#result-screen .result-ceremony-modal.victory"))'), true, 'Victory result scene must exist');
-  assert.equal(await evaluate('Boolean(document.querySelector(".ceremony-crest.victory"))'), true, 'Victory laurel crest must exist');
-  assert.equal(await evaluate('document.querySelectorAll(".ceremony-corner").length'), 4, '4 Corner brackets must exist');
-  assert.ok((await evaluate('document.querySelector("#result-title").textContent')).includes('Bring the fire home'), 'Victory title must match');
+  assert.equal(await evaluate('Boolean(document.querySelector(".result-ceremony-modal.victory .result-banner"))'), true, 'Victory banner must exist');
+  assert.equal(await evaluate('document.querySelectorAll(".result-ceremony-modal .win").length >= 2'), true, 'Result uses JRPG windows');
+  assert.ok((await evaluate('document.querySelector("#result-title").textContent')).includes('The bell remembers'), 'Victory title must match');
 
   // Check XP Cards Grid and Selectors
   assert.equal(await evaluate('document.querySelector("#result-details").hidden'), true, 'Secondary breakdowns stay closed in the summary');
@@ -65,7 +65,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key }) => {
   await key('Escape');
   await wait('document.querySelector("#result-details").hidden');
   assert.equal(await evaluate('document.querySelector("#result-screen").scrollTop'), 0, 'Returning from Details restores the result scene to its summary position');
-  assert.ok(await evaluate('document.querySelector(".ceremony-crest").getBoundingClientRect().top >= 0'), 'Mobile victory crest must remain in view after Details closes');
+  assert.ok(await evaluate('document.querySelector(".result-banner").getBoundingClientRect().top >= 0'), 'Mobile victory crest must remain in view after Details closes');
   await screenshot('artifacts/victory-hades-mobile-360x640.png');
   console.log('✓ Captured artifacts/victory-hades-mobile-360x640.png');
 
@@ -83,7 +83,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
-  await click('[data-facility="campaign"]');
+  await click.nav('campaign');
   await click('[data-zone="0"]');
   await click('[data-depart="adventure"]');
   await click('#start');
@@ -95,7 +95,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
 
   // Verify the intermission result remains a full-screen state.
   assert.equal(await evaluate('Boolean(document.querySelector("#result-screen .result-ceremony-modal.wave-clear"))'), true, 'Wave clear result must exist');
-  assert.equal(await evaluate('Boolean(document.querySelector(".ceremony-crest.wave-clear"))'), true, 'Wave clear crest must exist');
+  assert.equal(await evaluate('Boolean(document.querySelector(".result-ceremony-modal.wave-clear .result-banner"))'), true, 'Wave clear banner must exist');
   assert.equal(await evaluate('Boolean(document.querySelector("#next-wave"))'), true, '#next-wave CTA must exist');
   const mobileBounds = await evaluate('JSON.stringify([...document.querySelectorAll("#result-screen .ceremony-actions button, #result-details-toggle")].map(button => { const box = button.getBoundingClientRect(); return {top:box.top,bottom:box.bottom,height:box.height}; }))');
   const controls = JSON.parse(mobileBounds);
@@ -104,7 +104,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   assert.ok(await evaluate('document.documentElement.scrollHeight <= innerHeight + 1 && document.documentElement.scrollWidth <= innerWidth + 1'), 'Result screen must not create document scrolling');
   await click('#result-town');
   await wait('document.querySelector("#modal").open');
-  assert.ok(await evaluate('document.querySelector("#modal").textContent.includes("Abandon ends this run")'), 'Leaving an incomplete encounter must present a confirmation');
+  assert.ok(await evaluate('document.querySelector("#modal").textContent.includes("Abandon ends")'), 'Leaving an incomplete encounter must present a confirmation');
   await click('#modal button[data-close]:not(.modal-close)');
   await wait('!document.querySelector("#modal").open && window.gridbound.battle.status === "victory" && !document.querySelector("#result-screen").hidden');
 
@@ -126,8 +126,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
-  await click('[data-facility="campaign"]');
-  await click('[data-facility="endless"]');
+  await click.nav('campaign');
+  await click.nav('endless');
   await click('[data-depart="endless"]');
   await click('#start');
   await wait('window.gridbound.battle.status === "fighting"');
@@ -138,8 +138,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
 
   // Verify the full-screen defeat scene
   assert.equal(await evaluate('Boolean(document.querySelector("#result-screen .result-ceremony-modal.defeat"))'), true, 'Defeat result scene must exist');
-  assert.equal(await evaluate('Boolean(document.querySelector(".ceremony-crest.defeat"))'), true, 'Defeat skull crest must exist');
-  assert.ok((await evaluate('document.querySelector("#result-title").textContent')).includes('Rally. Adapt. Return'), 'Defeat title must match');
+  assert.equal(await evaluate('Boolean(document.querySelector(".result-ceremony-modal.defeat .result-banner"))'), true, 'Defeat banner must exist');
+  assert.ok((await evaluate('document.querySelector("#result-title").textContent')).includes('Rally, adapt, return'), 'Defeat title must match');
   assert.equal(await evaluate('Boolean(document.querySelector("#retry"))'), true, '#retry CTA must exist');
   assert.equal(await evaluate('Boolean(document.querySelector("#result-town"))'), true, '#result-town CTA must exist');
 

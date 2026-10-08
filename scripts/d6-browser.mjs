@@ -9,12 +9,12 @@ try {
  while(!output.includes('http://127.0.0.1:5186/')){if(server.exitCode!==null||Date.now()>deadline)throw Error(output);await new Promise(r=>setTimeout(r,100));}
  await withBrowser(async({send,evaluate,wait,click,errors,screenshot})=>{
   await send('Page.navigate',{url:'http://127.0.0.1:5186/'});
-  await wait('window.gridbound && (document.querySelector(".game-nav") || document.querySelector("#title-screen"))',15000);
+  await wait('window.gridbound && (document.querySelector(".town-game-shell") || document.querySelector("#title-screen"))',15000);
   const openProfiles=async()=>{
    if(await evaluate('Boolean(document.querySelector("dialog[open] #new-commander"))')) return;
    if(await evaluate('Boolean(document.querySelector("#title-screen:not([hidden])"))')) await click('#title-profiles');
    else {
-    if(!await evaluate('Boolean(document.querySelector(".more-scene"))')) { await click('.game-nav [data-facility="more"]'); await wait('Boolean(document.querySelector(".more-scene"))'); }
+    if(!await evaluate('Boolean(document.querySelector(".more-scene"))')) { await click.nav('more'); await wait('Boolean(document.querySelector(".more-scene"))'); }
     await click('.more-scene [data-open-action="profiles"]');
    }
    await wait('Boolean(document.querySelector("#new-commander"))',15000);
@@ -52,7 +52,7 @@ try {
   await evaluate('window.__d6BeforeReload=true');
   await send('Page.reload');
   await wait('window.__d6BeforeReload===undefined && !document.querySelector("dialog[open]")',15000);
-  await wait('window.gridbound && document.querySelector(".game-nav")',15000);
+  await wait('window.gridbound && document.querySelector(".town-game-shell")',15000);
   await openProfiles();
   await wait('document.querySelectorAll("[data-commander]").length===3',15000);
   const alpha=await evaluate(`Array.from(document.querySelectorAll('[data-commander]')).find(el=>el.parentElement.textContent.includes('Smoke Alpha')).dataset.commander`);
@@ -62,17 +62,17 @@ try {
   assert.equal(await evaluate('document.querySelector("[data-load-slot=manual-1]").disabled'),false);
   await click('[data-close]');
   for(const mode of ['raid','endless']) {
-   await click('.game-nav [data-facility="campaign"]');
+   await click.nav('campaign');
    await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
    await click(`.world-map-wrapper .expedition-mode-nav [data-facility="${mode}"]`);
    await wait(`Boolean(document.querySelector('[data-depart="${mode}"]'))`);
-   await wait('document.querySelector("#storage-status")?.textContent.includes("local IndexedDB")');
+   await wait('document.querySelector("#storage-status")?.textContent.startsWith("Saved")');
    await click(`[data-depart="${mode}"]`);try { await wait(`window.gridbound?.battle?.mode===${JSON.stringify(mode)} && window.gridbound?.inTown===false`); } catch(e) { console.log(await evaluate('document.body.innerText'),JSON.stringify(errors));throw e; }
    const before=await evaluate('window.gridbound.battle.snapshot()');
    await click('#pause');await wait('Boolean(document.querySelector("#modal #pause-retreat"))');
    await click('#pause-retreat');await wait('Boolean(document.querySelector("#suspend-run"))');
    await click('#suspend-run');await wait('window.gridbound.inTown===true');
-   await click('.game-nav [data-facility="campaign"]');
+   await click.nav('campaign');
    await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
    await click(`.world-map-wrapper .expedition-mode-nav [data-facility="${mode}"]`);
    await openProfiles();await wait('Boolean(document.querySelector("#continue-latest"))');
@@ -87,16 +87,16 @@ try {
    assert.equal(after.bossHp,before.bossHp,mode+' resume boss');
    await click('#pause');await wait('Boolean(document.querySelector("#modal #pause-retreat"))');
    await click('#pause-retreat');await wait('Boolean(document.querySelector("#abandon-run"))');await click('#abandon-run');await wait('window.gridbound.inTown===true');
-   await click('.game-nav [data-facility="campaign"]');
+   await click.nav('campaign');
    await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
    await click(`.world-map-wrapper .expedition-mode-nav [data-facility="${mode}"]`);
    await openProfiles();await wait('Boolean(document.querySelector("#continue-latest"))');await click('#continue-latest');
    await wait('document.querySelector("#profile-error")?.textContent.includes("No checkpoint")');await click('[data-close]');
   }
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
-  await wait('Boolean(document.querySelector("[data-depart=raid]")) && document.querySelector("#storage-status")?.textContent.includes("local IndexedDB")');
+  await wait('Boolean(document.querySelector("[data-depart=raid]")) && document.querySelector("#storage-status")?.textContent.startsWith("Saved")');
   await click('[data-depart="raid"]');await wait('window.gridbound.inTown===false');
   const initialBank=await evaluate('window.gridbound.profile().economy.commanderCrystal');
   await click('#start');
@@ -109,10 +109,10 @@ try {
   await wait('Boolean(document.querySelector("#result-town")) && !document.querySelector("#result-town").disabled',15000);
   assert.equal(await evaluate('window.gridbound.profile().economy.commanderCrystal'),paid.economy.commanderCrystal,'terminal replay never recredits');
   await click('#result-town');await wait('window.gridbound.inTown===true');
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="endless"]');
-  await wait('Boolean(document.querySelector("[data-depart=endless]")) && document.querySelector("#storage-status")?.textContent.includes("local IndexedDB")');
+  await wait('Boolean(document.querySelector("[data-depart=endless]")) && document.querySelector("#storage-status")?.textContent.startsWith("Saved")');
   await click('[data-depart="endless"]');await wait('window.gridbound.inTown===false');await click('#start');
   const beforeDefeat=await evaluate('window.gridbound.profile().economy.commanderCrystal');
   await evaluate('window.gridbound.battle.heroes.forEach(h=>h.hp=0)');

@@ -147,3 +147,16 @@
 .quest-reward { font-size: 14px; color: var(--ink-soft); }
 .quest-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .quest-actions .btn { flex: 1 1 auto; }
+
+/* Screens with a Depart footer: header rows stay put, the middle scrolls, the footer never covers content. */
+.town-scene > .party-scene, .town-scene > .secondary-scene { overflow: hidden; }
+.party-scene > .training-panel, .secondary-scene > .secondary-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.party-scene > .training-panel { min-height: 120px; }
+.party-scene > .deploy-bar, .secondary-scene > .deploy-bar { position: static; padding: 0; background: none; }
+.party-scene > *, .secondary-scene > * { flex-shrink: 0; }
+.party-scene > .training-panel, .secondary-scene > .secondary-content { flex-shrink: 1; }
+@media (max-height: 700px) {
+  .training-identity img { width: 44px; height: 48px; }
+  .training-identity p { display: none; }
+  .party-roster button img { width: 26px; height: 28px; }
+}

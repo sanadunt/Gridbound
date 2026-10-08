@@ -191,8 +191,8 @@ $('app').innerHTML = `
         <div class="win boss-hud">
           <div class="boss-hud-inner">
             <div class="boss-title"><h2 id="boss-name"></h2><span id="boss-title"></span><span id="phase" class="boss-phase-badge"></span></div>
-            <div class="boss-meter"><div id="boss-hp-ghost" class="boss-hp-ghost"></div><div id="boss-hp"></div><div class="boss-phase-notch p1"></div><div class="boss-phase-notch p2"></div><span id="boss-health"></span></div>
-            <div class="stagger-row"><span id="stagger-label">${t('battle.armor')}</span><div class="stagger-track"><i id="stagger"></i></div><span id="clock">00:00</span></div>
+            <div class="boss-meter"><div id="boss-hp-ghost" class="boss-hp-ghost"></div><div id="boss-hp"></div><div class="boss-phase-notch p1"></div><div class="boss-phase-notch p2"></div></div>
+            <div class="stagger-row"><span id="boss-health"></span><span id="stagger-label">${t('battle.armor')}</span><div class="stagger-track"><i id="stagger"></i></div><span id="clock">00:00</span></div>
           </div>
         </div>
       </div>
@@ -278,7 +278,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
     if (tab === 'camp') animateTownEntrance();
     else {
       const panel = document.querySelector<HTMLElement>('.town-scene');
-      if (panel) gsap.fromTo(panel, { opacity: 0.7, y: 8 }, { opacity: 1, y: 0, duration: 0.24, ease: 'power2.out', clearProps: 'all' });
+      if (panel) gsap.fromTo(panel, { opacity: 0.6 }, { opacity: 1, duration: 0.2, ease: 'power2.out', clearProps: 'opacity' });
     }
     if (tab === 'party' || tab === 'party-advanced') animateMirrorTalents();
     else if (tab === 'bestiary') animateCodexEntry();
@@ -366,8 +366,8 @@ $('town-screen').addEventListener('click', event => {
     showTown('campaign', '', true);
     return;
   }
-  if (button.dataset.zone) {
-    townState.zone = Number(button.dataset.zone);
+  if (button.dataset.zone || button.dataset.mission) {
+    townState.zone = Number(button.dataset.zone ?? button.dataset.mission);
     townState.campaignPage = townState.zone;
     sound.clink();
     showTown('mission', '', true);
@@ -606,7 +606,7 @@ function showReady() {
   $('ready-copy').textContent = battle.stage > 0 ? t('ready.copy.next') : battle.mode === 'adventure' ? t('ready.copy.story') : t('ready.copy.other');
   $('start').textContent = t('battle.begin');
   if (profile.motion) {
-    gsap.fromTo('#start-overlay .start-window', { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.24, ease: 'back.out(1.6)', clearProps: 'opacity,transform' });
+    gsap.fromTo('#start-overlay .start-window', { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
   }
 }
 async function begin() {
@@ -1273,6 +1273,7 @@ async function presentResult() {
         ${readyQuests && !moreWaves && won ? `<p class="hint">${t('result.quests', { n: readyQuests })}</p>` : ''}
       </section>
       <section class="win result-details" id="result-details" aria-label="${t('result.details')}" hidden>
+        ${xpRows ? `<div class="xp-results">${xpRows}</div>` : ''}
         <p class="hint">${t('result.xp.note')}</p>
         <dl class="stat-table"><div><dt>${t('battle.stat.damage')}</dt><dd>${Math.round(battle.damage).toLocaleString()}</dd></div><div><dt>${t('battle.stat.blocked')}</dt><dd>${Math.round(battle.blocked).toLocaleString()}</dd></div></dl>
       </section>

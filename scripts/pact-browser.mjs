@@ -33,7 +33,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await wait('Boolean(window.gridbound && document.querySelector("#town-screen:not([hidden])"))');
 
   // Navigate to Raid Hunts (Pact of Punishment)
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
   await wait('document.querySelectorAll("[data-raid]").length === 12');
@@ -81,7 +81,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   console.log('PASS: Desktop The Sunken Bell (Descent) verified and captured.');
 
   // Open Story Journal Modal from More.
-  await click('.game-nav [data-facility="more"]');
+  await click.nav('more');
   await wait('Boolean(document.querySelector(".more-scene"))');
   await click('.more-scene [data-open-action="journal"]');
   await wait('Boolean(document.querySelector("#modal")?.open)');
@@ -126,7 +126,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   };
 
   // Test Raid Hunts on mobile
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
   await wait('document.querySelectorAll("[data-raid]").length === 12');

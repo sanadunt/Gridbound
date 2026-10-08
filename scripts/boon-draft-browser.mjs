@@ -11,7 +11,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
   // Go to endless / The Sunken Bell
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="endless"]');
   await wait('Boolean(document.querySelector("[data-depart=endless]"))');
@@ -56,7 +56,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
   // Go to endless
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="endless"]');
   await wait('Boolean(document.querySelector("[data-depart=endless]"))');

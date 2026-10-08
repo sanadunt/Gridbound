@@ -1,15 +1,17 @@
-.town-screen { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
-.town-game-shell { min-height: 100%; }
-.town-scene { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 10px; min-height: 100%; }
-[data-town-route="camp"] .town-scene { padding: 0; gap: 0; }
-body[data-screen="camp"] .town-screen { overflow: hidden; }
+.town-screen { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.town-game-shell { height: 100%; }
+.town-scene { position: relative; display: flex; flex-direction: column; height: 100%; }
+/* Each route scrolls inside its own panel so sticky deploy bars stay on screen. */
+.town-scene > :not(.town-notice) { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 10px; scrollbar-width: thin; scroll-padding-bottom: 96px; }
+.town-scene > .camp-scene { padding: 0; }
 
 /* Camp: the pixel village fills the column; buildings are the menu. */
-.camp-scene { display: flex; flex-direction: column; align-items: center; height: 100%; background: #0d1418; }
+.camp-scene { display: flex; flex-direction: column; align-items: center; background: #0d1418; }
 .town-map {
   position: relative;
   flex: 0 0 auto;
-  width: min(100%, calc((100dvh - 178px) * var(--town-w) / var(--town-h)));
+  /* Fit the viewport, but never shrink buildings below a 44px touch target (the camp scrolls instead). */
+  width: min(100%, max(160px, calc((100dvh - 178px) * var(--town-w) / var(--town-h))));
   aspect-ratio: var(--town-w) / var(--town-h);
   overflow: hidden;
 }
@@ -63,7 +65,7 @@ body[data-screen="camp"] .town-screen { overflow: hidden; }
 .map-title-block small { color: var(--ink-dim); }
 .map-title-block h2 { font-family: var(--pixel); font-size: 12px; color: var(--gold); line-height: 1.5; margin-top: 2px; }
 .map-stepper-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.map-stepper-btn { min-width: 40px; padding: 4px; }
+.map-stepper-btn { min-width: 44px; padding: 4px; }
 .chapter-counter { font-family: var(--pixel); font-size: 9px; white-space: nowrap; }
 .map-act-nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .map-act-tab { display: flex; flex-direction: column; align-items: center; gap: 1px; min-height: 52px; padding: 4px; border: 2px solid #ffffff88; border-radius: 5px; background: #0a1145; color: var(--ink); }
@@ -72,7 +74,8 @@ body[data-screen="camp"] .town-screen { overflow: hidden; }
 .act-tab-roman { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
 .act-tab-name { font-weight: 400; font-size: 12px; line-height: 1.1; text-align: center; }
 .act-tab-badge { font-size: 11px; color: var(--ink-dim); }
-.world-map-canvas-card { border: 3px solid var(--win-edge); border-radius: var(--radius); box-shadow: 0 0 0 2px var(--win-shadow), 0 4px 0 2px #0007; overflow: hidden; }
+.world-map-canvas-card { border: 3px solid var(--win-edge); border-radius: var(--radius); box-shadow: 0 0 0 2px var(--win-shadow), 0 4px 0 2px #0007; }
+.world-map-canvas-card .overworld-art { border-radius: 4px; }
 .map-chart-viewport { position: relative; aspect-ratio: 200 / 120; }
 .overworld-art { position: absolute; inset: 0; width: 100%; height: 100%; }
 .map-nodes-layer { position: absolute; inset: 0; }
@@ -101,3 +104,9 @@ body[data-screen="camp"] .town-screen { overflow: hidden; }
 .stage-route { margin: 8px 0; padding-left: 18px; }
 .stage-route li { padding: 2px 0; }
 .stage-route small { color: var(--ink-dim); }
+.world-map-dossier .departure-actions { position: sticky; bottom: 0; z-index: 2; margin: 10px -12px -10px; padding: 10px 12px; background: linear-gradient(180deg, #0e1654ee, #0e1654); border-radius: 0 0 4px 4px; }
+.mission-brief.map-selected { display: block; }
+.map-selected small { color: var(--ink-dim); }
+.map-selected h3 { font-family: var(--pixel); font-size: 12px; color: var(--gold); margin: 4px 0 6px; line-height: 1.5; }
+.map-selected .map-hint { margin: 0 0 8px; color: var(--ink-soft); }
+.map-selected .btn { width: 100%; }

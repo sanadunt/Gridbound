@@ -5,6 +5,8 @@ import { monsterCanvas } from '../art/monsters';
 import { ENEMIES } from '../game/world';
 import { KITS } from '../game/content';
 import { Sound } from '../audio/sound';
+import { t, lang } from '../i18n';
+import { eventText } from '../i18n/content';
 
 export const ARENA={width:600,height:760,x:72,y:367,cw:144,ch:112,gap:12};
 export function cell(slot:number){return {x:ARENA.x+(slot%3)*(ARENA.cw+ARENA.gap),y:ARENA.y+Math.floor(slot/3)*(ARENA.ch+ARENA.gap)};}
@@ -53,7 +55,7 @@ export class BattleScene extends Phaser.Scene {
  replace(battle:Battle){this.tweens.killAll();for(const child of [...this.children.list])if('depth' in child && Number(child.depth)>=17)child.destroy();this.fx=this.add.graphics().setDepth(20);this.flashRect=this.add.rectangle(300,380,600,760,0xffffff,0).setDepth(45);this.hitStop=0;this.bossKick=0;this.introLeft=0;this.victoryAge=0;this.pulse=0;this.shake=0;this.bossCue=undefined;this.dragId=-1;this.dragPoint=undefined;this.hoverSlot=-1;this.battle=battle;this.heroes.forEach(s=>s.destroy());this.heroes.clear();this.enemies.forEach(s=>s.destroy());this.enemies.clear();this.particles=[];this.flashes.clear();this.attacks.clear();this.accumulator=0;this.resetEnemyDeathAnimation();this.syncHeroes();}
 
  /** Battle start: boss lunges in, white flash and a FIGHT banner. */
- encounterStart(){this.introLeft=this.reducedMotion?0:.45;this.screenFlash(0xffffff,.55);this.floating(300,380,'FIGHT!','#ffe082',true,true);}
+ encounterStart(){this.introLeft=this.reducedMotion?0:.45;this.screenFlash(0xffffff,.55);this.floating(300,380,t('battle.begin'),'#ffe082',true,true);}
  private screenFlash(color:number,alpha=.45){if(this.reducedMotion)return;this.flashRect.setFillStyle(color,alpha);this.tweens.add({targets:this.flashRect,fillAlpha:0,duration:220,ease:'Quad.easeOut'});}
  private freeze(seconds:number){if(!this.reducedMotion)this.hitStop=Math.max(this.hitStop,seconds);}
 
@@ -155,7 +157,7 @@ export class BattleScene extends Phaser.Scene {
   const size = crit ? '36px' : big ? '28px' : '22px';
   const strokeColor = crit ? '#5c3900' : '#122825';
   const strokeThickness = crit ? 7 : 5;
-  const label=this.add.text(x,y,text,{fontFamily:'"Press Start 2P"',fontSize:size,color,stroke:strokeColor,strokeThickness}).setOrigin(.5).setDepth(40);
+  const label=this.add.text(x,y,eventText(text,lang()),{fontFamily:'"Press Start 2P"',fontSize:size,color,stroke:strokeColor,strokeThickness}).setOrigin(.5).setDepth(40);
   if(this.reducedMotion){this.time.delayedCall(220,()=>label.destroy());return;}
   label.setScale(crit?1.6:1.3);this.tweens.add({targets:label,scale:1,y:y-8,duration:120,ease:'Back.easeOut'});
   this.tweens.add({targets:label,y:y-(crit?60:46),alpha:0,delay:crit?420:280,duration:crit?900:700,onComplete:()=>label.destroy()});
@@ -171,7 +173,7 @@ export class BattleScene extends Phaser.Scene {
    } else if (options.isHeal) {
      this.floating(x, y, `+${value} HP`, '#69f0ae');
    } else if (options.isBlocked) {
-     this.floating(x, y, 'BLOCKED', '#80deea', true);
+     this.floating(x, y, t('battle.blocked'), '#80deea', true);
    } else {
      this.floating(x, y, String(value), '#ffdfa0');
    }
@@ -228,7 +230,7 @@ export class BattleScene extends Phaser.Scene {
   }
   if(e.type==='hurt'){
    const blocked=!e.amount;this.flashes.set(e.source!,.16);if(!blocked&&(e.amount??0)>=60){this.shake=Math.max(this.shake,.18);this.screenFlash(0xff3030,.16);}
-   if(blocked){this.floating(pos.x,pos.y-10,'BLOCKED','#80deea',true);this.ring(pos.x,pos.y,0x80deea,14,2.3);}
+   if(blocked){this.floating(pos.x,pos.y-10,t('battle.blocked'),'#80deea',true);this.ring(pos.x,pos.y,0x80deea,14,2.3);}
    else{this.floating(pos.x,pos.y-10,`−${e.amount}`,'#ff8a80');this.ring(pos.x,pos.y,0xe99a8b,11,1.8);}
    this.burst(pos.x,pos.y,blocked?0x9ed6ed:0xe99a8b,blocked?4:6);
   }
@@ -243,7 +245,7 @@ export class BattleScene extends Phaser.Scene {
    else this.ring(pos.x,pos.y,0x80deea,15,2.2);
   }
   if(e.type==='buff')this.ring(pos.x,pos.y,0x96f2be,13,2.1);
-  if(e.type==='break'){this.setBossCue('break',0xffd54f,.52);this.freeze(.1);this.screenFlash(0xffe6a0,.4);this.floating(300,150,'BREAK!','#ffe082',true,true);this.burst(300,200,0xf5d378,20);this.ring(300,200,0x55e3c7,19,2.4);this.ring(300,200,0xffd54f,13,2.8);this.shake=.3;}
+  if(e.type==='break'){this.setBossCue('break',0xffd54f,.52);this.freeze(.1);this.screenFlash(0xffe6a0,.4);this.floating(300,150,t('battle.break'),'#ffe082',true,true);this.burst(300,200,0xf5d378,20);this.ring(300,200,0x55e3c7,19,2.4);this.ring(300,200,0xffd54f,13,2.8);this.shake=.3;}
   if(e.type==='coin'){this.floating(pos.x,pos.y-20,`+${e.amount}g`);this.burst(pos.x,pos.y,0xe9c56d,5);}
   if(e.type==='move')this.floating(pos.x,pos.y-25,e.text??'MOVE','#eed69a');
   if(e.type==='impact'){

@@ -198,7 +198,7 @@ async function runBrowserScenario() {
       })()`);
 
       const storyStarted = await action('depart Story baseline', async () => {
-        await click('.game-nav [data-facility="campaign"]');
+        await click.nav('campaign');
         await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
         await click('[data-zone="0"]');
         await click('[data-depart="adventure"]');
@@ -219,7 +219,7 @@ async function runBrowserScenario() {
       }
 
       const raidOpened = await action('open Raid baseline', async () => {
-        await click('.game-nav [data-facility="campaign"]');
+        await click.nav('campaign');
         await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
         await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
         await wait('Boolean(document.querySelector("[data-depart=raid]"))', 10000);
@@ -243,7 +243,7 @@ async function runBrowserScenario() {
       }
 
       const rogueOpened = await action('open Roguelike setup', async () => {
-        await click('.game-nav [data-facility="campaign"]');
+        await click.nav('campaign');
         await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
         await click('.world-map-wrapper .expedition-mode-nav [data-facility="endless"]');
         await wait('document.querySelectorAll("[data-rogue-slot]").length === 3', 10000);
@@ -383,7 +383,7 @@ async function runBrowserScenario() {
         });
 
         const reopenedRogue = await action('reopen Roguelike after leaving', async () => {
-          await click('.game-nav [data-facility="campaign"]');
+          await click.nav('campaign');
           await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
           await click('.world-map-wrapper .expedition-mode-nav [data-facility="endless"]');
           await wait('document.querySelectorAll("[data-rogue-slot]").length === 3', 10000);
@@ -414,7 +414,7 @@ async function runBrowserScenario() {
       }
 
       const postRogueStory = await action('recheck Story after abandoning Roguelike', async () => {
-        await click('.game-nav [data-facility="campaign"]');
+        await click.nav('campaign');
         await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
         await click('[data-zone="0"]');
         await click('[data-depart="adventure"]');
@@ -433,7 +433,7 @@ async function runBrowserScenario() {
       }
 
       const postRogueRaid = await action('recheck Raid after abandoning Roguelike', async () => {
-        await click('.game-nav [data-facility="campaign"]');
+        await click.nav('campaign');
         await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
         await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
         await wait('Boolean(document.querySelector("[data-depart=raid]"))', 10000);

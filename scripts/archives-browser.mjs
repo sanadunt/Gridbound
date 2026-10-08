@@ -14,7 +14,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
   // A. Field Bestiary (Codex of the Underworld)
-  await click('[data-facility="bestiary"]');
+  await click.nav('bestiary');
   await wait('Boolean(document.querySelector(".bestiary-list"))');
 
   assert.equal(await evaluate('Boolean(document.querySelector(".bestiary-list article img"))'), true, 'Monster reliquary image must exist');
@@ -37,7 +37,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   console.log('✓ Captured artifacts/bestiary-hades-desktop.png');
 
   // B. Quest Ledger (The Fated List of Minor Prophecies)
-  await click('[data-facility="quests"]');
+  await click.nav('quests');
   await wait('Boolean(document.querySelector(".quest-pages"))');
 
   assert.equal(await evaluate('Boolean(document.querySelector("[data-quest-filter]"))'), true, 'Quest filter must exist');
@@ -51,7 +51,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   console.log('✓ Captured artifacts/quests-hades-desktop.png');
 
   // C. Challenge Shop (Charon\'s Sunken Archive)
-  await click('[data-facility="challenge-shop"]');
+  await click.nav('challenge-shop');
   await wait('Boolean(document.querySelector(".challenge-shop-grid"))');
 
   assert.ok((await evaluate('document.querySelectorAll(".challenge-shop-grid .shop-item").length')) >= 1, 'Shop items must exist');
@@ -72,7 +72,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
   // Bestiary on Mobile
-  await click('[data-facility="bestiary"]');
+  await click.nav('bestiary');
   await wait('Boolean(document.querySelector(".bestiary-list"))');
 
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), true, 'Bestiary must have zero horizontal overflow on mobile');
@@ -84,7 +84,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   console.log('✓ Captured artifacts/bestiary-hades-mobile-390.png');
 
   // Quest Ledger on Mobile
-  await click('[data-facility="quests"]');
+  await click.nav('quests');
   await wait('Boolean(document.querySelector(".quest-pages"))');
 
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), true, 'Quest Ledger must have zero horizontal overflow on mobile');

@@ -8,7 +8,7 @@ console.log('--- TESTING HADES COMBAT HUD & BOSS INTENT / HEALTH BAR ---');
 async function enterCampaignBattle({ click, wait, evaluate }) {
   await wait('Boolean(window.gridbound && document.querySelector(\'[data-facility="campaign"]\'))');
   await evaluate('document.fonts.ready');
-  await click('[data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(\'[data-zone="0"]\'))');
   await click('[data-zone="0"]');
   await wait('Boolean(document.querySelector(\'[data-depart="adventure"]\'))');
@@ -24,7 +24,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await enterCampaignBattle({ click, wait, evaluate });
   // 1. Verify Gilded Boss HUD Structure
   assert.equal(await evaluate('Boolean(document.querySelector(".boss-hud"))'), true, 'Boss HUD must exist');
-  assert.equal(await evaluate('document.querySelectorAll(".boss-crest-corner").length'), 4, '4 Filigree corner brackets must exist');
+  assert.equal(await evaluate('Boolean(document.querySelector(".boss-hud.win"))'), true, 'Boss HUD uses the JRPG window frame');
   assert.equal(await evaluate('Boolean(document.querySelector("#boss-hp"))'), true, '#boss-hp must exist');
   assert.equal(await evaluate('Boolean(document.querySelector("#boss-hp-ghost"))'), true, '#boss-hp-ghost must exist');
   assert.equal(await evaluate('document.querySelectorAll(".boss-phase-notch").length'), 2, 'Phase notches must exist');
@@ -102,7 +102,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
       viewport: { width: innerWidth, height: innerHeight },
       page: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
       column: { clientHeight: column.clientHeight, scrollHeight: column.scrollHeight },
-      content: ['.arena-heading', '.threat-band', '.battle-banner', '.arena', '.party-health-tray', '.action-bar'].map(bounds),
+      content: ['.battle-top', '.threat-band', '.battle-banner', '.arena', '.party-health-tray', '.action-bar'].map(bounds),
       targets
     };
   })()`);
@@ -177,7 +177,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
       viewport: { width: innerWidth, height: innerHeight },
       page: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
       column: { clientHeight: column.clientHeight, scrollHeight: column.scrollHeight },
-      content: ['.arena-heading', '.threat-band', '.battle-banner', '.arena', '.party-health-tray', '.action-bar'].map(box),
+      content: ['.battle-top', '.threat-band', '.battle-banner', '.arena', '.party-health-tray', '.action-bar'].map(box),
       targets
     };
   })()`);

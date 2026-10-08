@@ -25,7 +25,7 @@ try {
     await wait('window.gridbound?.scene?.textures?.exists("dragon-auric-0")');
 
     assert.deepEqual(await evaluate('window.gridbound.profile().storyActive'),[0,4,3]);
-    await click('.game-nav [data-facility="campaign"]');
+    await click.nav('campaign');
     await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
     await click('[data-zone="0"]');
     await click('[data-depart="adventure"]');
@@ -37,7 +37,7 @@ try {
     // Seed only this disposable origin, through the actual profile/recruitment functions.
     await evaluate(`(async()=>{const {createProfile,completeZone}=await import('/src/game/profile.ts');const p=createProfile();p.motion=false;for(let i=0;i<4;i++)completeZone(p,i);p.storyActive=[0,4,3,2,7,1];for(const id of p.storyActive)p.loadouts[id].xp=1000;localStorage.setItem('gridbound.v3',JSON.stringify(p));})()`);
     await send('Page.reload');await wait('window.gridbound?.profile().roster.length===9');
-    await click('.game-nav [data-facility="more"]');
+    await click.nav('more');
     await wait('Boolean(document.querySelector(".more-scene"))');
     await click('.more-scene [data-open-action="profiles"]');
     await wait('Boolean(document.querySelector("#legacy-preview"))');
@@ -46,10 +46,10 @@ try {
     assert.equal(await evaluate('document.querySelector("#legacy-confirm").disabled'),false);
     await click('#legacy-confirm');
     await wait('!document.querySelector("dialog[open]")');
-    await wait('document.querySelector("#storage-status")?.textContent.includes("Commander revision") || document.querySelector("#storage-status")?.textContent.includes("Session-only: export")');
+    await wait('document.querySelector("#storage-status")?.textContent.startsWith("Saved") || document.querySelector("#storage-status")?.textContent.includes("Session-only: export")');
     await wait('window.gridbound.profile().storyActive.length===6');
     const originalLoads=await evaluate('window.gridbound.profile().loadouts');
-    await click('[data-facility="party"]');
+    await click.nav('party');
     assert.equal(await evaluate('document.querySelectorAll("[data-story-toggle]").length'),9);
     assert.equal(await evaluate('document.querySelectorAll("[data-story-toggle]")[8].disabled'),true);
     const selected=[4,3,2,7,1,8];
@@ -70,7 +70,7 @@ try {
     await send('Page.reload');await wait('window.gridbound?.profile?.()?.storyActive?.includes(8) === true');
     assert.deepEqual(await evaluate('window.gridbound.profile().storyActive'),selected);
     report.checks.push({name:'progressed9 select6, capped controls, swap, reload, retained9 loadouts, mobile390',ids:selected});
-    await click('.game-nav [data-facility="campaign"]');
+    await click.nav('campaign');
     await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
     await click('.map-act-tab:nth-child(1)');
     await wait('Boolean(document.querySelector(".biome-act-1"))');
@@ -112,7 +112,7 @@ try {
     assert.deepEqual(await evaluate('window.gridbound.profile().loadouts'),after.loadouts);
     assert.deepEqual(await evaluate('window.gridbound.profile().storyActive'),selected);
     for(const mode of ['raid','endless']) {
-      await click('.game-nav [data-facility="campaign"]');
+      await click.nav('campaign');
       await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
       await click(`.world-map-wrapper .expedition-mode-nav [data-facility="${mode}"]`);
       await wait(`Boolean(document.querySelector('[data-depart="${mode}"]'))`);

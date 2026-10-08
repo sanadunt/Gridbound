@@ -6,12 +6,12 @@ for(const width of [360,390])await withBrowser(async({send,evaluate,wait,click,k
  await send('Page.navigate',{url});await wait('window.gridbound && window.gridbound.scene?.textures?.exists("dragon-auric-0")');
  const fits=async()=>assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),`No horizontal overflow ${width}`);
  await fits();await screenshot(`artifacts/town-${width}.png`);
- await click('[data-facility="party"]');await click('[data-facility="party-advanced"]');await click('[data-training-tab="jobs"]');await fits();
+ await click.nav('party');await click.nav('party-advanced');await click('[data-training-tab="jobs"]');await fits();
  assert.equal(await evaluate('document.querySelectorAll(".job-node").length'),4);
  await click('[data-training-tab="talents"]');
  assert.equal(await evaluate('document.querySelectorAll(".talent-node").length'),1);
  await screenshot(`artifacts/training-${width}.png`);
- await click('[data-facility="campaign"]');await click('[data-zone="0"]');await click('[data-depart="adventure"]');await click('#start');
+ await click.nav('campaign');await click('[data-zone="0"]');await click('[data-depart="adventure"]');await click('#start');
  await wait('window.gridbound.battle.status==="fighting"');await fits();
  const tap=await evaluate(`(()=>{const r=document.querySelector('[data-tap="0"]').getBoundingClientRect();return {w:r.width,h:r.height}})()`);
  await click('[data-battle-view="hero"]');await wait('window.gridbound.battle.status==="paused"');

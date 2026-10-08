@@ -29,7 +29,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
     const z = CAMPAIGN[zoneIdx], cleared = p.cleared.includes(zoneIdx), open = canEnterZone(p, zoneIdx), climax = nodeIdx === 3;
     const status = cleared ? 'cleared' : open ? 'active' : 'locked';
     return `<div class="map-node-anchor" style="left:${NODES[nodeIdx].x}%;top:${NODES[nodeIdx].y}%">
-      <button class="map-node-pin ${status} ${state.zone === zoneIdx ? 'chosen' : ''} ${climax ? 'climax-node' : ''}" data-zone="${zoneIdx}" ${open ? '' : 'disabled'} aria-label="${escape(t('map.node', { n: zoneIdx + 1, name: z.name }))} (${t(`map.status.${status}` as StringKey)})">
+      <button class="map-node-pin ${status} ${state.zone === zoneIdx ? 'chosen' : ''} ${climax ? 'climax-node' : ''}" data-zone="${zoneIdx}" title="${escape(z.name)}" ${open ? '' : 'disabled'} aria-label="${escape(t('map.node', { n: zoneIdx + 1, name: z.name }))} (${t(`map.status.${status}` as StringKey)})">
         <span class="map-node-icon" aria-hidden="true"></span><span class="map-node-badge">${zoneIdx + 1}</span>
       </button>
       <span class="map-node-plate">${escape(z.name)}</span>
@@ -59,7 +59,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
       <div class="map-stepper-wrap"><button class="btn map-stepper-btn" data-campaign-page="-1" ${state.zone <= 0 ? 'disabled' : ''} aria-label="${t('map.prevch')}">◀</button><span class="chapter-counter">CH ${state.zone + 1}/${CAMPAIGN.length}</span><button class="btn map-stepper-btn" data-campaign-page="1" ${state.zone >= CAMPAIGN.length - 1 ? 'disabled' : ''} aria-label="${t('map.nextch')}">▶</button></div></div>
     <nav class="map-act-nav" aria-label="${t('map.acts')}">${acts}</nav>
     <section class="world-map-canvas-card" aria-label="${t('map.title')}"><div class="map-chart-viewport"><img class="overworld-art" src="${art}" alt=""/><div class="map-nodes-layer">${nodes}</div></div></section>
-    <p class="msg-window map-hint">${t('map.hint')}</p>`}
+    <article class="msg-window mission-brief map-selected"><small>CH ${state.zone + 1} · ${escape(zone.subtitle)}</small><h3>${escape(zone.name)}</h3><p class="map-hint">${t('map.hint')}</p>${canEnter ? `<button class="btn primary" data-mission="${state.zone}">${t('map.view')} ▶</button>` : ''}</article>`}
     ${mission ? dossier : ''}
   </div>`;
 }

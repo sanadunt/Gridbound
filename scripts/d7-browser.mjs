@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { withBrowser } from './browser-harness.mjs';
 await withBrowser(async ({ wait, evaluate, click, errors, screenshot }) => {
   await evaluate("location.href='http://127.0.0.1:5187/'");
-  await wait('Boolean(window.gridbound && (document.querySelector(".game-nav") || document.querySelector("#title-screen:not([hidden])")))', 15000);
+  await wait('Boolean(window.gridbound && (document.querySelector(".town-game-shell") || document.querySelector("#title-screen:not([hidden])")))', 15000);
   if (await evaluate('Boolean(document.querySelector("#title-screen:not([hidden])"))')) await click('#title-profiles');
   else {
-    await click('.game-nav [data-facility="more"]');
+    await click.nav('more');
     await wait('Boolean(document.querySelector(".more-scene"))');
     await click('.more-scene [data-open-action="profiles"]');
   }

@@ -13,20 +13,20 @@ for (const [width, height] of [[1440, 900], [390, 844], [360, 640]]) {
     await wait('document.querySelector("#title-screen").hidden && document.querySelector("#town-screen:not([hidden]) .camp-scene")', 5000);
 
     const camp = await evaluate(`(() => {
-      const nav = [...document.querySelectorAll('.game-nav button')].map(button => {
+      const nav = [...document.querySelectorAll('.town-spot')].map(button => {
         const rect = button.getBoundingClientRect();
         return { width: rect.width, height: rect.height };
       });
       return {
-        title: document.querySelector('.camp-scene h1')?.textContent,
+        title: document.querySelector('.camp-scene h1')?.firstChild?.textContent.trim(),
         document: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
         nav
       };
     })()`);
     assert.equal(camp.title, 'Emberhollow');
     assert.ok(camp.document.width <= width + 1 && camp.document.height <= height + 1, `Camp must fit ${width}×${height}: ${JSON.stringify(camp)}`);
-    assert.equal(camp.nav.length, 4, 'Camp exposes four primary destinations');
-    assert.ok(camp.nav.every(button => button.width >= 44 && button.height >= 44), 'Primary navigation targets remain at least 44×44');
+    assert.equal(camp.nav.length, 9, 'Camp exposes nine tappable buildings');
+    assert.ok(camp.nav.every(button => button.width >= 44 && button.height >= 44), `Building targets remain at least 44×44: ${JSON.stringify(camp.nav)}`);
     const settings = await evaluate(`(() => {
       const rect = document.querySelector('#settings').getBoundingClientRect();
       return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
@@ -45,7 +45,7 @@ for (const [width, height] of [[1440, 900], [390, 844], [360, 640]]) {
     assert.ok(focused.focusVisible && focused.visible && focused.outline !== 'none' && focused.outlineWidth !== '0px',
       `Keyboard focus stays visible on an actionable control: ${JSON.stringify(focused)}`);
 
-    await evaluate('document.querySelector(".game-nav [data-facility=campaign]").focus()');
+    await evaluate('document.querySelector(".town-spot[data-facility=campaign]").focus()');
     await key('Enter');
     await wait('document.querySelector(".world-map-wrapper.map-view")');
     await evaluate(`document.querySelector('[data-zone="0"]').focus()`);
@@ -61,7 +61,7 @@ for (const [width, height] of [[1440, 900], [390, 844], [360, 640]]) {
       'Mission selection does not create document scrolling');
 
     await click('.mission-map-return');
-    await click('.game-nav [data-facility="more"]');
+    await click.nav('more');
     await wait('document.querySelector(".more-scene")');
     const menu = await evaluate(`(() => ({
       journal: Boolean(document.querySelector('.more-scene [data-open-action="journal"]')),
