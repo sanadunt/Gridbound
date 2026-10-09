@@ -1,6 +1,15 @@
 # GUI verification — game-first redesign (local, not deployed)
 
-## JRPG overhaul + English/Indonesian — local verification (latest)
+## Original GUI theme, grid unit status, character screens — local verification (latest)
+
+Branch `claude/tender-brown-j7bmek`; local headless Chromium only. No live deployment, no physical device, Safari or Firefox testing, and no human playtest.
+
+- Theme restore (original forest-green/brass palette, Space Grotesk): 15 browser scripts passed (the 13 in `npm run test:browser` plus title-screen and training).
+- Grid unit HP bars and skill chips: 19 scripts passed, including D3, audio-combat and boon-draft. `combat-hud-browser` now checks one HP bar per hero cell, the one-tap toggle and the 3-skill picker; `viewport-game-browser` checks the skill chips and focus bar at every viewport. A 9-hero Raid grid (dev hook) was reviewed visually at 360×640, 390×844, 1024×700 and 1440×900. Skill chips are about 20 px tall at 360×640 and 23 px at 390×844 (under the 44 px used for other battle controls); tapping the hero itself remains a 44 px+ target.
+- Character screens (sheet, equipment slots + item cards, skill book, talent gems, Status tab): 20 scripts passed, then progression, training, gui-layout and language again after the Status tab change. currency-ui and D7 (need a server on port 5187) were not re-run in this pass.
+- `npm run test:production` and `npm run test:webapp` passed. `npm test`: 138 passed. `npm run database` left `data/database.json` unchanged. `npm run build` passed. `npm run balance` cleared 16 chapters / 76 stages and 48 Raid variants; `src/game/` was not modified.
+
+## JRPG overhaul + English/Indonesian — local verification
 
 Branch `claude/tender-brown-j7bmek`; local headless Chromium only. No live deployment, no physical device, Safari or Firefox testing, and no human playtest.
 
