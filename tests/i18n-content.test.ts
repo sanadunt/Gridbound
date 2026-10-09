@@ -105,7 +105,7 @@ test('Indonesian mode translates English-only fields while keeping names', () =>
   assert.equal(CAMPAIGN[0].name, 'Ashwood Trail');
   assert.equal(CAMPAIGN[4].stages[0].name, 'Penyeberangan · The Empty Census');
   assert.equal(KITS.warrior.skills[0].name, 'Cleave');
-  assert.equal(CHALLENGE_SHOP[0].description, 'Pulihkan party di antara ruangan.');
+  assert.equal(CHALLENGE_SHOP[0].description, 'Setiap hero memulai ruangan ini dengan barrier sebesar 30% HP maksimum.');
   assert.equal(CAMPAIGN[0].intro, SOURCE.get('campaign.ashwood.intro'), 'Indonesian source prose is kept verbatim');
 });
 

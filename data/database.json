@@ -8,6 +8,7 @@
       "classId": "warrior",
       "slot": 0,
       "bio": "Aldric mengingat semua cara melindungi orang lain, tetapi tidak ingat siapa yang pertama ia lindungi. Perisainya memiliki goresan yang tidak sesuai dengan usianya. Ia belajar bahwa menjaga seseorang tidak berarti memiliki masa depannya.",
+      "joinLine": "Aku tidak ingat siapa yang pertama kulindungi. Biarlah kalian yang berikutnya.",
       "recruitChapter": 0
     },
     {
@@ -16,6 +17,7 @@
       "classId": "warrior",
       "slot": 1,
       "bio": "Bran selalu datang membawa perisai cadangan. Ia pernah terlambat satu kali dan tidak bisa menjelaskan mengapa rasa bersalah itu terasa lebih tua dari dirinya. Ia ingin sebuah kemenangan yang tidak meninggalkan siapa pun.",
+      "joinLine": "Aku terlambat sekali, dulu. Kali ini aku datang lebih awal dan membawa perisai cadangan.",
       "recruitChapter": 3
     },
     {
@@ -24,6 +26,7 @@
       "classId": "rogue",
       "slot": 2,
       "bio": "Sable mencuri benda yang pemiliknya mengaku tidak pernah punya. Ia menyimpan kuitansi, bukan trofi. Di kota yang bisa melupakan kontrak, seorang pencuri mungkin menjadi satu-satunya saksi yang menyimpan bukti.",
+      "joinLine": "Kuitansi ini menyebut kalian berutang padaku. Tenang, aku menagihnya dengan bertarung di sisimu.",
       "recruitChapter": 1
     },
     {
@@ -32,6 +35,7 @@
       "classId": "archer",
       "slot": 3,
       "bio": "Rowan mengenali setiap burung dari nadanya. Ketika harga sebuah penyeberangan adalah lagu ibunya, ia harus memilih antara mendapatkan masa lalunya kembali atau memberi orang lain jalan pulang.",
+      "joinLine": "Burung-burung di jalan setapak terdiam. Aku ikut, sampai mereka bernyanyi lagi.",
       "recruitChapter": 0
     },
     {
@@ -40,6 +44,7 @@
       "classId": "healer",
       "slot": 4,
       "bio": "Lyra selalu tahu obat untuk luka yang belum pernah ia lihat. Ia takut kebaikannya hanya perintah yang ditanamkan. Kisahnya bukan mencari bukti bahwa ia pernah manusia, tetapi memilih apa yang akan ia lakukan hari ini.",
+      "joinLine": "Aku tahu obat untuk luka yang belum kalian dapat. Mari pastikan aku tidak perlu memakainya.",
       "recruitChapter": 0
     },
     {
@@ -48,6 +53,7 @@
       "classId": "archer",
       "slot": 5,
       "bio": "Kestrel membawa lonceng kecil yang tak terhubung ke menara. Ia mengajari warga bahwa tanda bahaya dapat menjadi ajakan saling menjaga, bukan perintah untuk menyerahkan pilihan.",
+      "joinLine": "Lonceng kecilku tidak memerintah siapa pun. Ia hanya memanggil, dan aku menjawab.",
       "recruitChapter": 3
     },
     {
@@ -56,6 +62,7 @@
       "classId": "rogue",
       "slot": 6,
       "bio": "Nyx adalah pengukir yang mengingat bengkel sebelum bangunannya ada. Ia menulis nama-nama di bahan yang sulit dihapus. Keahliannya memberi bentuk pada hal-hal yang baru berani memilih untuk ada.",
+      "joinLine": "Kuukir nama kalian di batu yang sulit dihapus. Sekarang aku harus memastikan nama itu tetap hidup.",
       "recruitChapter": 4
     },
     {
@@ -64,6 +71,7 @@
       "classId": "wizard",
       "slot": 7,
       "bio": "Orin menulis prediksi di buku yang terus mengoreksi dirinya sendiri. Ia terpaksa memilih antara peta yang selalu benar dan masa depan yang belum ditentukan. Hal paling berani yang ia lakukan adalah menutup bukunya.",
+      "joinLine": "Buku ini sudah menulis akhir cerita kita. Aku ikut untuk membuktikannya salah.",
       "recruitChapter": 2
     },
     {
@@ -72,6 +80,7 @@
       "classId": "healer",
       "slot": 8,
       "bio": "Mira merawat hal-hal kecil: obat, jalur evakuasi, kursi sekolah yang kosong. Ketika para pahlawan sibuk memecahkan rahasia, ia membangun cara hidup yang tidak perlu mengorbankan seseorang agar terasa aman.",
+      "joinLine": "Kursi sekolah masih kosong. Aku ikut supaya ada yang pulang untuk mengisinya.",
       "recruitChapter": 4
     },
     {
@@ -80,6 +89,7 @@
       "classId": "bard",
       "slot": 4,
       "bio": "Tamsin menyanyikan lagu yang tidak diingat siapa pun di Emberhollow, lengkap dengan bait tentang tujuh belas anak yang hilang. Ia bukan saksi; ia hanya tidak pernah membayar lonceng dengan ingatannya. Lagunya menjadi arsip yang bisa berjalan.",
+      "joinLine": "Lagu ini punya tujuh belas bait, satu untuk setiap anak. Aku akan menyanyikannya sampai kalian ingat.",
       "recruitChapter": 5
     },
     {
@@ -88,6 +98,7 @@
       "classId": "hexer",
       "slot": 7,
       "bio": "Vesper dulu memungut ongkos ingatan di Feri Kaca. Ia tahu rasa setiap kenangan yang pernah dijual penumpang, dan membenci dirinya karena menikmatinya. Kutukannya adalah cara mengembalikan beban kepada yang menciptakannya.",
+      "joinLine": "Aku pernah menjual ongkos ingatan. Sekarang aku menagihnya kembali dari yang menetapkan harganya.",
       "recruitChapter": 6
     },
     {
@@ -96,6 +107,7 @@
       "classId": "engineer",
       "slot": 6,
       "bio": "Pell memperbaiki jam kota sejak umur sembilan dan diam-diam menulis catatan di setiap roda gigi. Di bangsal paduan suara, Pell menemukan bahwa mesin yang dirawatnya ikut menyimpan nyawa. Sekarang Pell membangun alat yang bisa dimatikan siapa saja.",
+      "joinLine": "Setiap roda gigi yang kubuat punya tombol mati. Itu janjiku pada kalian.",
       "recruitChapter": 7
     },
     {
@@ -104,6 +116,7 @@
       "classId": "monk",
       "slot": 1,
       "bio": "Koa bertapa di Frostward, menghitung napas agar tidak menghitung hari. Ia menulis surat untuk party di putaran sebelumnya dan lupa pernah mengirimnya. Tinjunya pelan, tetapi tidak pernah ragu.",
+      "joinLine": "Aku berhenti menghitung hari dan mulai menghitung napas. Napas berikutnya untuk perjalanan ini.",
       "recruitChapter": 9
     },
     {
@@ -112,6 +125,7 @@
       "classId": "bard",
       "slot": 5,
       "bio": "Ilse bernyanyi di pemakaman tanpa nama, untuk orang-orang yang belum meninggal. Ia percaya lagu duka bisa menjadi janji: kita akan berusaha agar lagu ini tidak pernah dibutuhkan.",
+      "joinLine": "Aku menyanyi untuk orang yang belum meninggal. Bantu aku membuat lagu itu tidak pernah dibutuhkan.",
       "recruitChapter": 11
     },
     {
@@ -120,6 +134,7 @@
       "classId": "engineer",
       "slot": 8,
       "bio": "Hale memimpin bengkel Koperasi Hearth dan mengubah lonceng-lonceng kecil menjadi alarm, pompa, dan pemanas. Baginya keselamatan adalah pekerjaan bersama yang membosankan, dan justru karena itu ia mempercayainya.",
+      "joinLine": "Kota tanpa lonceng tetap butuh tanda bahaya. Aku membangunnya, dan kali ini setiap orang bisa mematikannya.",
       "recruitChapter": 13
     }
   ],

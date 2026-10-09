@@ -169,6 +169,14 @@ Ending utama menyatakan mesin berhenti, Vharok bebas, Eda memilih namanya sendir
 | Nyx | Rogue | Pengukir yang memberi bentuk tahan lama kepada nama dan hal-hal yang memilih untuk ada. |
 | Orin | Wizard | Menulis prediksi dalam buku yang selalu mengoreksi dirinya, lalu belajar menutup buku itu. |
 | Mira | Healer | Membangun obat, jalur evakuasi, dan cara hidup aman tanpa mengorbankan seseorang. |
+| Tamsin | Bard | Menyanyikan lagu tujuh belas anak yang hilang; arsip yang bisa berjalan. Bergabung di Chapter 6. |
+| Vesper | Hexer | Mantan pemungut ongkos ingatan di Feri Kaca; kutukannya mengembalikan beban kepada pembuatnya. Chapter 7. |
+| Pell | Engineer | Perawat jam kota yang kini hanya membangun alat yang bisa dimatikan siapa saja. Chapter 8. |
+| Koa | Monk | Penjaga Frostward yang menghitung napas, bukan hari. Chapter 10. |
+| Ilse | Bard | Penyanyi duka untuk orang yang belum meninggal; lagunya adalah janji. Chapter 12. |
+| Hale | Engineer | Membangun tanda bahaya untuk kota tanpa lonceng, dengan tombol mati untuk semua orang. Chapter 14. |
+
+Setiap hero yang direkrut memutar adegan singkat "Sekutu baru" (kartu judul, potret, dan kalimat pertama hero) saat pemain kembali ke Camp setelah chapter perekrutan.
 
 ## 5. Struktur sesi dan loop pemain
 
@@ -244,9 +252,9 @@ Tidak semua kombinasi modifier mempunyai status reward-eligible. Source saat ini
 
 ### Roguelike
 
-Run dimulai dengan tiga recruit dan satu pilihan basic job per recruit. Room clear memberi point untuk promosi job run; satu job tier-2 menghabiskan satu point dan tier-3 menghabiskan total dua. Setiap kemenangan menawarkan sampai tiga boon yang belum dimiliki. Memilih boon memulihkan party sebelum descent berikutnya. Jika semua 12 boon telah dikumpulkan, tombol continuation tetap mengizinkan run berlanjut tanpa draft baru.
+Run dimulai dengan tiga recruit dan satu pilihan basic job per recruit. Room clear memberi point untuk promosi job run; satu job tier-2 menghabiskan satu point dan tier-3 menghabiskan total dua. Point dibelanjakan di layar draft boon antar-floor, dan job baru berlaku untuk sisa run. Setiap kemenangan menawarkan sampai tiga boon yang belum dimiliki. Memilih boon memulihkan party sebelum descent berikutnya. Jika semua 12 boon telah dikumpulkan, tombol continuation tetap mengizinkan run berlanjut tanpa draft baru.
 
-Roguelike memiliki tiga act milestone pada floor 3, 6, dan 9. Bank reward milestone adalah 6, 8, dan 22 Crystal. Floor setelah act ketiga adalah practice yang dapat diulang tanpa receipt milestone baru. Run wallet mendapatkan tiga Crystal per room dan terpisah dari bank Commander. Mending Shard memulihkan party antar-room, Fate Reroll mengubah pilihan upgrade berikutnya, dan Ember Upgrade meningkatkan power run. Wallet sementara hilang saat run selesai, ditinggalkan, atau kalah.
+Roguelike memiliki tiga act milestone pada floor 3, 6, dan 9. Bank reward milestone adalah 6, 8, dan 22 Crystal. Floor setelah act ketiga adalah practice yang dapat diulang tanpa receipt milestone baru. Run wallet mendapatkan tiga Crystal per room dan terpisah dari bank Commander. Shop run (sebelum room dimulai): Mending Shard memberi setiap hero barrier 30% HP maksimum untuk room itu, Fate Reroll mengacak ulang boon yang ditawarkan setelah room itu, dan Ember Upgrade memberi power party +15% untuk room itu. Wallet sementara hilang saat run selesai, ditinggalkan, atau kalah.
 
 Dua belas boon:
 

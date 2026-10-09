@@ -118,3 +118,8 @@
   .depth-card { grid-template-columns: 32px 1fr; }
   .depth-meta { grid-column: 2; }
 }
+
+/* Lore fragment on a guardian clear */
+.dungeon-lore { margin: 12px 0; padding: 8px 12px; border-left: 3px solid var(--gold-border); background: var(--inset); text-align: left; }
+.dungeon-lore small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
+.dungeon-lore p { margin: 6px 0 0; font-style: italic; color: var(--ink-soft); }

@@ -32,9 +32,9 @@ export type RaidContractRequest = Partial<Omit<RaidContract, 'modifiers'>> & {
 };
 
 export const CHALLENGE_SHOP: readonly ChallengeShopItem[] = Object.freeze([
-  { id: 'run-heal', name: 'Mending Shard', cost: 8, description: 'Restore the party between rooms.' },
-  { id: 'run-reroll', name: 'Fate Reroll', cost: 12, description: 'Reroll the next upgrade choices.' },
-  { id: 'run-upgrade', name: 'Ember Upgrade', cost: 18, description: 'Increase the current run power.' },
+  { id: 'run-heal', name: 'Mending Shard', cost: 8, description: 'Every hero starts this room with a barrier worth 30% of max HP.' },
+  { id: 'run-reroll', name: 'Fate Reroll', cost: 12, description: 'Reroll the boons offered after this room.' },
+  { id: 'run-upgrade', name: 'Ember Upgrade', cost: 18, description: 'Party power +15% for this room.' },
 ]);
 export const BANK_SHOP: readonly ChallengeShopItem[] = Object.freeze([
   { id: 'bank-relic-ward', name: 'Ward Relic', cost: 24, description: 'Unlock a certified Roguelike challenge relic.' },

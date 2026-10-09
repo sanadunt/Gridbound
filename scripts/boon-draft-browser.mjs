@@ -37,12 +37,19 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await screenshot('artifacts/boon-draft-hades-desktop.png');
   console.log('✓ Captured artifacts/boon-draft-hades-desktop.png');
 
+  // A cleared room grants a promotion point: promote the first recruit into an advanced job.
+  assert.equal(await evaluate('document.querySelector("#rogue-promote")?.hidden'), false, 'promotion panel shows with a point');
+  await click('[data-rogue-promote="0"]');
+  await wait('window.gridbound.battle.rogueBuild.points === 0 && Boolean(window.gridbound.battle.rogueBuild.recruits[0].job)');
+  assert.equal(await evaluate('document.querySelector("#rogue-promote").hidden'), true, 'panel hides once points are spent');
+
   // Read first card ID and click it
   const boonId = await evaluate('document.querySelector("[data-boon]").dataset.boon');
   await click('[data-boon]');
 
   // Verify transition to Floor 2
   assert.equal(await evaluate('window.gridbound.battle.floor'), 2, 'Floor must be 2 after drafting boon');
+  assert.ok(await evaluate('Boolean(window.gridbound.battle.hero(0).job)'), 'promotion carries into the next floor');
   const boons = await evaluate('window.gridbound.battle.boons');
   assert.ok(boons.includes(boonId), `Drafted boon ${boonId} must be active in run`);
 

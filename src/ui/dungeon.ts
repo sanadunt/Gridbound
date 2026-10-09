@@ -42,6 +42,7 @@ function finishedRun(run: DungeonRun): string {
   const kind = run.status === 'cleared' ? 'cleared' : run.status === 'extracted' ? 'extracted' : 'wiped';
   return `<article class="win dungeon-result ${kind}"><p class="result-banner">${t(`dungeon.end.${kind}.banner` as StringKey)}</p><h2>${t(`dungeon.depth.${run.depth}` as StringKey)}</h2><p>${t(`dungeon.end.${kind}` as StringKey)}</p>
     ${kind === 'wiped' ? '' : `<p class="dungeon-pouch">${t('dungeon.banked')}: ${pouchLine(run.pouch)}</p>`}
+    ${kind === 'cleared' ? `<blockquote class="dungeon-lore"><small>${t('dungeon.lore.title')}</small><p>${t(`dungeon.lore.${run.depth}` as StringKey)}</p></blockquote>` : ''}
     <button class="btn primary" data-dungeon-close>${t('dungeon.close')}</button></article>`;
 }
 

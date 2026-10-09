@@ -24,6 +24,20 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await key('Escape');
     await wait('!document.querySelector(".dialogue-scene")');
     assert.equal(await evaluate('Boolean(document.querySelector(".camp-scene"))'), true, 'Skipping returns to the town untouched');
+    // Recruit scene: a new hero's title card and first words.
+    await evaluate('void window.gridbound.recruitScene(9)');
+    await wait('Boolean(document.querySelector(".dialogue-scene .dialogue-card h2"))');
+    assert.match(await evaluate('document.querySelector(".dialogue-card h2").textContent'), /Tamsin/);
+    await click('.dialogue-scene');
+    await wait('!document.querySelector(".dialogue-box").hidden');
+    assert.equal(await evaluate('document.querySelector(".dialogue-speaker b").textContent').then(s => s.toUpperCase()), 'TAMSIN');
+    await click('.dialogue-box');
+    await wait('document.querySelector(".dialogue-box").classList.contains("ready")');
+    assert.ok((await evaluate('document.querySelector(".dialogue-text").textContent')).length > 30, 'join line is shown');
+    await new Promise(resolve => setTimeout(resolve, 600));
+    await screenshot(`artifacts/recruit-scene-${width}.png`);
+    await key('Escape');
+    await wait('!document.querySelector(".dialogue-scene")');
     assert.deepEqual(errors, []);
     console.log(`PASS story scene ${width}×${height}: title card, speaker, pagination, keyboard advance and skip`);
   }, { width, height, mobile: width < 500 });

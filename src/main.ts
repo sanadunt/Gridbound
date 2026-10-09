@@ -16,6 +16,7 @@ import { currencyAmount } from './ui/currency';
 import { townSceneCanvas } from './art/town-scene';
 import { Battle, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
+import { CHARACTERS } from './game/characters';
 import { CAMPAIGN, BOONS, boonChoices } from './game/world';
 import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult } from './game/profile';
 import { startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fightScale, dungeonXP, type Outcome } from './game/dungeon';
@@ -32,6 +33,7 @@ import { CommanderSession } from './game/commander-session';
 import { copyLegacyToCommander, createCommanderDocument, createRunCheckpoint, terminalRun, storedStateFor, type CommanderDocument, type CommanderMode, type SlotId } from './game/commander';
 import { storyBattleOptions, setStoryParty, normalizeStoryParty } from './game/story-party';
 import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-build';
+import { JOBS } from './game/jobs';
 import { createRaidBuild, setRaidJob, setRaidPartySize, normalizeRaidBuild } from './game/raid-build';
 import { QUESTS, questProgress } from './game/quests';
 import { CHALLENGE_SHOP, createRunWallet, creditRun, resetRunWallet, getRaidContractForEnemy, roguelikeMilestoneForFloor, buyRunItem, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
@@ -155,6 +157,8 @@ let bannerTimer = 0;
 let runBoons: string[] = [];
 let runWallet: RunWallet = createRunWallet();
 let runSeed = Date.now() % 1000000;
+/** Fate Rerolls bought for the current room; shifts the seed of the boon draft that follows it. */
+let boonReroll = 0;
 let offeredBoons: typeof BOONS = [];
 let resumeOnClose = false;
 let pauseForDetails = false;
@@ -636,6 +640,16 @@ function chapterIntro(zoneIndex: number) {
   return playDialogue($('app'), { kicker: t('battle.chapter', { n: zoneIndex + 1 }), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(Math.floor(zoneIndex / 4)), pages, motion: profile.motion, onBlip: () => sound.play('text') })
     .finally(() => { playingScene = false; markIntroSeen(zoneIndex); });
 }
+let recruitedIds: number[] = [];
+/** A short scene for a hero joining: their portrait and first words. */
+function recruitScene(id: number, force = false) {
+  const hero = CHARACTERS[id];
+  // Skipped under automation like the title screen and chapter intros; QA plays it through window.gridbound.recruitScene.
+  if (!hero || (!force && navigator.webdriver)) return Promise.resolve();
+  playingScene = true;
+  return playDialogue($('app'), { kicker: t('recruit.kicker'), title: t('recruit.title', { name: hero.name }), subtitle: KITS[hero.classId].name, backdrop: actArt(Math.min(3, Math.floor(hero.recruitChapter / 4))), pages: [{ speaker: hero.name, portrait: portrait(hero.classId), text: hero.joinLine }], motion: profile.motion, onBlip: () => sound.play('text') })
+    .finally(() => { playingScene = false; });
+}
 function depart(mode: Mode) {
   if (playingScene) return;
   commander.mode = mode === 'raid' ? 'raid' : mode === 'endless' ? 'roguelike' : 'story';
@@ -713,9 +727,10 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
 function buyForRun(id: string) {
   const item = buyRunItem(runWallet, id);
   if (!item) return undefined;
-  if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
-  if (item.id === 'run-upgrade') battle.power *= 1.1;
-  if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
+  // Bought before the room starts: heroes are at full HP, so the shard wards instead of healing.
+  if (item.id === 'run-heal') battle.heroes.forEach(hero => { if (hero.hp > 0) hero.shield = Math.max(hero.shield, Math.round(hero.maxHp * .3)); });
+  if (item.id === 'run-upgrade') battle.power *= 1.15;
+  if (item.id === 'run-reroll') boonReroll++;
   sound.play('coin');
   updateExpedition();
   frame(1);
@@ -1435,6 +1450,7 @@ async function presentResult() {
   const moreWaves = won && battle.mode === 'adventure' && battle.stage + 1 < battle.stageCount;
   const zone = CAMPAIGN[battle.floor - 1];
   let recruited: string[] = [];
+  recruitedIds = [];
   let reward = 0;
   if (!recorded) chapterResult = undefined;
   if (!recorded) {
@@ -1455,7 +1471,8 @@ async function presentResult() {
         candidate.gold += reward;
         const before = new Set(candidate.roster);
         completeZone(candidate, battle.floor - 1);
-        recruited = candidate.roster.filter(id => !before.has(id)).map(id => ROSTER[id].name);
+        recruitedIds = candidate.roster.filter(id => !before.has(id));
+        recruited = recruitedIds.map(id => ROSTER[id].name);
         chapterResult = { stars: chapterStars(battle.living().length === battle.heroes.length, battle.stageTime), ...recordChapterResult(candidate, battle.floor - 1, chapterStars(battle.living().length === battle.heroes.length, battle.stageTime), battle.heroic) };
       }
       candidate.wins++;
@@ -1478,7 +1495,7 @@ async function presentResult() {
     pendingSettlement = false;
     recorded = true;
   }
-  if (won && battle.mode === 'endless') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 7919);
+  if (won && battle.mode === 'endless') { offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 7919 + boonReroll * 104729); boonReroll = 0; }
   $('start-overlay').hidden = false;
   $('ready-label').textContent = '';
   $('ready-title').textContent = won ? moreWaves ? t('ready.after.wave') : t('ready.after.win') : t('ready.after.lose');
@@ -1503,10 +1520,12 @@ async function presentResult() {
         <p class="boon-modal-subtitle">${t('boon.choose.sub')}</p>
         <p class="boon-run-wallet">${t('boons.purse', { n: runWallet.crystal })} · ${t('battle.standing', { n: battle.living().length, total: battle.heroes.length })} · ${formatTime(battle.time)}</p>
       </header>
+      <section class="win rogue-promote" id="rogue-promote" aria-live="polite"></section>
       ${!offeredBoons.length ? `<button id="next-floor" class="btn primary">${t('boon.allcollected')}</button>` : ''}
       <div class="boon-draft-grid">${cardsHtml}</div>
       <footer class="boon-modal-footer"><button id="result-town" class="btn">${t('boon.abandon')}</button></footer>
     </div>`);
+    renderRoguePromote();
     animateBoonDraft();
   } else {
     const outcomeClass = won ? (moreWaves ? 'wave-clear' : 'victory') : 'defeat';
@@ -1597,6 +1616,8 @@ async function presentResult() {
     closeWithoutResume();
     inTown = true;
     showTown('camp', '', true);
+    const joined = recruitedIds; recruitedIds = [];
+    void joined.reduce((chain, id) => chain.then(() => recruitScene(id)), Promise.resolve());
   });
 }
 
@@ -1699,6 +1720,24 @@ async function clearEncounter() {
   });
   if (ok) { encounter = undefined; runBoons = []; resetRunWallet(runWallet); }
   return ok;
+}
+/** Spend the run's promotion points (one per room cleared) between floors. */
+function renderRoguePromote() {
+  const host = document.getElementById('rogue-promote'), build = battle.rogueBuild;
+  if (!host) return;
+  if (!build || build.points < 1 || battle.mode !== 'endless') { host.hidden = true; return; }
+  const rows = build.recruits.map((recruit, i) => {
+    const hero = battle.hero(i), options = rogueUpgrades(build, i);
+    if (!hero) return '';
+    const current = recruit.job ? JOBS[recruit.job]?.name : KITS[recruit.classId].name;
+    return `<div class="rogue-promote-row"><span><b>${escapeUI(hero.name)}</b><small>${escapeUI(current ?? '')}</small></span><span class="rogue-promote-options">${options.length ? options.map(j => `<button class="btn" data-rogue-promote="${i}" data-job="${j.id}">${escapeUI(j.name)} ▲</button>`).join('') : `<small>${t('rogue.promote.max')}</small>`}</span></div>`;
+  }).join('');
+  host.hidden = false;
+  host.innerHTML = `<h3>${t('rogue.promote.title', { n: build.points })}</h3><p class="hint">${t('rogue.promote.sub')}</p>${rows}`;
+  host.querySelectorAll<HTMLElement>('[data-rogue-promote]').forEach(el => el.addEventListener('click', () => {
+    if (battle.upgradeRogue(Number(el.dataset.roguePromote), el.dataset.job!)) { sound.play('levelup'); townState.rogueSetup = structuredClone(battle.rogueBuild); }
+    renderRoguePromote();
+  }));
 }
 async function nextFloor() {
   if (pendingSettlement || commander.stale) return;
@@ -1942,5 +1981,5 @@ if (import.meta.env.DEV) Object.assign(window, { gridbound: {
   get runBoons() { return runBoons; },
   setRunBoons: (b: string[]) => { runBoons = [...b]; battle.boons = [...b]; updateExpedition(); },
   step: (seconds: number) => { for (let t = 0; t < Math.min(600, Math.max(0, seconds)); t += 1 / 60) battle.tick(1 / 60); frame(1); },
-  boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro,
+  boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro, recruitScene: (id: number) => recruitScene(id, true),
 } });
