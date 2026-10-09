@@ -1,4 +1,5 @@
 export const MAX_HERO_LEVEL = 40;
+export const LEVEL_POWER = .05, LEVEL_HP = .06;
 export const LEVEL_THRESHOLDS = [0];
 for (let level = 1; level < MAX_HERO_LEVEL; level++) {
   LEVEL_THRESHOLDS.push(LEVEL_THRESHOLDS[level - 1] + 120 + (level - 1) * 40 + (level - 1) ** 2 * 2);
@@ -19,5 +20,6 @@ export function xpForLevel(level: number) {
 }
 export function levelStats(xp: unknown) {
   const n = heroProgress(xp).level - 1;
-  return { power: 1 + n * .015, hp: 1 + n * .02 };
+  // Levels are the main source of growth: each level is +5% power and +6% HP.
+  return { power: 1 + n * LEVEL_POWER, hp: 1 + n * LEVEL_HP };
 }

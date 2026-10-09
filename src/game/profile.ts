@@ -67,7 +67,8 @@ export function completeZone(p:Profile,index:number) {
   }
   return true;
 }
-export function profileModifiers(p:Profile) { const level=p.cleared.length;return {power:1+level*.12,vitality:1+level*.13,tempo:1+level*.035}; }
+// Story progress no longer multiplies the party: growth comes from hero levels, gear, talents and jobs.
+export function profileModifiers(_p:Profile) { return {power:1,vitality:1,tempo:1}; }
 
 export function syncProfileEconomy(p:Profile): void {
   p.economy.gold = Math.max(0, Math.min(1000000, Math.floor(p.gold)));

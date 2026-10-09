@@ -14,6 +14,14 @@ export type BattleEvent = { type:string; source?:number; slot?:number; lane?:num
 export type Status = 'ready'|'fighting'|'paused'|'victory'|'defeat';
 export type BattleOptions = { rogueBuild?:RogueBuild; raidBuild?:RaidBuild; raidSandbox?:RaidSandbox; roster?:number[]; storyCleared?:number[]; storyRecruited?:number[]; loadouts?:Record<number,{skills:number[];talents:string[];xp?:number;slot?:number;job?:string;gear?:Record<string,string>}>; boons?:string[]; enemyId?:string; stage?:number; settlementId?:string; raidContract?:RaidContract; runWallet?:RunWallet; runAct?:1|2|3; runActClear?:boolean; runFinalClear?:boolean };
 const defaultUpgrades = {power:1,vitality:1,tempo:1};
+// Per-chapter enemy tuning, calibrated by scripts/calibrate.ts against the balance harness's casual player.
+export const CHAPTER_HP:number[]=[2.4,1.96,1.6,1.23,3.06,3.21,3.31,2.87,3.76,3.23,3.33,3.01,3.29,3.08,3.13,2.41];
+export const CHAPTER_DMG:number[]=[2.48,3.22,4.45,4.22,5.01,5.55,6.25,7.01,8.98,8.75,9.86,10.42,8.42,11.53,10.7,11.85];
+// Damage shape: telegraphs are punishing but survivable; steady front-row strikes and minions keep healers busy.
+export const RAID_HP=1.25,RAID_DMG=1.1,ENDLESS_HP=1300,ENDLESS_HP_GROWTH=1.13,ENDLESS_DMG_GROWTH=1.075;
+export const TELEGRAPH_SHARE=.5,CLAW_BASE=24,CLAW_EVERY=4.2,MINION_HIT=22;
+const chapterHp=(floor:number)=>CHAPTER_HP[Math.min(CHAPTER_HP.length,floor)-1];
+const chapterDmg=(floor:number)=>CHAPTER_DMG[Math.min(CHAPTER_DMG.length,floor)-1];
 export class Battle {
   heroes:Hero[]=[]; threats:Telegraph[]=[]; minions:Minion[]=[]; events:BattleEvent[]=[];
   storyRecruited:readonly number[]=[];
@@ -93,7 +101,7 @@ export class Battle {
     if(this.mode==='adventure') {
       const zone=CAMPAIGN[this.floor-1],stage=zone.stages[this.stage];
       this.stageCount=zone.stages.length; this.enemyId=stage.enemy; this.stageName=stage.name;
-      this.bossMax=Math.round(stage.hp*(this.floor<=4?2.2:4+this.floor*.75));
+      this.bossMax=Math.round(stage.hp*chapterHp(this.floor));
     } else {
       const endless=Object.values(ENEMIES).filter(e=>e.archetype===e.id).map(e=>e.id);
       const requestedEnemy = this.options.enemyId ?? (this.mode === 'raid' ? this.raidContract?.bossId : undefined);
@@ -101,7 +109,9 @@ export class Battle {
       if (this.mode === 'raid' && this.raidContract?.bossId !== ENEMIES[this.enemyId]?.archetype) this.raidContract = validateRaidContract(undefined);
       this.stageCount=1; this.stageName=this.mode==='endless'?`Descent ${this.floor}`:this.raidContract?.sandbox?'Practice arena · no Crystal':'Raid contract';
       const hpScale=this.mode==='raid' ? this.raidSandbox?.hpScale ?? 1 : 1;
-      this.bossMax=Math.round((this.mode==='endless'?1900:3400)*Math.pow(this.heroes.length/3,.9)*Math.pow(1.2,this.floor-1)*ENEMIES[this.enemyId].hp*hpScale);
+      // Raids follow the story curve: a raid at level N is a tougher version of chapter N's boss for the party size of that point.
+      const raidHp=()=>{const ch=Math.min(CAMPAIGN.length,this.floor),boss=CAMPAIGN[ch-1].stages.at(-1)!.hp*chapterHp(ch)*RAID_HP;return boss*Math.pow(1.15,Math.max(0,this.floor-CAMPAIGN.length))*Math.pow(this.heroes.length/storyPartyCap(Array.from({length:ch-1},(_,i)=>i)),.9);};
+      this.bossMax=Math.round((this.mode==='endless'?ENDLESS_HP*Math.pow(this.heroes.length/3,.9)*Math.pow(ENDLESS_HP_GROWTH,this.floor-1):raidHp())*ENEMIES[this.enemyId].hp*hpScale);
     }
     this.bossHp=this.bossMax; this.enemyName=ENEMIES[this.enemyId].name; this.enemyTitle=ENEMIES[this.enemyId].title;
   }
@@ -186,14 +196,14 @@ export class Battle {
     if(this.finish())return;
     this.attackIn-=dt;this.clawIn-=dt;this.summonIn-=dt;
     if(this.attackIn<=0&&this.breakLeft<=0){this.telegraph();this.attackIn=(ENEMIES[this.enemyId].interval-(this.phase-1)*.6)*(this.raidSandbox?.intervalScale??1);}
-    if(this.clawIn<=0&&this.breakLeft<=0){const h=this.living().sort((a,b)=>a.slot-b.slot)[0];if(h){this.hurt(h,(13+this.phase*3)*this.enemyScale());this.emit({type:'claw',slot:h.slot});}this.clawIn=6.5*(this.raidSandbox?.intervalScale??1);}
+    if(this.clawIn<=0&&this.breakLeft<=0){const h=this.living().sort((a,b)=>a.slot-b.slot)[0];if(h){this.hurt(h,(CLAW_BASE+this.phase*6)*this.enemyScale());this.emit({type:'claw',slot:h.slot});}this.clawIn=CLAW_EVERY*(this.raidSandbox?.intervalScale??1);}
     if(this.summonIn<=0){this.summon();this.summonIn=25*(this.raidSandbox?.intervalScale??1);}
     for(const t of [...this.threats]){
       if(t.targetId!==undefined){const target=this.hero(t.targetId);t.slots=target&&target.hp>0?[target.slot]:[];}
       t.left-=dt;
       if(t.left<=0){for(const slot of t.slots){const h=this.heroes.find(a=>a.slot===slot&&a.hp>0);if(h)this.hurt(h,(t.damage??83)*this.enemyScale());else this.dodged++;}this.emit({type:'impact',targets:t.slots,kind:t.type});this.threats.splice(this.threats.indexOf(t),1);}
     }
-    for(const m of this.minions){if(m.hp<=0)continue;m.timer-=dt;if(m.timer<=0){const h=this.living().filter(a=>a.slot%3===m.lane).sort((a,b)=>a.slot-b.slot)[0]??this.living().sort((a,b)=>a.hp-b.hp)[0];if(h){this.hurt(h,16*this.enemyScale());this.emit({type:'minionAttack',slot:h.slot,lane:m.lane});}m.timer=5.5;}}
+    for(const m of this.minions){if(m.hp<=0)continue;m.timer-=dt;if(m.timer<=0){const h=this.living().filter(a=>a.slot%3===m.lane).sort((a,b)=>a.slot-b.slot)[0]??this.living().sort((a,b)=>a.hp-b.hp)[0];if(h){this.hurt(h,MINION_HIT*this.enemyScale());this.emit({type:'minionAttack',slot:h.slot,lane:m.lane});}m.timer=5.5;}}
     this.minions=this.minions.filter(m=>m.hp>0);this.finish();
   }
   private finish() {
@@ -201,7 +211,7 @@ export class Battle {
     if(this.bossHp<=0){this.status='victory';if(this.rogueBuild)rewardRogueRoom(this.rogueBuild,this.floor);this.gold+=this.mode==='adventure'?20+this.stage*12+this.floor*6:80+this.floor*15;this.emit({type:'victory'});return true;}
     return false;
   }
-  enemyScale() { return (this.mode==='adventure'?.65+this.floor*.17:this.mode==='endless'?.82:1.05)*Math.pow(1.075,this.mode==='adventure'?0:this.floor-1)*(this.stageTime>150?1.7:1)*(this.mode==='raid'?(this.raidSandbox?.damageScale??1):1); }
+  enemyScale() { return (this.mode==='adventure'?chapterDmg(this.floor):this.mode==='endless'?.82*Math.pow(ENDLESS_DMG_GROWTH,this.floor-1):RAID_DMG*chapterDmg(this.floor)*Math.pow(1.06,Math.max(0,this.floor-CAMPAIGN.length)))*(this.stageTime>150?1.7:1)*(this.mode==='raid'?(this.raidSandbox?.damageScale??1):1); }
   telegraph() {
     const enemy=ENEMIES[this.enemyId],intent:Intent=enemy.patterns[this.pattern++%enemy.patterns.length];
     let slots:number[]=[],targetId:number|undefined,type:Telegraph['type']='meteor',name='',counter='';
@@ -219,7 +229,7 @@ export class Battle {
       const candidates=[...alive];while(slots.length<Math.min(3,alive.length)){const i=Math.floor(this.random()*candidates.length);slots.push(candidates.splice(i,1)[0].slot);}type='meteor';name=this.enemyId==='spider'?'VENOM WEB':'FALLING SHARDS';counter='GROUND: pindahkan hero ke tile aman. Tanda tetap di tanah.';
     }
     const total=type==='all'?4.2:3.2;
-    this.threats.push({id:this.eventId++,name,type,slots,left:total,total,targetId,counter,damage:enemy.damage*(type==='all'?.85:1)*(1+(this.phase-1)*.1)});
+    this.threats.push({id:this.eventId++,name,type,slots,left:total,total,targetId,counter,damage:enemy.damage*TELEGRAPH_SHARE*(type==='all'?.85:1)*(1+(this.phase-1)*.1)});
     this.emit({type:'warning',text:name,targets:slots});
     if(this.phase>=2&&this.enemyId.startsWith('dragon')&&intent==='meteor'){
       const slot=alive[Math.floor(this.random()*alive.length)].slot;
@@ -240,7 +250,7 @@ export class Battle {
   private threatPower(h:Hero) { const s=KITS[h.classId].skills[h.stance];return s.power/this.cooldown(h)*this.skillPower(h)*(h.buff>0?1.3:1); }
   summon() {
     const lanes=this.heroes.length<=3?[1]:this.heroes.length<=5?[0,2]:[0,1,2];
-    for(const lane of lanes){if(this.minions.some(m=>m.lane===lane&&m.hp>0))continue;const hp=Math.round((this.mode==='adventure'?65+this.floor*18:170)*Math.pow(1.1,this.mode==='adventure'?0:this.floor-1));this.minions.push({id:this.eventId++,lane,hp,maxHp:hp,timer:4,enemyId:['wolf','spider','goblin'][(this.stage+lane)%3]});}
+    for(const lane of lanes){if(this.minions.some(m=>m.lane===lane&&m.hp>0))continue;const hp=Math.round((this.mode==='adventure'?36*chapterHp(this.floor):170)*Math.pow(1.1,this.mode==='adventure'?0:this.floor-1));this.minions.push({id:this.eventId++,lane,hp,maxHp:hp,timer:4,enemyId:['wolf','spider','goblin'][(this.stage+lane)%3]});}
     this.emit({type:'summon',text:'REINFORCEMENTS'});
   }
   act(h:Hero) {

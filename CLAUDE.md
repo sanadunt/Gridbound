@@ -17,12 +17,13 @@ node --import tsx --test --test-name-pattern="shield absorbs" tests/combat.test.
 npm run build                       # tsc --noEmit (typecheck) + vite build -> dist/
 npm run database                    # regenerate data/database.json from src/game definitions
 npm run docs                        # database + regenerate Gridbound_GDD_GRID_RAID.md
-npm run balance                     # simulate the full campaign with a scripted input policy (writes artifacts/balance.json)
+npm run balance                     # play the campaign with scripted expert/casual/idle players (writes artifacts/balance.json)
+npm run calibrate                   # re-fit per-chapter enemy HP/damage tables for the casual player (prints tables)
 ```
 
 There is no linter/formatter configured; `tsc` (strict) via `npm run build` is the type check.
 
-CI (`.github/workflows/ci.yml`) runs: `npm test`, `npm run database` then **`git diff --exit-code -- data/database.json`**, `npm run build`, `npm run balance`, and `scripts/package-hostinger.py`. So any change to content definitions in `src/game/` (skills, jobs, gear, talents, quests, enemies, campaign, boons) must be followed by `npm run database` and committing the regenerated `data/database.json`. `npm run balance` must still clear the whole campaign without shortcuts, so combat/number changes can fail CI there.
+CI (`.github/workflows/ci.yml`) runs: `npm test`, `npm run database` then **`git diff --exit-code -- data/database.json`**, `npm run build`, `npm run balance`, and `scripts/package-hostinger.py`. So any change to content definitions in `src/game/` (skills, jobs, gear, talents, quests, enemies, campaign, boons) must be followed by `npm run database` and committing the regenerated `data/database.json`. `npm run balance` fails CI unless the expert and casual scripted players (casual may retry a chapter once) clear all chapters, the expert wins every raid variant, and an idle player cannot clear Act I — so combat/number changes can fail CI there. Hero growth comes from levels (`LEVEL_POWER`/`LEVEL_HP` in `levels.ts`), gear, talents and jobs; `profileModifiers` is neutral. Enemy strength per chapter is `CHAPTER_HP`/`CHAPTER_DMG` in `simulation.ts` (raids reuse the chapter curve); after changing hero or enemy numbers, run `npm run calibrate`, paste the tables with ~15% damage margin, and re-run `npm run balance`.
 
 Browser tests (`scripts/*-browser.mjs`, `*-smoke.mjs`) drive headless Chrome over raw CDP via `scripts/browser-harness.mjs` (not Playwright). They expect a dev server on port 5180 and a Chrome binary:
 

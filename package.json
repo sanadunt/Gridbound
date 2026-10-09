@@ -15,6 +15,7 @@
     "database": "node --import tsx scripts/export-database.ts",
     "docs": "npm run database && node --import tsx scripts/export-docs.ts",
     "balance": "node --import tsx scripts/balance.ts",
+    "calibrate": "node --import tsx scripts/calibrate.ts",
     "test:browser": "node scripts/browser-smoke.mjs && node scripts/mobile-smoke.mjs && node scripts/campaign-browser.mjs && node scripts/progression-browser.mjs && node scripts/town-screen-browser.mjs && node scripts/mode-switch-browser.mjs && node scripts/world-map-browser.mjs && node scripts/viewport-game-browser.mjs && node scripts/combat-hud-browser.mjs && node scripts/ceremony-browser.mjs && node scripts/gui-layout-smoke.mjs && node scripts/language-browser.mjs && node scripts/story-scene-browser.mjs",
     "test:production": "node scripts/production-smoke.mjs",
     "test:webapp": "node scripts/node-production-smoke.mjs",
