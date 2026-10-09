@@ -210,6 +210,7 @@ $('app').innerHTML = `
         <div id="banner" class="battle-banner" aria-live="polite"></div>
         <div class="lane-targets" aria-label="${t('battle.lanes')}">${[0, 1, 2].map(i => `<button data-lane="${i}" aria-label="${t('battle.lane', { n: i + 1 })}" aria-pressed="false"><span>${['I', 'II', 'III'][i]}</span></button>`).join('')}</div>
         <div id="unit-layer"></div>
+        <div id="skill-picker" class="win skill-picker" role="dialog" hidden></div>
         <div class="board-bottom"><span id="standing"></span><span id="move-tip"></span></div>
         <section id="start-overlay" class="start-overlay" aria-labelledby="ready-title">
           <div class="win start-window">
@@ -221,7 +222,7 @@ $('app').innerHTML = `
         </section>
       </div>
       </div>
-      <section id="party-health-tray" class="win party-health-tray" aria-label="${t('battle.party')}"></section>
+      <button id="focus-bar" type="button" class="win focus-bar" aria-label="${t('battle.focus.aria')}"><img class="focus-face" alt=""/><span class="focus-id"><b class="focus-name"></b><small class="focus-skill"></small></span><span class="focus-stats"><span class="focus-hp">HP <b></b></span><span class="focus-status"></span></span></button>
       <div class="action-bar">
         <button id="guard" class="cmd guard-button"><span>${t('battle.guard')}<small id="guard-label"></small></span></button>
         <button id="potion" class="cmd potion-button"><span>${t('battle.potion')}<small id="potions"></small></span><b>2</b></button>
@@ -672,7 +673,7 @@ async function begin() {
 
 function renderPartyHealthTray() {
   partyHealthViews.clear();
-  for (const trayId of ['party-health-tray', 'details-party-health-tray']) {
+  for (const trayId of ['details-party-health-tray']) {
     const host = $(trayId);
     host.dataset.count = String(battle.heroes.length);
     host.innerHTML = battle.heroes.map(h => `<button type="button" class="party-health-card" data-party-hero="${h.id}" aria-pressed="false" aria-label="${heroName(h)}">
@@ -728,13 +729,110 @@ function updatePartyHealthView(h: PartyHero) {
 function makeUnits() {
   $('unit-layer').innerHTML = battle.heroes.map(h => {
     const p = cell(h.slot);
-    return `<div class="unit-card" data-hero="${h.id}" style="left:${p.x / 6}%;top:${p.y / 7.6}%;width:24%;height:${120 / 7.6}%;--class-color:${KITS[h.classId].color}"><button class="unit-tap" data-tap="${h.id}" aria-label="${t('battle.tap.aria', { name: heroName(h) })}"><span class="unit-name">${heroName(h)}</span><span class="tap-flash">${t('battle.tempo')}</span></button></div>`;
+    return `<div class="unit-card" data-hero="${h.id}" style="left:${p.x / 6}%;top:${p.y / 7.6}%;width:24%;height:${UNIT_H / 7.6}%;--class-color:${KITS[h.classId].color}"><button class="unit-tap" data-tap="${h.id}" aria-label="${t('battle.tap.aria', { name: heroName(h) })}"><span class="unit-name">${heroName(h)}</span><span class="tap-flash">${t('battle.tempo')}</span></button><span class="unit-hp" aria-hidden="true"><i></i><em></em></span><button type="button" class="unit-skill" data-skill-switch="${h.id}"><i class="unit-skill-fill"></i><span class="unit-skill-name"></span><span class="unit-skill-icon" aria-hidden="true"></span></button></div>`;
   }).join('');
+  unitViews.clear();
+  for (const h of battle.heroes) {
+    const card = document.querySelector<HTMLElement>(`#unit-layer [data-hero="${h.id}"]`)!;
+    const skill = card.querySelector<HTMLButtonElement>('.unit-skill')!;
+    unitViews.set(h.id, { card, hp: card.querySelector('.unit-hp i')!, shield: card.querySelector('.unit-hp em')!, skill, fill: skill.querySelector('.unit-skill-fill')!, name: skill.querySelector('.unit-skill-name')!, icon: skill.querySelector('.unit-skill-icon')!, key: '' });
+    skill.addEventListener('click', event => { event.stopPropagation(); switchSkill(h.id); });
+  }
+  closeSkillPicker();
   $('unit-layer').querySelectorAll<HTMLElement>('[data-tap]').forEach(el => bindPointer(el, Number(el.dataset.tap)));
   renderPartyHealthTray();
   $('party-size').textContent = `${battle.heroes.length}`;
   selectedKey = '';
   renderInspector();
+}
+// A unit card spans its 112px cell plus most of the row gap, so the skill chip sits under the portrait.
+const UNIT_H = 122;
+type UnitView = { card: HTMLElement; hp: HTMLElement; shield: HTMLElement; skill: HTMLButtonElement; fill: HTMLElement; name: HTMLElement; icon: HTMLElement; key: string };
+const unitViews = new Map<number, UnitView>();
+function updateUnitView(h: PartyHero) {
+  const view = unitViews.get(h.id);
+  if (!view) return;
+  const ratio = h.maxHp > 0 ? Math.min(1, Math.max(0, h.hp / h.maxHp)) : 0;
+  const charge = h.total > 0 ? Math.min(1, Math.max(0, 1 - h.remaining / h.total)) : 1;
+  const skills = battle.availableSkills(h.id);
+  const canSwitch = h.hp > 0 && skills.length > 1 && ['ready', 'fighting'].includes(battle.status);
+  view.hp.style.width = `${ratio * 100}%`;
+  view.shield.style.width = `${Math.min(1, Math.max(0, h.shield / Math.max(1, h.maxHp))) * 100}%`;
+  view.fill.style.width = `${h.hp > 0 ? charge * 100 : 0}%`;
+  view.card.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
+  view.card.classList.toggle('charged', h.hp > 0 && charge > .97);
+  const key = `${h.stance}-${skills.length}-${canSwitch}-${h.hp > 0}`;
+  if (key === view.key) return;
+  if (view.key && view.key.split('-')[0] !== String(h.stance)) { view.card.classList.remove('switched'); void view.card.offsetWidth; view.card.classList.add('switched'); }
+  view.key = key;
+  const skill = KITS[h.classId].skills[h.stance];
+  view.name.textContent = skill.name;
+  view.icon.textContent = skills.length > 2 ? '▾' : '⇄';
+  view.skill.disabled = !canSwitch;
+  view.skill.setAttribute('aria-label', t('battle.skill.switch', { name: heroName(h), skill: skill.name }));
+  view.skill.setAttribute('aria-haspopup', String(skills.length > 2));
+}
+function switchSkill(id: number) {
+  const h = battle.hero(id);
+  if (!h || h.hp <= 0 || inTown) return;
+  const skills = battle.availableSkills(id);
+  if (skills.length < 2) return;
+  if (skills.length === 2) { closeSkillPicker(); cycleSkill(id); return; }
+  if (pickerHero === id) { closeSkillPicker(); return; }
+  openSkillPicker(id);
+}
+let pickerHero = -1;
+function openSkillPicker(id: number) {
+  const h = battle.hero(id);
+  if (!h) return;
+  const kit = KITS[h.classId];
+  battle.selected = id;
+  pickerHero = id;
+  const picker = $('skill-picker');
+  picker.setAttribute('aria-label', t('battle.skill.choose', { name: heroName(h) }));
+  picker.innerHTML = `<h4>${t('battle.skill.choose', { name: heroName(h) })}</h4>${battle.availableSkills(id).map(i => { const s = kit.skills[i]; return `<button type="button" data-pick-skill="${i}" aria-pressed="${h.stance === i}"><span><b>${s.name}</b><small>${s.label}</small></span><em>${s.cooldown.toFixed(1)}s</em></button>`; }).join('')}`;
+  const p = cell(h.slot);
+  const width = Math.max(180, $('arena').clientWidth * .52) / $('arena').clientWidth * 100;
+  picker.style.left = `${Math.min(98 - width, Math.max(2, (p.x + 72) / 6 - width / 2))}%`;
+  picker.style.bottom = `${Math.min(70, (760 - p.y - 70) / 7.6)}%`;
+  picker.hidden = false;
+  picker.querySelectorAll<HTMLButtonElement>('[data-pick-skill]').forEach(button => button.addEventListener('click', event => {
+    event.stopPropagation();
+    withDetailsPausedAction(() => battle.stance(id, Number(button.dataset.pickSkill)));
+    sound.unlock();
+    closeSkillPicker();
+    renderInspector();
+    frame(1);
+  }));
+  picker.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus({ preventScroll: true });
+  renderInspector();
+}
+function closeSkillPicker() {
+  pickerHero = -1;
+  const picker = document.getElementById('skill-picker');
+  if (picker) { picker.hidden = true; picker.innerHTML = ''; }
+}
+document.addEventListener('pointerdown', event => {
+  if (pickerHero === -1) return;
+  const target = event.target as HTMLElement;
+  if (!target.closest('#skill-picker') && !target.closest('.unit-skill')) closeSkillPicker();
+}, true);
+function updateFocusBar() {
+  const h = battle.hero(battle.selected);
+  const bar = document.getElementById('focus-bar');
+  if (!h || !bar) return;
+  const ratio = h.maxHp > 0 ? h.hp / h.maxHp : 0;
+  const skill = KITS[h.classId].skills[h.stance];
+  const status = h.hp <= 0 ? t('battle.down') : h.remaining > 0 ? `${Math.max(.1, h.remaining).toFixed(1)}s` : t('battle.ready');
+  const face = bar.querySelector<HTMLImageElement>('.focus-face')!;
+  const src = portrait(h.classId);
+  if (face.getAttribute('src') !== src) face.setAttribute('src', src);
+  bar.querySelector('.focus-name')!.textContent = `${heroName(h)} · LV ${h.level}`;
+  bar.querySelector('.focus-skill')!.textContent = skill.name;
+  bar.querySelector('.focus-hp b')!.textContent = `${Math.ceil(Math.max(0, h.hp))}/${h.maxHp}${h.shield > 0 ? ` +${Math.round(h.shield)}` : ''}`;
+  bar.querySelector('.focus-status')!.textContent = status;
+  bar.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
+  bar.classList.toggle('downed', h.hp <= 0);
 }
 type Touch = { id: number; x: number; y: number; started: number; drag: boolean; el: HTMLElement };
 const touches = new Map<number, Touch>();
@@ -912,7 +1010,10 @@ function frame(dt: number) {
     el.classList.toggle('downed', h.hp <= 0);
     el.classList.toggle('buffed', h.buff > 0);
     updatePartyHealthView(h);
+    updateUnitView(h);
   }
+  updateFocusBar();
+  if (pickerHero !== -1 && (battle.status !== 'fighting' && battle.status !== 'ready' || (battle.hero(pickerHero)?.hp ?? 0) <= 0)) closeSkillPicker();
   const h = battle.hero(battle.selected);
   if (h && $('selected-hp')) {
     $('selected-hp').textContent = `${Math.ceil(h.hp)} / ${h.maxHp}`;
@@ -1617,6 +1718,7 @@ $('battle-screen').addEventListener('click', event => {
 });
 document.querySelectorAll<HTMLButtonElement>('.battle-view-tabs [data-battle-view]').forEach(button => button.addEventListener('click', () => setBattleView(button.dataset.battleView as 'arena' | 'hero' | 'log')));
 $('battle-detail-resume').addEventListener('click', () => setBattleView('arena'));
+$('focus-bar').addEventListener('click', () => setBattleView('hero'));
 // Expedition and preparation routes are handled by the Town screen's delegated actions.
 $('start').addEventListener('click', begin);
 $('pause').addEventListener('click', pauseMenu);
@@ -1668,7 +1770,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyH') battle.potion();
   if (e.code === 'KeyG') battle.guard();
   if (e.code === 'KeyR') battle.ultimate();
-  if (e.code === 'Escape') { moveMode = false; renderInspector(); }
+  if (e.code === 'Escape') { moveMode = false; closeSkillPicker(); renderInspector(); }
   if (/^Digit[1-9]$/.test(e.code)) { const h = battle.heroes.find(h => h.slot === Number(e.code.slice(-1)) - 1); if (h) { sound.unlock(); tapHero(h.id); } }
   if (e.code === 'KeyQ' || e.code === 'KeyE') cycleSkill(battle.selected, e.code === 'KeyE' ? 1 : -1);
 });

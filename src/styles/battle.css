@@ -88,7 +88,7 @@
 .lane-targets.has-minions button { border-color: #ffffff44; color: #ffffffaa; }
 .lane-targets button.active { border-style: solid; border-color: var(--gold); color: var(--gold); background: #e5c68718; }
 
-.board-bottom { position: absolute; z-index: 2; left: 6px; right: 6px; bottom: 4px; display: flex; justify-content: space-between; font-size: 11px; color: #ffffffaa; text-shadow: 1px 1px 0 #000; pointer-events: none; }
+.board-bottom { position: absolute; z-index: 2; left: 6px; right: 6px; bottom: 1px; display: flex; justify-content: space-between; font-size: 10px; line-height: 1.2; color: #ffffffaa; text-shadow: 1px 1px 0 #000; pointer-events: none; }
 
 .start-overlay { position: absolute; z-index: 6; inset: 0; display: grid; place-items: center; padding: 16px; background: #06100d66; }
 .start-window { width: min(100%, 320px); text-align: center; }
@@ -99,7 +99,6 @@
 
 /* Party status window with ATB-style skill gauges */
 .party-health-tray { flex: 0 0 auto; display: grid; grid-template-columns: 1fr; gap: 2px; padding: 4px 6px; }
-#party-health-tray[data-count="4"], #party-health-tray[data-count="5"], #party-health-tray[data-count="6"] { grid-template-columns: 1fr 1fr; column-gap: 8px; }
 .party-health-card { display: grid; grid-template-columns: 26px minmax(48px, 1fr) auto 1.1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; min-height: 44px; padding: 2px 4px; border: 0; border-radius: var(--radius); background: transparent; color: var(--ink); text-align: left; }
 .party-health-card[aria-pressed="true"] { background: #ffffff18; }
 .party-health-card[aria-pressed="true"] .party-hero-name { color: var(--gold); }
@@ -122,12 +121,6 @@
 .party-health-card.low-health .party-health-meter i { background: var(--hp-low); }
 .party-health-card.downed { opacity: 0.55; }
 .party-health-card.downed .party-hp b { color: var(--danger); }
-#party-health-tray[data-count="4"] .party-health-card, #party-health-tray[data-count="5"] .party-health-card, #party-health-tray[data-count="6"] .party-health-card { grid-template-columns: 22px 1fr 1fr; }
-#party-health-tray[data-count="4"] .party-health-values, #party-health-tray[data-count="5"] .party-health-values, #party-health-tray[data-count="6"] .party-health-values,
-#party-health-tray[data-count="4"] .party-face, #party-health-tray[data-count="5"] .party-face, #party-health-tray[data-count="6"] .party-face { display: none; }
-#party-health-tray[data-count="4"] .party-health-meter, #party-health-tray[data-count="5"] .party-health-meter, #party-health-tray[data-count="6"] .party-health-meter { grid-column: 2; width: auto; justify-self: stretch; }
-#party-health-tray[data-count="4"] .party-hero-name, #party-health-tray[data-count="5"] .party-hero-name, #party-health-tray[data-count="6"] .party-hero-name { grid-column: 1 / 3; grid-row: 1; font-size: 13px; }
-#party-health-tray[data-count="4"] .party-atb, #party-health-tray[data-count="5"] .party-atb, #party-health-tray[data-count="6"] .party-atb, #party-health-tray[data-count="4"] .party-cooldown, #party-health-tray[data-count="5"] .party-cooldown, #party-health-tray[data-count="6"] .party-cooldown { grid-column: 3; }
 
 /* Command row */
 .action-bar { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 6px; }
@@ -186,12 +179,56 @@
   .arena-column { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 400px); grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px 10px; }
   .arena-slot { grid-column: 1; grid-row: 1 / 4; }
   .threat-band { grid-column: 2; grid-row: 1; }
-  .party-health-tray { grid-column: 2; grid-row: 2; align-content: start; overflow-y: auto; }
+  .focus-bar { grid-column: 2; grid-row: 2; align-self: start; }
   .action-bar { grid-column: 2; grid-row: 3; }
-  #party-health-tray[data-count="4"], #party-health-tray[data-count="5"], #party-health-tray[data-count="6"] { grid-template-columns: 1fr; }
 }
 
 /* Encounter transition */
 .battle-wipe { position: absolute; inset: 0; z-index: 70; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(14, 1fr); pointer-events: none; }
 .battle-wipe i { background: #fff; animation: wipe-block 0.42s steps(4) forwards; }
 @keyframes wipe-block { 0% { background: #fff; } 30% { background: #0e1e19; transform: scale(1); } 100% { background: #0e1e19; transform: scale(0); } }
+
+/* Grid units: each hero cell carries its own HP bar and a skill chip (charge fill + switch). */
+.unit-card { position: absolute; container-type: inline-size; }
+.unit-name { display: none; }
+.unit-hp { position: absolute; z-index: 1; left: 7%; right: 7%; top: 61%; height: 5%; min-height: 3px; border: 1px solid #07120fcc; background: #07120fcc; pointer-events: none; overflow: hidden; }
+.unit-hp i, .unit-hp em { position: absolute; left: 0; top: 0; bottom: 0; }
+.unit-hp i { background: linear-gradient(180deg, #b8f0c8, var(--hp) 45%, var(--hp-deep)); transition: width 0.15s linear; }
+.unit-hp em { height: 40%; background: var(--mana); }
+.unit-card.low-health .unit-hp i { background: var(--hp-low); }
+.unit-card.downed .unit-hp { opacity: 0.4; }
+.unit-skill { position: absolute; z-index: 1; left: 4%; right: 4%; top: 68%; height: 31%; display: flex; align-items: center; gap: 2px; padding: 0 4px 0 6px; border: 1px solid var(--win-edge); border-radius: 3px; background: #0e1e19e6; color: var(--ink); font-size: clamp(9px, 9cqw, 13px); font-weight: 600; line-height: 1; overflow: hidden; touch-action: manipulation; }
+.unit-skill-fill { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--class-color) 38%, transparent); transition: width 0.1s linear; }
+.unit-skill-name { position: relative; flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.unit-skill-icon { position: relative; flex-shrink: 0; color: var(--gold); font-size: 0.9em; }
+.unit-skill:hover:not(:disabled), .unit-skill:focus-visible { border-color: var(--gold-border); }
+.unit-skill:disabled { cursor: default; }
+.unit-skill:disabled .unit-skill-icon { display: none; }
+.unit-card.charged .unit-skill { border-color: var(--class-color); box-shadow: 0 0 6px color-mix(in srgb, var(--class-color) 60%, transparent); }
+.unit-card.charged .unit-skill-fill { background: color-mix(in srgb, var(--class-color) 55%, transparent); }
+.unit-card.selected .unit-skill { border-color: var(--gold); }
+.unit-card.downed .unit-skill { opacity: 0.45; }
+.unit-card.switched .unit-skill { animation: skill-swap 0.3s ease-out; }
+@keyframes skill-swap { 0% { transform: scale(1.12); background: var(--gold-bg); } }
+
+/* Skill picker (heroes with three or more skills) */
+.skill-picker { position: absolute; z-index: 7; width: 52%; min-width: 180px; max-width: 280px; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.skill-picker h4 { margin: 0 0 2px; font-size: 12px; color: var(--ink-dim); font-weight: 500; }
+.skill-picker button { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 44px; padding: 4px 10px; border: 1px solid var(--win-edge); border-radius: 3px; background: var(--inset); color: var(--ink); text-align: left; }
+.skill-picker button b { display: block; font-size: 14px; }
+.skill-picker button small { color: var(--ink-dim); font-size: 11px; }
+.skill-picker button[aria-pressed="true"] { border-color: var(--gold-border); background: var(--gold-bg); }
+.skill-picker button[aria-pressed="true"] b { color: var(--gold); }
+.skill-picker button em { font-style: normal; font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); }
+
+/* Focus bar: one compact line for the selected hero, whatever the party size. */
+.focus-bar { flex: 0 0 auto; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 48px; padding: 4px 10px; text-align: left; cursor: pointer; }
+.focus-face { width: 30px; height: 33px; }
+.focus-id { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.focus-id b { font-size: 14px; color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.focus-id small { font-size: 12px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.focus-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; color: var(--ink-dim); }
+.focus-stats b { font-family: var(--pixel); font-size: 10px; font-weight: 400; color: var(--ink); }
+.focus-bar.low-health .focus-hp b { color: var(--hp-low); }
+.focus-bar.downed .focus-hp b { color: var(--danger); }
+.focus-status { font-family: var(--pixel); font-size: 8px; color: var(--gold); }

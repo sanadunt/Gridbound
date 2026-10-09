@@ -77,7 +77,8 @@ for (const [width, height] of viewports) {
         ['boss name', document.querySelector('#battle-screen #boss-name')],
         ['boss health', document.querySelector('#battle-screen #boss-health')],
         ...[...document.querySelectorAll('#battle-screen .lane-targets button')].map((element, index) => [\`target lane \${index + 1}\`, element]),
-        ...[...document.querySelectorAll('#battle-screen #party-health-tray .party-health-card')].map((element, index) => [\`party health \${index + 1}\`, element]),
+        ...[...document.querySelectorAll('#battle-screen #unit-layer .unit-skill')].map((element, index) => [\`unit skill \${index + 1}\`, element]),
+        ['focus bar', document.querySelector('#battle-screen #focus-bar')],
         ...[...document.querySelectorAll('#battle-screen .action-bar > button')].map(element => [element.id, element])
       ];
       const bounds = selector => {
@@ -90,8 +91,8 @@ for (const [width, height] of viewports) {
         actions: bounds('#battle-screen .action-bar'),
         controls: controlElements.map(([name, element]) => measure(name, element)),
         standing: document.querySelector('#standing').textContent.trim(),
-        health: [...document.querySelectorAll('#battle-screen #party-health-tray .party-health-card')]
-          .map(card => card.querySelector('.party-hp-value')?.textContent.trim()).filter(Boolean),
+        health: [...document.querySelectorAll('#battle-screen #unit-layer .unit-hp i')].map(bar => bar.style.width).filter(Boolean),
+        focusHp: document.querySelector('#battle-screen #focus-bar .focus-hp b')?.textContent.trim(),
         bossHealthLines: (() => {
           const range = document.createRange();
           range.selectNodeContents(document.querySelector('#battle-screen #boss-health'));
@@ -107,13 +108,14 @@ for (const [width, height] of viewports) {
     }
     assert.deepEqual(active.controls.map(control => control.name), [
       'boss HUD', 'boss name', 'boss health', 'target lane 1', 'target lane 2', 'target lane 3',
-      'party health 1', 'party health 2', 'party health 3', 'guard', 'potion', 'ultimate'
+      'unit skill 1', 'unit skill 2', 'unit skill 3', 'focus bar', 'guard', 'potion', 'ultimate'
     ], `Every boss, lane, party, and action control is present at ${width}×${height}`);
     const clipped = active.controls.filter(control => !control.visible || !control.withinViewport || control.clippedBy.length);
     assert.deepEqual(clipped, [], `Every combat control remains visible without scrolling at ${width}×${height}: ${JSON.stringify(clipped)}`);
     assert.match(active.standing, /^\d+\/\d+ standing$/);
-    assert.ok(active.health.length === 3 && active.health.every(value => /^\d+$/.test(value)),
-      `Every party health value remains visible and numeric at ${width}×${height}: ${JSON.stringify(active.health)}`);
+    assert.ok(active.health.length === 3 && active.health.every(value => /^\d+(\.\d+)?%$/.test(value)),
+      `Every hero cell shows an HP bar at ${width}×${height}: ${JSON.stringify(active.health)}`);
+    assert.match(active.focusHp ?? '', /^\d+\/\d+/, `Selected hero HP stays readable at ${width}×${height}`);
     assert.equal(active.bossHealthLines, 1, `Boss health remains on one readable line at ${width}×${height}`);
     assert.ok(active.threat.length > 0, 'Active battle retains a readable threat/counter cue');
     const lanePoint = await evaluate(`(() => {

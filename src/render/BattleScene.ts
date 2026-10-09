@@ -13,6 +13,8 @@ export function cell(slot:number){return {x:ARENA.x+(slot%3)*(ARENA.cw+ARENA.gap
 export function center(slot:number){const p=cell(slot);return {x:p.x+72,y:p.y+54};}
 type Particle={x:number;y:number;vx:number;vy:number;life:number;max:number;color:number;size:number;gravity:number};
 type BossCue={color:number;kind:'threat'|'phase'|'break'|'summon'|'ultimate'|'victory';left:number;total:number};
+// Heroes stand in the upper part of their cell; the DOM unit card puts HP and the skill chip below them.
+const HERO_SCALE=2,HERO_LIFT=18;
 export const ENEMY_DEATH_ANIMATION_MS=780;
 export const ENEMY_DEATH_ANIMATION_REDUCED_MS=120;
 export class BattleScene extends Phaser.Scene {
@@ -95,7 +97,7 @@ export class BattleScene extends Phaser.Scene {
 
  private deathProgress(){return Math.min(1,this.enemyDeathDuration>0?this.enemyDeathElapsed/this.enemyDeathDuration:1);}
 
- private syncHeroes(){if(!this.floor)return;for(const h of this.battle.heroes){if(this.heroes.has(h.id))continue;const p=center(h.slot);this.heroes.set(h.id,this.add.image(p.x,p.y-7,`${h.classId}-0`).setScale(2.3).setDepth(9));}}
+ private syncHeroes(){if(!this.floor)return;for(const h of this.battle.heroes){if(this.heroes.has(h.id))continue;const p=center(h.slot);this.heroes.set(h.id,this.add.image(p.x,p.y-HERO_LIFT,`${h.classId}-0`).setScale(HERO_SCALE).setDepth(9));}}
  update(_time:number,delta:number){
   let dt=Math.min(delta/1000,.1);
   if(this.hitStop>0){this.hitStop-=dt;dt*=.08;}
@@ -123,23 +125,23 @@ export class BattleScene extends Phaser.Scene {
    for(const dx of [0,137])for(const dy of [0,105])this.floor.fillStyle(selected?0xdfc486:0x70836a).fillRect(p.x+dx,p.y+dy,7,2).fillRect(p.x+dx,p.y+dy,2,7);
    if(this.hoverSlot===i){this.floor.fillStyle(0xe1ce93,.22).fillRect(p.x,p.y,144,112);this.floor.lineStyle(2,0xefdeb0).strokeRect(p.x,p.y,144,112);}
    if(h){
-    const pos=center(i),image=this.heroes.get(h.id)!;let x=pos.x,y=pos.y-10;
+    const pos=center(i),image=this.heroes.get(h.id)!;let x=pos.x,y=pos.y-HERO_LIFT;
     const attack=this.attacks.get(h.id)??0;if(attack>0){this.attacks.set(h.id,attack-dt);if(!this.reducedMotion)y-=Math.sin(Math.min(1,attack/.34)*Math.PI)*26;}
     if(this.victoryAge>0&&h.hp>0&&!this.reducedMotion)y-=Math.abs(Math.sin((this.victoryAge*2.6+h.id*.37)*Math.PI))*18;
     if(this.dragId===h.id&&this.dragPoint){x=this.dragPoint.x;y=this.dragPoint.y;image.setDepth(30);}else image.setDepth(9);
     image.x=Phaser.Math.Linear(image.x,x,Math.min(1,dt*18));image.y=Phaser.Math.Linear(image.y,y,Math.min(1,dt*18));image.setTexture(`${h.classId}-${Math.floor(t*4+h.id)%4}`);
     image.setAlpha(h.hp<=0?.2:1);const flash=this.flashes.get(h.id)??0;if(flash>0){this.flashes.set(h.id,flash-dt);image.setTint(0xff857e);}else image.clearTint();
-    this.floor.fillStyle(0x050818,.55).fillEllipse(pos.x,pos.y+30,70,14);
-    if(h.shield>0||b.guardLeft>0){const shieldAlpha=this.reducedMotion?.6:.6+Math.sin(t*3)*.15;this.threats.lineStyle(2,0x9bd8ef,shieldAlpha);this.threats.strokeEllipse(pos.x,pos.y-5,77,78);this.threats.fillStyle(0x8acee8,.04).fillEllipse(pos.x,pos.y-5,77,78);}
-    if(h.buff>0){const buffWidth=this.reducedMotion?61:61+Math.sin(t*5)*4;this.threats.lineStyle(2,0x8bf3ca,.7);this.threats.strokeEllipse(pos.x,pos.y+25,buffWidth,15);}
-    if(h.hp<=0){this.threats.lineStyle(2,0xa19788,.7).lineBetween(pos.x-8,pos.y-13,pos.x+8,pos.y+3).lineBetween(pos.x+8,pos.y-13,pos.x-8,pos.y+3);}
+    this.floor.fillStyle(0x050818,.55).fillEllipse(pos.x,pos.y+17,62,12);
+    if(h.shield>0||b.guardLeft>0){const shieldAlpha=this.reducedMotion?.6:.6+Math.sin(t*3)*.15;this.threats.lineStyle(2,0x9bd8ef,shieldAlpha);this.threats.strokeEllipse(pos.x,pos.y-HERO_LIFT,72,74);this.threats.fillStyle(0x8acee8,.04).fillEllipse(pos.x,pos.y-HERO_LIFT,72,74);}
+    if(h.buff>0){const buffWidth=this.reducedMotion?61:61+Math.sin(t*5)*4;this.threats.lineStyle(2,0x8bf3ca,.7);this.threats.strokeEllipse(pos.x,pos.y+14,buffWidth,13);}
+    if(h.hp<=0){this.threats.lineStyle(2,0xa19788,.7).lineBetween(pos.x-8,pos.y-28,pos.x+8,pos.y-12).lineBetween(pos.x+8,pos.y-28,pos.x-8,pos.y-12);}
    }
   }
   for(const danger of b.threats){const blink=this.reducedMotion?.22:.22+Math.sin(t*5)*.065;for(const s of danger.slots){const p=cell(s),color=danger.type==='all'?0xd9b5ee:danger.type==='target'?0xffba78:danger.type==='breath'?0xeb9d5f:0xef786b;this.threats.fillStyle(color,blink).fillRect(p.x+3,p.y+3,138,106);this.threats.lineStyle(2,color,.85).strokeRect(p.x+3,p.y+3,138,106);
    this.threats.fillStyle(color,.7).fillRect(p.x+3,p.y+3,138*danger.left/danger.total,3);
    this.threats.lineStyle(1,color,.28);for(let stripe=0;stripe<6;stripe++)this.threats.lineBetween(p.x+8+stripe*24,p.y+111,p.x+30+stripe*20,p.y+5);
    this.threats.lineStyle(2,0xffd4a6,.8).strokeTriangle(p.x+119,p.y+15,p.x+111,p.y+29,p.x+127,p.y+29);
-   if(danger.type==='target'){const marked=center(s);this.threats.lineStyle(3,0xffce91).strokeCircle(marked.x,marked.y-7,35);this.threats.lineBetween(marked.x,marked.y-49,marked.x,marked.y-28);}
+   if(danger.type==='target'){const marked=center(s);this.threats.lineStyle(3,0xffce91).strokeCircle(marked.x,marked.y-HERO_LIFT,33);this.threats.lineBetween(marked.x,marked.y-HERO_LIFT-42,marked.x,marked.y-HERO_LIFT-22);}
    if(b.status==='fighting'&&danger.type==='meteor'&&danger.left<.55&&!this.reducedMotion){const hit=center(s),yy=hit.y-230*(danger.left/.55);this.fx.fillStyle(0xfac589,.9).fillRect(hit.x-4,yy,8,13);this.fx.fillStyle(0xee9970,.5).fillRect(hit.x-2,yy-17,4,19);this.particle(hit.x,yy,0xfac589,3,.25,0,-20,0);}
   }}
   for(const m of b.minions){let spr=this.enemies.get(m.id);if(!spr){spr=this.add.image(144+m.lane*156,320,`${m.enemyId??'goblin'}-0`).setScale(.42).setDepth(6);this.enemies.set(m.id,spr);}spr.y=321+(this.reducedMotion?0:Math.sin(t*4+m.lane)*3);this.threats.fillStyle(0x102621).fillRect(spr.x-23,348,46,3);this.threats.fillStyle(0xd6be78).fillRect(spr.x-23,348,46*m.hp/m.maxHp,3);}
