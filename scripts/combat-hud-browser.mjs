@@ -8,7 +8,7 @@ console.log('--- TESTING HADES COMBAT HUD & BOSS INTENT / HEALTH BAR ---');
 async function enterCampaignBattle({ click, wait, evaluate }) {
   await wait('Boolean(window.gridbound && document.querySelector(\'[data-facility="campaign"]\'))');
   await evaluate('document.fonts.ready');
-  await click('[data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(\'[data-zone="0"]\'))');
   await click('[data-zone="0"]');
   await wait('Boolean(document.querySelector(\'[data-depart="adventure"]\'))');
@@ -24,7 +24,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await enterCampaignBattle({ click, wait, evaluate });
   // 1. Verify Gilded Boss HUD Structure
   assert.equal(await evaluate('Boolean(document.querySelector(".boss-hud"))'), true, 'Boss HUD must exist');
-  assert.equal(await evaluate('document.querySelectorAll(".boss-crest-corner").length'), 4, '4 Filigree corner brackets must exist');
+  assert.equal(await evaluate('Boolean(document.querySelector(".boss-hud.win"))'), true, 'Boss HUD uses the JRPG window frame');
   assert.equal(await evaluate('Boolean(document.querySelector("#boss-hp"))'), true, '#boss-hp must exist');
   assert.equal(await evaluate('Boolean(document.querySelector("#boss-hp-ghost"))'), true, '#boss-hp-ghost must exist');
   assert.equal(await evaluate('document.querySelectorAll(".boss-phase-notch").length'), 2, 'Phase notches must exist');
@@ -90,7 +90,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
     };
     const column = document.querySelector('#battle-screen .arena-column');
     const targets = Array.from(document.querySelectorAll(
-      '#battle-screen .battle-view-tabs button, #battle-screen .arena-heading-controls button, #battle-screen .lane-targets button, #battle-screen .party-health-tray button, #battle-screen .action-bar button, #battle-screen [data-tap]'
+      '#battle-screen .battle-view-tabs button, #battle-screen .arena-heading-controls button, #battle-screen .lane-targets button, #battle-screen #focus-bar, #battle-screen .action-bar button, #battle-screen [data-tap]'
     )).filter(button => {
       const r = button.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && getComputedStyle(button).visibility !== 'hidden';
@@ -102,7 +102,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
       viewport: { width: innerWidth, height: innerHeight },
       page: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
       column: { clientHeight: column.clientHeight, scrollHeight: column.scrollHeight },
-      content: ['.arena-heading', '.threat-band', '.battle-banner', '.arena', '.party-health-tray', '.action-bar'].map(bounds),
+      content: ['.battle-top', '.threat-band', '.battle-banner', '.arena', '#focus-bar', '.action-bar'].map(bounds),
       targets
     };
   })()`);
@@ -112,6 +112,19 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   assert.ok(mobileBounds.content.every(box => box.left >= 0 && box.right <= mobileBounds.viewport.width && box.top >= 0 && box.bottom <= mobileBounds.viewport.height), 'Required combat regions must remain in the viewport');
   assert.ok(mobileBounds.targets.length > 0 && mobileBounds.targets.every(target => target.height >= 44 && target.left >= 0 && target.right <= mobileBounds.viewport.width && target.top >= 0 && target.bottom <= mobileBounds.viewport.height), 'Mobile combat targets must be 44px and fully visible');
 
+
+  // Each grid cell carries its own HP bar and skill chip; the chip switches skills in place.
+  assert.equal(await evaluate('document.querySelectorAll("#unit-layer .unit-card .unit-hp").length'), await evaluate('window.gridbound.battle.heroes.length'));
+  const stanceBefore = await evaluate('window.gridbound.battle.hero(0).stance');
+  await click('[data-skill-switch="0"]');
+  assert.notEqual(await evaluate('window.gridbound.battle.hero(0).stance'), stanceBefore, 'Grid skill chip switches a two-skill hero in one tap');
+  await evaluate('window.gridbound.battle.hero(0).skills.push(2); window.gridbound.step(0)');
+  await click('[data-skill-switch="0"]');
+  await wait('!document.querySelector("#skill-picker").hidden && document.querySelectorAll("#skill-picker [data-pick-skill]").length === 3');
+  await click('#skill-picker [data-pick-skill="2"]');
+  assert.equal(await evaluate('window.gridbound.battle.hero(0).stance'), 2, 'Skill picker sets the chosen skill');
+  assert.equal(await evaluate('document.querySelector("#skill-picker").hidden'), true, 'Skill picker closes after choosing');
+  await evaluate('window.gridbound.battle.hero(0).skills.pop(); window.gridbound.battle.stance(0, window.gridbound.battle.hero(0).skills[0])');
 
   // Trigger damage, threat, and ultimate on mobile
   await evaluate(`(() => {
@@ -165,7 +178,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
     };
     const column = document.querySelector('#battle-screen .arena-column');
     const targets = Array.from(document.querySelectorAll(
-      '#battle-screen .battle-view-tabs button, #battle-screen .arena-heading-controls button, #battle-screen .lane-targets button, #battle-screen .party-health-tray button, #battle-screen .action-bar button, #battle-screen [data-tap]'
+      '#battle-screen .battle-view-tabs button, #battle-screen .arena-heading-controls button, #battle-screen .lane-targets button, #battle-screen #focus-bar, #battle-screen .action-bar button, #battle-screen [data-tap]'
     )).filter(button => {
       const r = button.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && getComputedStyle(button).visibility !== 'hidden';
@@ -177,7 +190,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
       viewport: { width: innerWidth, height: innerHeight },
       page: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
       column: { clientHeight: column.clientHeight, scrollHeight: column.scrollHeight },
-      content: ['.arena-heading', '.threat-band', '.battle-banner', '.arena', '.party-health-tray', '.action-bar'].map(box),
+      content: ['.battle-top', '.threat-band', '.battle-banner', '.arena', '#focus-bar', '.action-bar'].map(box),
       targets
     };
   })()`);

@@ -28,7 +28,7 @@ for (const [width, height] of viewports) {
         const targetSelector = [
           '#app > .site-header #sound', '#app > .site-header #settings',
           '#app > .site-header .mode-tabs button', '#app > .site-header #story-journal', '#app > .site-header #profiles',
-          '.game-nav button', '.expedition-mode-nav button', '.training-tabs button',
+          '#app > .site-header #menu-button', '.town-spot', '.expedition-mode-nav button', '.training-tabs button',
           '.back-link', '.party-advanced-link', '.map-stepper-btn', '.map-act-tab'
         ].join(',');
         const touchTargets = [...document.querySelectorAll(targetSelector)].filter(visible).map(element => {
@@ -76,7 +76,7 @@ for (const [width, height] of viewports) {
           document: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
           scene: { left: sceneRect.left, right: sceneRect.right, top: sceneRect.top, bottom: sceneRect.bottom,
             width: scene.clientWidth, height: scene.clientHeight, scrollWidth: scene.scrollWidth, scrollHeight: scene.scrollHeight },
-          navigation: (() => { const bounds = document.querySelector('.game-nav')?.getBoundingClientRect(); return bounds ? { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom } : null; })(),
+          navigation: (() => { const bounds = document.querySelector('#app > .site-header')?.getBoundingClientRect(); return bounds ? { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom } : null; })(),
           action: rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height } : null,
           touchTargets, clipped, noticeOverlaps,
           storage: { left: storageRect.left, right: storageRect.right, top: storageRect.top, bottom: storageRect.bottom, width: storageRect.width, height: storageRect.height }
@@ -118,8 +118,8 @@ for (const [width, height] of viewports) {
       }
     };
 
-    await measure('camp', '.camp-actions [data-facility="campaign"]');
-    await click('.game-nav [data-facility="campaign"]');
+    await measure('camp', '.town-spot[data-facility="campaign"]');
+    await click.nav('campaign');
     await measure('expedition-map', '[data-zone="0"]');
     await click('[data-zone="0"]');
     await measure('mission-dossier', '.mission-brief [data-depart="adventure"]');
@@ -129,32 +129,32 @@ for (const [width, height] of viewports) {
     await click('.expedition-mode-nav [data-facility="endless"]');
     await measure('roguelike-setup', '.secondary-deploy [data-depart="endless"]');
 
-    await click('.game-nav [data-facility="party"]');
+    await click.nav('party');
     await measure('party-formation', '.party-deploy-button');
     await click('[data-training-tab="skills"]');
     await measure('party-skills', '.party-deploy-button');
     await click('[data-training-tab="gear"]');
     await measure('party-gear', '.party-deploy-button');
-    await click('[data-facility="party-advanced"]');
+    await click.nav('party-advanced');
     await measure('party-overview', '.party-deploy-button');
     await click('[data-training-tab="jobs"]');
     await measure('party-jobs', '.party-deploy-button');
     await click('[data-training-tab="talents"]');
     await measure('party-talents', '.party-deploy-button');
 
-    await click('.game-nav [data-facility="party"]');
+    await click.nav('party');
     await click('.formation-grid [data-formation="0"]');
     await wait('Boolean(document.querySelector(".town-notice:not([hidden])"))');
     await measure('party-notice');
 
-    await click('.game-nav [data-facility="more"]');
+    await click.nav('more');
     await measure('more-menu', '.more-card[data-facility="quests"]');
     await click('.more-card[data-facility="quests"]');
     await measure('quests');
-    await click('.game-nav [data-facility="more"]');
+    await click.nav('more');
     await click('.more-card[data-facility="bestiary"]');
     await measure('bestiary');
-    await click('.game-nav [data-facility="more"]');
+    await click.nav('more');
     await click('.more-card[data-facility="challenge-shop"]');
     await measure('challenge-shop');
 
@@ -178,7 +178,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, errors }) => {
     return {
       bounds: { top: bounds.top, bottom: bounds.bottom, height: bounds.height },
       clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflow: getComputedStyle(element).overflow,
-      controls: [...element.querySelectorAll('#sound,#settings,.mode-tabs button,#profiles,#wallet,#bank-wallet')]
+      controls: [...element.querySelectorAll('#sound,#settings,#menu-button,#wallet,#bank-wallet')]
         .filter(visible).map(node => {
           const rect = node.getBoundingClientRect();
           return { name: node.id || node.textContent.trim(), tag: node.tagName, left: rect.left, right: rect.right,
@@ -201,8 +201,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, errors }) => {
       document: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
       scene: bounds(document.querySelector('.town-scene')),
       camp: bounds(document.querySelector('.camp-scene')),
-      action: bounds(document.querySelector('.camp-actions [data-facility="campaign"]')),
-      navigation: bounds(document.querySelector('.game-nav')),
+      action: bounds(document.querySelector('.town-spot[data-facility="campaign"]')),
+      navigation: bounds(document.querySelector('#app > .site-header')),
       storage: bounds(document.querySelector('#storage-status'))
     };
   })()`);

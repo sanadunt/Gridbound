@@ -14,7 +14,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
   // Open Training Hall (Party facility)
-  await click('[data-facility="party"]');
+  await click.nav('party');
   await wait('Boolean(document.querySelector(".training-identity"))');
 
   // Verify Hero Sanctum Header
@@ -24,11 +24,13 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   // Verify all 6 Sub-Navigation Tabs
   const subTabs = ['overview', 'skills', 'jobs', 'talents', 'gear', 'formation'];
   for (const tab of subTabs) {
+    await click.nav(['overview', 'jobs', 'talents'].includes(tab) ? 'party-advanced' : 'party');
     await click(`[data-training-tab="${tab}"]`);
     assert.equal(await evaluate(`Boolean(document.querySelector('[data-training-panel="${tab}"]'))`), true, `Panel for ${tab} must exist`);
   }
 
   // Focus on Talents (Mirror of Night)
+  await click.nav('party-advanced');
   await click('[data-training-tab="talents"]');
   await wait('Boolean(document.querySelector(".talent-workspace"))');
 
@@ -56,16 +58,15 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   console.log('✓ Captured artifacts/training-talents-hades-desktop.png');
 
   // Focus on Equipment (Forge)
+  await click.nav('party');
   await click('[data-training-tab="gear"]');
   await wait('Boolean(document.querySelector(".gear-slots"))');
-  assert.equal(await evaluate('document.querySelectorAll("[data-gear-slot]").length'), 3, '3 gear slot selectors');
+  assert.equal(await evaluate('document.querySelectorAll("[data-gear-open]").length'), 3, '3 equipment slots');
+  assert.ok(await evaluate('document.querySelectorAll("[data-gear-item]").length') >= 1, 'Item cards list the gear for the open slot');
 
   // Inspect a piece of gear
-  await evaluate(`(() => {
-    const el = document.querySelector('[data-gear-slot="weapon"]');
-    el.value = 'scout-weapon';
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  await click('[data-gear-open="weapon"]');
+  await click('[data-gear-item="scout-weapon"]');
   await wait('Boolean(document.querySelector("[data-gear-preview]"))');
   assert.equal(await evaluate('Boolean(document.querySelector(".gear-comparison"))'), true, 'Gear comparison stats must display');
   assert.equal(await evaluate('Boolean(document.querySelector("[data-confirm-gear]"))'), true, 'Confirm gear CTA must exist');
@@ -75,6 +76,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   console.log('✓ Captured artifacts/training-gear-hades-desktop.png');
 
   // Focus on Jobs (Advancement)
+  await click.nav('party-advanced');
   await click('[data-training-tab="jobs"]');
   await wait('Boolean(document.querySelector(".job-paths"))');
   assert.equal(await evaluate('document.querySelectorAll(".job-node").length'), 4, '4 job advancement nodes');
@@ -90,7 +92,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
-  await click('[data-facility="party"]');
+  await click.nav('party');
   await wait('Boolean(document.querySelector(".training-identity"))');
 
   // Verify zero horizontal overflow on mobile
@@ -102,6 +104,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   assert.ok(tabHeights.every(h => h >= 40), 'Training tabs must have accessible touch heights');
 
   // Switch to Talents on Mobile
+  await click.nav('party-advanced');
   await click('[data-training-tab="talents"]');
   await wait('Boolean(document.querySelector(".talent-workspace"))');
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), true, 'Talent workspace must fit 390px mobile');

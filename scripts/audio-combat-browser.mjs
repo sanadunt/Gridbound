@@ -37,7 +37,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   assert.ok(soundEnabled, 'Sound toggle should be active based on profile');
 
   // Enter Campaign encounter to test combat HUD and juice
-  await click('[data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('[data-zone="0"]');
   await click('[data-depart="adventure"]');
@@ -120,7 +120,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await wait('Boolean(window.gridbound && document.querySelector("#town-screen:not([hidden])"))');
 
   // Depart into combat
-  await click('[data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('[data-zone="0"]');
   await click('[data-depart="adventure"]');

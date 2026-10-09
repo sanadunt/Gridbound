@@ -11,7 +11,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
   // Go to endless / The Sunken Bell
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="endless"]');
   await wait('Boolean(document.querySelector("[data-depart=endless]"))');
@@ -28,7 +28,6 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   assert.equal(await evaluate('document.querySelectorAll("[data-boon]").length'), 3, 'Must present exactly 3 boon cards');
   assert.equal(await evaluate('document.querySelectorAll(".boon-card").length'), 3, 'Cards must use .boon-card class');
   assert.equal(await evaluate('document.querySelectorAll(".boon-patron-badge").length'), 3, 'Each card must have a patron badge');
-  assert.equal(await evaluate('document.querySelectorAll(".boon-rarity-pill").length'), 3, 'Each card must have a rarity pill');
   assert.equal(await evaluate('document.querySelectorAll(".boon-cta").length'), 3, 'Each card must have an Accept Blessing CTA');
 
   // Wait for GSAP card deal animation to settle
@@ -56,7 +55,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
   // Go to endless
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="endless"]');
   await wait('Boolean(document.querySelector("[data-depart=endless]"))');

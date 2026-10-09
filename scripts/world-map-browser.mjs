@@ -38,7 +38,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await send('Page.reload');
   await wait('window.gridbound && document.querySelector("canvas")');
   await wait('Boolean(document.querySelector("#town-screen:not([hidden])"))');
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
 
   const cleared = await evaluate('window.gridbound.profile().cleared');
@@ -47,7 +47,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
 
   // Verify World Map presence
   assert.equal(await evaluate('Boolean(document.querySelector(".world-map-wrapper"))'), true, 'World map container must be rendered');
-  assert.equal(await evaluate('Boolean(document.querySelector(".world-map-svg"))'), true, 'SVG cartography canvas must be rendered');
+  assert.equal(await evaluate('Boolean(document.querySelector(".overworld-art"))'), true, 'Pixel overworld map must be rendered');
 
   // Check 4 Act selector tabs
   const actTabsCount = await evaluate('document.querySelectorAll(".map-act-tab").length');
@@ -125,7 +125,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await send('Page.reload');
   await wait('window.gridbound && document.querySelector("canvas")');
   await wait('Boolean(document.querySelector("#town-screen:not([hidden])"))');
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
 
   // Assert mobile fit
@@ -153,7 +153,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")');
   await evaluate('window.gridbound.hideTitle()');
   await wait('document.querySelector("#title-screen").hidden');
-  await click('.game-nav [data-facility="campaign"]');
+  await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper.map-view"))');
 
   const clippedMap = await evaluate(`(() => {
@@ -162,7 +162,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   })()`);
   assert.equal(clippedMap.overflowY, 'auto', `Short map viewport must offer vertical scrolling: ${JSON.stringify(clippedMap)}`);
   assert.ok(clippedMap.scrollHeight > clippedMap.clientHeight, `Map content must retain its scroll range: ${JSON.stringify(clippedMap)}`);
-  await evaluate(`(() => { const wrapper = document.querySelector('.world-map-wrapper'); wrapper.scrollTop = wrapper.scrollHeight; })()`);
+  await evaluate(`(() => { const wrapper = document.querySelector('.world-map-wrapper'); wrapper.scrollTop = wrapper.scrollHeight; document.querySelector('[data-zone="0"]').scrollIntoView({ block: 'center' }); })()`);
   const pin = await evaluate(`(() => {
     const wrapper = document.querySelector('.world-map-wrapper').getBoundingClientRect();
     const target = document.querySelector('[data-zone="0"]').getBoundingClientRect();

@@ -8,7 +8,7 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
   const textures = await evaluate(`Object.keys(window.gridbound.scene.textures.list).filter(k=>/^(wolf|goblin|spider|shaman|golem|wraith|treant|dragon|moth|basilisk|crab|revenant)(-ash|-frost|-auric)?-0$/.test(k)).map(k=>window.gridbound.scene.textures.get(k).getSourceImage().toDataURL())`);
   assert.equal(textures.length, 48);
   assert.equal(new Set(textures).size, 48, 'each monster variant is actually visually distinct');
-  await click('[data-facility="campaign"]');
+  await click.nav('campaign');
 
   for (let chapter = 0; chapter < 16; chapter += 1) {
     if (!(await evaluate(`Boolean(document.querySelector('[data-zone="${chapter}"]'))`))) {
@@ -21,20 +21,20 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
     }
 
     if (chapter === 3 || chapter === 9) {
-      await click('.game-nav [data-facility="party"]');
-      await click('[data-facility="party-advanced"]');
+      await click.nav('party');
+      await click.nav('party-advanced');
       await click('[data-training-tab="jobs"]');
       const job = chapter === 3 ? 'paladin' : 'aegis';
       await wait(`Boolean(document.querySelector('[data-promote="${job}"]'))`);
       await click(`[data-promote="${job}"]`);
       assert.equal(await evaluate('window.gridbound.profile().loadouts[0].job'), job);
-      await click('[data-facility="party"]');
+      await click.nav('party');
       await click('[data-training-tab="skills"]');
       const skill = chapter === 3 ? 4 : 6;
-      await evaluate(`(() => { const select = document.querySelector('[data-equip-slot="0"]'); select.value = '${skill}'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await click(`[data-equip-skill="${skill}"][data-skill-slot="0"]`);
       assert.ok(await evaluate(`window.gridbound.profile().loadouts[0].skills.includes(${skill})`));
       await screenshot(`artifacts/${chapter === 3 ? 'advanced' : 'third'}-class.png`);
-      await click('[data-facility="campaign"]');
+      await click.nav('campaign');
     }
 
     if (!(await evaluate(`Boolean(document.querySelector('[data-zone="${chapter}"]'))`))) {
@@ -45,7 +45,7 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
       }
       assert.equal(await evaluate('document.querySelectorAll("[data-zone]").length'), 4);
     }
-    await click('[data-facility="campaign"]');
+    await click.nav('campaign');
     await click(`[data-zone="${chapter}"]`);
     await click('[data-depart="adventure"]');
     await click('#start');
@@ -105,19 +105,22 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
     await click('#result-town');
     await wait('document.querySelector("#town-screen:not([hidden])")');
     assert.equal((await evaluate('window.gridbound.profile().cleared')).length, chapter + 1);
-    await click('[data-facility="campaign"]');
+    await click.nav('campaign');
   }
 
   await screenshot('artifacts/campaign-complete.png');
   assert.equal(await evaluate('window.gridbound.profile().roster.length'), 9);
-  assert.ok(await evaluate('document.querySelector(".story-journal").textContent.includes("YANG HIDUP TIDAK BERUTANG MASA DEPANNYA")'));
+  await click.nav('more');
+  await click('.more-scene [data-open-action="journal"]');
+  await wait('document.querySelectorAll("#modal[open] .journal-entry-card").length === 16');
+  await click('#modal [data-close]');
   await send('Page.reload');
   await wait('window.gridbound?.profile().cleared.length === 16');
   assert.equal(await evaluate('window.gridbound.profile().loadouts[0].job'), 'aegis');
   assert.ok((await evaluate('window.gridbound.profile().loadouts[0].skills')).includes(6));
 
-  await click('[data-facility="campaign"]');
-  await click('[data-facility="endless"]');
+  await click.nav('campaign');
+  await click.nav('endless');
   await click('[data-depart="endless"]');
   for (let floor = 1; floor <= 13; floor += 1) {
     await click('#start');

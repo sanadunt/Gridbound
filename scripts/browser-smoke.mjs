@@ -12,26 +12,27 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   assert.deepEqual(await evaluate('window.gridbound.profile().roster'), [0, 4, 3]);
   await screenshot('artifacts/town-desktop.png');
 
-  await click('[data-facility="party"]');
-  await click('[data-facility="party-advanced"]');
+  await click.nav('party');
+  await click.nav('party-advanced');
   await click('[data-training-tab="talents"]');
   await screenshot('artifacts/training-desktop.png');
   await click('[data-inspect-talent="active-2"]');await click('[data-talent="active-2"]');
   assert.ok((await evaluate('window.gridbound.profile().loadouts[0].talents')).includes('active-2'));
-  await click('[data-facility="party"]');
+  await click.nav('party');
   await click('[data-training-tab="skills"]');
-  await evaluate(`(() => { const select = document.querySelector('[data-equip-slot="1"]'); select.value = '2'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  await click('[data-equip-skill="2"][data-skill-slot="1"]');
   assert.deepEqual(await evaluate('window.gridbound.profile().loadouts[0].skills'), [0, 2]);
 
   await click('[data-training-tab="gear"]');
   const goldBeforePreview = await evaluate('window.gridbound.profile().gold');
-  await evaluate(`(() => { const select = document.querySelector('[data-gear-slot="charm"]'); select.value = 'ember-charm'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  await click('[data-gear-open="charm"]');
+  await click('[data-gear-item="ember-charm"]');
   assert.equal(await evaluate('Boolean(document.querySelector("[data-gear-preview=ember-charm]"))'), true);
   assert.equal(await evaluate('window.gridbound.profile().gold'), goldBeforePreview, 'equipment inspection must not spend gold');
   await click('[data-confirm-gear]');
   assert.ok(await evaluate('window.gridbound.profile().loadouts[0].inventory.includes("ember-charm")'));
 
-  await click('[data-facility="campaign"]');
+  await click.nav('campaign');
   await click('[data-zone="0"]');
   await click('[data-depart="adventure"]');
   await wait('window.gridbound.battle.status === "ready" && document.querySelector("#start")');
@@ -45,9 +46,9 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
 
   await click('#pause');
   await wait('window.gridbound.battle.status === "paused"');
-  assert.equal(await evaluate(`['Resume', 'Controls', 'Sound & motion', 'Retreat · return to Camp'].every(label =>
+  assert.equal(await evaluate(`['Resume', 'Controls', 'Config', 'Retreat to town'].every(label =>
     [...document.querySelectorAll('#modal button')].some(button => button.textContent.trim() === label))`), true,
-  'Pause menu exposes Resume, Controls, Sound & motion, and Retreat to Camp');
+  'Pause menu exposes Resume, Controls, Config, and Retreat to town');
   const time = await evaluate('window.gridbound.battle.time');
   await evaluate('window.gridbound.step(5)');
   assert.equal(await evaluate('window.gridbound.battle.time'), time);
@@ -68,7 +69,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   await wait('window.gridbound.battle.status === "paused"');
   await click('#pause-retreat');
   await wait('document.querySelector("#modal #abandon-run")');
-  assert.equal(await evaluate(`document.querySelector('#modal').textContent.includes('Leave this encounter?')`), true,
+  assert.equal(await evaluate(`document.querySelector('#modal').textContent.includes('Leave this battle?')`), true,
     'Retreat opens a confirmation instead of abandoning the run immediately');
   await click('#modal [data-close]');
   await wait('window.gridbound.battle.status === "fighting"');
@@ -95,7 +96,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   await click('#result-town');
   await wait('document.querySelector("#town-screen:not([hidden])")');
   await wait('window.gridbound.profile().gold === ' + banked);
-  await click('[data-facility="campaign"]');
+  await click.nav('campaign');
   await click('[data-campaign-page="1"]');await click('[data-zone="1"]');
   assert.match(await evaluate('document.querySelector(".mission-brief h3").textContent'), /Sunken/);
   await send('Page.reload');
@@ -105,8 +106,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   assert.equal(await evaluate('window.gridbound.profile().sound'), false, 'Sound-off setting survives reload');
   assert.equal(await evaluate('window.gridbound.profile().motion'), false, 'Reduced-motion setting survives reload');
 
-  await click('[data-facility="campaign"]');
-  await click('[data-facility="endless"]');
+  await click.nav('campaign');
+  await click.nav('endless');
   await click('[data-depart="endless"]');
   await click('#start');
   await evaluate('window.gridbound.battle.bossHp = 0; window.gridbound.step(.1)');

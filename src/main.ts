@@ -5,30 +5,21 @@ import '@fontsource/space-grotesk/latin-400.css';
 import '@fontsource/space-grotesk/latin-500.css';
 import '@fontsource/space-grotesk/latin-600.css';
 import '@fontsource/space-grotesk/latin-700.css';
-import './style.css';
+import './styles/base.css';
+import './styles/title.css';
+import './styles/town.css';
+import './styles/screens.css';
+import './styles/battle.css';
+import './styles/result.css';
 import { currencyAmount } from './ui/currency';
-
-import './town.css';
-import './rpg.css';
-import './progression.css';
-import './paged-town.css';
-import './compact-combat.css';
-import './currency.css';
-import './talent-ui.css';
-import './title-screen.css';
-import './boon-draft.css';
-import './combat-hud.css';
-import './result-ceremony.css';
-import './archives-ui.css';
-import './pact-ui.css';
-import './world-map.css';
-import './portrait-layout.css';
-import { townCanvas } from './art/monsters';
+import { townSceneCanvas } from './art/town-scene';
 import { Battle, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CAMPAIGN, BOONS, boonChoices } from './game/world';
 import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock } from './game/profile';
-import { renderTown, portrait, type TownState, type TownTab } from './ui/town';
+import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
+import { actArt } from './ui/world-map';
+import { playDialogue, paginate } from './ui/dialogue';
 import { BattleScene, ARENA, cell } from './render/BattleScene';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
@@ -41,10 +32,14 @@ import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-
 import { createRaidBuild, setRaidJob, setRaidPartySize, normalizeRaidBuild } from './game/raid-build';
 import { QUESTS, questProgress } from './game/quests';
 import { CHALLENGE_SHOP, createRunWallet, creditRun, resetRunWallet, getRaidContractForEnemy, roguelikeMilestoneForFloor, buyRunItem, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
+import { t, lang, setLang, gameText, type Lang } from './i18n';
+import { localizeContent, eventText } from './i18n/content';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const store = { getItem: (key: string) => localStorage.getItem(key), setItem: (key: string, value: string) => localStorage.setItem(key, value) };
-const titleWorld = townCanvas().toDataURL();
+localizeContent(lang());
+document.documentElement.lang = lang();
+const titleWorld = townSceneCanvas().toDataURL();
 const saved=loadSave(store);
 let profile = saved.profile;
 const commander = new CommanderSession();
@@ -52,50 +47,67 @@ let encounter: NonNullable<CommanderDocument['encounters']>[CommanderMode];
 let pendingSettlement = false;
 if (matchMedia('(prefers-reduced-motion: reduce)').matches) profile.motion = false;
 let storageFailed = false;
+const heroName = (h: { name: string }) => eventText(h.name, lang());
+const stageLabel = () => eventText(battle.stageName, lang());
+const modeName = (mode: CommanderMode) => t(mode === 'story' ? 'mode.campaign' : mode === 'raid' ? 'mode.raid' : 'mode.endless');
 function updateTitleStatus() {
   const nameEl = $('title-commander-name');
   if (!nameEl) return;
-  const name = commander.document?.name || 'Recruit';
-  const mode = commander.mode === 'story' ? 'Story' : commander.mode === 'raid' ? 'Raid' : 'Roguelike';
-  nameEl.textContent = `${name} · ${mode}`;
+  nameEl.textContent = `${commander.document?.name || t('title.recruit')} · ${modeName(commander.mode)}`;
+}
+function titleMarkup() {
+  return `<div class="title-backdrop" aria-hidden="true"><img class="title-world-art" src="${titleWorld}" alt="" /><div class="title-vignette"></div></div>
+  <div class="title-content">
+    <div class="title-brand"><span class="title-eyebrow">${t('title.eyebrow')}</span><h1 class="title-logo">GRIDBOUND</h1><div class="title-subtitle-wrap"><span class="title-flourish"></span><span>${t('title.subtitle')}</span><span class="title-flourish right"></span></div></div>
+    <p class="title-press" aria-hidden="true">${t('title.press')}</p>
+    <nav class="win title-menu menu-list" aria-label="${t('title.menu')}">
+      <button id="title-enter" class="title-menu-item menu-item primary" type="button"><span class="menu-title">${t('title.enter')}</span><span class="menu-subtext">${t('title.enter.sub')}</span></button>
+      <button id="title-profiles" class="title-menu-item menu-item" type="button"><span class="menu-title">${t('title.profiles')}</span><span class="menu-subtext">${t('title.profiles.sub')}</span></button>
+      <button id="title-journal" class="title-menu-item menu-item" type="button"><span class="menu-title">${t('title.journal')}</span><span class="menu-subtext">${t('title.journal.sub')}</span></button>
+      <button id="title-settings" class="title-menu-item menu-item" type="button"><span class="menu-title">${t('title.settings')}</span><span class="menu-subtext">${t('title.settings.sub')}</span></button>
+    </nav>
+    <div class="title-lang" role="group" aria-label="${t('settings.language')}">${(['en', 'id'] as Lang[]).map(code => `<button type="button" data-lang="${code}" aria-pressed="${lang() === code}">${code === 'en' ? 'English' : 'Indonesia'}</button>`).join('')}</div>
+  </div>
+  <footer class="title-footer"><div class="title-active-commander" id="title-commander-status"><b>${t('title.active')}</b> <span id="title-commander-name"></span></div><div class="title-meta-info"><span>© EMBERHOLLOW</span><span>v0.5</span></div></footer>`;
 }
 function showTitleScreen(animated = true) {
   const titleScreen = $('title-screen');
   if (!titleScreen) return;
-  updateTitleStatus();
   titleScreen.classList.remove('dismissing');
   titleScreen.hidden = false;
+  updateTitleStatus();
   if (animated && profile.motion) {
     const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
-    tl.fromTo('.title-brand', { opacity: 0, y: -20, scale: 0.95 }, { opacity: 1, y: 0, scale: 1, duration: 0.45 })
+    tl.fromTo('.title-logo', { opacity: 0, y: -30, scale: 1.4 }, { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: 'back.out(1.6)' })
       .fromTo('.title-flourish', { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: 'power3.out' }, '-=0.2')
-      .fromTo('.title-menu-item', { opacity: 0, y: 16 }, { opacity: 1, y: 0, stagger: 0.07, duration: 0.35, clearProps: 'transform' }, '-=0.15')
+      .fromTo('.title-menu', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.35, clearProps: 'transform' }, '-=0.1')
       .fromTo('.title-footer', { opacity: 0 }, { opacity: 1, duration: 0.3, clearProps: 'all' }, '-=0.2');
   }
+  requestAnimationFrame(() => $('title-enter')?.focus({ preventScroll: true }));
 }
 function animateTownEntrance() {
   if (!profile.motion) return;
   const town = $('town-screen');
   if (!town || town.hidden) return;
-  gsap.fromTo('.camp-art', { opacity: 0.55, scale: 1.03 }, { opacity: 1, scale: 1, duration: 0.65, ease: 'power2.out', clearProps: 'all' });
-  gsap.fromTo('.camp-copy > *', { opacity: 0, y: 12 }, { opacity: 1, y: 0, stagger: 0.055, duration: 0.28, ease: 'power2.out', clearProps: 'all' });
+  gsap.fromTo('.town-map', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', clearProps: 'opacity' });
+  gsap.fromTo('.camp-copy', { opacity: 0, y: 16 }, { opacity: 1, y: 0, delay: 0.25, duration: 0.3, ease: 'power2.out', clearProps: 'all' });
 }
 function enterEmberhollow() {
   const titleScreen = $('title-screen');
   if (!titleScreen || titleScreen.hidden) return;
   sound.unlock();
+  sound.play('confirm');
   if (profile.motion) {
     const tl = gsap.timeline({
       onComplete: () => {
         titleScreen.hidden = true;
         titleScreen.classList.remove('dismissing');
-        gsap.set([titleScreen, '.title-menu-item'], { clearProps: 'all' });
+        gsap.set([titleScreen, '.title-menu'], { clearProps: 'all' });
         animateTownEntrance();
       }
     });
-    tl.to('#title-enter', { scale: 1.04, borderColor: '#fff', duration: 0.12, yoyo: true, repeat: 1 })
-      .to('.title-menu-item:not(#title-enter)', { opacity: 0, y: 10, stagger: 0.04, duration: 0.2 }, 0.1)
-      .to(titleScreen, { opacity: 0, scale: 1.02, duration: 0.25, ease: 'power2.in' }, 0.18);
+    tl.to('#title-enter', { x: 8, duration: 0.08, yoyo: true, repeat: 1 })
+      .to(titleScreen, { opacity: 0, duration: 0.35, ease: 'power2.in' }, 0.12);
   } else {
     titleScreen.classList.add('dismissing');
     setTimeout(() => {
@@ -107,7 +119,10 @@ function enterEmberhollow() {
 function storageStatus() {
   $('wallet').innerHTML = currencyAmount('gold', profile.gold);
   $('bank-wallet').innerHTML = currencyAmount('crystal', profile.economy.commanderCrystal);
-  $('storage-status').textContent = saved.readOnly ? saved.warning : (commander.error || (!commander.document ? 'Choose or create a Commander. Legacy saves are read-only.' : commander.busy ? 'Saving Commander…' : commander.dirty ? 'Unsaved changes. Retry or export before leaving.' : commander.repository?.persistent ? `Commander revision ${commander.document.revision} · local IndexedDB` : 'Session-only: export before closing this tab.'));
+  const status = $('storage-status');
+  const warning = saved.readOnly ? gameText(saved.warning) : commander.error ? gameText(commander.error) : commander.dirty ? t('storage.dirty') : '';
+  status.textContent = warning || (!commander.document ? t('storage.none') : commander.busy ? t('storage.saving') : commander.repository?.persistent ? t('storage.saved', { n: commander.document.revision }) : t('storage.session'));
+  status.dataset.level = warning || (commander.document && !commander.repository?.persistent) ? 'warn' : commander.busy ? 'busy' : 'ok';
   updateTitleStatus();
 }
 function context(slotId: SlotId = 'auto') {
@@ -140,7 +155,7 @@ let runSeed = Date.now() % 1000000;
 let offeredBoons: typeof BOONS = [];
 let resumeOnClose = false;
 let pauseForDetails = false;
-type PartyHealthView = { button: HTMLButtonElement; hp: HTMLElement; shield: HTMLElement; cooldown: HTMLElement; healthFill: HTMLElement; shieldFill: HTMLElement };
+type PartyHealthView = { button: HTMLButtonElement; hp: HTMLElement; shield: HTMLElement; cooldown: HTMLElement; healthFill: HTMLElement; shieldFill: HTMLElement; atb: HTMLElement };
 type PartyHero = (typeof battle.heroes)[number];
 const partyHealthViews = new Map<number, PartyHealthView[]>();
 let resultGeneration: ResultGateGeneration | undefined;
@@ -150,157 +165,77 @@ const townState: TownState = {
 };
 
 $('app').innerHTML = `
-<section id="title-screen" class="title-screen" hidden>
-  <div class="title-backdrop" aria-hidden="true">
-    <img class="title-world-art" src="${titleWorld}" alt="" />
-    <div class="title-vignette"></div>
-    <div class="title-crest-glow"></div>
-  </div>
-  <div class="title-content">
-    <div class="title-brand">
-      <span class="title-eyebrow">A Tactical Roguelike RPG</span>
-      <h1 class="title-logo">GRIDBOUND</h1>
-      <div class="title-subtitle-wrap">
-        <span class="title-flourish"></span>
-        <span>ASHES OF THE BELL</span>
-        <span class="title-flourish right"></span>
-      </div>
-    </div>
-    <nav class="title-menu" aria-label="Main Menu">
-      <button id="title-enter" class="title-menu-item primary" type="button">
-        <span class="menu-title">
-          <span class="menu-bullet" aria-hidden="true">◆</span>
-          ENTER EMBERHOLLOW
-          <span class="menu-bullet" aria-hidden="true">◆</span>
-        </span>
-        <span class="menu-subtext">Return to town &amp; prepare for expeditions</span>
-      </button>
-      <button id="title-profiles" class="title-menu-item" type="button">
-        <span class="menu-title">
-          <span class="menu-bullet" aria-hidden="true">◆</span>
-          COMMANDER PROFILES
-          <span class="menu-bullet" aria-hidden="true">◆</span>
-        </span>
-        <span class="menu-subtext">Switch commander or manage save slots</span>
-      </button>
-      <button id="title-journal" class="title-menu-item" type="button">
-        <span class="menu-title">
-          <span class="menu-bullet" aria-hidden="true">◆</span>
-          STORY JOURNAL
-          <span class="menu-bullet" aria-hidden="true">◆</span>
-        </span>
-        <span class="menu-subtext">Chronicle of choices, memories &amp; epilogues</span>
-      </button>
-      <button id="title-settings" class="title-menu-item" type="button">
-        <span class="menu-title">
-          <span class="menu-bullet" aria-hidden="true">◆</span>
-          CAMP SETTINGS
-          <span class="menu-bullet" aria-hidden="true">◆</span>
-        </span>
-        <span class="menu-subtext">Audio, visuals &amp; accessibility preferences</span>
-      </button>
-    </nav>
-  </div>
-  <footer class="title-footer">
-    <div class="title-active-commander" id="title-commander-status">
-      <b>ACTIVE:</b> <span id="title-commander-name">Recruit</span>
-    </div>
-    <div class="title-meta-info">
-      <span>GRIDBOUND v3.1</span>
-      <span>•</span>
-      <span>HTML5 / PHASER CANVAS</span>
-    </div>
-  </footer>
-</section>
-<header class="site-header"><button class="brand" id="home" aria-label="Return to Emberhollow"><span class="brand-mark" aria-hidden="true">${'<i></i>'.repeat(9)}</span><span>GRIDBOUND<small>ASHES OF THE BELL</small></span></button>
-  <div class="header-tools"><b id="wallet" class="wallet" aria-label="Gold">${currencyAmount('gold', profile.gold)}</b><b id="bank-wallet" class="wallet bank-wallet" aria-label="Commander Crystal">${currencyAmount('crystal', profile.economy.commanderCrystal)}</b><button id="sound" class="icon-button" aria-label="Toggle sound effects" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="Settings">⚙</button></div>
+<section id="title-screen" class="title-screen" hidden>${titleMarkup()}</section>
+<header class="site-header hud-bar">
+  <button class="brand" id="home" aria-label="${t('hud.home')}"><span class="brand-back" aria-hidden="true">◀</span><span id="hud-title">${t('town.name')}</span></button>
+  <div class="header-tools"><b id="wallet" class="wallet">${currencyAmount('gold', profile.gold)}</b><b id="bank-wallet" class="wallet bank-wallet">${currencyAmount('crystal', profile.economy.commanderCrystal)}</b><button id="sound" class="icon-button" aria-label="${t('hud.sound')}" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="${t('hud.settings')}">⚙</button><button id="menu-button" class="icon-button menu-button" data-facility="more" aria-label="${t('route.menu')}">${t('hud.menu')}</button></div>
 </header>
   <main id="town-screen" class="town-screen"></main>
   <main id="battle-screen" class="game-layout" data-battle-view="arena" hidden>
-    <nav class="battle-view-tabs" aria-label="Battle views">
-      <button type="button" data-battle-view="arena" aria-controls="battle-arena-panel" aria-pressed="true">Arena</button>
-      <button type="button" data-battle-view="hero" aria-controls="battle-details-panel" aria-pressed="false">Hero</button>
-      <button type="button" data-battle-view="log" aria-controls="battle-details-panel" aria-pressed="false">Log</button>
-    </nav>
+    <div class="battle-top">
+      <div class="battle-place"><b id="mode-label"></b><span id="encounter-label"></span></div>
+      <nav class="battle-view-tabs" aria-label="${t('battle.views')}">
+        <button type="button" data-battle-view="arena" aria-controls="battle-arena-panel" aria-pressed="true">${t('battle.view.arena')}</button>
+        <button type="button" data-battle-view="hero" aria-controls="battle-details-panel" aria-pressed="false">${t('battle.view.hero')}</button>
+        <button type="button" data-battle-view="log" aria-controls="battle-details-panel" aria-pressed="false">${t('battle.view.log')}</button>
+      </nav>
+      <div class="arena-heading-controls">
+        <button id="combat-boons" class="icon-button combat-boons-btn" aria-label="${t('battle.boons')}" title="${t('battle.boons')} [B]">✦<span id="boon-count-badge" class="boon-count-badge" style="display:none">0</span></button>
+        <button id="pause" class="icon-button" aria-label="${t('battle.pause')}">Ⅱ</button>
+      </div>
+    </div>
     <aside class="left-sidebar">
-      <span class="eyebrow" id="expedition-label">EXPEDITION</span>
-      <h1 id="journey-title">Beyond<br>the bell.</h1>
+      <small id="expedition-label"></small>
+      <h1 id="journey-title"></h1>
       <p class="intro-copy" id="journey-copy"></p>
       <ol id="stage-list" class="expedition-stages"></ol>
-      <section class="field-guide">
-        <div class="section-label">READ. REACT. SURVIVE.</div>
-        <p>Tap hero untuk mengisi skill lebih cepat. Ganti fokus saat fatigue naik.</p>
-        <p>Ground: pindah tile. Marked: lindungi hero yang diincar. All-grid: Guard atau interrupt.</p>
-        <button id="howto" class="secondary-button">Field guide</button>
-      </section>
-      <section class="run-boons"><h3>Run boons</h3><div id="boon-list"></div></section>
-      <section class="run-shop-panel">
-        <h3>Journey shop</h3>
-        <div id="run-shop-host"></div>
-        <small>Journey Crystal resets on abandon, defeat, or clear. It never enters the bank.</small>
-      </section>
-      <button id="retreat" class="secondary-button">Pulang ke town</button>
+      <section class="run-boons"><h3>${t('battle.runboons')}</h3><div id="boon-list"></div></section>
+      <section class="run-shop-panel"><h3>${t('shop.journey')}</h3><div id="run-shop-host"></div><small>${t('shop.journey.hint')}</small></section>
+      <section class="field-guide"><button id="howto" class="btn">${t('battle.guide')}</button><button id="retreat" class="btn">${t('battle.retreat')}</button></section>
     </aside>
-    <section id="battle-arena-panel" class="arena-column" aria-label="Arena pertarungan">
-      <div class="arena-heading">
-        <span><b id="mode-label"></b><span id="encounter-label"></span></span>
-        <div class="arena-heading-controls">
-          <button id="combat-boons" class="icon-button combat-boons-btn" aria-label="Boon codex" title="Active boons [B]">✦<span id="boon-count-badge" class="boon-count-badge" style="display:none">0</span></button>
-          <button id="pause" class="icon-button" aria-label="Jeda permainan">Ⅱ</button>
-        </div>
-      </div>
-      <div class="threat-band" aria-label="Threat and target controls">
-        <div class="boss-hud">
-          <div class="boss-crest-corner tl"></div><div class="boss-crest-corner tr"></div>
-          <div class="boss-crest-corner bl"></div><div class="boss-crest-corner br"></div>
+    <section id="battle-arena-panel" class="arena-column" aria-label="${t('battle.arena')}">
+      <div class="threat-band" aria-label="${t('battle.enemy')}">
+        <div class="win boss-hud">
           <div class="boss-hud-inner">
-            <div class="boss-caption"><span class="boss-title-prefix">✦ ADVERSARY ✦</span><span id="boss-title"></span><span id="phase" class="boss-phase-badge"></span></div>
-            <div class="boss-title"><h2 id="boss-name"></h2><span id="boss-health"></span></div>
+            <div class="boss-title"><h2 id="boss-name"></h2><span id="boss-title"></span><span id="phase" class="boss-phase-badge"></span></div>
             <div class="boss-meter"><div id="boss-hp-ghost" class="boss-hp-ghost"></div><div id="boss-hp"></div><div class="boss-phase-notch p1"></div><div class="boss-phase-notch p2"></div></div>
-            <div class="stagger-row"><span id="stagger-label">ARMOR</span><div class="stagger-track"><i id="stagger"></i></div><span id="clock">00:00</span></div>
+            <div class="stagger-row"><span id="boss-health"></span><span id="stagger-label">${t('battle.armor')}</span><div class="stagger-track"><i id="stagger"></i></div><span id="clock">00:00</span></div>
           </div>
         </div>
-        <div id="intent" class="intent-panel" role="status" aria-live="polite"><b>No hostile intent</b><span>Perhatikan pola berikutnya.</span></div>
-        <div class="lane-targets" aria-label="Pilih lane target">${['I', 'II', 'III'].map((label, i) => `<button data-lane="${i}" aria-label="Target lane ${i + 1}" aria-pressed="false">${label} <span>${['LEFT', 'CENTER', 'RIGHT'][i]}</span></button>`).join('')}</div>
       </div>
-      <section id="start-overlay" class="start-overlay" aria-labelledby="ready-title">
-        <div>
-          <span class="eyebrow" id="ready-label">BEYOND THE GATE</span>
-          <h3 id="ready-title">Ready, Bellkeepers?</h3>
-          <p id="ready-copy">Skill dan formasi telah disiapkan. Perhatikan tanda serangan.</p>
-        </div>
-        <button id="start" class="gold-button">Begin encounter</button>
-      </section>
+      <div class="arena-slot">
       <div id="arena" class="arena">
-        <div id="banner" class="battle-banner" aria-live="polite"></div>
         <div id="game-canvas"></div>
+        <div id="intent" class="intent-panel msg-window" role="status" aria-live="polite"><b></b><span></span></div>
+        <div id="banner" class="battle-banner" aria-live="polite"></div>
+        <div class="lane-targets" aria-label="${t('battle.lanes')}">${[0, 1, 2].map(i => `<button data-lane="${i}" aria-label="${t('battle.lane', { n: i + 1 })}" aria-pressed="false"><span>${['I', 'II', 'III'][i]}</span></button>`).join('')}</div>
         <div id="unit-layer"></div>
-        <div class="rank-label front">FRONT</div><div class="rank-label middle">MID</div><div class="rank-label back">BACK</div>
-        <div class="board-bottom"><span id="standing"></span><span id="move-tip">DRAG TO REPOSITION</span></div>
+        <div id="skill-picker" class="win skill-picker" role="dialog" hidden></div>
+        <div class="board-bottom"><span id="standing"></span><span id="move-tip"></span></div>
+        <section id="start-overlay" class="start-overlay" aria-labelledby="ready-title">
+          <div class="win start-window">
+            <small id="ready-label"></small>
+            <h3 id="ready-title"></h3>
+            <p id="ready-copy"></p>
+            <button id="start" class="btn primary">${t('battle.begin')}</button>
+          </div>
+        </section>
       </div>
-      <section id="party-health-tray" class="party-health-tray" aria-label="Party health"></section>
+      </div>
+      <button id="focus-bar" type="button" class="win focus-bar" aria-label="${t('battle.focus.aria')}"><img class="focus-face" alt=""/><span class="focus-id"><b class="focus-name"></b><small class="focus-skill"></small></span><span class="focus-stats"><span class="focus-hp">HP <b></b></span><span class="focus-status"></span></span></button>
       <div class="action-bar">
-        <button id="guard" class="guard-button"><span>Party Guard<small id="guard-label">G · READY</small></span></button>
-        <button id="potion" class="potion-button"><span>Mending mist<small id="potions">H · 2 CHARGES</small></span><b>2</b></button>
-        <button id="ultimate" class="ultimate-button" disabled><i id="resolve-fill"></i><span>Ninefold Dawn<small id="resolve-label">R · RESOLVE</small></span></button>
+        <button id="guard" class="cmd guard-button"><span>${t('battle.guard')}<small id="guard-label"></small></span></button>
+        <button id="potion" class="cmd potion-button"><span>${t('battle.potion')}<small id="potions"></small></span><b>2</b></button>
+        <button id="ultimate" class="cmd ultimate-button" disabled><i id="resolve-fill"></i><span>${t('battle.ultimate')}<small id="resolve-label"></small></span></button>
       </div>
     </section>
     <aside id="battle-details-panel" class="right-sidebar">
-      <p id="battle-detail-pause-note" class="battle-detail-pause-note" role="status" hidden>
-        Combat pauses while Hero or Log is open.
-        <button id="battle-detail-resume" type="button">Return to Arena &amp; resume</button>
-      </p>
-      <section class="battle-detail-panel battle-detail-health" aria-label="Party health">
-        <div class="section-label">PARTY HEALTH</div>
-        <div id="details-party-health-tray" class="party-health-tray"></div>
-      </section>
-      <section id="battle-hero-panel" class="battle-detail-panel">
-        <div class="section-label">PARTY INSPECTOR <span id="party-size"></span></div>
-        <div id="inspector"></div>
-      </section>
-      <section id="battle-log-panel" class="battle-detail-panel">
-        <section class="battle-notes"><div class="section-label">BATTLE NOTES</div><div id="combat-log"></div></section>
-        <div class="session-stats"><div><small>DAMAGE</small><b id="damage">0</b></div><div><small>BLOCKED</small><b id="blocked">0</b></div><div><small>CARRIED LOOT</small><b id="loot">0g</b></div></div>
+      <p id="battle-detail-pause-note" class="msg-window battle-detail-pause-note" role="status" hidden>${t('battle.detailpause')} <button id="battle-detail-resume" class="btn" type="button">${t('battle.resume.arena')}</button></p>
+      <section class="win battle-detail-panel battle-detail-health" aria-label="${t('battle.party')}"><h3 class="subheading">${t('battle.party')}</h3><div id="details-party-health-tray" class="party-health-tray"></div></section>
+      <section id="battle-hero-panel" class="win battle-detail-panel"><h3 class="subheading">${t('battle.inspector')} <span id="party-size"></span></h3><div id="inspector"></div></section>
+      <section id="battle-log-panel" class="win battle-detail-panel">
+        <h3 class="subheading">${t('battle.log')}</h3><div id="combat-log"></div>
+        <div class="session-stats"><div><small>${t('battle.stat.damage')}</small><b id="damage">0</b></div><div><small>${t('battle.stat.blocked')}</small><b id="blocked">0</b></div><div><small>${t('battle.stat.loot')}</small><b id="loot">0G</b></div></div>
       </section>
     </aside>
   </main>
@@ -334,7 +269,15 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   townState.notice = notice;
   $('town-screen').hidden = false;
   $('battle-screen').hidden = true;
+  document.body.dataset.screen = tab === 'camp' ? 'camp' : 'town';
+  $('hud-title').textContent = routeTitle(tab);
+  $('home').setAttribute('aria-label', tab === 'camp' ? t('menu.title.sub') : t('hud.home'));
+  // Keep the scroll position when a panel re-renders in place (equipping, inspecting, learning).
+  const oldPanel = $('town-screen').querySelector<HTMLElement>('[data-training-panel]');
+  const keptScroll = !routeChanged && oldPanel ? { panel: oldPanel.dataset.trainingPanel, top: oldPanel.scrollTop } : undefined;
   renderTown($('town-screen'), profile, townState);
+  const newPanel = $('town-screen').querySelector<HTMLElement>('[data-training-panel]');
+  if (newPanel && keptScroll && newPanel.dataset.trainingPanel === keptScroll.panel) newPanel.scrollTop = keptScroll.top;
   if (routeChanged) {
     const scene = $('town-screen').querySelector<HTMLElement>('.town-scene');
     const heading = scene?.querySelector<HTMLElement>('h1') ?? scene;
@@ -348,7 +291,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
     if (tab === 'camp') animateTownEntrance();
     else {
       const panel = document.querySelector<HTMLElement>('.town-scene');
-      if (panel) gsap.fromTo(panel, { opacity: 0.7, y: 8 }, { opacity: 1, y: 0, duration: 0.24, ease: 'power2.out', clearProps: 'all' });
+      if (panel) gsap.fromTo(panel, { opacity: 0.6 }, { opacity: 1, duration: 0.2, ease: 'power2.out', clearProps: 'opacity' });
     }
     if (tab === 'party' || tab === 'party-advanced') animateMirrorTalents();
     else if (tab === 'bestiary') animateCodexEntry();
@@ -367,13 +310,14 @@ $('town-screen').addEventListener('click', event => {
     if (button.dataset.openAction === 'journal') void storyJournal();
     else if (button.dataset.openAction === 'profiles') void profilesMenu();
     else if (button.dataset.openAction === 'settings') settings();
+    else if (button.dataset.openAction === 'title') showTitleScreen();
     return;
   }
   if (button.dataset.storyToggle !== undefined) {
     const id=Number(button.dataset.storyToggle);
     const ids=profile.storyActive.includes(id)?profile.storyActive.filter(hero=>hero!==id):[...profile.storyActive,id];
     const ok=setStoryParty(profile,ids);
-    showTown('party',ok?'Story party disimpan. Semua loadout tetap tersimpan.':'Pilih minimal 1 hero dan jangan melebihi cap Story.', true);
+    showTown('party',ok?t('notice.story.saved'):t('notice.story.invalid'), true);
     return;
   }
   if (button.dataset.facility) {
@@ -382,8 +326,32 @@ $('town-screen').addEventListener('click', event => {
     return;
   }
   if (button.dataset.talent) {
-    const ok = buyTalent(profile, townState.hero, button.dataset.talent);
-    showTown('party-advanced', ok ? 'Talent learned. Its effect will apply to the next expedition.' : 'Talent is unavailable or gold is insufficient.', true);
+    const id = button.dataset.talent;
+    const ok = buyTalent(profile, townState.hero, id);
+    showTown('party-advanced', ok ? t('notice.talent.ok') : t('notice.talent.fail'), true);
+    if (ok) celebrate(`[data-inspect-talent="${id}"], [data-talent="${id}"], .hero-sheet`);
+    return;
+  }
+  if (button.dataset.gearOpen) {
+    townState.gearSlot = button.dataset.gearOpen as TownState['gearSlot'];
+    townState.pendingGear = undefined;
+    townState.trainingTab = 'gear';
+    showTown('party', '', true);
+    return;
+  }
+  if (button.dataset.gearItem) {
+    const slot = button.dataset.gearSlotFor as 'weapon' | 'armor' | 'charm';
+    townState.gearSlot = slot;
+    townState.trainingTab = 'gear';
+    townState.pendingGear = { hero: townState.hero, slot, gearId: button.dataset.gearItem };
+    showTown('party', '', true);
+    document.querySelector('[data-gear-preview]')?.scrollIntoView({ block: 'nearest' });
+    return;
+  }
+  if (button.dataset.equipSkill !== undefined) {
+    const ok = equipSkill(profile, townState.hero, Number(button.dataset.skillSlot), Number(button.dataset.equipSkill));
+    showTown('party', ok ? t('notice.loadout') : '', true);
+    if (ok) celebrate(`[data-loadout-slot="${button.dataset.skillSlot}"]`);
     return;
   }
   if (button.dataset.inspectTalent) {
@@ -435,8 +403,8 @@ $('town-screen').addEventListener('click', event => {
     showTown('campaign', '', true);
     return;
   }
-  if (button.dataset.zone) {
-    townState.zone = Number(button.dataset.zone);
+  if (button.dataset.zone || button.dataset.mission) {
+    townState.zone = Number(button.dataset.zone ?? button.dataset.mission);
     townState.campaignPage = townState.zone;
     sound.clink();
     showTown('mission', '', true);
@@ -445,19 +413,12 @@ $('town-screen').addEventListener('click', event => {
   if (button.dataset.raid) { townState.raid = button.dataset.raid; townState.raidSandbox = undefined; showTown('raid', '', true); return; }
   if (button.dataset.bankBuy) {
     const item = buyChallengeUnlock(profile, button.dataset.bankBuy);
-    showTown(townState.tab, item ? `${item.name} unlocked. Bank Crystal spent; equip it before a future run.` : 'Not enough bank Crystal or this unlock is already owned.');
+    showTown(townState.tab, item ? t('notice.bank.ok', { name: item.name }) : t('notice.bank.fail'));
     return;
   }
   if (button.dataset.runBuy) {
-    const item = buyRunItem(runWallet, button.dataset.runBuy);
-    if (item) {
-      if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
-      if (item.id === 'run-upgrade') battle.power *= 1.1;
-      if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
-      updateExpedition();
-      frame(1);
-    }
-    if (item && inTown) showTown(townState.tab, `${item.name} bought for this run.`);
+    const item = buyForRun(button.dataset.runBuy);
+    if (item && inTown) showTown(townState.tab, t('notice.run.ok', { name: item.name }));
     return;
   }
   if (button.hasAttribute('data-confirm-gear')) {
@@ -465,7 +426,8 @@ $('town-screen').addEventListener('click', event => {
     if (pending && pending.hero === townState.hero && pending.gearId) {
       const ok = equipGear(profile, pending.hero, pending.gearId);
       townState.pendingGear = undefined;
-      showTown('party', ok ? 'Equipment dibeli atau dipasang. Efek berlaku pada expedition berikutnya.' : 'Equipment tidak dapat dibeli atau dipasang.');
+      showTown('party', ok ? t('notice.gear.ok') : t('notice.gear.fail'));
+      if (ok) celebrate(`[data-gear-open="${pending.slot}"], .hero-sheet`);
     }
     return;
   }
@@ -474,29 +436,29 @@ $('town-screen').addEventListener('click', event => {
     showTown('party');
     return;
   }
-  if (button.dataset.promote) { const ok=promote(profile,townState.hero,button.dataset.promote);showTown('party-advanced',ok?'Job learned. Equip its signature skill in an active slot.':'Promotion requirements are not met.'); }
+  if (button.dataset.promote) { const job=button.dataset.promote;const ok=promote(profile,townState.hero,job);showTown('party-advanced',ok?t('notice.job.ok'):t('notice.job.fail'));if(ok)celebrate(`[data-promote="${job}"], .hero-sheet`); }
 
   if (button.dataset.formation) {
     moveFormation(profile, townState.hero, Number(button.dataset.formation));
-    showTown('party', 'Formasi disimpan.');
+    showTown('party', t('notice.formation'));
   }
   if (button.hasAttribute('data-respec')) {
     const reset = respecHero(profile, townState.hero);
     showTown('party-advanced', reset
-      ? 'Talents and jobs reset. Gold refunded; two basic skills equipped.'
-      : 'No talents or job to reset.');
+      ? t('notice.respec.ok')
+      : t('notice.respec.fail'));
   }
   if(button.dataset.claimQuest){
     const questId = button.dataset.claimQuest;
     const q=QUESTS.find(q=>q.id===questId);
     const ok=claimQuest(profile,questId,townState.hero);
-    showTown('quests',ok?`Reward diterima ${ROSTER[q?.heroId??townState.hero].name}. Equipment hadiah masuk inventory; pasang di Training hall.`:'Quest belum selesai atau sudah diklaim.', true);
+    showTown('quests',ok?t('notice.quest.ok', { name: ROSTER[q?.heroId??townState.hero].name }):t('notice.quest.fail'), true);
     if (ok && profile.motion) {
       const entry = document.querySelector<HTMLElement>(`[data-quest="${questId}"]`);
       if (entry) gsap.fromTo(entry, { scale: 0.96, filter: 'brightness(1.5)' }, { scale: 1, filter: 'brightness(1)', duration: 0.35, ease: 'back.out(2)', clearProps: 'transform,filter' });
     }
   }
-  if(button.dataset.trackQuest){const q=QUESTS.find(q=>q.id===button.dataset.trackQuest);if(q&&questProgress(profile,q).unlocked){profile.trackedQuest=q.id;showTown('quests','Quest ditandai. Progress dihitung dari kemenangan yang sudah dibank.');}}
+  if(button.dataset.trackQuest){const q=QUESTS.find(q=>q.id===button.dataset.trackQuest);if(q&&questProgress(profile,q).unlocked){profile.trackedQuest=q.id;showTown('quests',t('notice.quest.track'));}}
   if(button.dataset.questHunt){townState.raid=button.dataset.questHunt;townState.raidSandbox=undefined;navigateTown('raid');}
   if (button.dataset.depart) {
     depart(button.dataset.depart as Mode);
@@ -537,33 +499,27 @@ $('town-screen').addEventListener('change', event => {
     const build=(townState.raidBuild&&normalizeRaidBuild(townState.raidBuild,profile.roster))??createRaidBuild(profile.roster,Math.min(3,profile.roster.length,6));
     const ok=setRaidPartySize(build,Number(el.value),profile.roster);
     if(ok)townState.raidBuild=build;
-    showTown('raid',ok?'Raid party disimpan. Story loadout tidak berubah.':'Raid party harus berisi 1–6 hero yang sudah direkrut.');return;
+    showTown('raid',ok?t('notice.raid.party.ok'):t('notice.raid.party.fail'));return;
   }
   if(el.matches('[data-raid-job]')){
     const build=(townState.raidBuild&&normalizeRaidBuild(townState.raidBuild,profile.roster))??createRaidBuild(profile.roster,Math.min(3,profile.roster.length,6));
     const ok=setRaidJob(build,Number(el.dataset.raidJob),el.value);
     if(ok)townState.raidBuild=build;
-    showTown('raid',ok?'Raid job disimpan sebagai build sementara.':'Job Raid tidak valid.');return;
+    showTown('raid',ok?t('notice.raid.job.ok'):t('notice.raid.job.fail'));return;
   }
   if(el.matches('[data-raid-sandbox]')){
     const input=el as unknown as HTMLInputElement;
     const key=input.dataset.raidSandbox as keyof RaidSandbox;
     const current=townState.raidSandbox??{hpScale:1,damageScale:1,intervalScale:1};
     townState.raidSandbox={...current,[key]:Number(input.value)};
-    showTown('raid','Practice slider aktif: run ini Sandbox dan tidak membayar Crystal.');return;
+    showTown('raid',t('notice.raid.sandbox'));return;
   }
-  if(el.matches('[data-gear-slot]')){
-    const slot = el.dataset.gearSlot as 'weapon' | 'armor' | 'charm';
-    townState.trainingTab = 'gear';
-    if (!el.value) { townState.pendingGear = undefined; showTown('party'); return; }
-    townState.pendingGear = { hero: townState.hero, slot, gearId: el.value };
-    showTown('party');
-    return;
-  }
-  if (!el.matches('[data-equip-slot]')) return;
-  equipSkill(profile, townState.hero, Number(el.dataset.equipSlot), Number(el.value));
-  showTown('party', 'Loadout disimpan. Slot pertama menjadi aksi pembuka.');
 });
+// Upgrade feedback: the changed element pops and the level-up jingle plays.
+function celebrate(selector: string) {
+  sound.play('levelup');
+  document.querySelectorAll<HTMLElement>(selector).forEach(el => { el.classList.remove('just-upgraded'); void el.offsetWidth; el.classList.add('just-upgraded'); });
+}
 
 let ensureCommanderPromise: Promise<CommanderDocument | undefined> | undefined;
 async function ensureCommander() {
@@ -584,12 +540,33 @@ async function ensureCommander() {
   return ensureCommanderPromise;
 }
 
+let playingScene = false;
+const INTRO_KEY = 'gridbound.introsSeen';
+/** Intros already shown in this browser; kept outside the save so retries after a defeat go straight to battle. */
+function introSeen(zone: number) { try { return (JSON.parse(localStorage.getItem(INTRO_KEY) ?? '[]') as number[]).includes(zone); } catch { return false; } }
+function markIntroSeen(zone: number) { try { const seen = JSON.parse(localStorage.getItem(INTRO_KEY) ?? '[]') as number[]; if (!seen.includes(zone)) localStorage.setItem(INTRO_KEY, JSON.stringify([...seen, zone])); } catch { /* storage blocked */ } }
+/** Chapter intro as a JRPG scene: title card, then the speaker's lines in a message box. */
+function chapterIntro(zoneIndex: number) {
+  const zone = CAMPAIGN[zoneIndex];
+  const [name, place] = zone.speaker.split(' · ');
+  const hero = ROSTER.find(r => r.name.toUpperCase() === name?.trim().toUpperCase());
+  const pages = paginate(zone.intro).map(text => ({ speaker: name?.trim(), place: place?.trim(), portrait: hero ? portrait(hero.classId) : undefined, text }));
+  playingScene = true;
+  return playDialogue($('app'), { kicker: t('battle.chapter', { n: zoneIndex + 1 }), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(Math.floor(zoneIndex / 4)), pages, motion: profile.motion, onBlip: () => sound.play('text') })
+    .finally(() => { playingScene = false; markIntroSeen(zoneIndex); });
+}
 function depart(mode: Mode) {
+  if (playingScene) return;
   commander.mode = mode === 'raid' ? 'raid' : mode === 'endless' ? 'roguelike' : 'story';
   if (commander.document) commander.document.activeMode = commander.mode;
   if (mode === 'adventure' && !canEnterZone(profile, townState.zone)) return;
   const existing = commander.document?.encounters?.[commander.mode];
   if (existing && !existing.settled) { restoreEncounter(existing); return; }
+  const firstVisit = mode === 'adventure' && !profile.cleared.includes(townState.zone) && !introSeen(townState.zone);
+  if (firstVisit && typeof navigator !== 'undefined' && !navigator.webdriver) { sound.unlock(); void chapterIntro(townState.zone).then(() => startDeparture(mode)); return; }
+  startDeparture(mode);
+}
+function startDeparture(mode: Mode) {
   runBoons = [];
   resetRunWallet(runWallet);
   runWallet = createRunWallet();
@@ -635,32 +612,58 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   moveMode = false;
   touches.clear();
   if (initialized) { scene.dragId = -1; scene.dragPoint = undefined; scene.hoverSlot = -1; scene.replace(battle); }
+  const fromTown = !$('town-screen').hidden;
   $('town-screen').hidden = true;
   $('battle-screen').hidden = false;
+  document.body.dataset.screen = 'battle';
+  if (fromTown) battleWipe();
   makeUnits();
   updateExpedition();
   showReady();
   $('combat-log').textContent = '';
-  addLog('Formasi siap. Talent dan dua skill aktif sudah dibawa dari town.');
+  addLog(t('log.ready'));
   document.querySelectorAll<HTMLElement>('[data-lane]').forEach(el => { el.classList.remove('active'); el.setAttribute('aria-pressed', 'false'); });
   frame(1);
   requestAnimationFrame(() => scene.scale?.refresh());
   $('battle-screen').scrollTop = 0;
 }
+/** Spend journey Crystal on a run item and apply its effect to the current battle. */
+function buyForRun(id: string) {
+  const item = buyRunItem(runWallet, id);
+  if (!item) return undefined;
+  if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
+  if (item.id === 'run-upgrade') battle.power *= 1.1;
+  if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
+  sound.play('coin');
+  updateExpedition();
+  frame(1);
+  return item;
+}
+/** Classic encounter transition: the screen shatters into blocks that fall away from the centre. */
+function battleWipe() {
+  sound.play('encounter');
+  if (!profile.motion) return;
+  const cols = 8, rows = 14, wipe = document.createElement('div');
+  wipe.className = 'battle-wipe';
+  wipe.setAttribute('aria-hidden', 'true');
+  wipe.innerHTML = Array.from({ length: cols * rows }, (_, i) => { const x = i % cols, y = Math.floor(i / cols), d = Math.hypot(x - (cols - 1) / 2, (y - (rows - 1) / 2) * .6); return `<i style="animation-delay:${Math.round(d * 45)}ms"></i>`; }).join('');
+  $('app').append(wipe);
+  window.setTimeout(() => wipe.remove(), 900);
+}
 function updateExpedition() {
   const c = CAMPAIGN[battle.floor - 1];
-  $('loot').textContent = battle.mode === 'endless' ? `${runWallet.crystal} RUN` : battle.mode === 'raid' ? `${battle.raidContract?.tier.toUpperCase() ?? 'PRACTICE'} · ${battle.raidContract?.sandbox ? 'NO CRYSTAL' : 'CONTRACT'}` : `${battle.gold}g`;
+  $('loot').textContent = battle.mode === 'endless' ? `${runWallet.crystal} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${battle.gold}G`;
   const runShopHost = document.getElementById('run-shop-host');
-  if (runShopHost) runShopHost.innerHTML = battle.mode === 'endless' && battle.status === 'ready' ? CHALLENGE_SHOP.map(item => `<button class="secondary-button" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${item.cost} RUN</button>`).join('') : '';
-  $('mode-label').textContent = battle.mode === 'adventure' ? `CHAPTER ${battle.floor}` : battle.mode === 'endless' ? `FLOOR ${battle.floor}` : 'RAID HUNT';
-  $('encounter-label').textContent = battle.stageName;
+  if (runShopHost) runShopHost.innerHTML = battle.mode === 'endless' && battle.status === 'ready' ? CHALLENGE_SHOP.map(item => `<button class="btn" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${item.cost} ◇</button>`).join('') : '';
+  $('mode-label').textContent = battle.mode === 'adventure' ? t('battle.chapter', { n: battle.floor }) : battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : t('mode.raid');
+  $('encounter-label').textContent = stageLabel();
   $('boss-name').textContent = battle.enemyName;
   $('boss-title').textContent = battle.enemyTitle;
-  $('expedition-label').textContent = battle.mode === 'adventure' ? 'STORY CAMPAIGN' : battle.mode === 'endless' ? 'THE SUNKEN BELL' : 'RAID CONTRACT';
-  $('journey-title').textContent = battle.mode === 'adventure' ? c.name : battle.mode === 'endless' ? 'Below the bell.' : battle.enemyName;
-  $('journey-copy').textContent = battle.mode === 'adventure' ? c.subtitle : 'Baca intent, siapkan counter. Jangan biarkan party kehilangan tempo.';
-  $('stage-list').innerHTML = battle.mode === 'adventure' ? c.stages.map((s, i) => `<li class="${i === battle.stage ? 'current' : i < battle.stage ? 'completed' : ''}"><small>${i + 1} · ${s.kind.toUpperCase()}</small><span>${s.name}</span></li>`).join('') : '';
-  $('boon-list').innerHTML = runBoons.length ? runBoons.map(id => { const b = BOONS.find(b => b.id === id)!; return `<p><b>${b.name}</b><small>${b.description}</small></p>`; }).join('') : '<p class="log-muted">Belum ada boon di run ini.</p>';
+  $('expedition-label').textContent = battle.mode === 'adventure' ? t('mode.campaign') : battle.mode === 'endless' ? t('route.endless') : t('mode.raid');
+  $('journey-title').textContent = battle.mode === 'adventure' ? c.name : battle.mode === 'endless' ? t('route.endless') : battle.enemyName;
+  $('journey-copy').textContent = battle.mode === 'adventure' ? c.subtitle : t('battle.journey.copy');
+  $('stage-list').innerHTML = battle.mode === 'adventure' ? c.stages.map((s, i) => `<li class="${i === battle.stage ? 'current' : i < battle.stage ? 'completed' : ''}"><small>${t('map.wave', { n: i + 1 })}</small> <span>${s.name}</span></li>`).join('') : '';
+  $('boon-list').innerHTML = runBoons.length ? runBoons.map(id => { const b = BOONS.find(b => b.id === id)!; return `<p><b>${b.name}</b><small>${b.description}</small></p>`; }).join('') : `<p class="hint">${t('battle.noboons')}</p>`;
   const boonBadge = $('boon-count-badge');
   if (boonBadge) {
     boonBadge.textContent = String(runBoons.length);
@@ -669,18 +672,14 @@ function updateExpedition() {
 }
 function showReady() {
   $('start-overlay').hidden = false;
-  $('ready-label').textContent = battle.stageName;
-  $('ready-title').textContent = battle.stage > 0 ? 'Keep the ember alive.' : 'Ready, Bellkeepers?';
-  $('ready-copy').textContent = battle.mode === 'adventure'
-    ? battle.stage > 0
-      ? 'Jalur berikutnya terbuka. HP dan potion dibawa; baca intent sebelum memilih lane.'
-      : 'Baca intent musuh, pilih lane, dan lindungi party sebelum serangan.'
-    : battle.stage > 0
-      ? 'HP dan potion tersisa dibawa ke wave ini. Periksa stance sebelum lanjut.'
-      : 'Skill dan formasi siap. Tap hero untuk mempercepat cooldown.';
-  $('start').textContent = 'Begin encounter';
+  $('ready-label').textContent = battle.stageCount > 1 ? `${t('map.wave', { n: battle.stage + 1 })}/${battle.stageCount} · ${stageLabel()}` : stageLabel();
+  $('ready-title').textContent = battle.stage > 0 ? t('ready.title.next') : t('ready.title.first', { name: battle.enemyName });
+  const beat = battle.mode === 'adventure' ? CAMPAIGN[battle.floor - 1]?.stages[battle.stage]?.beat : undefined;
+  $('ready-copy').textContent = beat ?? (battle.stage > 0 ? t('ready.copy.next') : battle.mode === 'adventure' ? t('ready.copy.story') : t('ready.copy.other'));
+  $('ready-copy').classList.toggle('story-beat', Boolean(beat));
+  $('start').textContent = t('battle.begin');
   if (profile.motion) {
-    gsap.fromTo('#start-overlay', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.26, ease: 'power2.out', clearProps: 'opacity,transform' });
+    gsap.fromTo('#start-overlay .start-window', { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
   }
 }
 async function begin() {
@@ -691,18 +690,22 @@ async function begin() {
   sound.unlock();
   battle.start();
   $('start-overlay').hidden = true;
-  addLog('Pertarungan dimulai. Perhatikan intent musuh.');
+  scene.encounterStart();
+  addLog(t('log.begin'));
   void ensureCommander().then(() => commander.flush()).then(() => checkpoint(true));
 }
 
 function renderPartyHealthTray() {
   partyHealthViews.clear();
-  for (const trayId of ['party-health-tray', 'details-party-health-tray']) {
+  for (const trayId of ['details-party-health-tray']) {
     const host = $(trayId);
-    host.innerHTML = battle.heroes.map(h => `<button type="button" class="party-health-card" data-party-hero="${h.id}" aria-pressed="false" aria-label="${h.name}">
-      <span class="party-hero-name">${h.name}</span><span class="party-cooldown">READY</span>
-      <span class="party-health-values"><span>HP <b class="party-hp-value">${Math.ceil(h.hp)} / ${h.maxHp}</b></span><span>SH <b class="party-shield-value">${Math.round(h.shield)}</b></span></span>
+    host.dataset.count = String(battle.heroes.length);
+    host.innerHTML = battle.heroes.map(h => `<button type="button" class="party-health-card" data-party-hero="${h.id}" aria-pressed="false" aria-label="${heroName(h)}">
+      <img class="party-face" src="${portrait(h.classId)}" alt=""/>
+      <span class="party-hero-name">${heroName(h)}</span>
+      <span class="party-health-values"><span class="party-hp"><small>HP</small> <b class="party-hp-value">${Math.ceil(h.hp)}</b><small>/${h.maxHp}</small></span><span class="party-sh">SH <b class="party-shield-value">${Math.round(h.shield)}</b></span></span>
       <span class="party-health-meter" aria-hidden="true"><i></i><em></em></span>
+      <span class="party-atb" aria-hidden="true"><i></i></span><span class="party-cooldown"></span>
     </button>`).join('');
     host.querySelectorAll<HTMLButtonElement>('[data-party-hero]').forEach(button => {
       const id = Number(button.dataset.partyHero);
@@ -714,6 +717,7 @@ function renderPartyHealthTray() {
         cooldown: button.querySelector<HTMLElement>('.party-cooldown')!,
         healthFill: button.querySelector<HTMLElement>('.party-health-meter i')!,
         shieldFill: button.querySelector<HTMLElement>('.party-health-meter em')!,
+        atb: button.querySelector<HTMLElement>('.party-atb i')!,
       });
       partyHealthViews.set(id, views);
       button.addEventListener('click', () => {
@@ -730,31 +734,129 @@ function updatePartyHealthView(h: PartyHero) {
   const hp = Math.ceil(h.hp);
   const shield = Math.round(h.shield);
   const cooldownSeconds = h.remaining > 0 ? Math.max(.1, h.remaining).toFixed(1) : '';
-  const cooldown = cooldownSeconds ? `CD ${cooldownSeconds}s` : 'READY';
-  const status = h.hp <= 0 ? 'DOWN' : ratio <= .35 ? `LOW HP · ${cooldown}` : cooldown;
-  const skillStatus = h.hp <= 0 ? 'unavailable' : cooldownSeconds ? `cooldown ${cooldownSeconds} seconds` : 'ready';
+  const charge = h.total > 0 ? Math.min(1, Math.max(0, 1 - h.remaining / h.total)) : 1;
+  const status = h.hp <= 0 ? t('battle.down') : cooldownSeconds ? `${cooldownSeconds}s` : t('battle.ready');
   for (const view of views) {
-    view.hp.textContent = `${hp} / ${h.maxHp}`;
+    view.hp.textContent = String(hp);
     view.shield.textContent = String(shield);
     view.cooldown.textContent = status;
     view.healthFill.style.width = `${ratio * 100}%`;
     view.shieldFill.style.width = `${Math.min(1, Math.max(0, h.shield / Math.max(1, h.maxHp))) * 100}%`;
+    view.atb.style.width = `${h.hp > 0 ? charge * 100 : 0}%`;
     view.button.classList.toggle('downed', h.hp <= 0);
     view.button.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
+    view.button.classList.toggle('charged', h.hp > 0 && charge > .97);
     view.button.setAttribute('aria-pressed', String(h.id === battle.selected));
-    view.button.setAttribute('aria-label', `${h.name}, HP ${hp} of ${h.maxHp}, shield ${shield}, skill ${skillStatus}${ratio <= .35 && h.hp > 0 ? ', low health' : ''}${h.id === battle.selected ? ', selected' : ''}`);
+    view.button.setAttribute('aria-label', t('battle.hero.aria', { name: heroName(h), hp, max: h.maxHp, shield, status }));
   }
 }
 function makeUnits() {
   $('unit-layer').innerHTML = battle.heroes.map(h => {
     const p = cell(h.slot);
-    return `<div class="unit-card" data-hero="${h.id}" style="left:${p.x / 6}%;top:${p.y / 7.6}%;width:24%;height:${120 / 7.6}%;--class-color:${KITS[h.classId].color}"><button class="unit-tap" data-tap="${h.id}" aria-label="Tap ${h.name} untuk mempercepat"><span class="unit-name">${h.name}</span><span class="tap-hint">TAP ↓ CD</span><span class="tap-flash">TEMPO</span></button></div>`;
+    return `<div class="unit-card" data-hero="${h.id}" style="left:${p.x / 6}%;top:${p.y / 7.6}%;width:24%;height:${UNIT_H / 7.6}%;--class-color:${KITS[h.classId].color}"><button class="unit-tap" data-tap="${h.id}" aria-label="${t('battle.tap.aria', { name: heroName(h) })}"><span class="unit-name">${heroName(h)}</span><span class="tap-flash">${t('battle.tempo')}</span></button><span class="unit-hp" aria-hidden="true"><i></i><em></em></span><button type="button" class="unit-skill" data-skill-switch="${h.id}"><i class="unit-skill-fill"></i><span class="unit-skill-name"></span><span class="unit-skill-icon" aria-hidden="true"></span></button></div>`;
   }).join('');
+  unitViews.clear();
+  for (const h of battle.heroes) {
+    const card = document.querySelector<HTMLElement>(`#unit-layer [data-hero="${h.id}"]`)!;
+    const skill = card.querySelector<HTMLButtonElement>('.unit-skill')!;
+    unitViews.set(h.id, { card, hp: card.querySelector('.unit-hp i')!, shield: card.querySelector('.unit-hp em')!, skill, fill: skill.querySelector('.unit-skill-fill')!, name: skill.querySelector('.unit-skill-name')!, icon: skill.querySelector('.unit-skill-icon')!, key: '' });
+    skill.addEventListener('click', event => { event.stopPropagation(); switchSkill(h.id); });
+  }
+  closeSkillPicker();
   $('unit-layer').querySelectorAll<HTMLElement>('[data-tap]').forEach(el => bindPointer(el, Number(el.dataset.tap)));
   renderPartyHealthTray();
-  $('party-size').textContent = `${battle.heroes.length} HEROES`;
+  $('party-size').textContent = `${battle.heroes.length}`;
   selectedKey = '';
   renderInspector();
+}
+// A unit card spans its 112px cell plus most of the row gap, so the skill chip sits under the portrait.
+const UNIT_H = 122;
+type UnitView = { card: HTMLElement; hp: HTMLElement; shield: HTMLElement; skill: HTMLButtonElement; fill: HTMLElement; name: HTMLElement; icon: HTMLElement; key: string };
+const unitViews = new Map<number, UnitView>();
+function updateUnitView(h: PartyHero) {
+  const view = unitViews.get(h.id);
+  if (!view) return;
+  const ratio = h.maxHp > 0 ? Math.min(1, Math.max(0, h.hp / h.maxHp)) : 0;
+  const charge = h.total > 0 ? Math.min(1, Math.max(0, 1 - h.remaining / h.total)) : 1;
+  const skills = battle.availableSkills(h.id);
+  const canSwitch = h.hp > 0 && skills.length > 1 && ['ready', 'fighting'].includes(battle.status);
+  view.hp.style.width = `${ratio * 100}%`;
+  view.shield.style.width = `${Math.min(1, Math.max(0, h.shield / Math.max(1, h.maxHp))) * 100}%`;
+  view.fill.style.width = `${h.hp > 0 ? charge * 100 : 0}%`;
+  view.card.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
+  view.card.classList.toggle('charged', h.hp > 0 && charge > .97);
+  const key = `${h.stance}-${skills.length}-${canSwitch}-${h.hp > 0}`;
+  if (key === view.key) return;
+  if (view.key && view.key.split('-')[0] !== String(h.stance)) { view.card.classList.remove('switched'); void view.card.offsetWidth; view.card.classList.add('switched'); }
+  view.key = key;
+  const skill = KITS[h.classId].skills[h.stance];
+  view.name.textContent = skill.name;
+  view.icon.textContent = skills.length > 2 ? '▾' : '⇄';
+  view.skill.disabled = !canSwitch;
+  view.skill.setAttribute('aria-label', t('battle.skill.switch', { name: heroName(h), skill: skill.name }));
+  view.skill.setAttribute('aria-haspopup', String(skills.length > 2));
+}
+function switchSkill(id: number) {
+  const h = battle.hero(id);
+  if (!h || h.hp <= 0 || inTown) return;
+  const skills = battle.availableSkills(id);
+  if (skills.length < 2) return;
+  if (skills.length === 2) { closeSkillPicker(); cycleSkill(id); return; }
+  if (pickerHero === id) { closeSkillPicker(); return; }
+  openSkillPicker(id);
+}
+let pickerHero = -1;
+function openSkillPicker(id: number) {
+  const h = battle.hero(id);
+  if (!h) return;
+  const kit = KITS[h.classId];
+  battle.selected = id;
+  pickerHero = id;
+  const picker = $('skill-picker');
+  picker.setAttribute('aria-label', t('battle.skill.choose', { name: heroName(h) }));
+  picker.innerHTML = `<h4>${t('battle.skill.choose', { name: heroName(h) })}</h4>${battle.availableSkills(id).map(i => { const s = kit.skills[i]; return `<button type="button" data-pick-skill="${i}" aria-pressed="${h.stance === i}"><span><b>${s.name}</b><small>${s.label}</small></span><em>${s.cooldown.toFixed(1)}s</em></button>`; }).join('')}`;
+  const p = cell(h.slot);
+  const width = Math.max(180, $('arena').clientWidth * .52) / $('arena').clientWidth * 100;
+  picker.style.left = `${Math.min(98 - width, Math.max(2, (p.x + 72) / 6 - width / 2))}%`;
+  picker.style.bottom = `${Math.min(70, (760 - p.y - 70) / 7.6)}%`;
+  picker.hidden = false;
+  picker.querySelectorAll<HTMLButtonElement>('[data-pick-skill]').forEach(button => button.addEventListener('click', event => {
+    event.stopPropagation();
+    withDetailsPausedAction(() => battle.stance(id, Number(button.dataset.pickSkill)));
+    sound.unlock();
+    closeSkillPicker();
+    renderInspector();
+    frame(1);
+  }));
+  picker.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus({ preventScroll: true });
+  renderInspector();
+}
+function closeSkillPicker() {
+  pickerHero = -1;
+  const picker = document.getElementById('skill-picker');
+  if (picker) { picker.hidden = true; picker.innerHTML = ''; }
+}
+document.addEventListener('pointerdown', event => {
+  if (pickerHero === -1) return;
+  const target = event.target as HTMLElement;
+  if (!target.closest('#skill-picker') && !target.closest('.unit-skill')) closeSkillPicker();
+}, true);
+function updateFocusBar() {
+  const h = battle.hero(battle.selected);
+  const bar = document.getElementById('focus-bar');
+  if (!h || !bar) return;
+  const ratio = h.maxHp > 0 ? h.hp / h.maxHp : 0;
+  const skill = KITS[h.classId].skills[h.stance];
+  const status = h.hp <= 0 ? t('battle.down') : h.remaining > 0 ? `${Math.max(.1, h.remaining).toFixed(1)}s` : t('battle.ready');
+  const face = bar.querySelector<HTMLImageElement>('.focus-face')!;
+  const src = portrait(h.classId);
+  if (face.getAttribute('src') !== src) face.setAttribute('src', src);
+  bar.querySelector('.focus-name')!.textContent = `${heroName(h)} · LV ${h.level}`;
+  bar.querySelector('.focus-skill')!.textContent = skill.name;
+  bar.querySelector('.focus-hp b')!.textContent = `${Math.ceil(Math.max(0, h.hp))}/${h.maxHp}${h.shield > 0 ? ` +${Math.round(h.shield)}` : ''}`;
+  bar.querySelector('.focus-status')!.textContent = status;
+  bar.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
+  bar.classList.toggle('downed', h.hp <= 0);
 }
 type Touch = { id: number; x: number; y: number; started: number; drag: boolean; el: HTMLElement };
 const touches = new Map<number, Touch>();
@@ -859,7 +961,7 @@ function renderInspector() {
   const key = `${h.id}-${h.stance}-${moveMode}-${battle.status}`;
   if (key === selectedKey) return;
   selectedKey = key;
-  $('inspector').innerHTML = `<div class="hero-identity"><div class="portrait-frame"><img src="${portrait(h.classId)}" alt="${h.name}"/><span>LV. ${h.level}</span></div><div><span class="hero-class">${k.name}</span><h2>${h.name}</h2><p>${k.role}</p></div></div><div class="hero-stats"><span>HP <b id="selected-hp"></b></span><span>SHIELD <b id="selected-shield"></b></span></div><div class="section-label stance-label">EQUIPPED SKILLS <span>AUTO-CAST</span></div><div class="stance-options">${battle.availableSkills(h.id).map(i => { const s = k.skills[i]; return `<button data-select-stance="${i}" class="stance-option ${h.stance === i ? 'chosen' : ''}" aria-pressed="${h.stance === i}" ${!['ready', 'fighting'].includes(battle.status) || h.hp <= 0 ? 'disabled' : ''}><span><b>${s.name}</b><small>${s.label} · ${s.cooldown.toFixed(1)}s</small></span><i>${h.stance === i ? '●' : '○'}</i></button>`; }).join('')}</div><p class="skill-description">${k.skills[h.stance].description}</p><div class="focus-meter"><div><span>TAP FATIGUE</span><span id="fatigue-label">FRESH</span></div><span><i id="fatigue-fill"></i></span></div><button id="move-selected" class="move-button">${moveMode ? 'Pilih grid tujuan · Esc batal' : 'Pindahkan karakter'}<small>+0.9s</small></button><div class="move-grid" ${moveMode ? '' : 'hidden'}>${Array.from({ length: 9 }, (_, i) => `<button data-move-slot="${i}" aria-label="Pindah ke grid ${i + 1}" ${i === h.slot ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>`;
+  $('inspector').innerHTML = `<div class="hero-identity"><div class="portrait-frame"><img src="${portrait(h.classId)}" alt="${heroName(h)}"/><span>LV ${h.level}</span></div><div><small class="hero-class">${k.name}</small><h2>${heroName(h)}</h2><p>${k.role}</p></div></div><div class="hero-stats"><span>HP <b id="selected-hp"></b></span><span>SH <b id="selected-shield"></b></span></div><h4 class="subheading stance-label">${t('battle.skills')} <span>${t('battle.autocast')}</span></h4><div class="stance-options">${battle.availableSkills(h.id).map(i => { const s = k.skills[i]; return `<button data-select-stance="${i}" class="stance-option ${h.stance === i ? 'chosen' : ''}" aria-pressed="${h.stance === i}" ${!['ready', 'fighting'].includes(battle.status) || h.hp <= 0 ? 'disabled' : ''}><span><b>${s.name}</b><small>${s.label} · ${s.cooldown.toFixed(1)}s</small></span><i>${h.stance === i ? '●' : '○'}</i></button>`; }).join('')}</div><p class="skill-description">${k.skills[h.stance].description}</p><div class="focus-meter"><div><span>${t('battle.fatigue')}</span><span id="fatigue-label"></span></div><span class="gauge"><i id="fatigue-fill"></i></span></div><button id="move-selected" class="btn move-button">${moveMode ? t('battle.move.pick') : t('battle.move')}<small>+0.9s</small></button><div class="move-grid" ${moveMode ? '' : 'hidden'}>${Array.from({ length: 9 }, (_, i) => `<button data-move-slot="${i}" aria-label="${t('formation.tile', { n: i + 1 })}" ${i === h.slot ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>`;
   $('inspector').querySelectorAll<HTMLButtonElement>('[data-select-stance]').forEach(el => {
     el.disabled = !canModify || h.hp <= 0;
     el.addEventListener('click', () => {
@@ -888,35 +990,40 @@ function frame(dt: number) {
   $('boss-hp').style.width = hpPercent;
   const ghost = document.getElementById('boss-hp-ghost');
   if (ghost) ghost.style.width = hpPercent;
-  $('phase').textContent = `PHASE ${battle.phase} / 3`;
+  $('phase').textContent = t('battle.phase', { n: battle.phase });
   $('stagger').style.width = `${battle.breakLeft > 0 ? battle.breakLeft / 6 * 100 : battle.stagger / 800 * 100}%`;
-  $('stagger-label').textContent = battle.breakLeft > 0 ? 'BREAK' : 'ARMOR';
+  $('stagger-label').textContent = battle.breakLeft > 0 ? t('battle.break') : t('battle.armor');
+  $('battle-screen').classList.toggle('boss-broken', battle.breakLeft > 0);
   $('clock').textContent = formatTime(battle.time);
   const threat = [...battle.threats].sort((a, b) => a.left - b.left)[0];
   const isDanger = Boolean(threat);
-  const wasDanger = $('intent').classList.contains('danger');
-  $('intent').classList.toggle('danger', isDanger);
+  const intent = $('intent');
+  const wasDanger = intent.classList.contains('danger');
+  intent.classList.toggle('danger', isDanger);
+  intent.classList.toggle('guarding', !isDanger && battle.guardLeft > 0);
   if (isDanger && !wasDanger && profile.motion) {
-    gsap.fromTo('#intent', { scale: 1.025 }, { scale: 1, duration: 0.25, ease: 'back.out(2)', clearProps: 'transform' });
+    gsap.fromTo('#intent', { scale: 1.08 }, { scale: 1, duration: 0.25, ease: 'back.out(2)', clearProps: 'transform' });
   }
-  $('intent').querySelector('b')!.textContent = threat ? `${threat.name} · ${Math.max(0, threat.left).toFixed(1)}s${threat.targetId !== undefined ? ` · ${battle.hero(threat.targetId)?.name ?? 'MARKED'}` : ''}` : battle.guardLeft > 0 ? `PARTY GUARD · ${battle.guardLeft.toFixed(1)}s` : 'Watch the next move.';
-  $('intent').querySelector('span')!.textContent = threat ? `${threat.counter ?? 'Pindahkan hero dari tile yang ditandai.'}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1} intent lain)` : ''}` : 'Ground: move. Marked: protect. All-grid: Guard / interrupt.';
+  intent.querySelector('b')!.textContent = threat ? `${eventText(threat.name, lang())} · ${Math.max(0, threat.left).toFixed(1)}s${threat.targetId !== undefined ? ` → ${battle.hero(threat.targetId)?.name ?? '?'}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: battle.guardLeft.toFixed(1) }) : t('battle.watch');
+  intent.querySelector('span')!.textContent = threat ? `${threat.counter ? eventText(threat.counter, lang()) : t('battle.counter.default')}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.hint');
   $('damage').textContent = Math.round(battle.damage).toLocaleString();
   $('blocked').textContent = Math.round(battle.blocked).toLocaleString();
-  $('loot').textContent = battle.mode === 'endless' ? `${runWallet.crystal} RUN` : battle.mode === 'raid' ? `${battle.raidContract?.sandbox ? 'PRACTICE' : battle.raidContract?.tier.toUpperCase() ?? 'PRACTICE'}` : `${battle.gold}g`;
-  $('standing').textContent = `${battle.living().length} / ${battle.heroes.length} STANDING`;
-  $('move-tip').textContent = moveMode ? 'CHOOSE A DESTINATION' : 'DRAG TO REPOSITION';
+  $('loot').textContent = battle.mode === 'endless' ? `${runWallet.crystal} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${battle.gold}G`;
+  $('standing').textContent = t('battle.standing', { n: battle.living().length, total: battle.heroes.length });
+  $('move-tip').textContent = moveMode ? t('battle.move.pick') : t('battle.drag');
   $('resolve-fill').style.width = `${battle.resolve}%`;
-  $('resolve-label').textContent = battle.resolve >= 100 ? 'R · READY' : `R · ${Math.floor(battle.resolve)}% RESOLVE`;
+  $('resolve-label').textContent = battle.resolve >= 100 ? t('battle.ult.ready') : t('battle.ult.charge', { n: Math.floor(battle.resolve) });
   const ultReady = battle.resolve >= 100 && battle.status === 'fighting';
   $<HTMLButtonElement>('ultimate').disabled = !ultReady;
   $('ultimate').classList.toggle('ready', ultReady);
   $<HTMLButtonElement>('potion').disabled = battle.potions <= 0 || battle.status !== 'fighting';
-  $('potions').textContent = `H · ${battle.potions} CHARGES`;
+  $('potions').textContent = t('battle.potion.left', { n: battle.potions });
   $('potion').querySelector('b')!.textContent = String(battle.potions);
   $<HTMLButtonElement>('guard').disabled = battle.guardCooldown > 0 || battle.status !== 'fighting';
-  $('guard-label').textContent = battle.guardLeft > 0 ? `ACTIVE · ${battle.guardLeft.toFixed(1)}s` : battle.guardCooldown > 0 ? `G · ${battle.guardCooldown.toFixed(1)}s` : 'G · READY';
+  $('guard-label').textContent = battle.guardLeft > 0 ? t('battle.guard.active', { s: battle.guardLeft.toFixed(1) }) : battle.guardCooldown > 0 ? t('battle.guard.cd', { s: battle.guardCooldown.toFixed(1) }) : t('battle.guard.ready');
   $('guard').classList.toggle('guarding', battle.guardLeft > 0);
+  $('lane-targets-hint')?.remove();
+  document.querySelector('.lane-targets')?.classList.toggle('has-minions', battle.minions.length > 0);
   for (const h of battle.heroes) {
     const el = document.querySelector<HTMLElement>(`[data-hero="${h.id}"]`);
     if (!el) continue;
@@ -927,12 +1034,15 @@ function frame(dt: number) {
     el.classList.toggle('downed', h.hp <= 0);
     el.classList.toggle('buffed', h.buff > 0);
     updatePartyHealthView(h);
+    updateUnitView(h);
   }
+  updateFocusBar();
+  if (pickerHero !== -1 && (battle.status !== 'fighting' && battle.status !== 'ready' || (battle.hero(pickerHero)?.hp ?? 0) <= 0)) closeSkillPicker();
   const h = battle.hero(battle.selected);
   if (h && $('selected-hp')) {
     $('selected-hp').textContent = `${Math.ceil(h.hp)} / ${h.maxHp}`;
     $('selected-shield').textContent = String(Math.round(h.shield));
-    $('fatigue-label').textContent = h.fatigue > 70 ? 'TIRED · SWITCH HERO' : h.fatigue > 40 ? 'WARM' : 'FRESH';
+    $('fatigue-label').textContent = h.fatigue > 70 ? t('battle.fatigue.tired') : h.fatigue > 40 ? t('battle.fatigue.warm') : t('battle.fatigue.fresh');
     $('fatigue-fill').style.width = `${h.fatigue}%`;
   }
 }
@@ -943,48 +1053,48 @@ function addLog(text: string) {
   time.textContent = formatTime(battle.time);
   p.append(time, document.createTextNode(text));
   $('combat-log').prepend(p);
-  while ($('combat-log').children.length > 5) $('combat-log').lastElementChild?.remove();
+  while ($('combat-log').children.length > 8) $('combat-log').lastElementChild?.remove();
 }
 window.addEventListener('battle-banner', event => {
   if (inTown) return;
   const e = (event as CustomEvent<BattleEvent>).detail;
-  $('banner').textContent = e.text ?? '';
-  $('banner').className = `battle-banner visible ${e.type === 'warning' ? 'danger' : ''}`;
+  const text = e.text ? eventText(e.text, lang()) : '';
+  $('banner').textContent = text;
+  $('banner').className = `battle-banner visible ${e.type === 'warning' ? 'danger' : e.type === 'ultimate' ? 'ultimate' : e.type === 'break' ? 'break' : ''}`;
   clearTimeout(bannerTimer);
   bannerTimer = window.setTimeout(() => {
     const banner = $('banner');
     banner.className = 'battle-banner';
     banner.textContent = '';
   }, 1800);
-  if (e.text) addLog(e.text);
+  if (text) addLog(text);
 });
 
 function openModal(content: string, pause = true) {
   const alreadyOpen = modal.open;
   if (!alreadyOpen) resumeOnClose = !inTown && pause && battle.status === 'fighting';
   if (!inTown && pause && battle.status === 'fighting') { resumeOnClose = true; battle.pause(); }
-  modal.innerHTML = `${content}<button data-close class="modal-close icon-button" aria-label="Tutup dialog">×</button>`;
+  modal.innerHTML = `${content}<button data-close class="modal-close icon-button" aria-label="${t('common.close')}">×</button>`;
   modal.scrollTop = 0;
   if (!alreadyOpen) {
     try { modal.showModal(); } catch { modal.show(); }
     sound.modalReveal();
-    if (profile.motion) {
-      gsap.fromTo(modal, { opacity: 0, scale: 0.94, y: -10 }, { opacity: 1, scale: 1, y: 0, duration: 0.22, ease: 'back.out(1.2)', clearProps: 'transform' });
-      const targets = modal.querySelectorAll('h2, .help-rows p, .setting-row, section, .gold-button, .secondary-button');
-      if (targets.length) {
-        gsap.fromTo(targets, { opacity: 0, y: 8 }, { opacity: 1, y: 0, stagger: 0.03, duration: 0.2, ease: 'power2.out', clearProps: 'opacity,transform' });
-      }
-    }
+    if (profile.motion) gsap.fromTo(modal, { opacity: 0 }, { opacity: 1, duration: 0.15, ease: 'power2.out', clearProps: 'opacity' });
   }
   modal.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => modal.close()));
 }
 modal.addEventListener('close', () => { if (resumeOnClose && !inTown && battle.status === 'paused') battle.pause(); resumeOnClose = false; });
 function closeWithoutResume() { resumeOnClose = false; clearResultState(); if (modal.open) modal.close(); }
 function help() {
-  openModal(`<span class="eyebrow">COMMANDER'S FIELD GUIDE</span><h2 id="modal-title">Every intent has an answer.</h2><div class="help-rows"><p><b>Tap / angka 1–9</b><br>Percepat cooldown hero di tile tersebut. Berganti fokus saat fatigue naik. Dua pointer didukung; drag tidak dihitung sebagai tap.</p><p><b>Skill / Q dan E</b><br>Ganti antara dua skill yang dipasang di town. Persentase cooldown dipertahankan, bukan direset.</p><p><b>Drag / Pindahkan karakter</b><br>Keluar dari ground AoE. Relokasi menambah cooldown 0,9 detik. Serangan marked tetap mengikuti hero: gunakan shield, heal, atau Guard.</p><p><b>Party Guard / G</b><br>Mitigasi seluruh party untuk window singkat. Tekan menjelang all-grid impact, jangan terlalu dini. Skill interrupt dapat membatalkan ritual.</p><p><b>Mending mist / H · Ninefold Dawn / R</b><br>Potion terbatas per expedition. Resolve mengisi serangan party. Jangan menunggu healer tumbang.</p><p><b>Lane I, II, III</b><br>Arahkan ranged skill ke minion. Klik lane yang sama lagi untuk kembali ke boss.</p></div><button class="gold-button" data-close>Kembali memimpin</button>`);
+  const rows: [string, string][] = [['help.tap.title', 'help.tap'], ['help.skill.title', 'help.skill'], ['help.drag.title', 'help.drag'], ['help.guard.title', 'help.guard'], ['help.items.title', 'help.items'], ['help.lanes.title', 'help.lanes']];
+  openModal(`<h2 id="modal-title">${t('help.title')}</h2><div class="help-rows">${rows.map(([title, body]) => `<p><b>${t(title as never)}</b><br>${t(body as never)}</p>`).join('')}</div><button class="btn primary" data-close>${t('help.close')}</button>`);
 }
 function settings() {
-  openModal(`<span class="eyebrow">CAMP SETTINGS</span><h2 id="modal-title">Your kind of adventure.</h2><label class="setting-row"><span><b>Efek suara pertarungan</b><small>Nada singkat untuk aksi; musik latar nonaktif.</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label><label class="setting-row"><span><b>Full motion & particles</b><small>Matikan untuk mengurangi gerakan dan screen shake.</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label><p>Save v3 menyimpan XP tiap hero, quest, talent, inventory dan formasi. Save v2 lama tetap utuh untuk rollback. Pertarungan berjalan tidak disimpan.</p><button id="export-save" class="secondary-button">Download backup save JSON</button><button class="gold-button" data-close>Kembali</button>`);
+  openModal(`<h2 id="modal-title">${t('settings.title')}</h2>
+    <div class="setting-row" role="group" aria-label="${t('settings.language')}"><span><b>${t('settings.language')}</b><small>${inTown ? t('settings.language.sub') : t('settings.language.town')}</small></span><span class="lang-switch">${(['en', 'id'] as Lang[]).map(code => `<button type="button" class="btn" data-lang="${code}" aria-pressed="${lang() === code}" ${inTown ? '' : 'disabled'}>${code === 'en' ? 'English' : 'Indonesia'}</button>`).join('')}</span></div>
+    <label class="setting-row"><span><b>${t('settings.sound')}</b><small>${t('settings.sound.sub')}</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label>
+    <label class="setting-row"><span><b>${t('settings.motion')}</b><small>${t('settings.motion.sub')}</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label>
+    <p class="hint">${t('settings.save.note')}</p><button id="export-save" class="btn">${t('settings.export')}</button><button class="btn primary" data-close>${t('common.back')}</button>`);
   $('export-save').addEventListener('click',exportCommander);
   $('setting-sound').addEventListener('change', e => { profile.sound = (e.target as HTMLInputElement).checked; updateSound(); });
   $('setting-motion').addEventListener('change', e => { profile.motion = (e.target as HTMLInputElement).checked; scene.reducedMotion = !profile.motion; document.body.classList.toggle('reduced-motion', !profile.motion); persist(); });
@@ -994,7 +1104,7 @@ function pauseMenu() {
   if (inTown) return;
   if (['victory', 'defeat'].includes(battle.status)) { result(); return; }
   if (modal.open) { modal.close(); return; }
-  openModal(`<span class="eyebrow">TAKE A BREATH</span><h2 id="modal-title">The forest can wait.</h2><p>Combat pauses while this menu is open.</p><button class="gold-button" data-close>Resume</button><button id="pause-help" class="secondary-button">Controls</button><button id="pause-settings" class="secondary-button">Sound & motion</button><button id="pause-retreat" class="secondary-button">Retreat · return to Camp</button>`);
+  openModal(`<h2 id="modal-title">${t('pause.title')}</h2><p class="hint">${t('pause.copy')}</p><nav class="menu-list"><button class="menu-item" data-close>${t('pause.resume')}</button><button id="pause-help" class="menu-item">${t('pause.controls')}</button><button id="pause-settings" class="menu-item">${t('pause.settings')}</button><button id="pause-retreat" class="menu-item">${t('pause.retreat')}</button></nav>`);
   $('pause-help').addEventListener('click', help);
   $('pause-settings').addEventListener('click', settings);
   $('pause-retreat').addEventListener('click', () => navigateTown());
@@ -1002,71 +1112,15 @@ function pauseMenu() {
 const escapeUI = (value: string) => value.replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]!));
 function showBoonTray() {
   if (inTown) return;
-  if (modal.open) {
-    if (modal.querySelector('.boon-tray-modal')) {
-      modal.close();
-      return;
-    }
-  }
+  if (modal.open && modal.querySelector('.boon-tray-modal')) { modal.close(); return; }
   sound.cardDeal();
-
   const activeBoonIds = (runBoons.length > 0 ? runBoons : battle.boons) ?? [];
   const boons = activeBoonIds.map(id => BOONS.find(b => b.id === id)).filter(Boolean) as typeof BOONS;
-  const isEndless = battle.mode === 'endless';
-  const isRaid = battle.mode === 'raid';
-
-  const modeBadge = isEndless
-    ? `THE SUNKEN BELL · FLOOR ${battle.floor}`
-    : isRaid
-    ? `RAID CONTRACT · ${battle.raidContract?.tier.toUpperCase() ?? 'PRACTICE'}`
-    : `STORY EXPEDITION · ${battle.stageName || 'ENCOUNTER'}`;
-
-  const boonsListHtml = boons.length > 0
-    ? `<div class="boon-tray-list">
-        ${boons.map((b, i) => `
-          <div class="boon-tray-card" style="animation-delay: ${i * 0.04}s">
-            <div class="boon-tray-card-top">
-              <span class="boon-patron-badge">✦ ${escapeUI(b.patron)}</span>
-              <span class="boon-id-badge">#${escapeUI(b.id)}</span>
-            </div>
-            <h3 class="boon-name">${escapeUI(b.name)}</h3>
-            <p class="boon-desc">${escapeUI(b.description)}</p>
-          </div>
-        `).join('')}
-      </div>`
-    : `<div class="boon-tray-empty">
-        <div class="empty-sigil">✦</div>
-        <p>No boons drafted yet in this expedition.</p>
-        <small>Claim Olympian & Underworld boons at floor thresholds, draft chambers, or the journey peddler.</small>
-      </div>`;
-
+  const modeBadge = battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : battle.mode === 'raid' ? t('mode.raid') : stageLabel();
   const raidModifiers = battle.raidContract?.modifiers?.length ?? 0;
-  const pactHeatHtml = raidModifiers > 0
-    ? `<div class="boon-tray-pact-badge"><span class="heat-flame">🔥</span> Pact Heat +${raidModifiers}</div>`
-    : '';
-
-  const content = `
-    <div class="boon-tray-modal">
-      <div class="boon-tray-header">
-        <div class="boon-tray-eyebrow">✦ UNDERWORLD CODEX · ACTIVE BLESSINGS ✦</div>
-        <h2 id="modal-title">Fated Boons & Relics (${boons.length})</h2>
-        <div class="boon-tray-sub">
-          <span class="boon-tray-mode-tag">${modeBadge}</span>
-          ${pactHeatHtml}
-        </div>
-      </div>
-      ${boonsListHtml}
-      <div class="boon-tray-footer">
-        <div class="boon-tray-stats">
-          <span>Purse: <b class="gold">${runWallet.crystal}</b> Crystal</span>
-          <span>Active: <b>${battle.heroes.filter(h => h.hp > 0).length} / ${battle.heroes.length}</b> Bellkeepers</span>
-        </div>
-        <button class="gold-button" data-close>Resume Encounter [ESC]</button>
-      </div>
-    </div>
-  `;
-
-  openModal(content);
+  openModal(`<div class="boon-tray-modal"><h2 id="modal-title">${t('boons.title', { n: boons.length })}</h2><p class="hint"><span class="boon-tray-mode-tag">${escapeUI(modeBadge)}</span>${raidModifiers ? ` · ${t('boons.pact', { n: raidModifiers })}` : ''}</p>
+    ${boons.length ? `<div class="boon-tray-list">${boons.map(b => `<div class="boon-tray-card"><small class="boon-patron-badge">${escapeUI(b.patron)}</small><h3 class="boon-name">${escapeUI(b.name)}</h3><p class="boon-desc">${escapeUI(b.description)}</p></div>`).join('')}</div>` : `<div class="boon-tray-empty"><p>${t('boons.empty')}</p><small>${t('boons.empty.hint')}</small></div>`}
+    <div class="boon-tray-footer"><div class="boon-tray-stats"><span>${t('boons.purse', { n: runWallet.crystal })}</span><span>${t('battle.standing', { n: battle.heroes.filter(h => h.hp > 0).length, total: battle.heroes.length })}</span></div><button class="btn primary" data-close>${t('boons.resume')}</button></div></div>`);
 }
 async function navigateTown(tab: TownTab = 'camp') {
   const activateTargetMode = () => {
@@ -1175,12 +1229,13 @@ function animateCeremony() {
   if (!profile.motion) return;
   const modalEl = resultScreen.querySelector('.result-ceremony-modal');
   if (!modalEl) return;
-  const crest = modalEl.querySelector('.ceremony-crest');
+  const crest = modalEl.querySelector('.result-banner');
   const plaques = modalEl.querySelectorAll('.stat-plaque');
   const cards = modalEl.querySelectorAll('.xp-card');
   const tl = gsap.timeline();
   if (crest) {
-    tl.fromTo(crest, { scale: 0.35, opacity: 0, rotation: -12 }, { scale: 1, opacity: 1, rotation: 0, duration: 0.4, ease: 'back.out(2)', clearProps: 'opacity,transform' });
+    tl.fromTo(crest, { scale: 2.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(2.2)', clearProps: 'opacity,transform' });
+    tl.fromTo(modalEl.querySelectorAll('.win'), { opacity: 0, scaleY: 0.3 }, { opacity: 1, scaleY: 1, stagger: 0.08, duration: 0.2, ease: 'power2.out', clearProps: 'opacity,transform' }, '-=0.1');
   }
   if (plaques.length) {
     tl.fromTo(plaques, { opacity: 0, y: 14 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.28, ease: 'power2.out', clearProps: 'opacity,transform' }, '-=0.15');
@@ -1273,7 +1328,7 @@ function result() {
     const hint = document.createElement('p');
     hint.className = 'result-input-hint';
     hint.setAttribute('role', 'status');
-    hint.textContent = 'Preparing the next step…';
+    hint.textContent = t('result.preparing');
     resultScreen.append(hint);
     resultScreen.scrollTop = 0;
     window.setTimeout(() => {
@@ -1305,9 +1360,9 @@ async function presentResult() {
       const wallet = structuredClone(runWallet);
       const rewards = settleProgress(candidate, battle, wallet);
       if (rewards === null) {
-        commander.error = 'Settlement rejected. No success receipt was created. Export pending outcome before refresh.';
+        commander.error = t('result.blocked.error');
         storageStatus();
-        openModal('<h2 id="modal-title">Settlement blocked</h2><p>No reward confirmation. Open Profiles to export recovery data.</p>');
+        openModal(`<h2 id="modal-title">${t('result.blocked.title')}</h2><p>${t('result.blocked.copy')}</p>`);
         return false;
       }
       reward = battle.gold + (battle.mode === 'adventure' ? zone.reward : 0);
@@ -1329,7 +1384,7 @@ async function presentResult() {
     } else if (!encounter?.settled) encounter = makeEncounter(true);
     const ok = await checkpoint(true);
     if (!ok && commander.document) {
-      openModal('<h2 id="modal-title">Outcome not saved</h2><p>Navigation locked. Retry the same pending outcome, or export recovery data.</p><button id="retry-save" class="gold-button">Retry save</button><button id="pending-export" class="secondary-button">Export pending outcome</button>');
+      openModal(`<h2 id="modal-title">${t('result.unsaved.title')}</h2><p>${t('result.unsaved.copy')}</p><button id="retry-save" class="btn primary">${t('result.unsaved.retry')}</button><button id="pending-export" class="btn">${t('result.unsaved.export')}</button>`);
       $('retry-save').onclick = () => { presentingResult = false; result(); };
       $('pending-export').onclick = exportCommander;
       return false;
@@ -1339,165 +1394,66 @@ async function presentResult() {
   }
   if (won && battle.mode === 'endless') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 7919);
   $('start-overlay').hidden = false;
-  $('ready-title').textContent = won ? moreWaves ? 'The path opens.' : 'The bell remembers.' : 'The ember remains.';
-  $('ready-copy').textContent = 'Buka hasil untuk melanjutkan atau kembali ke town.';
-  $('start').textContent = 'Lihat hasil';
-  const description = moreWaves ? 'Masih ada bahaya di depan. HP, potion, formasi, dan cooldown party dibawa ke pertempuran berikutnya.' : won && battle.mode === 'adventure' ? zone.outro : won && battle.mode === 'raid' ? `${battle.raidContract?.sandbox ? 'Practice selesai; kontrak Sandbox tidak memberi Crystal.' : `Certified ${battle.raidContract?.tier ?? 'bronze'} contract settled. Bank Crystal: ${battle.raidContract ? 'receipt recorded' : 'none'}.`}` : won ? `Room clear. Journey purse sekarang ${runWallet.crystal} Crystal; act reward hanya masuk bank pada authored act clear.` : 'Party tumbang. Coba skill berbeda, jaga hero yang ditandai, dan simpan Guard untuk ritual.';
+  $('ready-label').textContent = '';
+  $('ready-title').textContent = won ? moreWaves ? t('ready.after.wave') : t('ready.after.win') : t('ready.after.lose');
+  $('ready-copy').textContent = t('ready.after.copy');
+  $('start').textContent = t('ready.after.button');
+  const description = moreWaves ? t('result.desc.wave') : won && battle.mode === 'adventure' ? zone.outro : won && battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('result.desc.sandbox') : t('result.desc.raid', { tier: t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never) })) : won ? t('result.desc.room', { n: runWallet.crystal }) : t('result.desc.defeat');
   if (won && battle.mode === 'endless') {
     const cardsHtml = offeredBoons.map(b => {
       const meta = getBoonMeta(b.id);
-      return `<button class="boon-card" data-boon="${b.id}" style="--card-accent: ${meta.color}; --card-glow: ${meta.glow};" aria-label="${b.name} - ${b.patron}">
-        <div class="boon-card-corner tl"></div>
-        <div class="boon-card-corner tr"></div>
-        <div class="boon-card-corner bl"></div>
-        <div class="boon-card-corner br"></div>
-        <div class="boon-card-frame">
-          <div class="boon-card-header">
-            <div class="boon-patron-badge">
-              <span class="boon-patron-icon">${meta.icon}</span>
-              <span class="boon-patron-name">${b.patron}</span>
-            </div>
-            <span class="boon-rarity-pill">${meta.rarity}</span>
-          </div>
-          <div class="boon-card-body">
-            <h4 class="boon-name">${b.name}</h4>
-            <div class="boon-card-divider"><span class="card-div-gem">◆</span></div>
-            <p class="boon-desc">${b.description}</p>
-          </div>
-          <div class="boon-card-footer">
-            <div class="boon-cta">
-              <span class="boon-cta-gem">✦</span>
-              <span>Accept Blessing</span>
-              <span class="boon-cta-gem">✦</span>
-            </div>
-          </div>
-        </div>
+      return `<button class="boon-card" data-boon="${b.id}" style="--card-accent:${meta.color}" aria-label="${escapeUI(b.name)} - ${escapeUI(b.patron)}">
+        <span class="boon-card-gem" aria-hidden="true"></span>
+        <small class="boon-patron-badge boon-patron-name">${escapeUI(b.patron)}</small>
+        <h4 class="boon-name">${escapeUI(b.name)}</h4>
+        <p class="boon-desc">${escapeUI(b.description)}</p>
+        <span class="boon-cta">${t('boon.take')}</span>
       </button>`;
     }).join('');
-
     showResultScreen(`<div class="boon-draft-modal">
       <header class="boon-modal-header">
-        <span class="eyebrow">✦ DIVINE OFFERING · FLOOR ${battle.floor} CLEARED ✦</span>
-        <h2 id="result-title" class="boon-modal-title">THE PATRONS BESTOW THEIR FAVOR</h2>
-        <p class="boon-modal-subtitle">Choose one divine blessing to guide the Bellkeepers deeper into the Sunken Bell. Its power endures until the expedition ends.</p>
-        <div class="boon-run-wallet">
-          <span>Purse: <b>${runWallet.crystal}</b> Crystal</span>
-          <span>·</span>
-          <span>Party: <b>${battle.living().length}/${battle.heroes.length}</b> Standing</span>
-          <span>·</span>
-          <span>Elapsed: <b>${formatTime(battle.time)}</b></span>
-        </div>
+        <p class="result-banner">${t('result.floor.clear', { n: battle.floor })}</p>
+        <h2 id="result-title" class="boon-modal-title">${t('boon.choose')}</h2>
+        <p class="boon-modal-subtitle">${t('boon.choose.sub')}</p>
+        <p class="boon-run-wallet">${t('boons.purse', { n: runWallet.crystal })} · ${t('battle.standing', { n: battle.living().length, total: battle.heroes.length })} · ${formatTime(battle.time)}</p>
       </header>
-      ${!offeredBoons.length ? '<button id="next-floor" class="gold-button">All boons collected · descend</button>' : ''}
-      <div class="boon-draft-grid">
-        ${cardsHtml}
-      </div>
-      <footer class="boon-modal-footer">
-        <button id="result-town" class="secondary-button">Abandon Run & Return to Emberhollow</button>
-      </footer>
+      ${!offeredBoons.length ? `<button id="next-floor" class="btn primary">${t('boon.allcollected')}</button>` : ''}
+      <div class="boon-draft-grid">${cardsHtml}</div>
+      <footer class="boon-modal-footer"><button id="result-town" class="btn">${t('boon.abandon')}</button></footer>
     </div>`);
     animateBoonDraft();
   } else {
     const outcomeClass = won ? (moreWaves ? 'wave-clear' : 'victory') : 'defeat';
-    const crestIcon = won ? (moreWaves ? '⚔️' : '🏆') : '💀';
-    const eyebrowText = moreWaves ? `✦ STAGE ${battle.stage + 1} / ${battle.stageCount} CLEARED ✦` : (won ? '✦ EXPEDITION COMPLETE · VICTORY ✦' : '✦ EXPEDITION LOST · SLAIN IN COMBAT ✦');
-    const titleText = won ? (moreWaves ? 'Keep moving.' : 'Bring the fire home.') : 'Rally. Adapt. Return.';
-    const goldDisplay = won ? (moreWaves ? `${battle.gold}g` : `${battle.gold + (battle.mode === 'adventure' ? zone.reward : 0)}g`) : '0g';
-    const goldLabel = moreWaves ? 'CARRIED · NOT BANKED' : 'GOLD BANKED';
-
-    const xpCardsHtml = experienceRewards.length ? `
-      <section class="xp-results">
-        <div class="xp-section-header">
-          <h3>Hero experience banked</h3>
-          <span class="xp-section-tag">${experienceRewards.length} Bellkeepers</span>
-        </div>
-        <div class="xp-cards-grid">
-          ${experienceRewards.map(r => {
-            const isLevelUp = r.after > r.before;
-            const hero = ROSTER[r.id];
-            const roleIcon = hero.classId === 'warrior' ? '🛡️' : hero.classId === 'healer' ? '✨' : hero.classId === 'wizard' ? '🔮' : hero.classId === 'rogue' ? '🗡️' : '🏹';
-            return `<p class="xp-card ${isLevelUp ? 'leveled-up' : ''}" data-xp-kind="${r.kind}">
-              <span class="xp-hero-ident">
-                <span class="xp-hero-icon">${roleIcon}</span>
-                <span class="xp-hero-info">
-                  <b class="xp-hero-name">${hero.name} · ${r.kind === 'bench' ? 'BENCH' : 'ACTIVE'}</b>
-                  <span class="xp-role-badge ${r.kind}">${r.kind === 'bench' ? 'BENCH' : 'ACTIVE'}</span>
-                </span>
-              </span>
-              <span class="xp-gain-group">
-                <span class="xp-points">+${r.xp} XP${r.bonus ? ` <span class="xp-catchup">(catch-up +${r.bonus})</span>` : ''}</span>
-                <span class="xp-level-badge ${isLevelUp ? 'lvl-glow' : ''}">
-                  ${isLevelUp ? `⭐ LEVEL UP ${r.before} → ${r.after}` : `Lv.${r.after}`}
-                </span>
-              </span>
-            </p>`;
-          }).join('')}
-        </div>
-        <small class="xp-footnote">Hero tumbang mendapat 60% XP. Bonus stat baru aktif expedition berikutnya. ${QUESTS.filter(q=>questProgress(profile,q).ready).length} quest siap diklaim di town.</small>
-      </section>` : '';
-
+    const banner = moreWaves ? t('result.banner.wave', { n: battle.stage + 1, total: battle.stageCount }) : won ? t('result.banner.win') : t('result.banner.lose');
+    const titleText = won ? (moreWaves ? t('result.title.wave') : t('result.title.win')) : t('result.title.lose');
+    const goldDisplay = won ? (moreWaves ? battle.gold : battle.gold + (battle.mode === 'adventure' ? zone.reward : 0)) : 0;
+    const xpRows = experienceRewards.map(r => {
+      const isLevelUp = r.after > r.before;
+      const hero = ROSTER[r.id];
+      return `<p class="xp-card ${isLevelUp ? 'leveled-up' : ''}" data-xp-kind="${r.kind}"><img src="${portrait(hero.classId)}" alt=""/><span class="xp-hero-info"><b class="xp-hero-name">${hero.name}</b><small class="xp-role-badge ${r.kind}">${r.kind === 'bench' ? t('result.bench') : t('result.active')}</small></span><span class="xp-points">+${r.xp} EXP${r.bonus ? ` <small class="xp-catchup">(+${r.bonus})</small>` : ''}</span><span class="xp-level-badge ${isLevelUp ? 'lvl-glow' : ''}">${isLevelUp ? t('result.levelup', { from: r.before, to: r.after }) : `LV ${r.after}`}</span></p>`;
+    }).join('');
+    const readyQuests = QUESTS.filter(q => questProgress(profile, q).ready).length;
     showResultScreen(`<div class="result-ceremony-modal ${outcomeClass}">
-      <div class="ceremony-corner tl"></div>
-      <div class="ceremony-corner tr"></div>
-      <div class="ceremony-corner bl"></div>
-      <div class="ceremony-corner br"></div>
-
-      <div class="ceremony-crest-container">
-        <div class="ceremony-crest ${outcomeClass}">
-          <span class="ceremony-crest-aura"></span>
-          <span class="ceremony-crest-icon">${crestIcon}</span>
-        </div>
-      </div>
-
-      <header class="ceremony-header">
-        <span class="eyebrow">${eyebrowText}</span>
+      <p class="result-banner" aria-hidden="true">${banner}</p>
+      <header class="win ceremony-header">
         <h2 id="result-title" class="ceremony-title">${titleText}</h2>
-        <div class="ceremony-divider"><span class="ceremony-div-gem">◆</span></div>
-        <p class="ceremony-desc">${description}</p>
-        ${recruited.length ? `<p class="recruit-notice">${recruited.join(' dan ')} bergabung dengan Bellkeepers. Rekan baru mengikuti level tengah party.</p>` : ''}
+        <p class="ceremony-desc">${escapeUI(description).replace(/\n/g, '<br>')}</p>
+        ${recruited.length ? `<p class="recruit-notice">${t('result.recruited', { names: recruited.join(' & ') })}</p>` : ''}
       </header>
-
-
-      <section class="result-summary" aria-label="Outcome summary">
-        <div class="result-stats">
-          <div class="stat-plaque">
-            <span class="stat-icon">🛡️</span>
-            <div class="stat-meta">
-              <b>${battle.living().length}/${battle.heroes.length}</b>
-              <small>SURVIVORS</small>
-            </div>
-          </div>
-          <div class="stat-plaque gold">
-            <span class="stat-icon">🪙</span>
-            <div class="stat-meta">
-              <b>${goldDisplay}</b>
-              <small>${goldLabel}</small>
-            </div>
-          </div>
-        </div>
+      <section class="win result-summary" aria-label="${t('result.summary')}">
+        <dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque gold"><dt>${moreWaves ? t('result.carried') : t('result.gold')}</dt><dd>${goldDisplay}G</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>
+        ${xpRows ? `<div class="xp-results">${xpRows}</div>` : ''}
+        ${readyQuests && !moreWaves && won ? `<p class="hint">${t('result.quests', { n: readyQuests })}</p>` : ''}
       </section>
-
-      <section class="result-details" id="result-details" aria-label="Expedition details" hidden>
-        <div class="result-details-stats">
-          <div class="stat-plaque">
-            <span class="stat-icon">⏱️</span>
-            <div class="stat-meta">
-              <b>${formatTime(battle.time)}</b>
-              <small>ELAPSED</small>
-            </div>
-          </div>
-        </div>
-        ${xpCardsHtml}
+      <section class="win result-details" id="result-details" aria-label="${t('result.details')}" hidden>
+        <p class="hint">${t('result.xp.note')}</p>
+        <dl class="stat-table"><div><dt>${t('battle.stat.damage')}</dt><dd>${Math.round(battle.damage).toLocaleString()}</dd></div><div><dt>${t('battle.stat.blocked')}</dt><dd>${Math.round(battle.blocked).toLocaleString()}</dd></div></dl>
       </section>
-
-      <button id="result-details-toggle" class="secondary-button result-details-toggle" type="button" aria-controls="result-details" aria-expanded="false">Details</button>
-
       <div class="ceremony-actions">
-        ${moreWaves ? '<button id="next-wave" class="gold-button">Lanjut ke encounter berikutnya</button>' : '<button id="retry" class="secondary-button">Ulang expedition dari awal</button>'}
-        <button id="result-town" class="${moreWaves ? 'secondary-button' : 'gold-button'}">${moreWaves ? 'Abandon loot & pulang' : 'Kembali ke Emberhollow'}</button>
+        ${moreWaves ? `<button id="next-wave" class="btn primary">${t('result.next')} ▶</button>` : `<button id="retry" class="btn">${t('result.retry')}</button>`}
+        <button id="result-town" class="btn ${moreWaves ? '' : 'primary'}">${moreWaves ? t('result.abandon') : t('result.town')}</button>
+        <button id="result-details-toggle" class="btn result-details-toggle" type="button" aria-controls="result-details" aria-expanded="false">${t('result.details')}</button>
       </div>
-
-
     </div>`);
     const detailsToggle = resultScreen.querySelector<HTMLButtonElement>('#result-details-toggle');
     const detailsPanel = resultScreen.querySelector<HTMLElement>('#result-details');
@@ -1505,11 +1461,12 @@ async function presentResult() {
       const expanded = resultScreen.dataset.detailsOpen !== 'true';
       resultScreen.dataset.detailsOpen = String(expanded);
       detailsToggle.setAttribute('aria-expanded', String(expanded));
-      detailsToggle.textContent = expanded ? 'Back to result' : 'Details';
+      detailsToggle.textContent = expanded ? t('result.details.back') : t('result.details');
       if (detailsPanel) detailsPanel.hidden = !expanded;
       if (!expanded) resultScreen.scrollTop = 0;
     });
-
+    if (won && !moreWaves) sound.play('fanfare'); else if (!won) sound.play('defeat');
+    if (experienceRewards.some(r => r.after > r.before)) window.setTimeout(() => sound.play('levelup'), 1300);
     animateCeremony();
   }
   $('next-wave')?.addEventListener('click', () => {
@@ -1535,42 +1492,6 @@ async function presentResult() {
     void nextFloor();
   }));
   $('next-floor')?.addEventListener('click',()=>{closeWithoutResume();void nextFloor();});
-  resultScreen.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
-    const item = buyRunItem(runWallet, el.dataset.runBuy!);
-    if (!item) return;
-    if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
-    if (item.id === 'run-upgrade') battle.power *= 1.1;
-    if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
-    closeWithoutResume();
-    updateExpedition();
-    if (battle.mode === 'endless' && battle.status === 'paused') battle.pause();
-    frame(1);
-  }));
-  resultScreen.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
-    const item = buyRunItem(runWallet, el.dataset.runBuy!);
-    if (!item) return;
-    if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
-    if (item.id === 'run-upgrade') battle.power *= 1.1;
-    if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
-    closeWithoutResume();
-    updateExpedition();
-    if (battle.mode === 'endless' && battle.status === 'paused') battle.pause();
-    frame(1);
-  }));
-  resultScreen.querySelector('[data-open-run-shop]')?.addEventListener('click', () => {
-    const shop = document.createElement('section');
-    shop.className = 'run-shop-modal';
-    shop.innerHTML = `<h3>Journey shop · ${runWallet.crystal} Crystal</h3>${CHALLENGE_SHOP.map(item => `<button class="secondary-button" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${item.cost} RUN</button>`).join('')}`;
-    resultScreen.querySelector('[data-open-run-shop]')?.replaceWith(shop);
-    shop.querySelectorAll<HTMLElement>('[data-run-buy]').forEach(el => el.addEventListener('click', () => {
-      const item = buyRunItem(runWallet, el.dataset.runBuy!);
-      if (!item) return;
-      if (item.id === 'run-heal') battle.heroes.forEach(hero => battle.heal(hero, 130));
-      if (item.id === 'run-upgrade') battle.power *= 1.1;
-      if (item.id === 'run-reroll') offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 104729);
-      closeWithoutResume(); updateExpedition(); frame(1);
-    }));
-  });
   $('retry')?.addEventListener('click', () => {
     const mode = battle.mode, floor = battle.mode === 'endless' ? 1 : battle.floor;
     runBoons = [];
@@ -1637,7 +1558,7 @@ function restoreEncounter(savedEncounter: NonNullable<typeof encounter>) {
   recorded = frozen.settled;
   townState.rogueSetup = battle.rogueBuild ? structuredClone(battle.rogueBuild) : townState.rogueSetup;
   scene.replace(battle); makeUnits(); updateExpedition(); showReady();
-  $('ready-copy').textContent = 'Resumes from encounter start with saved HP, supplies and RNG. Not a mid-frame save.';
+  $('ready-copy').textContent = t('ready.resume');
   if (frozen.settled) result();
 }
 async function clearEncounter() {
@@ -1682,8 +1603,8 @@ async function leaveSafely(action: () => void | Promise<void>) {
   if (inTown) { closeWithoutResume(); await action(); return; }
   const hasCommander = Boolean(commander.document);
   openModal(hasCommander
-    ? '<h2 id="modal-title">Leave this encounter?</h2><p>Save & Suspend keeps the encounter-start checkpoint (same HP, supplies and RNG). Abandon ends this run without a new reward. Opening this menu changes nothing.</p><button id="suspend-run" class="gold-button">Save & Suspend</button><button id="abandon-run" class="secondary-button">Abandon run</button><button data-close class="secondary-button">Cancel</button>'
-    : '<h2 id="modal-title">Leave this encounter?</h2><p>There is no saved Commander checkpoint. Abandon ends this run without a reward; Cancel keeps the in-memory run active.</p><button id="abandon-run" class="secondary-button">Abandon run</button><button data-close class="secondary-button">Cancel</button>');
+    ? `<h2 id="modal-title">${t('leave.title')}</h2><p>${t('leave.copy')}</p><nav class="menu-list"><button id="suspend-run" class="menu-item">${t('leave.suspend')}</button><button id="abandon-run" class="menu-item">${t('leave.abandon')}</button><button data-close class="menu-item">${t('common.cancel')}</button></nav>`
+    : `<h2 id="modal-title">${t('leave.title')}</h2><p>${t('leave.copy.none')}</p><nav class="menu-list"><button id="abandon-run" class="menu-item">${t('leave.abandon')}</button><button data-close class="menu-item">${t('common.cancel')}</button></nav>`);
   $('suspend-run')?.addEventListener('click', async () => {
     if (!commander.document || commander.busy) return;
     if (await persist('auto', doc => { if (commander.mode !== 'story') { const state=commander.mode==='raid'?doc.raid:doc.rogue; if (state.activeRun) state.activeRun.status='suspended'; } })) { closeWithoutResume(); inTown = true; await action(); }
@@ -1709,6 +1630,10 @@ function exportCommander() {
   download(commander.dirty || pendingSettlement ? { kind:'gridbound-recovery', document:commander.document, pendingProfile:profile, pendingEncounter:encounter } : commander.document, 'Gridbound-Commander.json');
 }
 import { STORY_CHOICES, narrativeChoice, epilogue } from './game/narrative';
+function chapterChronicle() {
+  if (!profile.cleared.length) return '';
+  return `<section class="journal-chronicle"><h3>${t('journal.chronicle', { n: profile.cleared.length })}</h3>${[...profile.cleared].sort((a, b) => a - b).map(i => `<details class="journal-entry-card"><summary>CH ${i + 1} · ${escapeUI(CAMPAIGN[i].name)}</summary><button class="btn journal-replay" data-replay-chapter="${i}">▶ ${t('journal.watch')}</button><p>${escapeUI(CAMPAIGN[i].intro).replace(/\n/g, '<br>')}</p><p>${escapeUI(CAMPAIGN[i].outro).replace(/\n/g, '<br>')}</p></details>`).join('')}</section>`;
+}
 async function storyJournal() {
   if (commander.document && commander.mode !== 'story') {
     commander.mode = 'story';
@@ -1719,16 +1644,16 @@ async function storyJournal() {
  const state=profile.narrative??{};
  const scenes=STORY_CHOICES.filter(s=>Array.from({length:s.chapter},(_,i)=>i).every(i=>profile.cleared.includes(i)));
  const ending=epilogue(state,profile.cleared);
- openModal(`<h2 id="modal-title">Story journal</h2><p>Memory, loss, grief. Pilihan mengubah kehidupan kecil warga, bukan ending atau hadiah.</p>${scenes.length?'':'<p>Catatan pilihan pertama tersedia setelah Chapter 3. Story tetap linear.</p>'}${scenes.map(s=>`<section><h3>${s.title}</h3><p>${s.text}</p>${state[s.id]?`<p>${s.options.find(o=>o.id===state[s.id])?.outcome}</p>`:s.options.map(o=>`<button class="secondary-button" data-story-choice="${s.id}" data-story-option="${o.id}">${o.label}</button>`).join('')+`<button class="secondary-button" data-story-choice="${s.id}" data-story-option="${s.options[0].id}">Skip — ${s.options[0].label}</button>`}</section>`).join('')}${ending.map(text=>`<p>${text}</p>`).join('')}<button data-close>Back</button>`);
+ openModal(`<h2 id="modal-title">${t('journal.title')}</h2><p class="hint">${t('journal.intro')}</p>${scenes.length?'':`<p>${t('journal.locked')}</p>`}${scenes.map(s=>`<section class="journal-scene"><h3>${s.title}</h3><p>${s.text}</p>${state[s.id]?`<p class="journal-outcome">${s.options.find(o=>o.id===state[s.id])?.outcome}</p>`:`<nav class="menu-list">${s.options.map(o=>`<button class="menu-item" data-story-choice="${s.id}" data-story-option="${o.id}">${o.label}</button>`).join('')}<button class="menu-item" data-story-choice="${s.id}" data-story-option="${s.options[0].id}">${t('journal.skip', { label: s.options[0].label })}</button></nav>`}</section>`).join('')}${chapterChronicle()}${ending.map(text=>`<p>${text}</p>`).join('')}<button class="btn primary" data-close>${t('common.back')}</button>`);
+ modal.querySelectorAll<HTMLElement>('[data-replay-chapter]').forEach(button=>button.onclick=()=>{ closeWithoutResume(); void chapterIntro(Number(button.dataset.replayChapter)); });
  modal.querySelectorAll<HTMLElement>('[data-story-choice]').forEach(button=>button.onclick=async()=>{
   if(commander.busy||commander.stale)return;
   profile.narrative??={};
   if(narrativeChoice(profile.narrative,button.dataset.storyChoice!,button.dataset.storyOption!,profile.cleared)&&await persist())await storyJournal();
  });
 }
-const journalButton=document.createElement('button');journalButton.textContent='Story journal';journalButton.className='secondary-button';journalButton.id='story-journal';journalButton.onclick=()=>{void storyJournal();};document.querySelector('.header-tools')!.prepend(journalButton);
 async function profilesMenu() {
-  openModal('<h2 id="modal-title">Commander profiles</h2><p>Loading local profiles…</p>');
+  openModal(`<h2 id="modal-title">${t('profiles.title')}</h2><p>${t('profiles.loading')}</p>`);
   try {
     const documents = await commander.open();
     if (!commander.document && documents.length > 0) {
@@ -1737,32 +1662,37 @@ async function profilesMenu() {
     }
     const current = commander.document;
     const slots = current ? (commander.mode === 'story' ? current.story : commander.mode === 'raid' ? current.raid : current.rogue).slots : [];
-    openModal(`<h2 id="modal-title">Commander profiles</h2><p>3 profiles. Each mode: 3 manual slots + 1 auto. Shared Challenge wallet belongs only to this Commander.</p>${documents.map((doc,index) => `<p><b>${escapeUI(doc.name)}</b> · Chapter ${doc.story.slots[3].state?.cleared.length ?? 0} · ${doc.shared.bankCrystal} Crystal · revision ${doc.revision}<br><button data-commander="${index}" class="secondary-button">${current?.commanderId === doc.commanderId ? 'Current Commander' : 'Switch Commander'}</button></p>`).join('') || '<p>No Commander yet. Create one below; no legacy data is migrated automatically.</p>'}<label>Commander name <input id="commander-name" maxlength="32" value="${escapeUI(current?.name ?? 'Commander')}"></label><button id="new-commander" class="gold-button" ${documents.length >= 3 ? 'disabled' : ''}>New Commander</button>${current ? '<button id="rename-commander" class="secondary-button">Rename current</button><button id="export-commander" class="secondary-button">Export Commander / recovery</button><button id="delete-commander" class="secondary-button">Delete current…</button><button id="save-retry" class="secondary-button">Retry save</button>' : ''}<button id="legacy-preview" class="secondary-button">Preview legacy copy</button>${current ? `<h3>${commander.mode} slots</h3><p>Loading never restores an older shared wallet or receipt ledger. Challenge bookmarks show builds only; Continue latest resumes the authoritative checkpoint.</p>${slots.map(slot => `<p><b>${slot.slotId}</b> · ${slot.status} · ${slot.savedAt ? new Date(slot.savedAt).toLocaleString() : 'empty'}<br>${slot.slotId !== 'auto' ? `<button data-save-slot="${slot.slotId}" class="secondary-button">Save checkpoint</button>` : ''}<button data-load-slot="${slot.slotId}" class="secondary-button" ${!slot.state ? 'disabled' : ''}>Preview / load</button></p>`).join('')}<button id="continue-latest" class="gold-button">Continue latest</button>` : ''}<p id="profile-error" role="status">${escapeUI(commander.error || commander.repository?.warning || '')}</p><button data-close class="secondary-button">Cancel / close</button>`);
+    openModal(`<h2 id="modal-title">${t('profiles.title')}</h2><p class="hint">${t('profiles.intro')}</p>
+      <div class="save-files">${documents.map((doc,index) => `<div class="save-file ${current?.commanderId === doc.commanderId ? 'current' : ''}"><div><b>${escapeUI(doc.name)}</b><small>${t('profiles.file', { ch: doc.story.slots[3].state?.cleared.length ?? 0, crystal: doc.shared.bankCrystal, rev: doc.revision })}</small></div><button data-commander="${index}" class="btn">${current?.commanderId === doc.commanderId ? t('profiles.current') : t('profiles.switch')}</button></div>`).join('') || `<p>${t('profiles.empty')}</p>`}</div>
+      <label class="name-field">${t('profiles.name')} <input id="commander-name" maxlength="32" value="${escapeUI(current?.name ?? 'Commander')}"></label>
+      <div class="departure-actions"><button id="new-commander" class="btn primary" ${documents.length >= 3 ? 'disabled' : ''}>${t('profiles.new')}</button>${current ? `<button id="rename-commander" class="btn">${t('profiles.rename')}</button><button id="export-commander" class="btn">${t('profiles.export')}</button><button id="delete-commander" class="btn danger">${t('profiles.delete')}</button><button id="save-retry" class="btn">${t('result.unsaved.retry')}</button>` : ''}<button id="legacy-preview" class="btn">${t('profiles.legacy')}</button></div>
+      ${current ? `<h3 class="subheading">${t('profiles.slots', { mode: modeName(commander.mode) })}</h3><p class="hint">${t('profiles.slots.hint')}</p><div class="save-files">${slots.map(slot => `<div class="save-file"><div><b>${slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) })}</b><small>${t(`profiles.status.${slot.status}` as never)} · ${slot.savedAt ? new Date(slot.savedAt).toLocaleString() : t('profiles.emptyslot')}</small></div><span>${slot.slotId !== 'auto' ? `<button data-save-slot="${slot.slotId}" class="btn">${t('profiles.save')}</button>` : ''}<button data-load-slot="${slot.slotId}" class="btn" ${!slot.state ? 'disabled' : ''}>${t('profiles.load')}</button></span></div>`).join('')}</div><button id="continue-latest" class="btn primary">${t('profiles.continue')}</button>` : ''}
+      <p id="profile-error" role="status">${escapeUI(gameText(commander.error || commander.repository?.warning || ''))}</p><button data-close class="btn">${t('common.close')}</button>`);
     const attempt = async (task: () => Promise<void>) => { try { await task(); } catch(error) { $('profile-error').textContent = error instanceof Error ? error.message : String(error); } };
     modal.querySelectorAll<HTMLElement>('[data-commander]').forEach(button => button.onclick = () => { const target = documents[Number(button.dataset.commander)]; if (target.commanderId !== current?.commanderId) void leaveSafely(() => { activateCommander(target); closeWithoutResume(); }); else closeWithoutResume(); });
     $('new-commander').onclick = () => { const name = $<HTMLInputElement>('commander-name').value; void leaveSafely(() => attempt(async () => { activateCommander(await commander.create(name)); closeWithoutResume(); })); };
-    $('rename-commander')?.addEventListener('click', () => { const name = $<HTMLInputElement>('commander-name').value.trim().slice(0,32); void attempt(async () => { if (!name) throw new Error('Enter a name.'); if (await persist('auto', doc => { doc.name=name; })) await profilesMenu(); }); });
+    $('rename-commander')?.addEventListener('click', () => { const name = $<HTMLInputElement>('commander-name').value.trim().slice(0,32); void attempt(async () => { if (!name) throw new Error(t('profiles.name.required')); if (await persist('auto', doc => { doc.name=name; })) await profilesMenu(); }); });
     $('export-commander')?.addEventListener('click',exportCommander);
     $('save-retry')?.addEventListener('click', () => { if (pendingSettlement) { presentingResult=false; result(); } else void persist().then(() => profilesMenu()); });
     $('delete-commander')?.addEventListener('click', () => {
-      openModal(`<h2 id="modal-title">Delete ${escapeUI(current!.name)}?</h2><p>This removes all Story, Rogue and Raid slots, active runs, ${current!.shared.bankCrystal} bank Crystal and ${current!.shared.settlementReceipts.length} receipts. Export first. Type DELETE to confirm.</p><input id="delete-word" aria-label="Type DELETE"><button id="delete-confirm" class="secondary-button" disabled>Delete permanently</button><button data-close class="secondary-button">Cancel</button>`);
+      openModal(`<h2 id="modal-title">${t('profiles.delete.title', { name: escapeUI(current!.name) })}</h2><p>${t('profiles.delete.copy', { crystal: current!.shared.bankCrystal, receipts: current!.shared.settlementReceipts.length })}</p><input id="delete-word" aria-label="DELETE"><button id="delete-confirm" class="btn danger" disabled>${t('profiles.delete.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
       $('delete-word').oninput = () => { $<HTMLButtonElement>('delete-confirm').disabled = $<HTMLInputElement>('delete-word').value !== 'DELETE'; };
       $('delete-confirm').onclick = async () => { if (!inTown || pendingSettlement || commander.stale) return; try { await commander.flush(); await commander.repository!.remove(current!.commanderId,commander.document!.revision); commander.document=undefined; profile=createProfile(); showTown(); await profilesMenu(); } catch(error) { commander.error=String(error); storageStatus(); } };
     });
     $('legacy-preview').onclick = () => {
       let raw: string | null = null; try { raw=store.getItem('gridbound.v3'); } catch { /* source remains protected */ }
-      openModal(`<h2 id="modal-title">Legacy copy preview</h2><p>Story Gold ${saved.profile.gold}; roster ${saved.profile.roster.length}; active ${saved.profile.storyActive.join(', ')}. Challenge bank resets to 0. Legacy bytes remain unchanged. Existing jobs and gear stay Classic-compatible; no R1 hero-path remapping is claimed.</p><p>${escapeUI(saved.warning)}</p><button id="legacy-export" class="secondary-button">Export original bytes</button><button id="legacy-confirm" class="gold-button" ${!raw || saved.readOnly || documents.length>=3 ? 'disabled' : ''}>Create R1 copy (explicit opt-in)</button><button data-close class="secondary-button">Cancel</button>`);
+      openModal(`<h2 id="modal-title">${t('profiles.legacy.title')}</h2><p>${t('profiles.legacy.copy', { gold: saved.profile.gold, roster: saved.profile.roster.length })}</p><p>${escapeUI(gameText(saved.warning))}</p><button id="legacy-export" class="btn">${t('profiles.legacy.export')}</button><button id="legacy-confirm" class="btn primary" ${!raw || saved.readOnly || documents.length>=3 ? 'disabled' : ''}>${t('profiles.legacy.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
       $('legacy-export').onclick = () => download(raw ?? '', 'Gridbound-original-v3.json');
       $('legacy-confirm').onclick = () => { void leaveSafely(async () => { const candidate=copyLegacyToCommander(saved.profile,'Legacy copy'); candidate.legacySource=raw!; try { activateCommander(await commander.create('Legacy copy',candidate)); closeWithoutResume(); } catch(error) { commander.error=String(error); storageStatus(); } }); };
     };
-    modal.querySelectorAll<HTMLElement>('[data-save-slot]').forEach(button => button.onclick = () => { void attempt(async () => { if (!inTown && encounter && !pendingSettlement) { const frozen=structuredClone(encounter); await persist(button.dataset.saveSlot as SlotId, doc => { const state=commander.mode==='story'?doc.story:commander.mode==='raid'?doc.raid:doc.rogue; const auto=state.slots[3]; const index=state.slots.findIndex(slot=>slot.slotId===button.dataset.saveSlot); state.slots[index]=structuredClone({...auto,slotId:button.dataset.saveSlot as SlotId}); doc.encounters ??={}; doc.encounters[commander.mode]=frozen; }); } else await persist(button.dataset.saveSlot as SlotId); await profilesMenu(); }); });
+    modal.querySelectorAll<HTMLElement>('[data-save-slot]').forEach(button => button.onclick = () => { void attempt(async () => { if (!inTown && encounter && !pendingSettlement) { const frozen=structuredClone(encounter); await persist(button.dataset.saveSlot as SlotId, doc => { const state=commander.mode==='story'?doc.story:commander.mode==='raid'?doc.raid:doc.rogue; const auto=state.slots[3]; const index=state.slots.findIndex(slot=>slot.slotId===button.dataset.saveSlot); state.slots[index]=structuredClone({...auto,slotId:button.dataset.saveSlot as SlotId}); doc.encounters ??={}; doc.encounters[commander.mode]=frozen; }); } else await persist(button.dataset.saveSlot as SlotId); sound.play('save'); await profilesMenu(); }); });
     modal.querySelectorAll<HTMLElement>('[data-load-slot]').forEach(button => button.onclick = () => {
       const slot=slots.find(item=>item.slotId===button.dataset.loadSlot)!;
-      openModal(`<h2 id="modal-title">${slot.slotId} preview</h2><pre style="max-height:14rem;overflow:auto;white-space:pre-wrap">${escapeUI(JSON.stringify(slot.state,null,2))}</pre><p>Challenge run bookmarks cannot rewind rewards. Story load replaces only Story state.</p><button id="load-confirm" class="gold-button">Load selected slot</button><button data-close class="secondary-button">Cancel</button><p id="load-error" role="status"></p>`);
-      $('load-confirm').onclick = async () => { if (!inTown || pendingSettlement) { $('load-error').textContent='Save & Suspend or abandon before loading.'; return; } try { profile=await commander.loadSlot(slot.slotId); activateCommander(commander.document!,commander.mode); closeWithoutResume(); } catch(error) { $('load-error').textContent=String(error); } };
+      openModal(`<h2 id="modal-title">${t('profiles.preview', { slot: slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) }) })}</h2><pre class="slot-preview">${escapeUI(JSON.stringify(slot.state,null,2))}</pre><p class="hint">${t('profiles.preview.hint')}</p><button id="load-confirm" class="btn primary">${t('profiles.load.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button><p id="load-error" role="status"></p>`);
+      $('load-confirm').onclick = async () => { if (!inTown || pendingSettlement) { $('load-error').textContent=t('profiles.load.blocked'); return; } try { profile=await commander.loadSlot(slot.slotId); activateCommander(commander.document!,commander.mode); closeWithoutResume(); } catch(error) { $('load-error').textContent=String(error); } };
     });
-    $('continue-latest')?.addEventListener('click', () => { const savedEncounter=commander.document?.encounters?.[commander.mode]; if (!savedEncounter) { $('profile-error').textContent='No checkpoint in this mode. Depart from town to begin.'; return; } closeWithoutResume(); restoreEncounter(savedEncounter); });
-  } catch(error) { console.error('PROFILES_MENU_ERROR:', error); openModal(`<h2 id="modal-title">Protected storage</h2><p>${escapeUI(String(error))}</p><p>No existing save was overwritten. Refresh with a compatible build.</p>`); }
+    $('continue-latest')?.addEventListener('click', () => { const savedEncounter=commander.document?.encounters?.[commander.mode]; if (!savedEncounter) { $('profile-error').textContent=t('profiles.nocheckpoint'); return; } closeWithoutResume(); restoreEncounter(savedEncounter); });
+  } catch(error) { console.error('PROFILES_MENU_ERROR:', error); openModal(`<h2 id="modal-title">${t('profiles.protected')}</h2><p>${escapeUI(String(error))}</p><p>${t('profiles.protected.copy')}</p>`); }
 }
 commander.onStatus = () => { storageStatus(); if (commander.stale && battle.status === 'fighting') battle.pause(); };
 window.addEventListener('beforeunload', () => {
@@ -1772,16 +1702,47 @@ if (typeof navigator !== 'undefined' && !navigator.webdriver) {
   window.addEventListener('beforeunload', event => { if (commander.busy || commander.dirty || pendingSettlement) event.preventDefault(); });
 }
  $('home').addEventListener('click', () => {
-  if (inTown) showTown('camp');
+  if (inTown && townState.tab === 'camp') showTitleScreen();
+  else if (inTown) showTown('camp');
   else navigateTown('camp');
 });
 $('title-enter').addEventListener('click', enterEmberhollow);
 $('title-profiles').addEventListener('click', () => { void profilesMenu(); });
 $('title-journal').addEventListener('click', () => { void storyJournal(); });
 $('title-settings').addEventListener('click', settings);
+$('menu-button').addEventListener('click', () => { sound.play('confirm'); void navigateTown('more'); });
+document.addEventListener('click', event => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-lang]');
+  if (!button || button.dataset.lang === lang()) return;
+  if (!inTown || pendingSettlement || commander.busy) { storageStatus(); return; }
+  const next = button.dataset.lang as Lang;
+  void commander.flush().then(saved => {
+    if (!saved) { storageStatus(); return; }
+    const apply = () => { setLang(next); location.reload(); };
+    if (commander.document && !commander.repository?.persistent) {
+      openModal(`<h2 id="modal-title">${t('lang.session.title')}</h2><p>${t('lang.session.copy')}</p><button id="lang-export" class="btn">${t('profiles.export')}</button><button id="lang-anyway" class="btn danger">${t('lang.session.confirm')}</button><button data-close class="btn primary">${t('common.cancel')}</button>`, false);
+      $('lang-export').addEventListener('click', exportCommander);
+      $('lang-anyway').addEventListener('click', apply);
+      return;
+    }
+    apply();
+  });
+});
+document.addEventListener('pointerdown', event => {
+  const target = (event.target as HTMLElement).closest('button,[role="button"]');
+  if (target && !(target as HTMLButtonElement).disabled && !target.closest('#unit-layer')) sound.play('cursor');
+}, true);
+const titleScreenEl = $('title-screen');
+const leavePressPhase = () => { if (!titleScreenEl.classList.contains('press-phase')) return false; titleScreenEl.classList.remove('press-phase'); sound.unlock(); sound.play('confirm'); requestAnimationFrame(() => $('title-enter').focus({ preventScroll: true })); return true; };
+titleScreenEl.addEventListener('pointerdown', event => { if (titleScreenEl.classList.contains('press-phase')) { event.preventDefault(); leavePressPhase(); } });
 $('retreat').addEventListener('click', () => navigateTown());
+$('battle-screen').addEventListener('click', event => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-run-buy]');
+  if (button && !button.disabled && !inTown) buyForRun(button.dataset.runBuy!);
+});
 document.querySelectorAll<HTMLButtonElement>('.battle-view-tabs [data-battle-view]').forEach(button => button.addEventListener('click', () => setBattleView(button.dataset.battleView as 'arena' | 'hero' | 'log')));
 $('battle-detail-resume').addEventListener('click', () => setBattleView('arena'));
+$('focus-bar').addEventListener('click', () => setBattleView('hero'));
 // Expedition and preparation routes are handled by the Town screen's delegated actions.
 $('start').addEventListener('click', begin);
 $('pause').addEventListener('click', pauseMenu);
@@ -1801,6 +1762,15 @@ window.addEventListener('keydown', e => {
   if (e.repeat || (e.target as HTMLElement).matches('input,textarea,select,[contenteditable="true"]')) return;
   const titleScreen = $('title-screen');
   if (titleScreen && !titleScreen.hidden) {
+    if (leavePressPhase()) { e.preventDefault(); return; }
+    if (e.code === 'ArrowDown' || e.code === 'ArrowUp') {
+      const items = Array.from(titleScreen.querySelectorAll<HTMLButtonElement>('.title-menu-item'));
+      const index = items.indexOf(document.activeElement as HTMLButtonElement);
+      items[(index + (e.code === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
+      sound.play('cursor');
+      e.preventDefault();
+      return;
+    }
     if (e.code === 'Enter' || e.code === 'Space') {
       const active = document.activeElement;
       const otherButton = active && active !== $('title-enter') && active.tagName === 'BUTTON';
@@ -1824,7 +1794,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyH') battle.potion();
   if (e.code === 'KeyG') battle.guard();
   if (e.code === 'KeyR') battle.ultimate();
-  if (e.code === 'Escape') { moveMode = false; renderInspector(); }
+  if (e.code === 'Escape') { moveMode = false; closeSkillPicker(); renderInspector(); }
   if (/^Digit[1-9]$/.test(e.code)) { const h = battle.heroes.find(h => h.slot === Number(e.code.slice(-1)) - 1); if (h) { sound.unlock(); tapHero(h.id); } }
   if (e.code === 'KeyQ' || e.code === 'KeyE') cycleSkill(battle.selected, e.code === 'KeyE' ? 1 : -1);
 });
@@ -1832,10 +1802,11 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && !in
 scene = new BattleScene(battle, sound, frame);
 scene.reducedMotion = !profile.motion;
 document.body.classList.toggle('reduced-motion', !profile.motion);
-new Phaser.Game({ type: Phaser.AUTO, parent: 'game-canvas', width: ARENA.width, height: ARENA.height, backgroundColor: '#152d2c', pixelArt: true, roundPixels: true, antialias: false, scene: [scene], scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, input: { activePointers: 3 }, audio: { noAudio: true }, render: { preserveDrawingBuffer: true }, banner: false });
+new Phaser.Game({ type: Phaser.AUTO, parent: 'game-canvas', width: ARENA.width, height: ARENA.height, backgroundColor: '#0e1e19', pixelArt: true, roundPixels: true, antialias: false, scene: [scene], scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, input: { activePointers: 3 }, audio: { noAudio: true }, render: { preserveDrawingBuffer: true }, banner: false });
 initialized = true;
 showTown();
 if (typeof navigator !== 'undefined' && !navigator.webdriver) {
+  titleScreenEl.classList.add('press-phase');
   showTitleScreen();
 }
 void commander.open().then(documents => { if (documents.length > 0) { const latest = [...documents].sort((a, b) => b.lastPlayed - a.lastPlayed)[0]; activateCommander(latest); } }).catch(error => { commander.error=String(error); storageStatus(); });
@@ -1845,5 +1816,5 @@ if (import.meta.env.DEV) Object.assign(window, { gridbound: {
   get runBoons() { return runBoons; },
   setRunBoons: (b: string[]) => { runBoons = [...b]; battle.boons = [...b]; updateExpedition(); },
   step: (seconds: number) => { for (let t = 0; t < Math.min(600, Math.max(0, seconds)); t += 1 / 60) battle.tick(1 / 60); frame(1); },
-  boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray,
+  boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro,
 } });

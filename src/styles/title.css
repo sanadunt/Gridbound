@@ -1,0 +1,34 @@
+.title-screen { position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; overflow: hidden; background: #08110f; transition: opacity 0.25s; }
+.title-screen.dismissing { opacity: 0; }
+.title-backdrop { position: absolute; inset: 0; }
+.title-world-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(1.1) brightness(0.8); animation: title-pan 30s linear infinite alternate; }
+@keyframes title-pan { from { transform: scale(1.15) translateY(0); } to { transform: scale(1.15) translateY(-5%); } }
+.title-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 35%, transparent 20%, #08110fcc 75%), linear-gradient(180deg, #08110faa 0%, transparent 30%, #08110f 92%); }
+.title-content { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 24px 20px; }
+.title-brand { text-align: center; }
+.title-eyebrow { font-family: var(--text); font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--gold); letter-spacing: 3px; text-shadow: 0 1px 4px #000; }
+.title-logo {
+  margin: 10px 0;
+  font-family: var(--pixel);
+  font-size: clamp(30px, 9.5vw, 54px);
+  color: var(--gold);
+  letter-spacing: 2px;
+  text-shadow: 0 3px 0 #7e6734, 0 6px 0 #07120f, 0 0 26px #e5c68744;
+  animation: logo-glow 3s ease-in-out infinite;
+}
+@keyframes logo-glow { 50% { text-shadow: 0 3px 0 #7e6734, 0 6px 0 #07120f, 0 0 38px #e5c68777; } }
+.title-subtitle-wrap { display: flex; align-items: center; justify-content: center; gap: 10px; font-family: var(--pixel); font-size: 11px; color: #fff; text-shadow: 2px 2px 0 #000; letter-spacing: 2px; }
+.title-flourish { display: block; width: 40px; height: 3px; background: linear-gradient(90deg, transparent, var(--gold)); transform-origin: right; }
+.title-flourish.right { background: linear-gradient(90deg, var(--gold), transparent); transform-origin: left; }
+.title-press { display: none; margin: 0; font-family: var(--pixel); font-size: 14px; color: #fff; text-shadow: 3px 3px 0 #000; animation: blink 1.1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.title-menu { width: min(100%, 340px); padding: 8px; }
+.title-menu-item { width: 100%; }
+.title-lang { display: flex; gap: 6px; }
+.title-lang button { min-height: 36px; padding: 4px 12px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: #0e1e19cc; color: var(--ink-soft); font-size: 13px; }
+.title-lang button[aria-pressed="true"] { border-color: var(--gold-border); background: var(--gold-bg); color: var(--gold); }
+.title-footer { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 8px; padding: 10px 14px; font-size: 13px; color: var(--ink-dim); text-shadow: 2px 2px 0 #000; }
+.title-footer b { color: var(--gold); font-weight: 600; }
+.title-meta-info { display: flex; gap: 10px; }
+.title-screen.press-phase .title-press { display: block; }
+.title-screen.press-phase .title-menu, .title-screen.press-phase .title-lang { display: none; }

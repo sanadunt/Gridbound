@@ -5,7 +5,7 @@ for(const width of [390,768,1440]) await withBrowser(async({send,wait,evaluate,s
  await wait('Boolean(document.querySelector("#wallet"))');
  if (!await evaluate('Boolean(document.querySelector("#commander-name"))')) {
   if (await evaluate('Boolean(document.querySelector("#title-screen:not([hidden])"))')) await click('#title-profiles');
-  else { await click('.game-nav [data-facility="more"]'); await wait('Boolean(document.querySelector(".more-scene"))'); await click('.more-scene [data-open-action="profiles"]'); }
+  else { await click.nav('more'); await wait('Boolean(document.querySelector(".more-scene"))'); await click('.more-scene [data-open-action="profiles"]'); }
  }
  await wait('Boolean(document.querySelector("#commander-name"))');
  await evaluate('document.fonts.ready');

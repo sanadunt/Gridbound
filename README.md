@@ -25,16 +25,19 @@ npm ci
 npm run dev
 ```
 
-Use the local URL Vite prints. A new save opens in town with **Aldric (Warrior), Lyra (Healer), and Rowan (Archer)**. Begin at the war table, or prepare talents, two active skill slots, equipment and formation at the training yard.
+Use the local URL Vite prints. The title screen offers **English** or **Bahasa Indonesia** (also under Config; the game reloads to apply it). A new save opens in the village of Emberhollow with **Aldric (Warrior), Lyra (Healer), and Rowan (Archer)**.
+
+### Town
+
+Emberhollow is the hub: tap a building to open it — **Gate** (world map / story chapters), **Training Hall** (party), **Quests**, **Archive** (bestiary), **Merchant** (Crystal shop), **Hunters** (raid contracts), **Old Well** (roguelike), **Inn** (save files) and **Bell Tower** (journal). **MENU** in the top bar opens the classic main menu from anywhere in town.
 
 ### Controls
 
-- **Tap the character/sprite area labelled `TAP ↓ CD`**, not the small skill chip. This accelerates the current cooldown; rotating heroes helps manage fatigue.
-- The small chip **below** the sprite switches between the two equipped skills. The selected-character panel provides larger alternatives.
-- **Drag** a character to relocate or swap. A button-based relocation alternative is also available.
-- Read the enemy intent. Ground attacks stay on tiles; marked attacks follow their target. **Guard or interrupt** all-grid rituals.
-- `1–9`: tap the hero at that grid position. `Q/E`: switch skill. `G`: Party Guard. `H`: potion. `R`: ultimate. `Space`: pause when a button is not focused. `Escape`: close dialog/cancel move.
-- Two-finger tapping and touch dragging are supported. Mobile skill chips are 24 px tall; sprite tap targets are at least 44 px tall at tested 360/390 px widths, with no overlap.
+- **Tap a hero** on the battlefield to charge their skill gauge (the gold ATB-style bar in the party window). Rotate heroes as tap fatigue builds.
+- **Drag** a hero to another tile to dodge ground attacks (Status view has a button-based alternative).
+- Read the red enemy message box: ground attacks stay on tiles, marked attacks follow their target, all-grid rituals need **Guard** or an interrupt.
+- `1–9`: tap the hero at that grid position. `Q/E`: switch skill. `G`: Guard. `H`: potion. `R`: Ninefold Dawn. `B`: boons. `Space`: pause. `Escape`: close dialog/cancel move. Title screen: arrow keys + Enter.
+- All touch targets are at least 44 px; two-finger taps and touch dragging are supported.
 
 ## Included
 
@@ -48,6 +51,8 @@ Use the local URL Vite prints. A new save opens in town with **Aldric (Warrior),
 - **12 original monster silhouettes / 48 records** including ash/frost/auric variants; new moth, basilisk, crab and revenant opponents have authored intent sequences and counterplay.
 - **30 quests**: twelve hunts, six linked town requests, nine companion milestones and three endless milestones. Track objectives and manually claim gold, selected-hero XP and item rewards.
 - Twelve raid targets with variant selection, plus an escalating roguelike with **12 mechanical boons**, nonduplicating drafts and continued floors after all boons are collected.
+- Classic JRPG presentation: pixel-art village hub, per-act overworld maps, blue-window menus, hit-stop and screen flashes in battle, and an original victory fanfare.
+- Full English and Indonesian text, switchable in game.
 - Local procedural sprites, fonts and synthesized sound; no runtime backend, remote CDN or account required.
 
 Advanced promotion requires **campaign rank 4**; third jobs require rank 10 and their parent branch. Campaign rank rises on first clears; **individual hero levels rise through earned XP**. Respec refunds talent/job gold and skill points without resetting XP or equipment. Combat XP and hunt progress settle once on successful expedition/floor completion; downed participants receive 60% XP. Successful replays award XP/gold but never duplicate recruitment or first-clear bonuses.
@@ -95,7 +100,9 @@ The private repository does not itself create a public game URL. Deployment is a
 | `src/game/world.ts`, `story.ts` | Encounters, monster variants, boons, campaign narrative |
 | `src/game/profile.ts`, `src/game/commander.ts`, `src/game/commander-session.ts`, `src/game/save.ts` | Profile progression, Commander persistence, legacy migration, purchases, settlement, recruitment and respec |
 | `src/game/levels.ts`, `talents.ts`, `quests.ts` | XP curve, skill trees, quest definitions/objectives |
-| `src/ui/town.ts`, `src/main.ts` | Town/training/forge, journal, combat controls and dialogs |
+| `src/ui/town.ts`, `src/ui/world-map.ts`, `src/main.ts` | Town village and menus, world map, journal, combat controls and dialogs |
+| `src/styles/` | JRPG theme (windows, menus, battle HUD, results) |
+| `src/i18n/` | English/Indonesian UI strings and content translations |
 | `src/art/`, `src/render/`, `src/audio/` | Procedural visuals, Phaser renderer and Web Audio |
 | `data/database.json` | Regeneratable content database, including actual scaled encounter HP |
 | `docs/GDD-GRIDBOUND-V0.4.md` | Human-readable GDD for current runtime behavior, including modes, combat, story, saves, and verification limits |

@@ -12,7 +12,7 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
   try {
     profile = await mkdtemp(join(tmpdir(), 'gridbound-qa-'));
     const executable = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-    child = spawn(executable, ['--headless=new', '--mute-audio', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', 'about:blank'], { stdio: 'ignore' });
+    child = spawn(executable, ['--headless=new', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), '--mute-audio', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', 'about:blank'], { stdio: 'ignore' });
     let launchError;
     child.on('error', error => { launchError = error; });
     const deadline = Date.now() + 15000;
@@ -64,6 +64,36 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
       const point = await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) throw Error('Missing control: '+${JSON.stringify(selector)}); el.scrollIntoView({block:'center'}); const r=el.getBoundingClientRect(); if (!r.width || !r.height || el.disabled) throw Error('Inactive control: '+${JSON.stringify(selector)}); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
       await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
       await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
+    };
+    // Navigate the way a player does: town buildings, the MENU screen, and the gate's mode tabs.
+    click.nav = async facility => {
+      const route = () => evaluate('document.querySelector(".town-game-shell")?.dataset.townRoute ?? ""');
+      const toCamp = async () => {
+        for (let attempt = 0; attempt < 3 && await route() !== 'camp'; attempt++) {
+          await click('#home');
+          try { await wait('Boolean(document.querySelector(".town-spot"))', 2000); } catch { /* a click landing mid-transition is retried */ }
+        }
+        await wait('Boolean(document.querySelector(".town-spot"))');
+      };
+      if (facility === 'camp') return toCamp();
+      if (facility === 'more') { await click('#menu-button'); return wait('Boolean(document.querySelector(".more-scene"))'); }
+      if (['party', 'party-advanced', 'quests', 'bestiary', 'challenge-shop'].includes(facility)) {
+        await click('#menu-button');
+        await wait('Boolean(document.querySelector(".more-scene"))');
+        await click(`.more-scene [data-facility="${facility}"]`);
+        return wait(`document.querySelector(".town-game-shell")?.dataset.townRoute === ${JSON.stringify(facility)}`);
+      }
+      await toCamp();
+      await click('.town-spot[data-facility="campaign"]');
+      await wait('Boolean(document.querySelector(".expedition-mode-nav"))');
+      if (facility !== 'campaign') await click(`.expedition-mode-nav [data-facility="${facility}"]`);
+      await wait(`document.querySelector(".town-game-shell")?.dataset.townRoute === ${JSON.stringify(facility)}`);
+    };
+    // Leave a battle the way a player does: pause menu → Retreat.
+    click.retreat = async () => {
+      await click('#pause');
+      await wait('Boolean(document.querySelector("#pause-retreat"))');
+      await click('#pause-retreat');
     };
     const key = async (key, code = key) => {
       const virtual = ({Escape:27,Enter:13,' ':32,Tab:9,ArrowLeft:37,ArrowRight:39})[key] || (key.length===1 ? key.toUpperCase().charCodeAt(0) : 0);

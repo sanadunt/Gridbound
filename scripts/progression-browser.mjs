@@ -9,18 +9,18 @@ for(const width of [390,1440])await withBrowser(async({send,evaluate,wait,click,
  const select=async(selector,value)=>evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.value=${JSON.stringify(value)};el.dispatchEvent(new Event('change',{bubbles:true}));})()`);
  assert.equal(await evaluate("localStorage.getItem('gridbound.v2')"),legacy);
  assert.equal(await evaluate('window.gridbound.profile().version'),3);
- await click('[data-facility="party"]');await click('[data-facility="party-advanced"]');await fits();await click('[data-training-tab="overview"]');
+ await click.nav('party');await click.nav('party-advanced');await fits();await click('[data-training-tab="overview"]');
  assert.equal(await evaluate('document.querySelector("[data-hero-level]").dataset.heroLevel'),'5');
 
  const points=await evaluate('Number(document.querySelector("[data-skill-points]").textContent)');
  await click('[data-training-tab="talents"]');await click('[data-branch="assault"]');await click('[data-talent="assault-root"]');await click('[data-training-tab="overview"]');assert.equal(await evaluate('Number(document.querySelector("[data-skill-points]").textContent)'),points-1);await click('[data-training-tab="talents"]');await click('[data-inspect-talent="assault-break"]');
  assert.equal(await evaluate('document.querySelector("[data-talent=assault-break]").disabled'),true);
- await click('[data-facility="party"]');
- await click('[data-training-tab="gear"]');for(const slot of ['weapon','armor','charm']){await select(`[data-gear-slot="${slot}"]`,`scout-${slot}`);await click('[data-confirm-gear]');}
- assert.match(await evaluate('document.querySelector(".gear-set-status").textContent'),/ALL BONUSES ACTIVE/);
+ await click.nav('party');
+ await click('[data-training-tab="gear"]');for(const slot of ['weapon','armor','charm']){await click(`[data-gear-open="${slot}"]`);await click(`[data-gear-item="scout-${slot}"]`);await click('[data-confirm-gear]');}
+ assert.match(await evaluate('document.querySelector(".gear-set-status").textContent'),/FULL SET ACTIVE/);
  await screenshot(`artifacts/rpg-tree-${width}.png`);
- await click('[data-facility="more"]');
- await click('[data-facility="quests"]');await fits();
+ await click.nav('more');
+ await click.nav('quests');await fits();
  const seek=async(id)=>{for(let i=0;i<30;i++){if(await evaluate(`Boolean(document.querySelector('[data-quest="${id}"]'))`))return;await click('[data-quest-page="1"]');}throw Error('Missing quest '+id);};await seek('first-road');const before=await evaluate('window.gridbound.profile().loadouts[0].xp');
  await click('[data-claim-quest="first-road"]');
  assert.ok(await evaluate('window.gridbound.profile().loadouts[0].xp')>before);
@@ -40,16 +40,16 @@ for(const width of [390,1440])await withBrowser(async({send,evaluate,wait,click,
  await wait('!document.querySelector("#result-details").hidden');
  const banked=await evaluate('window.gridbound.profile().loadouts[0].xp');assert.ok(banked>xp0);
  assert.equal(await evaluate('window.gridbound.profile().ledger.enemies.moth'),1);
- await click('#result-town');await wait('document.querySelector("#town-screen:not([hidden])")');await click('[data-facility="more"]');await click('[data-facility="quests"]');await select('[data-quest-filter]','all');
+ await click('#result-town');await wait('document.querySelector("#town-screen:not([hidden])")');await click.nav('more');await click.nav('quests');await select('[data-quest-filter]','all');
  await seek('hunt-moth');await click('[data-claim-quest="hunt-moth"]');
  assert.ok((await evaluate('window.gridbound.profile().claimedQuests')).includes('hunt-moth'));
  await send('Page.reload');await wait('window.gridbound?.scene?.textures?.exists("revenant-auric-0")');
  assert.ok(await evaluate('window.gridbound.profile().loadouts[0].xp')>=banked);
  assert.equal(await evaluate("localStorage.getItem('gridbound.v2')"),legacy);
- await click('[data-facility="party"]');assert.ok((await evaluate('window.gridbound.profile().loadouts[0].talents')).includes('assault-root'));
+ await click.nav('party');assert.ok((await evaluate('window.gridbound.profile().loadouts[0].talents')).includes('assault-root'));
  assert.equal(await evaluate('window.gridbound.profile().loadouts[0].gear.weapon'),'scout-weapon');await fits();
  await evaluate("localStorage.setItem('gridbound.v3','{invalid')");await send('Page.reload');await wait('window.gridbound?.scene?.textures?.exists("revenant-auric-0")');
  assert.equal(await evaluate("localStorage.getItem('gridbound.v3')"),'{invalid');
- assert.match(await evaluate('document.querySelector("#storage-status").textContent'),/rusak|dilindungi|ditimpa/);
+ assert.match(await evaluate('document.querySelector("#storage-status").textContent'),/corrupted|protected|overwrit/);
  assert.deepEqual(errors,[]);console.log('PASS RPG browser',width,'v2 migration, 34-node tree/SP, set equipment, 30 quests/claims, hunt variant, XP settlement, reload and corrupt-save protection');
 },{width,height:900,mobile:width<500});

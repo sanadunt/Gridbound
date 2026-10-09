@@ -5,12 +5,16 @@ import { monsterCanvas } from '../art/monsters';
 import { ENEMIES } from '../game/world';
 import { KITS } from '../game/content';
 import { Sound } from '../audio/sound';
+import { t, lang } from '../i18n';
+import { eventText } from '../i18n/content';
 
 export const ARENA={width:600,height:760,x:72,y:367,cw:144,ch:112,gap:12};
 export function cell(slot:number){return {x:ARENA.x+(slot%3)*(ARENA.cw+ARENA.gap),y:ARENA.y+Math.floor(slot/3)*(ARENA.ch+ARENA.gap)};}
 export function center(slot:number){const p=cell(slot);return {x:p.x+72,y:p.y+54};}
 type Particle={x:number;y:number;vx:number;vy:number;life:number;max:number;color:number;size:number;gravity:number};
 type BossCue={color:number;kind:'threat'|'phase'|'break'|'summon'|'ultimate'|'victory';left:number;total:number};
+// Heroes stand in the upper part of their cell; the DOM unit card puts HP and the skill chip below them.
+const HERO_SCALE=2,HERO_LIFT=18;
 export const ENEMY_DEATH_ANIMATION_MS=780;
 export const ENEMY_DEATH_ANIMATION_REDUCED_MS=120;
 export class BattleScene extends Phaser.Scene {
@@ -23,6 +27,7 @@ export class BattleScene extends Phaser.Scene {
  private dragon!:Phaser.GameObjects.Image;
  private threats!:Phaser.GameObjects.Graphics;
  private fx!:Phaser.GameObjects.Graphics;
+ private hitStop=0;private bossKick=0;private flashRect!:Phaser.GameObjects.Rectangle;private introLeft=0;private victoryAge=0;
  private enemyDeathElapsed=0;private enemyDeathDuration=ENEMY_DEATH_ANIMATION_MS;private enemyDeathEnemyId:string|null=null;private enemyDeathStarted=false;private enemyDeathComplete=true;private enemyDeathWaiters:Array<()=>void>=[];
  constructor(battle:Battle,sound:Sound,onFrame:(dt:number)=>void){super('battle');this.battle=battle;this.soundBox=sound;this.onFrame=onFrame;}
  private setBossCue(kind:BossCue['kind'],color:number,duration:number){
@@ -47,9 +52,14 @@ export class BattleScene extends Phaser.Scene {
   for(const id of Object.keys(ENEMIES).filter(id=>id!=='dragon'))for(let frame=0;frame<8;frame++)this.textures.addCanvas(`${id}-${frame}`,monsterCanvas(id,frame));
   this.bg=this.add.image(300,380,'ruins').setScale(2);this.floor=this.add.graphics().setDepth(2);
   this.dragon=this.add.image(300,200,'dragon-0').setScale(2.28).setDepth(5);
-  this.threats=this.add.graphics().setDepth(7);this.fx=this.add.graphics().setDepth(20);this.resetEnemyDeathAnimation();this.syncHeroes();
+  this.threats=this.add.graphics().setDepth(7);this.fx=this.add.graphics().setDepth(20);this.flashRect=this.add.rectangle(300,380,600,760,0xffffff,0).setDepth(45);this.resetEnemyDeathAnimation();this.syncHeroes();
  }
- replace(battle:Battle){this.tweens.killAll();for(const child of [...this.children.list])if('depth' in child && Number(child.depth)>=17)child.destroy();this.fx=this.add.graphics().setDepth(20);this.pulse=0;this.shake=0;this.bossCue=undefined;this.dragId=-1;this.dragPoint=undefined;this.hoverSlot=-1;this.battle=battle;this.heroes.forEach(s=>s.destroy());this.heroes.clear();this.enemies.forEach(s=>s.destroy());this.enemies.clear();this.particles=[];this.flashes.clear();this.attacks.clear();this.accumulator=0;this.resetEnemyDeathAnimation();this.syncHeroes();}
+ replace(battle:Battle){this.tweens.killAll();for(const child of [...this.children.list])if('depth' in child && Number(child.depth)>=17)child.destroy();this.fx=this.add.graphics().setDepth(20);this.flashRect=this.add.rectangle(300,380,600,760,0xffffff,0).setDepth(45);this.hitStop=0;this.bossKick=0;this.introLeft=0;this.victoryAge=0;this.pulse=0;this.shake=0;this.bossCue=undefined;this.dragId=-1;this.dragPoint=undefined;this.hoverSlot=-1;this.battle=battle;this.heroes.forEach(s=>s.destroy());this.heroes.clear();this.enemies.forEach(s=>s.destroy());this.enemies.clear();this.particles=[];this.flashes.clear();this.attacks.clear();this.accumulator=0;this.resetEnemyDeathAnimation();this.syncHeroes();}
+
+ /** Battle start: boss lunges in, white flash and a FIGHT banner. */
+ encounterStart(){this.introLeft=this.reducedMotion?0:.45;this.screenFlash(0xffffff,.55);this.floating(300,380,t('battle.begin'),'#ffe082',true,true);}
+ private screenFlash(color:number,alpha=.45){if(this.reducedMotion)return;this.flashRect.setFillStyle(color,alpha);this.tweens.add({targets:this.flashRect,fillAlpha:0,duration:220,ease:'Quad.easeOut'});}
+ private freeze(seconds:number){if(!this.reducedMotion)this.hitStop=Math.max(this.hitStop,seconds);}
 
  /** True when the current victory's boss sequence has finished, or no victory is active. */
  public isEnemyDeathAnimationComplete(): boolean {this.ensureEnemyDeathAnimation();return this.enemyDeathComplete;}
@@ -87,9 +97,11 @@ export class BattleScene extends Phaser.Scene {
 
  private deathProgress(){return Math.min(1,this.enemyDeathDuration>0?this.enemyDeathElapsed/this.enemyDeathDuration:1);}
 
- private syncHeroes(){if(!this.floor)return;for(const h of this.battle.heroes){if(this.heroes.has(h.id))continue;const p=center(h.slot);this.heroes.set(h.id,this.add.image(p.x,p.y-7,`${h.classId}-0`).setScale(1.65).setDepth(9));}}
+ private syncHeroes(){if(!this.floor)return;for(const h of this.battle.heroes){if(this.heroes.has(h.id))continue;const p=center(h.slot);this.heroes.set(h.id,this.add.image(p.x,p.y-HERO_LIFT,`${h.classId}-0`).setScale(HERO_SCALE).setDepth(9));}}
  update(_time:number,delta:number){
-  const dt=Math.min(delta/1000,.1);this.age+=dt;
+  let dt=Math.min(delta/1000,.1);
+  if(this.hitStop>0){this.hitStop-=dt;dt*=.08;}
+  this.age+=dt;
   if(this.battle.status==='fighting'){this.accumulator+=dt;while(this.accumulator>=1/60){this.battle.tick(1/60);this.accumulator-=1/60;}}
   const events=this.battle.drain();events.forEach(e=>{this.event(e);this.soundBox.play(this.soundKind(e));});
   this.advanceEnemyDeathAnimation(dt);
@@ -99,9 +111,11 @@ export class BattleScene extends Phaser.Scene {
   const b=this.battle,t=this.age;this.floor.clear();this.threats.clear();this.fx.clear();
   if(this.bossCue){const cue=this.bossCue,alpha=this.reducedMotion?.72:Math.min(.72,(cue.left/cue.total)*1.25),width=cue.kind==='threat'?150:cue.kind==='phase'?188:cue.kind==='break'?164:142;this.fx.lineStyle(2,cue.color,alpha).lineBetween(300-width/2,276,300+width/2,276);this.fx.fillStyle(cue.color,alpha).fillTriangle(300,268,292,280,308,280);if(cue.kind==='phase'||cue.kind==='victory'){this.fx.lineStyle(1,cue.color,alpha*.8).lineBetween(300-width/2,282,300+width/2,282);}cue.left-=dt;if(cue.left<=0)this.bossCue=undefined;}
   const death=this.enemyDeathStarted&&b.status==='victory',progress=death?this.deathProgress():0,collapse=this.reducedMotion?progress:progress*progress,baseScale=b.enemyId==='dragon'?2.28:1.95,charging=b.threats.some(v=>v.left<1);
+  if(this.introLeft>0)this.introLeft-=dt;if(this.bossKick>0)this.bossKick-=dt;if(b.status==='victory')this.victoryAge+=dt;else this.victoryAge=0;
+  const intro=this.introLeft>0?this.introLeft/.45:0,kick=this.bossKick>0?this.bossKick/.14:0;
   const bossFrame=death&&this.enemyDeathComplete?0:this.reducedMotion?0:Math.floor(t*7)%8,idleBob=death||this.reducedMotion?0:Math.sin(t*1.8)*5,shakeScale=charging&&!this.reducedMotion?Math.sin(t*16)*.035:0;
-  this.dragon.setTexture(`${b.enemyId}-${bossFrame}`).setY(194+idleBob+(death&&!this.reducedMotion?collapse*34:0)).setScale(baseScale*(1+(!this.reducedMotion?collapse*.08:0)+shakeScale),baseScale*(1-(death&&!this.reducedMotion?collapse*.72:0)));
-  this.dragon.setAlpha(death?Math.max(0,1-progress):1).setRotation(death&&!this.reducedMotion?collapse*.18:0);if(this.pulse>0){this.pulse-=dt;this.dragon.setTint(0xffe6af);}else if(death)this.dragon.setTint(0xf1c77f);else this.dragon.clearTint();
+  this.dragon.setTexture(`${b.enemyId}-${bossFrame}`).setY(194+idleBob-intro*intro*70-kick*10+(death&&!this.reducedMotion?collapse*34:0)).setX(300+(kick>0?Math.sin(t*90)*4*kick:0)).setScale(baseScale*(1+(!this.reducedMotion?collapse*.08:0)+shakeScale),baseScale*(1-(death&&!this.reducedMotion?collapse*.72:0)));
+  this.dragon.setAlpha(death?Math.max(0,1-progress):1).setRotation(death&&!this.reducedMotion?collapse*.18:0);if(this.pulse>0){this.pulse-=dt;this.dragon.setTintFill(0xffffff);}else if(death)this.dragon.setTint(0xf1c77f);else this.dragon.clearTint();
   if(this.shake>0&&!this.reducedMotion){this.shake-=dt;this.cameras.main.setScroll(Math.sin(t*80)*this.shake*9,Math.cos(t*70)*this.shake*7);}else this.cameras.main.setScroll(0,0);
   // Slot borders remain visible beneath effects and communicate the legal drop area.
   for(let i=0;i<9;i++){
@@ -111,22 +125,23 @@ export class BattleScene extends Phaser.Scene {
    for(const dx of [0,137])for(const dy of [0,105])this.floor.fillStyle(selected?0xdfc486:0x70836a).fillRect(p.x+dx,p.y+dy,7,2).fillRect(p.x+dx,p.y+dy,2,7);
    if(this.hoverSlot===i){this.floor.fillStyle(0xe1ce93,.22).fillRect(p.x,p.y,144,112);this.floor.lineStyle(2,0xefdeb0).strokeRect(p.x,p.y,144,112);}
    if(h){
-    const pos=center(i),image=this.heroes.get(h.id)!;let x=pos.x,y=pos.y-10;
-    const attack=this.attacks.get(h.id)??0;if(attack>0){this.attacks.set(h.id,attack-dt);if(!this.reducedMotion)y-=Math.sin(attack/.34*Math.PI)*13;}
+    const pos=center(i),image=this.heroes.get(h.id)!;let x=pos.x,y=pos.y-HERO_LIFT;
+    const attack=this.attacks.get(h.id)??0;if(attack>0){this.attacks.set(h.id,attack-dt);if(!this.reducedMotion)y-=Math.sin(Math.min(1,attack/.34)*Math.PI)*26;}
+    if(this.victoryAge>0&&h.hp>0&&!this.reducedMotion)y-=Math.abs(Math.sin((this.victoryAge*2.6+h.id*.37)*Math.PI))*18;
     if(this.dragId===h.id&&this.dragPoint){x=this.dragPoint.x;y=this.dragPoint.y;image.setDepth(30);}else image.setDepth(9);
     image.x=Phaser.Math.Linear(image.x,x,Math.min(1,dt*18));image.y=Phaser.Math.Linear(image.y,y,Math.min(1,dt*18));image.setTexture(`${h.classId}-${Math.floor(t*4+h.id)%4}`);
     image.setAlpha(h.hp<=0?.2:1);const flash=this.flashes.get(h.id)??0;if(flash>0){this.flashes.set(h.id,flash-dt);image.setTint(0xff857e);}else image.clearTint();
-    this.floor.fillStyle(0x081c19,.5).fillEllipse(pos.x,pos.y+21,55,12);
-    if(h.shield>0||b.guardLeft>0){const shieldAlpha=this.reducedMotion?.6:.6+Math.sin(t*3)*.15;this.threats.lineStyle(2,0x9bd8ef,shieldAlpha);this.threats.strokeEllipse(pos.x,pos.y-5,77,78);this.threats.fillStyle(0x8acee8,.04).fillEllipse(pos.x,pos.y-5,77,78);}
-    if(h.buff>0){const buffWidth=this.reducedMotion?61:61+Math.sin(t*5)*4;this.threats.lineStyle(2,0x8bf3ca,.7);this.threats.strokeEllipse(pos.x,pos.y+25,buffWidth,15);}
-    if(h.hp<=0){this.threats.lineStyle(2,0xa19788,.7).lineBetween(pos.x-8,pos.y-13,pos.x+8,pos.y+3).lineBetween(pos.x+8,pos.y-13,pos.x-8,pos.y+3);}
+    this.floor.fillStyle(0x050818,.55).fillEllipse(pos.x,pos.y+17,62,12);
+    if(h.shield>0||b.guardLeft>0){const shieldAlpha=this.reducedMotion?.6:.6+Math.sin(t*3)*.15;this.threats.lineStyle(2,0x9bd8ef,shieldAlpha);this.threats.strokeEllipse(pos.x,pos.y-HERO_LIFT,72,74);this.threats.fillStyle(0x8acee8,.04).fillEllipse(pos.x,pos.y-HERO_LIFT,72,74);}
+    if(h.buff>0){const buffWidth=this.reducedMotion?61:61+Math.sin(t*5)*4;this.threats.lineStyle(2,0x8bf3ca,.7);this.threats.strokeEllipse(pos.x,pos.y+14,buffWidth,13);}
+    if(h.hp<=0){this.threats.lineStyle(2,0xa19788,.7).lineBetween(pos.x-8,pos.y-28,pos.x+8,pos.y-12).lineBetween(pos.x+8,pos.y-28,pos.x-8,pos.y-12);}
    }
   }
   for(const danger of b.threats){const blink=this.reducedMotion?.22:.22+Math.sin(t*5)*.065;for(const s of danger.slots){const p=cell(s),color=danger.type==='all'?0xd9b5ee:danger.type==='target'?0xffba78:danger.type==='breath'?0xeb9d5f:0xef786b;this.threats.fillStyle(color,blink).fillRect(p.x+3,p.y+3,138,106);this.threats.lineStyle(2,color,.85).strokeRect(p.x+3,p.y+3,138,106);
    this.threats.fillStyle(color,.7).fillRect(p.x+3,p.y+3,138*danger.left/danger.total,3);
    this.threats.lineStyle(1,color,.28);for(let stripe=0;stripe<6;stripe++)this.threats.lineBetween(p.x+8+stripe*24,p.y+111,p.x+30+stripe*20,p.y+5);
    this.threats.lineStyle(2,0xffd4a6,.8).strokeTriangle(p.x+119,p.y+15,p.x+111,p.y+29,p.x+127,p.y+29);
-   if(danger.type==='target'){const marked=center(s);this.threats.lineStyle(3,0xffce91).strokeCircle(marked.x,marked.y-7,35);this.threats.lineBetween(marked.x,marked.y-49,marked.x,marked.y-28);}
+   if(danger.type==='target'){const marked=center(s);this.threats.lineStyle(3,0xffce91).strokeCircle(marked.x,marked.y-HERO_LIFT,33);this.threats.lineBetween(marked.x,marked.y-HERO_LIFT-42,marked.x,marked.y-HERO_LIFT-22);}
    if(b.status==='fighting'&&danger.type==='meteor'&&danger.left<.55&&!this.reducedMotion){const hit=center(s),yy=hit.y-230*(danger.left/.55);this.fx.fillStyle(0xfac589,.9).fillRect(hit.x-4,yy,8,13);this.fx.fillStyle(0xee9970,.5).fillRect(hit.x-2,yy-17,4,19);this.particle(hit.x,yy,0xfac589,3,.25,0,-20,0);}
   }}
   for(const m of b.minions){let spr=this.enemies.get(m.id);if(!spr){spr=this.add.image(144+m.lane*156,320,`${m.enemyId??'goblin'}-0`).setScale(.42).setDepth(6);this.enemies.set(m.id,spr);}spr.y=321+(this.reducedMotion?0:Math.sin(t*4+m.lane)*3);this.threats.fillStyle(0x102621).fillRect(spr.x-23,348,46,3);this.threats.fillStyle(0xd6be78).fillRect(spr.x-23,348,46*m.hp/m.maxHp,3);}
@@ -141,16 +156,13 @@ export class BattleScene extends Phaser.Scene {
  private particle(x:number,y:number,color:number,size=3,life=.7,vx=(Math.random()-.5)*170,vy=(Math.random()-.5)*150,gravity=70){if(this.particles.length>240)return;this.particles.push({x,y,vx,vy,life,max:life,color,size,gravity});}
  private burst(x:number,y:number,color:number,n=22){const count=Math.min(n,this.reducedMotion?4:18);for(let i=0;i<count;i++){const size=this.reducedMotion?3:Math.random()>.5?4:2,life=this.reducedMotion?.22:.4+Math.random()*.6;this.particle(x,y,color,size,life,this.reducedMotion?0:(Math.random()-.5)*170,this.reducedMotion?0:(Math.random()-.5)*150,this.reducedMotion?0:70);}}
  floating(x:number,y:number,text:string,color='#ffdfa0',big=false,crit=false){
-  const size = crit ? '16px' : big ? '14px' : '11px';
+  const size = crit ? '36px' : big ? '28px' : '22px';
   const strokeColor = crit ? '#5c3900' : '#122825';
-  const strokeThickness = crit ? 5 : 4;
-  const label=this.add.text(x,y,text,{fontFamily:'"Press Start 2P"',fontSize:size,color,stroke:strokeColor,strokeThickness}).setOrigin(.5).setDepth(40);
-  if(crit&&!this.reducedMotion){
-    label.setScale(1.35);
-    this.tweens.add({targets:label,scale:1,duration:150,ease:'Back.easeOut'});
-  }
+  const strokeThickness = crit ? 7 : 5;
+  const label=this.add.text(x,y,eventText(text,lang()),{fontFamily:'"Press Start 2P"',fontSize:size,color,stroke:strokeColor,strokeThickness}).setOrigin(.5).setDepth(40);
   if(this.reducedMotion){this.time.delayedCall(220,()=>label.destroy());return;}
-  this.tweens.add({targets:label,y:y-(crit?48:38),alpha:0,delay:crit?400:250,duration:crit?900:800,onComplete:()=>label.destroy()});
+  label.setScale(crit?1.6:1.3);this.tweens.add({targets:label,scale:1,y:y-8,duration:120,ease:'Back.easeOut'});
+  this.tweens.add({targets:label,y:y-(crit?60:46),alpha:0,delay:crit?420:280,duration:crit?900:700,onComplete:()=>label.destroy()});
  }
  spawnDamageNumber(x: number, y: number, value: number | string, options: { isCrit?: boolean; isBreak?: boolean; isHeal?: boolean; isBlocked?: boolean } = {}) {
    if (options.isCrit) {
@@ -163,7 +175,7 @@ export class BattleScene extends Phaser.Scene {
    } else if (options.isHeal) {
      this.floating(x, y, `+${value} HP`, '#69f0ae');
    } else if (options.isBlocked) {
-     this.floating(x, y, 'BLOCKED', '#80deea', true);
+     this.floating(x, y, t('battle.blocked'), '#80deea', true);
    } else {
      this.floating(x, y, String(value), '#ffdfa0');
    }
@@ -182,17 +194,17 @@ export class BattleScene extends Phaser.Scene {
  private projectile(e:BattleEvent){
   const h=this.battle.hero(e.source??-1);const from=h?center(h.slot):{x:300,y:620};const to=e.lane===-1?{x:300,y:215}:{x:144+(e.lane??1)*156,y:320};
   const color=e.kind==='nova'||e.kind==='magic'||e.kind==='burst'?0x9bcdf3:e.kind==='steal'?0xd2b0ed:0xf1d393;
-  const bolt=this.add.rectangle(from.x,from.y,e.kind==='arrow'?3:7,e.kind==='arrow'?18:7,color).setDepth(18).setRotation(Math.atan2(to.y-from.y,to.x-from.x)+Math.PI/2);
+  const bolt=this.add.rectangle(from.x,from.y,e.kind==='arrow'?4:11,e.kind==='arrow'?24:11,color).setDepth(18).setRotation(Math.atan2(to.y-from.y,to.x-from.x)+Math.PI/2);
   const isBig=e.kind==='nova'||e.kind==='burst'||e.kind==='ultimate';
   const amount=Math.round(e.amount??0);
   const isCrit=amount>=110;
   const finish=()=>{
    bolt.destroy();
    this.burst(to.x,to.y,color,isCrit?18:isBig?14:8);
-   if(isCrit){this.floating(to.x,to.y,String(amount),'#ffe082',true,true);this.shake=.28;this.ring(to.x,to.y,0xffd54f,14,2.6);}
+   if(isCrit){this.floating(to.x,to.y,String(amount),'#ffe082',true,true);this.shake=.28;this.ring(to.x,to.y,0xffd54f,14,2.6);this.freeze(.07);this.screenFlash(0xffffff,.22);}
    else this.floating(to.x,to.y,String(amount),e.kind==='nova'?'#b5dbff':'#f6dfab',isBig);
-   if(e.lane===-1){this.pulse=.08;this.ring(to.x,to.y,color,12,2.2);}
-   if(isBig&&!isCrit)this.shake=.16;
+   if(e.lane===-1){this.pulse=.08;this.bossKick=.14;this.ring(to.x,to.y,color,12,2.2);}
+   if(isBig&&!isCrit){this.shake=.16;this.freeze(.04);}
   };
   if(this.reducedMotion){bolt.setPosition(to.x,to.y);finish();return;}
   this.tweens.add({targets:bolt,x:to.x,y:to.y,duration:e.kind==='slash'?150:370,ease:'Cubic.easeIn',onUpdate:()=>this.particle(bolt.x,bolt.y,color,2,.2,0,0,0),onComplete:finish});
@@ -219,8 +231,8 @@ export class BattleScene extends Phaser.Scene {
    if(e.lane!==undefined&&e.lane>=0)this.ring(144+e.lane*156,320,0xb9cef5,18,2.2);
   }
   if(e.type==='hurt'){
-   const blocked=!e.amount;this.flashes.set(e.source!,.16);
-   if(blocked){this.floating(pos.x,pos.y-10,'BLOCKED','#80deea',true);this.ring(pos.x,pos.y,0x80deea,14,2.3);}
+   const blocked=!e.amount;this.flashes.set(e.source!,.16);if(!blocked&&(e.amount??0)>=60){this.shake=Math.max(this.shake,.18);this.screenFlash(0xff3030,.16);}
+   if(blocked){this.floating(pos.x,pos.y-10,t('battle.blocked'),'#80deea',true);this.ring(pos.x,pos.y,0x80deea,14,2.3);}
    else{this.floating(pos.x,pos.y-10,`−${e.amount}`,'#ff8a80');this.ring(pos.x,pos.y,0xe99a8b,11,1.8);}
    this.burst(pos.x,pos.y,blocked?0x9ed6ed:0xe99a8b,blocked?4:6);
   }
@@ -235,9 +247,9 @@ export class BattleScene extends Phaser.Scene {
    else this.ring(pos.x,pos.y,0x80deea,15,2.2);
   }
   if(e.type==='buff')this.ring(pos.x,pos.y,0x96f2be,13,2.1);
-  if(e.type==='break'){this.setBossCue('break',0xffd54f,.52);this.burst(300,200,0xf5d378,20);this.ring(300,200,0x55e3c7,19,2.4);this.ring(300,200,0xffd54f,13,2.8);this.shake=.3;}
+  if(e.type==='break'){this.setBossCue('break',0xffd54f,.52);this.freeze(.1);this.screenFlash(0xffe6a0,.4);this.floating(300,150,t('battle.break'),'#ffe082',true,true);this.burst(300,200,0xf5d378,20);this.ring(300,200,0x55e3c7,19,2.4);this.ring(300,200,0xffd54f,13,2.8);this.shake=.3;}
   if(e.type==='coin'){this.floating(pos.x,pos.y-20,`+${e.amount}g`);this.burst(pos.x,pos.y,0xe9c56d,5);}
-  if(e.type==='move')this.floating(pos.x,pos.y-25,e.text??'MOVE','#eed69a');
+  if(e.type==='move')this.floating(pos.x,pos.y-25,e.text??t('battle.fx.move'),'#eed69a');
   if(e.type==='impact'){
    for(const slot of e.targets??[]){const p=center(slot),color=e.kind==='breath'?0x8ceeaa:0xf49b70;this.burst(p.x,p.y,color,12);this.ring(p.x,p.y,0xf4c07e,12,1.9);if(e.kind==='breath'&&!this.reducedMotion)for(let n=0;n<8;n++){const ratio=n/8;this.particle(305+(p.x-305)*ratio,215+(p.y-215)*ratio,0xa6e1a0,5,.38,15,70,10);}}
    this.shake=.3;
@@ -252,11 +264,11 @@ export class BattleScene extends Phaser.Scene {
    if(this.reducedMotion){bolt.setPosition(pos.x,pos.y);bolt.destroy();}else this.tweens.add({targets:bolt,x:pos.x,y:pos.y,duration:210,onComplete:()=>bolt.destroy()});
   }
   if(e.type==='minionDown')this.burst(144+e.lane!*156,320,0xb9d58a,14);
-  if(e.type==='ultimate'){this.setBossCue('ultimate',0xffe3a0,.65);this.shake=.55;this.ring(300,420,0xffe3a0,18,2.7);this.ring(300,220,0xffe3a0,14,2.4);this.burst(300,220,0xf3dda4,20);}
+  if(e.type==='ultimate'){this.setBossCue('ultimate',0xffe3a0,.65);this.shake=.55;this.freeze(.12);this.screenFlash(0xfff3c0,.7);this.bossKick=.14;this.pulse=.12;this.ring(300,420,0xffe3a0,18,2.7);this.ring(300,220,0xffe3a0,14,2.4);this.burst(300,220,0xf3dda4,20);}
   if(e.type==='warning')this.setBossCue('threat',0xef786b,.34);
   if(e.type==='phase'){this.setBossCue('phase',0xffd54f,.56);this.ring(300,220,0xffd54f,18,2.5);}
   if(e.type==='summon'){this.setBossCue('summon',0x9bd1a1,.4);this.ring(300,320,0x9bd1a1,20,2.4);}
-  if(e.type==='victory'){this.ensureEnemyDeathAnimation();this.setBossCue('victory',0xffe3a0,.72);this.ring(300,194,0xffe3a0,18,2.8);this.burst(300,194,0xf3dda4,18);}
+  if(e.type==='victory'){this.ensureEnemyDeathAnimation();this.screenFlash(0xffffff,.6);this.freeze(.15);this.setBossCue('victory',0xffe3a0,.72);this.ring(300,194,0xffe3a0,18,2.8);this.burst(300,194,0xf3dda4,18);}
   if(['banner','phase','warning','break','summon','ultimate'].includes(e.type)||(e.type==='shield'&&e.text))window.dispatchEvent(new CustomEvent('battle-banner',{detail:e}));
  }
 }
