@@ -109,7 +109,7 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
   }
 
   await screenshot('artifacts/campaign-complete.png');
-  assert.equal(await evaluate('window.gridbound.profile().roster.length'), 9);
+  assert.equal(await evaluate('window.gridbound.profile().roster.length'), 15, 'six companions join during Acts II-IV');
   await click.nav('more');
   await click('.more-scene [data-open-action="journal"]');
   await wait('document.querySelectorAll("#modal[open] .journal-entry-card").length === 16');

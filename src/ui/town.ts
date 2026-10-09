@@ -3,7 +3,7 @@ import { CAMPAIGN, ENEMIES } from '../game/world';
 import { TALENTS, canEnterZone, talentReason, availablePoints, gearReason, profileModifiers, type Profile } from '../game/profile';
 import { JOBS, GEAR, GEAR_SETS } from '../game/jobs';
 import { heroProgress } from '../game/levels';
-import { storyPartyCap } from '../game/story-party';
+import { storyPartyCap, normalizeStoryParty } from '../game/story-party';
 import { BASIC_JOBS, createRogueBuild, type RogueBuild } from '../game/roguelike-build';
 import { Battle } from '../game/simulation';
 import { BANK_SHOP, CHALLENGE_SHOP, RAID_MODIFIERS, getRaidContractForEnemy, raidReward, type RaidModifierId, type RaidSandbox, type RaidTier } from '../economy/challenge';
@@ -299,7 +299,10 @@ function forge(p: Profile, id: number, state: TownState) {
 }
 
 function formation(p: Profile, id: number, r: typeof ROSTER[number], loadout: Profile['loadouts'][number]) {
-  return `<h3 class="subheading">${t('formation.title')} <span>${t('formation.sub', { name: r.name })}</span></h3><div class="formation-grid" aria-label="${t('formation.title')}">${Array.from({ length: 9 }, (_, slot) => { const hero = p.roster.find(heroId => p.loadouts[heroId].slot === slot); const row = slot < 3 ? t('formation.front') : slot < 6 ? t('formation.mid') : t('formation.back'); return `<button data-formation="${slot}" class="${loadout.slot === slot ? 'chosen' : ''}" aria-label="${t('formation.tile', { n: slot + 1 })}${hero !== undefined ? `, ${ROSTER[hero].name}` : ''}"><small>${row}</small>${hero !== undefined ? `<img src="${portrait(ROSTER[hero].classId)}" alt=""/><span>${ROSTER[hero].name}</span>` : `<span class="empty">${t('formation.empty')}</span>`}</button>`; }).join('')}</div><p class="hint">${t('formation.hint')}</p><div class="departure-actions"><button class="btn" data-respec ${loadout.talents.length || loadout.job ? '' : 'disabled'}>${t('party.respec', { name: r.name })}</button></div>`;
+  // The grid shows the deployed story party; a benched hero is previewed on its preferred tile.
+  const deployed = normalizeStoryParty(p.storyActive, p.roster, p.cleared);
+  const benched = !deployed.includes(id);
+  return `<h3 class="subheading">${t('formation.title')} <span>${t('formation.sub', { name: r.name })}</span></h3><div class="formation-grid" aria-label="${t('formation.title')}">${Array.from({ length: 9 }, (_, slot) => { const hero = deployed.find(heroId => heroId !== id && p.loadouts[heroId].slot === slot) ?? (loadout.slot === slot ? id : undefined); const row = slot < 3 ? t('formation.front') : slot < 6 ? t('formation.mid') : t('formation.back'); return `<button data-formation="${slot}" class="${loadout.slot === slot ? 'chosen' : ''}" aria-label="${t('formation.tile', { n: slot + 1 })}${hero !== undefined ? `, ${ROSTER[hero].name}` : ''}"><small>${row}</small>${hero !== undefined ? `<img src="${portrait(ROSTER[hero].classId)}" alt=""/><span>${ROSTER[hero].name}</span>` : `<span class="empty">${t('formation.empty')}</span>`}</button>`; }).join('')}</div><p class="hint">${benched ? t('formation.benched', { name: r.name }) : t('formation.hint')}</p><div class="departure-actions"><button class="btn" data-respec ${loadout.talents.length || loadout.job ? '' : 'disabled'}>${t('party.respec', { name: r.name })}</button></div>`;
 }
 
 function bestiary(pageIndex: number) {

@@ -1,7 +1,7 @@
-import type { ClassId } from './content';
+import { CLASS_IDS, type ClassId } from './content';
 import { JOBS } from './jobs';
 
-export const BASIC_JOBS: readonly ClassId[] = Object.freeze(['warrior','rogue','archer','healer','wizard']);
+export const BASIC_JOBS: readonly ClassId[] = Object.freeze([...CLASS_IDS]);
 export type RogueRecruit = { classId: ClassId; job?: string };
 export type RogueBuild = { recruits: RogueRecruit[]; points: number; clearedRooms: number[] };
 const basic = (value: unknown): value is ClassId => BASIC_JOBS.includes(value as ClassId);

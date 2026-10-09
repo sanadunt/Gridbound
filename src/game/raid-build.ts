@@ -1,6 +1,6 @@
-import { KITS, ROSTER, type ClassId } from './content';
+import { KITS, ROSTER, CLASS_IDS, type ClassId } from './content';
 
-export const RAID_BASIC_JOBS: readonly ClassId[] = Object.freeze(['warrior', 'rogue', 'archer', 'healer', 'wizard']);
+export const RAID_BASIC_JOBS: readonly ClassId[] = Object.freeze([...CLASS_IDS]);
 export type RaidSlot = { heroId: number; classId: ClassId; slot?: number };
 export type RaidBuild = { slots: RaidSlot[] };
 

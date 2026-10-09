@@ -9,8 +9,8 @@ import { TALENTS, talentStats } from '../src/game/talents';
 import { QUESTS } from '../src/game/quests';
 import { ENEMIES } from '../src/game/world';
 
-test('42 gear pieces and six distinct sets preserve slot, level, class and quest gates',()=>{
- assert.equal(GEAR.length,42);assert.equal(new Set(GEAR.map(g=>g.id)).size,42);assert.equal(GEAR_SETS.length,6);
+test('54 gear pieces and six distinct sets preserve slot, level, class and quest gates',()=>{
+ assert.equal(GEAR.length,54);assert.equal(new Set(GEAR.map(g=>g.id)).size,54);assert.equal(GEAR_SETS.length,6);
  const p=createProfile();p.gold=99999;
  assert.equal(equipGear(p,0,'scout-weapon'),false);awardExperience(p,0,xpForLevel(20));
  assert.equal(equipGear(p,0,'healer-weapon-1'),false);assert.equal(equipGear(p,0,'unbound-weapon'),false);
@@ -23,9 +23,9 @@ test('42 gear pieces and six distinct sets preserve slot, level, class and quest
  assert.ok(equipGear(p,0,'warrior-weapon-1'));const gold=p.gold;assert.equal(equipGear(p,0,'warrior-weapon-1'),false);assert.equal(p.gold,gold);
  p.loadouts[0].inventory!.push('healer-weapon-1');p.loadouts[0].gear!.weapon='healer-weapon-1';assert.equal(normalizeProfile(p).loadouts[0].gear!.weapon,undefined);
 });
-test('50 talent definitions expose 34 class-appropriate choices and no dangling links',()=>{
- assert.equal(TALENTS.length,50);
- for(const base of ['warrior','rogue','archer','healer','wizard'])assert.equal(TALENTS.filter(t=>!t.classId||t.classId===base).length,34);
+test('66 talent definitions expose 34 class-appropriate choices and no dangling links',()=>{
+ assert.equal(TALENTS.length,66);
+ for(const base of ['warrior','rogue','archer','healer','wizard','bard','hexer','monk','engineer'])assert.equal(TALENTS.filter(t=>!t.classId||t.classId===base).length,34);
  for(const t of TALENTS)for(const id of [t.requires,...t.requiresAll??[]].filter(Boolean))assert.ok(TALENTS.some(n=>n.id===id));
  assert.equal(QUESTS.length,30);assert.equal(new Set(QUESTS.map(q=>q.id)).size,30);
  for(const q of QUESTS){if(q.enemy)assert.ok(ENEMIES[q.enemy]);if(q.gear)assert.ok(GEAR.find(g=>g.id===q.gear));if(q.requires)assert.ok(QUESTS.find(n=>n.id===q.requires));}

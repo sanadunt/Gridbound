@@ -9,11 +9,11 @@ const ink='#111d25',skin='#e9bb89',skinShade='#ab7867';
 
 export function heroCanvas(cls:ClassId,frame=0){
  const {el,c}=canvas(40,44);const bob=frame===1?-1:frame===3?1:0;c.translate(0,bob);
- const color=KITS[cls].color;const dark={warrior:'#786143',rogue:'#514669',archer:'#4e6548',healer:'#347876',wizard:'#425a8b'}[cls];
+ const color=KITS[cls].color;const palette:Record<ClassId,string>={warrior:'#786143',rogue:'#514669',archer:'#4e6548',healer:'#347876',wizard:'#425a8b',bard:'#7a4660',hexer:'#4a2a45',monk:'#8a5a24',engineer:'#5e4433'};const dark=palette[cls];
  // Each silhouette is authored in pixel coordinates; palette highlights share the same light direction.
  rect(c,12,34,6,6,ink);rect(c,23,34,6,6,ink);rect(c,13,34,4,4,dark);rect(c,24,34,4,4,dark);
  rect(c,11,39,7,2,'#736852');rect(c,23,39,7,2,'#736852');
- if(cls==='healer'||cls==='wizard'){poly(c,[[13,20],[27,20],[31,37],[9,37]],ink);poly(c,[[14,21],[26,21],[29,35],[11,35]],dark);poly(c,[[17,21],[23,21],[25,35],[14,35]],color);rect(c,18,23,3,12,'#d8d7ad');}
+ if(cls==='healer'||cls==='wizard'||cls==='hexer'){poly(c,[[13,20],[27,20],[31,37],[9,37]],ink);poly(c,[[14,21],[26,21],[29,35],[11,35]],dark);poly(c,[[17,21],[23,21],[25,35],[14,35]],color);rect(c,18,23,3,12,'#d8d7ad');}
  else {rect(c,11,20,18,15,ink);rect(c,13,21,14,12,dark);rect(c,14,21,11,7,color);rect(c,13,30,14,3,'#695245');rect(c,19,30,3,3,'#e3b976');}
  rect(c,10,22,4,10,ink);rect(c,26,22,4,10,ink);rect(c,10,23,3,6,dark);rect(c,27,23,3,6,color);rect(c,10,29,3,3,skin);rect(c,27,29,3,3,skin);
  rect(c,12,6,16,16,ink);rect(c,14,8,12,13,skinShade);rect(c,14,8,11,10,skin);rect(c,14,17,10,3,skinShade);rect(c,15,13,2,2,ink);rect(c,22,13,2,2,ink);rect(c,17,18,5,1,'#e3a578');
@@ -34,9 +34,34 @@ export function heroCanvas(cls:ClassId,frame=0){
  }else if(cls==='healer'){
   poly(c,[[11,11],[12,7],[15,4],[25,4],[28,8],[28,15],[25,11],[24,8],[15,8],[14,13]],'#dce6d5');rect(c,11,13,3,9,'#b3d8c5');rect(c,26,12,3,10,'#80afa1');rect(c,18,4,3,5,'#d4b675');
   rect(c,33,15,2,24,'#c1a471');rect(c,30,10,8,7,ink);rect(c,32,8,4,10,'#ddc992');rect(c,29,11,10,4,'#ddc992');rect(c,32,11,4,4,'#8df3d2');
- }else{
+ }else if(cls==='wizard'){
   poly(c,[[9,12],[15,3],[18,0],[21,3],[26,8],[31,11],[31,14],[9,14]],ink);poly(c,[[11,11],[17,3],[19,2],[22,7],[28,11]],color);rect(c,11,11,18,2,dark);rect(c,18,7,3,3,'#eee0ac');rect(c,14,17,10,4,'#cfdfdf');
   rect(c,33,15,2,25,'#b28468');poly(c,[[29,13],[31,7],[36,5],[39,10],[37,15],[32,17]],'#233c64');poly(c,[[31,11],[33,7],[36,7],[37,10],[35,14],[32,14]],'#a0ddf2');rect(c,33,8,2,3,'#f1fff2');
+ }else if(cls==='bard'){
+  // Plumed cap, short cape and a lute held across the body.
+  poly(c,[[10,10],[13,5],[26,4],[30,9],[28,11],[12,11]],ink);poly(c,[[12,9],[15,6],[25,6],[28,9]],color);rect(c,11,10,18,2,dark);
+  poly(c,[[24,6],[31,0],[34,1],[28,7]],'#f6e7c1');rect(c,30,1,3,2,'#f29fc5');
+  poly(c,[[27,21],[33,23],[31,35],[27,33]],dark);
+  rect(c,2,24,12,11,ink);rect(c,3,25,10,9,'#b0733f');rect(c,5,27,6,5,'#d9a066');rect(c,7,28,2,2,ink);
+  rect(c,12,20,2,8,ink);rect(c,13,17,3,4,'#7a5032');rect(c,4,29,9,1,'#f1e1b5');
+ }else if(cls==='hexer'){
+  // Deep hood shading the face, a violet charm orb and a ledger-bone fetish.
+  poly(c,[[9,16],[12,5],[20,1],[28,5],[31,16],[27,18],[26,9],[14,9],[13,18]],ink);poly(c,[[11,15],[14,6],[20,3],[26,6],[29,15],[26,11],[14,11]],dark);rect(c,14,9,12,3,'#2a1a2c');
+  rect(c,15,13,2,2,'#f08bc0');rect(c,22,13,2,2,'#f08bc0');
+  rect(c,31,22,7,7,ink);rect(c,32,23,5,5,'#b04f8f');rect(c,33,24,2,2,'#ffd2ec');
+  rect(c,3,22,4,14,'#d8d2b8');rect(c,2,21,6,3,'#efe9cf');rect(c,3,25,4,1,ink);rect(c,3,29,4,1,ink);
+ }else if(cls==='monk'){
+  // Shaven head with a headband, wrapped fists raised in guard.
+  rect(c,12,6,16,5,ink);rect(c,14,7,12,4,skin);rect(c,13,10,14,2,'#c8402f');rect(c,27,9,4,2,'#c8402f');rect(c,29,11,3,4,'#c8402f');
+  rect(c,13,27,14,3,'#c8402f');rect(c,17,30,3,4,'#c8402f');
+  rect(c,4,20,7,7,ink);rect(c,5,21,5,5,'#f1e6c8');rect(c,29,18,7,7,ink);rect(c,30,19,5,5,'#f1e6c8');
+  rect(c,9,24,4,3,skin);rect(c,27,22,4,3,skin);
+ }else{
+  // Engineer: goggles on a flat cap, tool satchel, oversized spark wrench.
+  poly(c,[[10,10],[12,5],[28,5],[30,10]],ink);rect(c,12,6,16,4,'#6f5a44');rect(c,11,9,19,2,dark);
+  rect(c,13,9,6,4,ink);rect(c,21,9,6,4,ink);rect(c,14,10,4,2,'#9fe0ff');rect(c,22,10,4,2,'#9fe0ff');
+  rect(c,4,23,7,9,ink);rect(c,5,24,5,7,'#8a6a45');rect(c,5,26,5,1,'#c9a66d');
+  rect(c,32,14,3,22,ink);rect(c,33,15,1,20,'#c3c9c9');poly(c,[[29,10],[38,10],[38,15],[35,13],[32,13],[29,15]],ink);rect(c,30,11,7,2,'#d7dede');rect(c,33,8,2,3,'#ffd36b');
  }
  return el;
 }

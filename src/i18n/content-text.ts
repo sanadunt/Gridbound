@@ -19,6 +19,7 @@
 import { CAMPAIGN, ENEMIES, VARIANTS } from '../game/world';
 import { GEAR, GEAR_SETS } from '../game/jobs';
 import { D8_ULTRAS } from '../game/d8-content';
+import { R2_TEXT } from './content-text-r2';
 
 export type ContentText = { en: string; id: string };
 
@@ -37,8 +38,8 @@ const AUTHORED: Record<string, ContentText> = {
   "kit.rogue.skills.2.description": { en: "42 damage and marks the boss for 4 seconds: all attacks deal +20% damage.", id: "42 damage dan tandai boss selama 4 detik: semua serangan +20% damage." },
   "kit.rogue.skills.3.description": { en: "40 shield for the whole party and a 2-second buff for yourself.", id: "40 shield untuk seluruh party dan 2 detik buff untuk diri sendiri." },
   "kit.archer.role": { en: "Hunter of minions and weak points", id: "Pemburu minion dan weak point" },
-  "kit.archer.skills.0.description": { en: "48 damage split among minions; if the lane is clear, every arrow strikes the boss.", id: "48 damage terbagi ke minion; jika lane bersih, semua panah mengenai boss." },
-  "kit.archer.skills.1.description": { en: "79 damage to a chosen target. Click an enemy lane to take aim.", id: "79 damage pada target pilihan. Klik salah satu lane musuh untuk mengarahkan." },
+  "kit.archer.skills.0.description": { en: "62 damage split among minions; if the lane is clear, every arrow strikes the boss.", id: "62 damage terbagi ke minion; jika lane bersih, semua panah mengenai boss." },
+  "kit.archer.skills.1.description": { en: "96 damage to a chosen target. Click an enemy lane to take aim.", id: "96 damage pada target pilihan. Klik salah satu lane musuh untuk mengarahkan." },
   "kit.archer.skills.2.description": { en: "61 damage to the boss and breaks all-grid rituals. Only available if equipped before setting out.", id: "61 damage ke boss dan putus ritual all-grid. Hanya tersedia jika dipasang sebelum berangkat." },
   "kit.archer.skills.3.description": { en: "105 power split among minions, or all of it into the boss when the lane is clear.", id: "105 power dibagi ke minion, atau seluruhnya ke boss saat lane bersih." },
   "kit.healer.role": { en: "Recovery and party tempo", id: "Pemulihan dan tempo party" },
@@ -547,6 +548,8 @@ const AUTHORED: Record<string, ContentText> = {
  * pieces, Act II–IV stage names and beats, ultra variants). They are built from
  * the authored entries above with the same templates the content modules use.
  */
+Object.assign(AUTHORED, R2_TEXT);
+
 function derived(): Record<string, ContentText> {
   const out: Record<string, ContentText> = {};
   const pair = (key: string, fallback: string): ContentText => AUTHORED[key] ?? { en: fallback, id: fallback };

@@ -15,8 +15,8 @@ test('D4 fresh Roguelike has exactly three custom recruits, deterministic and de
   a.snapshot().rogueBuild!.recruits[0].classId='wizard';
   assert.equal(a.heroes[0].classId,'warrior');
 });
-test('D4 all five basic jobs including triples are valid; invalid selections are atomic', () => {
-  const build=createRogueBuild(); assert.equal(BASIC_JOBS.length,5);
+test('D4 all nine basic jobs including triples are valid; invalid selections are atomic', () => {
+  const build=createRogueBuild(); assert.equal(BASIC_JOBS.length,9);
   for(const job of BASIC_JOBS) {
     assert.equal(setRogueJobs(build,[job,job,job]),true);
     const b=new Battle('endless',1,undefined,{rogueBuild:build});

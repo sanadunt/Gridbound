@@ -192,6 +192,7 @@ export const ID: Record<keyof typeof EN, string> = {
   'formation.tile': 'Petak {n}',
   'formation.empty': '—',
   'formation.hint': 'Musuh menyerang dari atas. Memilih petak yang sudah terisi akan menukar posisi kedua hero.',
+  'formation.benched': '{name} sedang cadangan. Tambahkan ke party story di bawah untuk menempatkannya di grid.',
 
   // Bestiary
   'bestiary.tier': 'Tier {n}',
@@ -203,6 +204,8 @@ export const ID: Record<keyof typeof EN, string> = {
   'intent.weakest': 'Incar terlemah',
   'intent.strongest': 'Incar terkuat',
   'intent.all': 'Ritual seluruh grid',
+  'intent.silence': 'Lonceng senyap',
+  'intent.mend': 'Ritus pemulihan',
 
   // Raid
   'raid.hunt': 'Buru {name}',

@@ -9,5 +9,11 @@ const bios=[
 'Nyx adalah pengukir yang mengingat bengkel sebelum bangunannya ada. Ia menulis nama-nama di bahan yang sulit dihapus. Keahliannya memberi bentuk pada hal-hal yang baru berani memilih untuk ada.',
 'Orin menulis prediksi di buku yang terus mengoreksi dirinya sendiri. Ia terpaksa memilih antara peta yang selalu benar dan masa depan yang belum ditentukan. Hal paling berani yang ia lakukan adalah menutup bukunya.',
 'Mira merawat hal-hal kecil: obat, jalur evakuasi, kursi sekolah yang kosong. Ketika para pahlawan sibuk memecahkan rahasia, ia membangun cara hidup yang tidak perlu mengorbankan seseorang agar terasa aman.',
+'Tamsin menyanyikan lagu yang tidak diingat siapa pun di Emberhollow, lengkap dengan bait tentang tujuh belas anak yang hilang. Ia bukan saksi; ia hanya tidak pernah membayar lonceng dengan ingatannya. Lagunya menjadi arsip yang bisa berjalan.',
+'Vesper dulu memungut ongkos ingatan di Feri Kaca. Ia tahu rasa setiap kenangan yang pernah dijual penumpang, dan membenci dirinya karena menikmatinya. Kutukannya adalah cara mengembalikan beban kepada yang menciptakannya.',
+'Pell memperbaiki jam kota sejak umur sembilan dan diam-diam menulis catatan di setiap roda gigi. Di bangsal paduan suara, Pell menemukan bahwa mesin yang dirawatnya ikut menyimpan nyawa. Sekarang Pell membangun alat yang bisa dimatikan siapa saja.',
+'Koa bertapa di Frostward, menghitung napas agar tidak menghitung hari. Ia menulis surat untuk party di putaran sebelumnya dan lupa pernah mengirimnya. Tinjunya pelan, tetapi tidak pernah ragu.',
+'Ilse bernyanyi di pemakaman tanpa nama, untuk orang-orang yang belum meninggal. Ia percaya lagu duka bisa menjadi janji: kita akan berusaha agar lagu ini tidak pernah dibutuhkan.',
+'Hale memimpin bengkel Koperasi Hearth dan mengubah lonceng-lonceng kecil menjadi alarm, pompa, dan pemanas. Baginya keselamatan adalah pekerjaan bersama yang membosankan, dan justru karena itu ia mempercayainya.',
 ];
-export const CHARACTERS=ROSTER.map((r,id)=>({id,...r,bio:bios[id],recruitChapter:id===0||id===4||id===3?0:id===2?1:id===7?2:id===1||id===5?3:4}));
+export const CHARACTERS=ROSTER.map((r,id)=>({id,...r,bio:bios[id],recruitChapter:id===0||id===4||id===3?0:id===2?1:id===7?2:id===1||id===5?3:id<=8?4:[5,6,7,9,11,13][id-9]}));

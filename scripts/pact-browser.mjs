@@ -36,10 +36,10 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
-  await wait('document.querySelectorAll("[data-raid]").length === 12');
+  await wait('document.querySelectorAll("[data-raid]").length === 18');
 
   const bossCount = await evaluate('document.querySelectorAll("[data-raid]").length');
-  assert.equal(bossCount, 12, 'Must render all 12 authored boss archetypes');
+  assert.equal(bossCount, 18, 'Must render all 18 authored boss archetypes');
 
   // Select Moth quarry
   await click('[data-raid="moth"]');
@@ -129,7 +129,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
   await click('.world-map-wrapper .expedition-mode-nav [data-facility="raid"]');
-  await wait('document.querySelectorAll("[data-raid]").length === 12');
+  await wait('document.querySelectorAll("[data-raid]").length === 18');
   await fits('Mobile Raid Hunts');
 
   // Verify touch target heights >= 44px

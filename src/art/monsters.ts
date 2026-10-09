@@ -37,6 +37,54 @@ export function monsterCanvas(id:string,frame=0) {
     poly(c,[[31,58],[41,45],[79,45],[89,58],[83,77],[68,84],[49,84],[36,76]],'#a48252');
     rect(c,43,24,34,36,ink);rect(c,48,27,24,30,'#9b956c');rect(c,41,55,38,8,'#d0b576');rect(c,54,20,12,9,'#c6b984');rect(c,48,31,5,19,'#dcc48b');
     rect(c,39,67,6,5,'#f3d391');rect(c,75,67,6,5,'#f3d391');rect(c,50,77,20,3,ink);
+  } else if(id==='lich') {
+    // Robed archivist with a floating ledger and pale lantern eyes.
+    poly(c,[[38,20],[60,6],[82,20],[88,52],[98,104],[22,104],[32,52]],ink);
+    poly(c,[[42,24],[60,12],[78,24],[83,52],[90,98],[30,98],[37,52]],'#4b4a6b');
+    poly(c,[[48,26],[60,17],[72,26],[72,44],[48,44]],'#d9d6c3');rect(c,52,31,6,4,'#8ff0ff');rect(c,63,31,6,4,'#8ff0ff');rect(c,54,40,12,2,ink);
+    poly(c,[[45,58],[75,58],[80,96],[40,96]],'#6d6a92');for(let i=0;i<4;i++)rect(c,46,64+i*8,28,2,'#a9a4cc');
+    rect(c,86,46+(frame%2)*2,26,20,ink);rect(c,88,48+(frame%2)*2,22,16,'#efe6c6');rect(c,98,48+(frame%2)*2,2,16,'#b39a6a');for(let i=0;i<3;i++)rect(c,90,52+i*4+(frame%2)*2,7,1,'#7b6a4a');
+    rect(c,8,52,10,14,ink);rect(c,10,54,6,10,'#8ff0ff');rect(c,12,40,2,14,ink);
+  } else if(id==='knight') {
+    // Hollow plate armour, notched greatsword raised overhead.
+    poly(c,[[42,18],[60,8],[78,18],[80,40],[92,52],[88,82],[96,104],[70,104],[60,86],[50,104],[24,104],[32,82],[28,52],[40,40]],ink);
+    poly(c,[[46,20],[60,13],[74,20],[75,38],[45,38]],'#8c98a0');rect(c,48,26,24,4,ink);rect(c,52,27,16,2,'#ff7a5c');
+    poly(c,[[36,44],[84,44],[86,78],[34,78]],'#6f7b84');poly(c,[[44,48],[76,48],[74,70],[46,70]],'#a7b3b8');rect(c,58,48,4,22,'#59646c');
+    poly(c,[[38,80],[56,80],[54,100],[30,100]],'#59646c');poly(c,[[64,80],[82,80],[90,100],[66,100]],'#59646c');
+    rect(c,94,4,8,64,ink);rect(c,96,6,4,58,'#cfd8d8');rect(c,88,64,20,6,ink);rect(c,90,65,16,4,'#b08a55');rect(c,96,8,4,4,ink);
+  } else if(id==='hydra') {
+    // Three glassy necks rising from a shared body.
+    poly(c,[[18,104],[26,76],[46,66],[74,66],[94,76],[102,104]],ink);poly(c,[[24,100],[30,80],[48,72],[72,72],[90,80],[96,100]],'#3f7f86');
+    for(const [x,top,sway] of [[34,22,-1],[60,10,0],[86,24,1]]){
+      const w=(frame%2)*2*sway;
+      poly(c,[[x-7+w,top+8],[x+w,top],[x+8+w,top+6],[x+6,74],[x-6,74]],ink);poly(c,[[x-4+w,top+10],[x+w,top+4],[x+5+w,top+9],[x+3,72],[x-3,72]],'#6fc3c4');
+      rect(c,x-6+w,top+3,13,9,ink);rect(c,x-4+w,top+5,9,5,'#9fe5e0');rect(c,x+1+w,top+6,3,2,'#ffe28a');
+    }
+    for(let i=0;i<5;i++)rect(c,34+i*11,82+(i%2)*4,6,3,'#c8f4f0');
+  } else if(id==='harpy') {
+    // Storm harrier mid-dive, wide feathered wings.
+    const flap=(frame%2)*8;
+    for(const side of [-1,1]){poly(c,[[60,46],[60+side*52,18+flap],[60+side*46,46],[60+side*30,62],[60+side*12,66]],ink);poly(c,[[60,48],[60+side*46,24+flap],[60+side*40,44],[60+side*27,56],[60+side*12,60]],'#8a8fb8');for(let i=0;i<3;i++)rect(c,60+side*(20+i*9)-2,40+i*3+flap/2,4,12,'#c9cdeb');}
+    poly(c,[[48,30],[60,20],[72,30],[74,70],[66,92],[54,92],[46,70]],ink);poly(c,[[51,32],[60,25],[69,32],[70,68],[64,86],[56,86],[50,68]],'#b7a68b');
+    rect(c,53,34,5,3,'#ffe066');rect(c,63,34,5,3,'#ffe066');poly(c,[[57,40],[63,40],[60,46]],'#e0a040');
+    rect(c,50,92,6,8,ink);rect(c,64,92,6,8,ink);rect(c,48,98,10,3,'#e0a040');rect(c,62,98,10,3,'#e0a040');
+  } else if(id==='colossus') {
+    // Hunched glacier giant with a cracked ice core.
+    poly(c,[[16,104],[20,60],[34,30],[60,16],[86,30],[100,60],[104,104]],ink);
+    poly(c,[[22,100],[26,62],[38,36],[60,23],[82,36],[94,62],[98,100]],'#7fa6c4');
+    poly(c,[[44,40],[60,32],[76,40],[72,54],[48,54]],'#b9d8ec');rect(c,50,44,6,3,'#173a5c');rect(c,64,44,6,3,'#173a5c');
+    poly(c,[[50,62],[70,62],[66,88],[54,88]],'#dff4ff');rect(c,58,66,4,18,'#7ad0ff');rect(c,54,74,12,2,'#7ad0ff');
+    rect(c,4,60,18,30,ink);rect(c,6,62,14,26,'#9ec2db');rect(c,98,60,18,30,ink);rect(c,100,62,14,26,'#9ec2db');
+    for(let i=0;i<4;i++)rect(c,28+i*18,96,8,4,'#e8f6ff');
+  } else if(id==='choir') {
+    // A bronze bell frame with three faceless singers hanging inside.
+    rect(c,14,10,92,8,ink);rect(c,16,12,88,4,'#b08a55');rect(c,14,10,8,94,ink);rect(c,98,10,8,94,ink);rect(c,16,12,4,90,'#8a6a40');rect(c,100,12,4,90,'#8a6a40');
+    for(const [x,y] of [[36,30],[60,22],[84,30]]){
+      const swing=(frame%2)*2;
+      rect(c,x-1,18,2,y-18,ink);poly(c,[[x-12+swing,y+30],[x-8+swing,y+6],[x+swing,y],[x+8+swing,y+6],[x+12+swing,y+30]],ink);
+      poly(c,[[x-9+swing,y+28],[x-6+swing,y+8],[x+swing,y+3],[x+6+swing,y+8],[x+9+swing,y+28]],'#d6c9a6');rect(c,x-4+swing,y+14,8,3,ink);rect(c,x-3+swing,y+20,6,5,'#3a2a20');
+    }
+    poly(c,[[30,76],[60,66],[90,76],[94,100],[26,100]],ink);poly(c,[[34,78],[60,70],[86,78],[89,96],[31,96]],'#c08a3e');rect(c,56,84,8,8,'#ffe9a8');
   } else if(id==='revenant') {
     poly(c,[[43,23],[54,13],[73,18],[79,36],[90,49],[87,77],[100,105],[72,96],[60,107],[39,97],[24,105],[35,70],[29,48],[43,39]],ink);
     poly(c,[[44,43],[74,41],[83,53],[77,75],[87,96],[68,88],[60,100],[43,89],[33,96],[43,71],[36,53]],'#45695c');

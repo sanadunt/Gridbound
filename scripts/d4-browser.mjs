@@ -8,7 +8,7 @@ import { withBrowser } from './browser-harness.mjs';
 const port = 5185;
 const url = `http://127.0.0.1:${port}/`;
 const artifactPath = join(process.cwd(), 'artifacts', 'd4-browser-report.json');
-const basicJobs = ['warrior', 'rogue', 'archer', 'healer', 'wizard'];
+const basicJobs = ['warrior', 'rogue', 'archer', 'healer', 'wizard', 'bard', 'hexer', 'monk', 'engineer'];
 const freshBaseline = {
   storyIds: [0, 4, 3],
   storyNames: ['Aldric', 'Lyra', 'Rowan'],
@@ -264,7 +264,7 @@ async function runBrowserScenario() {
         requireEqual(actual.allSelectCount, 3, 'all setup select count');
         requireEqual(actual.rogueSelectCount, 3, 'Roguelike selector count');
         requireEqual(actual.slots, [0, 1, 2], 'Roguelike selector slots');
-        requireTrue(actual.options.every(options => isDeepStrictEqual(options, basicJobs)), 'every selector must expose exactly the five basic jobs');
+        requireTrue(actual.options.every(options => isDeepStrictEqual(options, basicJobs)), 'every selector must expose exactly the nine basic jobs');
         return actual;
       });
 

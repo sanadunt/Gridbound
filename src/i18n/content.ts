@@ -22,6 +22,7 @@ import { STORY_CHOICES } from '../game/narrative';
 import { D8_ADVANCED_PATHS, D8_THIRD_PATHS, D8_ULTRAS } from '../game/d8-content';
 import { CHALLENGE_SHOP, BANK_SHOP, RAID_MODIFIERS, type RaidModifier } from '../economy/challenge';
 import { CONTENT_TEXT, type ContentText } from './content-text';
+import { R2_EVENT_TEXT } from './content-text-r2';
 
 export type ContentLang = 'en' | 'id';
 export { CONTENT_TEXT };
@@ -146,6 +147,7 @@ export function localizedRaidModifier(modifier: RaidModifier, lang: ContentLang)
 // Runtime event text (simulation.ts banners, floating texts, threats).
 
 const EVENT_TEXT: ContentText[] = [
+  ...R2_EVENT_TEXT,
   // Threat names (Battle.telegraph). EMERALD CATACLYSM is Vharok's named attack and stays as is.
   { en: 'HUNT THE WOUNDED', id: 'BURU YANG TERLUKA' },
   { en: 'BREAK THE STRONG', id: 'PATAHKAN YANG KUAT' },

@@ -51,7 +51,9 @@ export function equipGear(p:Profile,id:number,gearId:string) {
 }
 export function moveFormation(p:Profile,heroId:number,slot:number) {
   const h=loadout(p,heroId);if(!h||!Number.isInteger(slot)||slot<0||slot>8||slot===h.slot)return false;
-  const other=p.roster.find(id=>p.loadouts[id].slot===slot);
+  // Only the deployed party shares the 3x3 grid; benched heroes keep a preferred tile.
+  const party=p.storyActive.includes(heroId)?p.storyActive:p.roster;
+  const other=party.find(id=>id!==heroId&&p.loadouts[id].slot===slot);
   if(other!==undefined)p.loadouts[other].slot=h.slot;
   h.slot=slot;return true;
 }
@@ -61,7 +63,7 @@ export function completeZone(p:Profile,index:number) {
   p.cleared.push(index);
   for(const id of CAMPAIGN[index].recruit)if(!p.roster.includes(id)){
     const occupied=new Set(p.roster.map(id=>p.loadouts[id].slot));
-    const slot=Array.from({length:9},(_,i)=>i).find(i=>!occupied.has(i))!;
+    const slot=Array.from({length:9},(_,i)=>i).find(i=>!occupied.has(i))??ROSTER[id].slot;
     const levels=p.roster.map(i=>heroProgress(p.loadouts[i].xp).level).sort((a,b)=>a-b);
     p.loadouts[id]={skills:[0,1],talents:[],slot,xp:xpForLevel(levels[Math.floor(levels.length/2)]??1)};p.roster.push(id);
   }
@@ -123,7 +125,7 @@ export function normalizeProfile(raw:unknown,legacy?:unknown):Profile {
     h.skills=valid.length===2?valid:[0,1];
     const slot=source.slot;
     if(typeof slot==='number'&&Number.isInteger(slot)&&slot>=0&&slot<=8&&!occupied.has(slot))h.slot=slot;
-    else if(occupied.has(h.slot))h.slot=Array.from({length:9},(_,i)=>i).find(i=>!occupied.has(i))!;
+    else if(occupied.has(h.slot))h.slot=Array.from({length:9},(_,i)=>i).find(i=>!occupied.has(i))??ROSTER[id].slot;
     occupied.add(h.slot);
   }
   const ledger=record(data.ledger),enemies=record(ledger.enemies);

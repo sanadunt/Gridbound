@@ -190,6 +190,7 @@ export const EN = {
   'formation.tile': 'Tile {n}',
   'formation.empty': '—',
   'formation.hint': 'Enemies attack from the top. Picking an occupied tile swaps the two heroes.',
+  'formation.benched': '{name} is on the bench. Add them to the story party below to deploy them on the grid.',
 
   // Bestiary
   'bestiary.tier': 'Tier {n}',
@@ -201,6 +202,8 @@ export const EN = {
   'intent.weakest': 'Mark weakest',
   'intent.strongest': 'Mark strongest',
   'intent.all': 'All-grid ritual',
+  'intent.silence': 'Tolling silence',
+  'intent.mend': 'Mending rite',
 
   // Raid
   'raid.hunt': 'Hunt {name}',

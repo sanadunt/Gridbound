@@ -73,6 +73,54 @@
       "slot": 8,
       "bio": "Mira merawat hal-hal kecil: obat, jalur evakuasi, kursi sekolah yang kosong. Ketika para pahlawan sibuk memecahkan rahasia, ia membangun cara hidup yang tidak perlu mengorbankan seseorang agar terasa aman.",
       "recruitChapter": 4
+    },
+    {
+      "id": 9,
+      "name": "Tamsin",
+      "classId": "bard",
+      "slot": 4,
+      "bio": "Tamsin menyanyikan lagu yang tidak diingat siapa pun di Emberhollow, lengkap dengan bait tentang tujuh belas anak yang hilang. Ia bukan saksi; ia hanya tidak pernah membayar lonceng dengan ingatannya. Lagunya menjadi arsip yang bisa berjalan.",
+      "recruitChapter": 5
+    },
+    {
+      "id": 10,
+      "name": "Vesper",
+      "classId": "hexer",
+      "slot": 7,
+      "bio": "Vesper dulu memungut ongkos ingatan di Feri Kaca. Ia tahu rasa setiap kenangan yang pernah dijual penumpang, dan membenci dirinya karena menikmatinya. Kutukannya adalah cara mengembalikan beban kepada yang menciptakannya.",
+      "recruitChapter": 6
+    },
+    {
+      "id": 11,
+      "name": "Pell",
+      "classId": "engineer",
+      "slot": 6,
+      "bio": "Pell memperbaiki jam kota sejak umur sembilan dan diam-diam menulis catatan di setiap roda gigi. Di bangsal paduan suara, Pell menemukan bahwa mesin yang dirawatnya ikut menyimpan nyawa. Sekarang Pell membangun alat yang bisa dimatikan siapa saja.",
+      "recruitChapter": 7
+    },
+    {
+      "id": 12,
+      "name": "Koa",
+      "classId": "monk",
+      "slot": 1,
+      "bio": "Koa bertapa di Frostward, menghitung napas agar tidak menghitung hari. Ia menulis surat untuk party di putaran sebelumnya dan lupa pernah mengirimnya. Tinjunya pelan, tetapi tidak pernah ragu.",
+      "recruitChapter": 9
+    },
+    {
+      "id": 13,
+      "name": "Ilse",
+      "classId": "bard",
+      "slot": 5,
+      "bio": "Ilse bernyanyi di pemakaman tanpa nama, untuk orang-orang yang belum meninggal. Ia percaya lagu duka bisa menjadi janji: kita akan berusaha agar lagu ini tidak pernah dibutuhkan.",
+      "recruitChapter": 11
+    },
+    {
+      "id": 14,
+      "name": "Hale",
+      "classId": "engineer",
+      "slot": 8,
+      "bio": "Hale memimpin bengkel Koperasi Hearth dan mengubah lonceng-lonceng kecil menjadi alarm, pompa, dan pemanas. Baginya keselamatan adalah pekerjaan bersama yang membosankan, dan justru karena itu ia mempercayainya.",
+      "recruitChapter": 13
     }
   ],
   "basicJobs": {
@@ -230,17 +278,17 @@
           "name": "Split Arrow",
           "label": "VOLLEY",
           "cooldown": 4.4,
-          "power": 48,
+          "power": 62,
           "kind": "aoe",
-          "description": "48 damage terbagi ke minion; jika lane bersih, semua panah mengenai boss."
+          "description": "62 damage terbagi ke minion; jika lane bersih, semua panah mengenai boss."
         },
         {
           "name": "Pinpoint",
           "label": "TARGET",
-          "cooldown": 5,
-          "power": 79,
+          "cooldown": 4.8,
+          "power": 96,
           "kind": "attack",
-          "description": "79 damage pada target pilihan. Klik salah satu lane musuh untuk mengarahkan."
+          "description": "96 damage pada target pilihan. Klik salah satu lane musuh untuk mengarahkan."
         },
         {
           "name": "Silence Arrow",
@@ -433,6 +481,294 @@
           "power": 147,
           "kind": "interrupt",
           "description": "147 damage dan putus ritual; mendorong mundur jadwal intent berikutnya."
+        }
+      ]
+    },
+    "bard": {
+      "name": "Bard",
+      "color": "#f29fc5",
+      "hp": 300,
+      "role": "Irama yang mempercepat party",
+      "skills": [
+        {
+          "name": "Quickstep Reel",
+          "label": "HASTE",
+          "cooldown": 6,
+          "power": 1.7,
+          "kind": "haste",
+          "description": "Cooldown tersisa setiap hero lain berkurang 1,7 detik. Tempo party jadi senjata."
+        },
+        {
+          "name": "Discordant Note",
+          "label": "DISCORD",
+          "cooldown": 5,
+          "power": 58,
+          "kind": "weaken",
+          "description": "58 damage dan lemahkan musuh 5 detik: semua damage musuh −25%."
+        },
+        {
+          "name": "Lullaby",
+          "label": "LULL",
+          "cooldown": 8,
+          "power": 2.2,
+          "kind": "delay",
+          "description": "Tunda intent musuh berikutnya 2,2 detik. Telegraph yang sudah muncul tetap berjalan."
+        },
+        {
+          "name": "Encore",
+          "label": "ENCORE",
+          "cooldown": 9,
+          "power": 14,
+          "kind": "resolve",
+          "description": "Isi 14 Resolve. Ninefold Dawn datang lebih cepat."
+        },
+        {
+          "name": "Rousing Chorus",
+          "label": "CHORUS",
+          "cooldown": 6.5,
+          "power": 0,
+          "kind": "buff",
+          "description": "Battle Hymn seluruh party: +30% damage dan +20% tempo."
+        },
+        {
+          "name": "War Drum",
+          "label": "DRUM",
+          "cooldown": 7,
+          "power": 2,
+          "kind": "haste",
+          "description": "Cooldown tersisa setiap hero berkurang 2 detik."
+        },
+        {
+          "name": "Grand Finale",
+          "label": "FINALE",
+          "cooldown": 9,
+          "power": 24,
+          "kind": "resolve",
+          "description": "Isi 24 Resolve sekaligus. Ninefold Dawn menjadi ritme party."
+        },
+        {
+          "name": "Storm Cadence",
+          "label": "CADENCE",
+          "cooldown": 7.5,
+          "power": 165,
+          "kind": "aoe",
+          "description": "165 power dibagi ke minion; seluruhnya ke boss saat lane bersih."
+        }
+      ]
+    },
+    "hexer": {
+      "name": "Hexer",
+      "color": "#d0638a",
+      "hp": 265,
+      "role": "Kutukan dan damage berkelanjutan",
+      "skills": [
+        {
+          "name": "Withering Hex",
+          "label": "HEX",
+          "cooldown": 5,
+          "power": 18,
+          "kind": "curse",
+          "description": "Kutuk boss: 18 damage per detik selama 6 detik. Recast memperbarui kutukan."
+        },
+        {
+          "name": "Soul Siphon",
+          "label": "SIPHON",
+          "cooldown": 4.6,
+          "power": 52,
+          "kind": "drain",
+          "description": "52 damage; rekan paling terluka pulih sebesar 50% damage itu."
+        },
+        {
+          "name": "Hollow Pact",
+          "label": "PACT",
+          "cooldown": 6,
+          "power": 170,
+          "kind": "sacrifice",
+          "description": "Korbankan 8% HP sendiri untuk 170 damage ke boss."
+        },
+        {
+          "name": "Unravel",
+          "label": "UNRAVEL",
+          "cooldown": 7.5,
+          "power": 70,
+          "kind": "interrupt",
+          "description": "70 damage dan putus ritual all-grid yang sedang berjalan."
+        },
+        {
+          "name": "Rot Bloom",
+          "label": "ROT",
+          "cooldown": 6,
+          "power": 30,
+          "kind": "curse",
+          "description": "Kutukan 30 damage per detik selama 6 detik."
+        },
+        {
+          "name": "Grave Tithe",
+          "label": "TITHE",
+          "cooldown": 5,
+          "power": 95,
+          "kind": "drain",
+          "description": "95 damage; rekan paling terluka pulih 50% damage itu."
+        },
+        {
+          "name": "Black Harvest",
+          "label": "HARVEST",
+          "cooldown": 7.5,
+          "power": 52,
+          "kind": "curse",
+          "description": "Kutukan 52 damage per detik selama 6 detik."
+        },
+        {
+          "name": "Ossuary Ward",
+          "label": "OSSUARY",
+          "cooldown": 8,
+          "power": 92,
+          "kind": "partyshield",
+          "description": "92 shield untuk seluruh party dari tulang yang dibangkitkan."
+        }
+      ]
+    },
+    "monk": {
+      "name": "Monk",
+      "color": "#f2c14e",
+      "hp": 380,
+      "role": "Petarung combo dan counter",
+      "skills": [
+        {
+          "name": "Palm Strike",
+          "label": "COMBO",
+          "cooldown": 3.2,
+          "power": 34,
+          "kind": "combo",
+          "description": "34 damage, +12% per cast beruntun (maks 5 tumpukan). Hantaman telegraph mereset combo."
+        },
+        {
+          "name": "Iron Stance",
+          "label": "COUNTER",
+          "cooldown": 6.5,
+          "power": 60,
+          "kind": "counter",
+          "description": "Selama 3,5 detik damage ke hero ini −50% dan setiap pukulan dibalas 60 damage."
+        },
+        {
+          "name": "Hundred Fists",
+          "label": "FLURRY",
+          "cooldown": 6,
+          "power": 120,
+          "kind": "flurry",
+          "description": "Rentetan pukulan total 120 damage; stagger boss terisi dua kali lipat."
+        },
+        {
+          "name": "Inner Calm",
+          "label": "CALM",
+          "cooldown": 8,
+          "power": 0.3,
+          "kind": "selfheal",
+          "description": "Pulihkan 30% HP sendiri dan hapus semua fatigue."
+        },
+        {
+          "name": "Seven Gates",
+          "label": "GATES",
+          "cooldown": 3.6,
+          "power": 52,
+          "kind": "combo",
+          "description": "52 damage, +12% per cast beruntun (maks 5 tumpukan)."
+        },
+        {
+          "name": "Mountain Guard",
+          "label": "MOUNTAIN",
+          "cooldown": 7,
+          "power": 110,
+          "kind": "counter",
+          "description": "3,5 detik counter: damage masuk −50%, setiap pukulan dibalas 110."
+        },
+        {
+          "name": "Void Palm",
+          "label": "VOID",
+          "cooldown": 7,
+          "power": 230,
+          "kind": "flurry",
+          "description": "Rentetan total 230 damage; stagger terisi dua kali lipat."
+        },
+        {
+          "name": "Temple Wall",
+          "label": "TEMPLE",
+          "cooldown": 7.5,
+          "power": 165,
+          "kind": "counter",
+          "description": "3,5 detik counter: damage masuk −50%, setiap pukulan dibalas 165."
+        }
+      ]
+    },
+    "engineer": {
+      "name": "Engineer",
+      "color": "#d98f5c",
+      "hp": 320,
+      "role": "Turret, perangkap, dan perbaikan",
+      "skills": [
+        {
+          "name": "Spark Turret",
+          "label": "TURRET",
+          "cooldown": 7,
+          "power": 22,
+          "kind": "turret",
+          "description": "Pasang turret di lane sendiri: 22 damage per detik selama 6 detik ke target terdepan."
+        },
+        {
+          "name": "Flash Mine",
+          "label": "STUN",
+          "cooldown": 7.5,
+          "power": 1.6,
+          "kind": "stun",
+          "description": "Tunda serangan musuh berikutnya 1,6 detik dan isi stagger boss 120."
+        },
+        {
+          "name": "Patch Kit",
+          "label": "REPAIR",
+          "cooldown": 14,
+          "power": 1,
+          "kind": "repair",
+          "description": "Tambah 1 potion (maks 3). Sekali per stage."
+        },
+        {
+          "name": "Overclock",
+          "label": "OVERCLOCK",
+          "cooldown": 8,
+          "power": 1.8,
+          "kind": "haste",
+          "description": "Cooldown tersisa setiap hero berkurang 1,8 detik."
+        },
+        {
+          "name": "Shrapnel Bloom",
+          "label": "SHRAPNEL",
+          "cooldown": 7,
+          "power": 150,
+          "kind": "aoe",
+          "description": "150 power dibagi ke minion; seluruhnya ke boss saat lane bersih."
+        },
+        {
+          "name": "Ember Mine",
+          "label": "MINE",
+          "cooldown": 8,
+          "power": 2.4,
+          "kind": "stun",
+          "description": "Tunda serangan musuh berikutnya 2,4 detik dan isi stagger 120."
+        },
+        {
+          "name": "Brass Sentinel",
+          "label": "SENTINEL",
+          "cooldown": 9,
+          "power": 48,
+          "kind": "turret",
+          "description": "Turret besar: 48 damage per detik selama 6 detik di lane sendiri."
+        },
+        {
+          "name": "Siege Charge",
+          "label": "SIEGE",
+          "cooldown": 8,
+          "power": 260,
+          "kind": "attack",
+          "description": "260 damage ke target terdepan di lane sendiri."
         }
       ]
     }
@@ -826,6 +1162,318 @@
         "power": 147,
         "kind": "interrupt",
         "description": "147 damage dan putus ritual; mendorong mundur jadwal intent berikutnya."
+      }
+    },
+    "troubadour": {
+      "id": "troubadour",
+      "base": "bard",
+      "name": "Troubadour",
+      "tier": 2,
+      "level": 4,
+      "cost": 180,
+      "index": 4,
+      "effect": "hymn",
+      "description": "Buff berlangsung 3 detik lebih lama. Setiap cast menambah 2 Resolve.",
+      "skill": {
+        "name": "Rousing Chorus",
+        "label": "CHORUS",
+        "cooldown": 6.5,
+        "power": 0,
+        "kind": "buff",
+        "description": "Battle Hymn seluruh party: +30% damage dan +20% tempo."
+      }
+    },
+    "skald": {
+      "id": "skald",
+      "base": "bard",
+      "name": "War Skald",
+      "tier": 2,
+      "level": 4,
+      "cost": 180,
+      "index": 5,
+      "effect": "time",
+      "description": "Semua cooldown milik hero ini 15% lebih cepat.",
+      "skill": {
+        "name": "War Drum",
+        "label": "DRUM",
+        "cooldown": 7,
+        "power": 2,
+        "kind": "haste",
+        "description": "Cooldown tersisa setiap hero berkurang 2 detik."
+      }
+    },
+    "maestro": {
+      "id": "maestro",
+      "base": "bard",
+      "name": "Maestro",
+      "tier": 3,
+      "parent": "troubadour",
+      "level": 10,
+      "cost": 420,
+      "index": 6,
+      "effect": "hymn",
+      "description": "Hymn tetap aktif. Mulai expedition dengan barrier 25% HP.",
+      "skill": {
+        "name": "Grand Finale",
+        "label": "FINALE",
+        "cooldown": 9,
+        "power": 24,
+        "kind": "resolve",
+        "description": "Isi 24 Resolve sekaligus. Ninefold Dawn menjadi ritme party."
+      }
+    },
+    "thunder-skald": {
+      "id": "thunder-skald",
+      "base": "bard",
+      "name": "Thunder Skald",
+      "tier": 3,
+      "parent": "skald",
+      "level": 10,
+      "cost": 420,
+      "index": 7,
+      "effect": "time",
+      "description": "Tempo Skald tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik.",
+      "skill": {
+        "name": "Storm Cadence",
+        "label": "CADENCE",
+        "cooldown": 7.5,
+        "power": 165,
+        "kind": "aoe",
+        "description": "165 power dibagi ke minion; seluruhnya ke boss saat lane bersih."
+      }
+    },
+    "witch": {
+      "id": "witch",
+      "base": "hexer",
+      "name": "Bog Witch",
+      "tier": 2,
+      "level": 4,
+      "cost": 180,
+      "index": 4,
+      "effect": "execute",
+      "description": "Power +35% ketika musuh utama di bawah 40% HP.",
+      "skill": {
+        "name": "Rot Bloom",
+        "label": "ROT",
+        "cooldown": 6,
+        "power": 30,
+        "kind": "curse",
+        "description": "Kutukan 30 damage per detik selama 6 detik."
+      }
+    },
+    "soulbinder": {
+      "id": "soulbinder",
+      "base": "hexer",
+      "name": "Soulbinder",
+      "tier": 2,
+      "level": 4,
+      "cost": 180,
+      "index": 5,
+      "effect": "leech",
+      "description": "Cast ofensif memulihkan 12% power. Kutukan menjadi sustain.",
+      "skill": {
+        "name": "Grave Tithe",
+        "label": "TITHE",
+        "cooldown": 5,
+        "power": 95,
+        "kind": "drain",
+        "description": "95 damage; rekan paling terluka pulih 50% damage itu."
+      }
+    },
+    "plague-saint": {
+      "id": "plague-saint",
+      "base": "hexer",
+      "name": "Plague Saint",
+      "tier": 3,
+      "parent": "witch",
+      "level": 10,
+      "cost": 420,
+      "index": 6,
+      "effect": "execute",
+      "description": "Execute tetap aktif. Setiap cast kelima memicu echo 40%.",
+      "skill": {
+        "name": "Black Harvest",
+        "label": "HARVEST",
+        "cooldown": 7.5,
+        "power": 52,
+        "kind": "curse",
+        "description": "Kutukan 52 damage per detik selama 6 detik."
+      }
+    },
+    "lich-warden": {
+      "id": "lich-warden",
+      "base": "hexer",
+      "name": "Lich Warden",
+      "tier": 3,
+      "parent": "soulbinder",
+      "level": 10,
+      "cost": 420,
+      "index": 7,
+      "effect": "leech",
+      "description": "Leech tetap aktif. Mulai expedition dengan barrier 25% HP.",
+      "skill": {
+        "name": "Ossuary Ward",
+        "label": "OSSUARY",
+        "cooldown": 8,
+        "power": 92,
+        "kind": "partyshield",
+        "description": "92 shield untuk seluruh party dari tulang yang dibangkitkan."
+      }
+    },
+    "ascetic": {
+      "id": "ascetic",
+      "base": "monk",
+      "name": "Ascetic",
+      "tier": 2,
+      "level": 4,
+      "cost": 180,
+      "index": 4,
+      "effect": "precision",
+      "description": "Setiap cast ofensif ketiga menghasilkan 1,6× power.",
+      "skill": {
+        "name": "Seven Gates",
+        "label": "GATES",
+        "cooldown": 3.6,
+        "power": 52,
+        "kind": "combo",
+        "description": "52 damage, +12% per cast beruntun (maks 5 tumpukan)."
+      }
+    },
+    "iron-fist": {
+      "id": "iron-fist",
+      "base": "monk",
+      "name": "Iron Fist",
+      "tier": 2,
+      "level": 4,
+      "cost": 180,
+      "index": 5,
+      "effect": "rage",
+      "description": "Saat HP di bawah 50%, power +40%. Counter makin berbahaya.",
+      "skill": {
+        "name": "Mountain Guard",
+        "label": "MOUNTAIN",
+        "cooldown": 7,
+        "power": 110,
+        "kind": "counter",
+        "description": "3,5 detik counter: damage masuk −50%, setiap pukulan dibalas 110."
+      }
+    },
+    "void-palm": {
+      "id": "void-palm",
+      "base": "monk",
+      "name": "Void Palm",
+      "tier": 3,
+      "parent": "ascetic",
+      "level": 10,
+      "cost": 420,
+      "index": 6,
+      "effect": "precision",
+      "description": "Precision tetap aktif. Setiap cast kelima memicu echo 40%.",
+      "skill": {
+        "name": "Void Palm",
+        "label": "VOID",
+        "cooldown": 7,
+        "power": 230,
+        "kind": "flurry",
+        "description": "Rentetan total 230 damage; stagger terisi dua kali lipat."
+      }
+    },
+    "temple-wall": {
+      "id": "temple-wall",
+      "base": "monk",
+      "name": "Temple Wall",
+      "tier": 3,
+      "parent": "iron-fist",
+      "level": 10,
+      "cost": 420,
+      "index": 7,
+      "effect": "rage",
+      "description": "Rage tetap aktif; setiap cast ofensif memulihkan 8% power skill.",
+      "skill": {
+        "name": "Temple Wall",
+        "label": "TEMPLE",
+        "cooldown": 7.5,
+        "power": 165,
+        "kind": "counter",
+        "description": "3,5 detik counter: damage masuk −50%, setiap pukulan dibalas 165."
+      }
+    },
+    "artificer": {
+      "id": "artificer",
+      "base": "engineer",
+      "name": "Artificer",
+      "tier": 2,
+      "level": 4,
+      "cost": 180,
+      "index": 4,
+      "effect": "elements",
+      "description": "Power skill AoE +30%.",
+      "skill": {
+        "name": "Shrapnel Bloom",
+        "label": "SHRAPNEL",
+        "cooldown": 7,
+        "power": 150,
+        "kind": "aoe",
+        "description": "150 power dibagi ke minion; seluruhnya ke boss saat lane bersih."
+      }
+    },
+    "sapper": {
+      "id": "sapper",
+      "base": "engineer",
+      "name": "Sapper",
+      "tier": 2,
+      "level": 4,
+      "cost": 180,
+      "index": 5,
+      "effect": "hunter",
+      "description": "Semua serangan ke minion +45%.",
+      "skill": {
+        "name": "Ember Mine",
+        "label": "MINE",
+        "cooldown": 8,
+        "power": 2.4,
+        "kind": "stun",
+        "description": "Tunda serangan musuh berikutnya 2,4 detik dan isi stagger 120."
+      }
+    },
+    "clockwright": {
+      "id": "clockwright",
+      "base": "engineer",
+      "name": "Clockwright",
+      "tier": 3,
+      "parent": "artificer",
+      "level": 10,
+      "cost": 420,
+      "index": 6,
+      "effect": "elements",
+      "description": "Elements tetap aktif. Setiap cast kelima memicu echo 40%.",
+      "skill": {
+        "name": "Brass Sentinel",
+        "label": "SENTINEL",
+        "cooldown": 9,
+        "power": 48,
+        "kind": "turret",
+        "description": "Turret besar: 48 damage per detik selama 6 detik di lane sendiri."
+      }
+    },
+    "demolisher": {
+      "id": "demolisher",
+      "base": "engineer",
+      "name": "Demolisher",
+      "tier": 3,
+      "parent": "sapper",
+      "level": 10,
+      "cost": 420,
+      "index": 7,
+      "effect": "hunter",
+      "description": "Hunter tetap aktif. Membunuh minion memulihkan party 18 HP.",
+      "skill": {
+        "name": "Siege Charge",
+        "label": "SIEGE",
+        "cooldown": 8,
+        "power": 260,
+        "kind": "attack",
+        "description": "260 damage ke target terdepan di lane sendiri."
       }
     }
   },
@@ -1433,6 +2081,235 @@
       "cost": 92,
       "branch": "class",
       "classId": "wizard"
+    },
+    {
+      "id": "bard-1",
+      "name": "Steady Tempo",
+      "description": "+6% tempo.",
+      "level": 5,
+      "points": 1,
+      "requires": "focus",
+      "effect": {
+        "tempo": 0.06
+      },
+      "cost": 40,
+      "branch": "class",
+      "classId": "bard"
+    },
+    {
+      "id": "bard-2",
+      "name": "Warm Voice",
+      "description": "Heal yang diberikan +10% dan barrier awal 6% HP.",
+      "level": 9,
+      "points": 1,
+      "requires": "bard-1",
+      "effect": {
+        "heal": 0.1,
+        "openingBarrier": 0.06
+      },
+      "cost": 56,
+      "branch": "class",
+      "classId": "bard"
+    },
+    {
+      "id": "bard-3",
+      "name": "Counterpoint",
+      "description": "Echo ofensif kelima +15%.",
+      "level": 14,
+      "points": 2,
+      "requires": "bard-2",
+      "effect": {
+        "echo": 0.15
+      },
+      "cost": 76,
+      "branch": "class",
+      "classId": "bard"
+    },
+    {
+      "id": "bard-4",
+      "name": "Standing Ovation",
+      "description": "+8% tempo dan tap +0,08s.",
+      "level": 18,
+      "points": 2,
+      "requires": "bard-3",
+      "effect": {
+        "tempo": 0.08,
+        "tapBonus": 0.08
+      },
+      "cost": 92,
+      "branch": "class",
+      "classId": "bard"
+    },
+    {
+      "id": "hexer-1",
+      "name": "Bitter Ink",
+      "description": "+8% power.",
+      "level": 5,
+      "points": 1,
+      "requires": "focus",
+      "effect": {
+        "power": 0.08
+      },
+      "cost": 40,
+      "branch": "class",
+      "classId": "hexer"
+    },
+    {
+      "id": "hexer-2",
+      "name": "Borrowed Breath",
+      "description": "Cast ofensif memulihkan diri 5% power.",
+      "level": 9,
+      "points": 1,
+      "requires": "hexer-1",
+      "effect": {
+        "leech": 0.05
+      },
+      "cost": 56,
+      "branch": "class",
+      "classId": "hexer"
+    },
+    {
+      "id": "hexer-3",
+      "name": "Lingering Curse",
+      "description": "Echo ofensif kelima +18%.",
+      "level": 14,
+      "points": 2,
+      "requires": "hexer-2",
+      "effect": {
+        "echo": 0.18
+      },
+      "cost": 76,
+      "branch": "class",
+      "classId": "hexer"
+    },
+    {
+      "id": "hexer-4",
+      "name": "Name Unspoken",
+      "description": "+10% power dan +6% HP.",
+      "level": 18,
+      "points": 2,
+      "requires": "hexer-3",
+      "effect": {
+        "power": 0.1,
+        "hp": 0.06
+      },
+      "cost": 92,
+      "branch": "class",
+      "classId": "hexer"
+    },
+    {
+      "id": "monk-1",
+      "name": "Hardened Palms",
+      "description": "Damage masuk −5%.",
+      "level": 5,
+      "points": 1,
+      "requires": "focus",
+      "effect": {
+        "reduction": 0.05
+      },
+      "cost": 40,
+      "branch": "class",
+      "classId": "monk"
+    },
+    {
+      "id": "monk-2",
+      "name": "Rising Breath",
+      "description": "+6% tempo.",
+      "level": 9,
+      "points": 1,
+      "requires": "monk-1",
+      "effect": {
+        "tempo": 0.06
+      },
+      "cost": 56,
+      "branch": "class",
+      "classId": "monk"
+    },
+    {
+      "id": "monk-3",
+      "name": "Echoing Strike",
+      "description": "Echo ofensif kelima +15%.",
+      "level": 14,
+      "points": 2,
+      "requires": "monk-2",
+      "effect": {
+        "echo": 0.15
+      },
+      "cost": 76,
+      "branch": "class",
+      "classId": "monk"
+    },
+    {
+      "id": "monk-4",
+      "name": "Still Mountain",
+      "description": "+10% HP dan pantulkan 10% damage yang ditahan.",
+      "level": 18,
+      "points": 2,
+      "requires": "monk-3",
+      "effect": {
+        "hp": 0.1,
+        "thorns": 0.1
+      },
+      "cost": 92,
+      "branch": "class",
+      "classId": "monk"
+    },
+    {
+      "id": "engineer-1",
+      "name": "Calibrated Sights",
+      "description": "Damage ke minion +15%.",
+      "level": 5,
+      "points": 1,
+      "requires": "focus",
+      "effect": {
+        "minionDamage": 0.15
+      },
+      "cost": 40,
+      "branch": "class",
+      "classId": "engineer"
+    },
+    {
+      "id": "engineer-2",
+      "name": "Spare Plating",
+      "description": "Barrier awal 10% HP.",
+      "level": 9,
+      "points": 1,
+      "requires": "engineer-1",
+      "effect": {
+        "openingBarrier": 0.1
+      },
+      "cost": 56,
+      "branch": "class",
+      "classId": "engineer"
+    },
+    {
+      "id": "engineer-3",
+      "name": "Feedback Loop",
+      "description": "Echo ofensif kelima +15%.",
+      "level": 14,
+      "points": 2,
+      "requires": "engineer-2",
+      "effect": {
+        "echo": 0.15
+      },
+      "cost": 76,
+      "branch": "class",
+      "classId": "engineer"
+    },
+    {
+      "id": "engineer-4",
+      "name": "Masterwork",
+      "description": "+8% power dan +6% tempo.",
+      "level": 18,
+      "points": 2,
+      "requires": "engineer-3",
+      "effect": {
+        "power": 0.08,
+        "tempo": 0.06
+      },
+      "cost": 92,
+      "branch": "class",
+      "classId": "engineer"
     }
   ],
   "equipment": [
@@ -2026,6 +2903,210 @@
       "source": "forge",
       "effects": {},
       "description": "36% power. Tempo +7%. Khusus wizard."
+    },
+    {
+      "id": "bard-weapon-1",
+      "name": "Wayfarer Lute",
+      "slot": "weapon",
+      "cost": 150,
+      "power": 0.16,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "bard",
+      "minLevel": 5,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "tapBonus": 0.04
+      },
+      "description": "16% power. Tap +0.04s. Khusus bard."
+    },
+    {
+      "id": "bard-weapon-2",
+      "name": "Glass Harp",
+      "slot": "weapon",
+      "cost": 330,
+      "power": 0.26,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "bard",
+      "minLevel": 10,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "tapBonus": 0.08
+      },
+      "description": "26% power. Tap +0.08s. Khusus bard."
+    },
+    {
+      "id": "bard-weapon-3",
+      "name": "Unwritten Score",
+      "slot": "weapon",
+      "cost": 510,
+      "power": 0.36,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "bard",
+      "minLevel": 20,
+      "rarity": "epic",
+      "source": "forge",
+      "effects": {
+        "tapBonus": 0.12
+      },
+      "description": "36% power. Tap +0.12s. Khusus bard."
+    },
+    {
+      "id": "hexer-weapon-1",
+      "name": "Ashen Fetish",
+      "slot": "weapon",
+      "cost": 150,
+      "power": 0.16,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "hexer",
+      "minLevel": 5,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "heal": 0.06
+      },
+      "description": "16% power. Heal diberikan +6%. Khusus hexer."
+    },
+    {
+      "id": "hexer-weapon-2",
+      "name": "Ledger Bone",
+      "slot": "weapon",
+      "cost": 330,
+      "power": 0.26,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "hexer",
+      "minLevel": 10,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "heal": 0.09
+      },
+      "description": "26% power. Heal diberikan +9%. Khusus hexer."
+    },
+    {
+      "id": "hexer-weapon-3",
+      "name": "Name Eater",
+      "slot": "weapon",
+      "cost": 510,
+      "power": 0.36,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "hexer",
+      "minLevel": 20,
+      "rarity": "epic",
+      "source": "forge",
+      "effects": {
+        "heal": 0.12
+      },
+      "description": "36% power. Heal diberikan +12%. Khusus hexer."
+    },
+    {
+      "id": "monk-weapon-1",
+      "name": "Wrapped Knuckles",
+      "slot": "weapon",
+      "cost": 150,
+      "power": 0.16,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "monk",
+      "minLevel": 5,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "reduction": 0.03
+      },
+      "description": "16% power. Damage masuk −3%. Khusus monk."
+    },
+    {
+      "id": "monk-weapon-2",
+      "name": "River Stone Beads",
+      "slot": "weapon",
+      "cost": 330,
+      "power": 0.26,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "monk",
+      "minLevel": 10,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "reduction": 0.05
+      },
+      "description": "26% power. Damage masuk −5%. Khusus monk."
+    },
+    {
+      "id": "monk-weapon-3",
+      "name": "Dawn Fist",
+      "slot": "weapon",
+      "cost": 510,
+      "power": 0.36,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "monk",
+      "minLevel": 20,
+      "rarity": "epic",
+      "source": "forge",
+      "effects": {
+        "reduction": 0.07
+      },
+      "description": "36% power. Damage masuk −7%. Khusus monk."
+    },
+    {
+      "id": "engineer-weapon-1",
+      "name": "Spark Wrench",
+      "slot": "weapon",
+      "cost": 150,
+      "power": 0.16,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "engineer",
+      "minLevel": 5,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "openingBarrier": 0.06
+      },
+      "description": "16% power. Barrier awal 6% HP. Khusus engineer."
+    },
+    {
+      "id": "engineer-weapon-2",
+      "name": "Bellows Gauntlet",
+      "slot": "weapon",
+      "cost": 330,
+      "power": 0.26,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "engineer",
+      "minLevel": 10,
+      "rarity": "rare",
+      "source": "forge",
+      "effects": {
+        "openingBarrier": 0.09
+      },
+      "description": "26% power. Barrier awal 9% HP. Khusus engineer."
+    },
+    {
+      "id": "engineer-weapon-3",
+      "name": "Clockheart Rig",
+      "slot": "weapon",
+      "cost": 510,
+      "power": 0.36,
+      "hp": 0,
+      "tempo": 0,
+      "classId": "engineer",
+      "minLevel": 20,
+      "rarity": "epic",
+      "source": "forge",
+      "effects": {
+        "openingBarrier": 0.12
+      },
+      "description": "36% power. Barrier awal 12% HP. Khusus engineer."
     }
   ],
   "equipmentSets": [
@@ -2756,6 +3837,115 @@
       "archetype": "revenant",
       "tier": 1
     },
+    "lich": {
+      "id": "lich",
+      "name": "Pale Archivist",
+      "title": "LEDGER LICH",
+      "description": "Pustakawan mati yang mencatat setiap cooldown. Lonceng senyapnya memundurkan skill seluruh party, lalu ia menambal dirinya dengan halaman curian.",
+      "counter": "Siapkan interrupt untuk Ritus Pemulihan dan Guard untuk Lonceng Senyap. Heal target lemah sebelum mark.",
+      "patterns": [
+        "weakest",
+        "silence",
+        "strongest",
+        "mend"
+      ],
+      "hp": 1.05,
+      "damage": 92,
+      "interval": 8.4,
+      "archetype": "lich",
+      "tier": 1
+    },
+    "knight": {
+      "id": "knight",
+      "name": "Hollow Knight",
+      "title": "OATHLESS KNIGHT",
+      "description": "Ksatria tanpa sumpah yang menghantam barisan depan dua kali berturut-turut sebelum menantang hero terkuat.",
+      "counter": "Rotasi barisan depan setelah tanda pertama. Tank dengan shield menahan hantaman kedua; Guard untuk ritual.",
+      "patterns": [
+        "front",
+        "front",
+        "strongest",
+        "all"
+      ],
+      "hp": 1.2,
+      "damage": 104,
+      "interval": 8.8,
+      "archetype": "knight",
+      "tier": 1
+    },
+    "hydra": {
+      "id": "hydra",
+      "name": "Glassmere Hydra",
+      "title": "MIRROR HYDRA",
+      "description": "Tiga kepala kaca menyembur lane paling ramai, lalu menumbuhkan sisik baru kecuali diputus.",
+      "counter": "Sebar hero ke beberapa lane agar breath kehilangan target. Interrupt Ritus Pemulihan.",
+      "patterns": [
+        "breath",
+        "breath",
+        "meteor",
+        "mend",
+        "all"
+      ],
+      "hp": 1.1,
+      "damage": 98,
+      "interval": 8.2,
+      "archetype": "hydra",
+      "tier": 1
+    },
+    "harpy": {
+      "id": "harpy",
+      "name": "Gale Harrier",
+      "title": "STORM HARPY",
+      "description": "Pemburu cepat yang menjatuhkan bulu badai ke tile ramai dan menyambar hero paling lemah.",
+      "counter": "Interval pendek: bergerak lebih awal dan biarkan healer menjaga target lemah. Damage per hantaman lebih kecil.",
+      "patterns": [
+        "meteor",
+        "weakest",
+        "meteor",
+        "breath"
+      ],
+      "hp": 0.9,
+      "damage": 84,
+      "interval": 7,
+      "archetype": "harpy",
+      "tier": 1
+    },
+    "colossus": {
+      "id": "colossus",
+      "name": "Frostward Colossus",
+      "title": "GLACIER COLOSSUS",
+      "description": "Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile.",
+      "counter": "Interval panjang memberi waktu reposisi. Simpan interrupt untuk Ritus Pemulihan dan Guard untuk hantaman grid.",
+      "patterns": [
+        "front",
+        "mend",
+        "all",
+        "strongest"
+      ],
+      "hp": 1.2,
+      "damage": 112,
+      "interval": 10,
+      "archetype": "colossus",
+      "tier": 1
+    },
+    "choir": {
+      "id": "choir",
+      "name": "The Hollow Choir",
+      "title": "BELL CHOIR",
+      "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka.",
+      "counter": "Idealnya dua interrupt: satu untuk Lonceng Senyap, satu untuk Ritus Pemulihan. Guard menahan ritual grid.",
+      "patterns": [
+        "silence",
+        "strongest",
+        "all",
+        "mend"
+      ],
+      "hp": 1.15,
+      "damage": 100,
+      "interval": 8.5,
+      "archetype": "choir",
+      "tier": 1
+    },
     "wolf-ash": {
       "id": "wolf-ash",
       "name": "Ashbound Ashfang",
@@ -3415,6 +4605,351 @@
       "archetype": "revenant",
       "tier": 4,
       "tint": 16766874
+    },
+    "lich-ash": {
+      "id": "lich-ash",
+      "name": "Ashbound Pale Archivist",
+      "title": "ASHBOUND · LEDGER LICH",
+      "description": "Pustakawan mati yang mencatat setiap cooldown. Lonceng senyapnya memundurkan skill seluruh party, lalu ia menambal dirinya dengan halaman curian. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Siapkan interrupt untuk Ritus Pemulihan dan Guard untuk Lonceng Senyap. Heal target lemah sebelum mark.",
+      "patterns": [
+        "weakest",
+        "silence",
+        "strongest",
+        "mend"
+      ],
+      "hp": 1.1760000000000002,
+      "damage": 97,
+      "interval": 8.4,
+      "archetype": "lich",
+      "tier": 2,
+      "tint": 15840154
+    },
+    "lich-frost": {
+      "id": "lich-frost",
+      "name": "Frostbound Pale Archivist",
+      "title": "FROSTBOUND · LEDGER LICH",
+      "description": "Pustakawan mati yang mencatat setiap cooldown. Lonceng senyapnya memundurkan skill seluruh party, lalu ia menambal dirinya dengan halaman curian. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Siapkan interrupt untuk Ritus Pemulihan dan Guard untuk Lonceng Senyap. Heal target lemah sebelum mark.",
+      "patterns": [
+        "silence",
+        "strongest",
+        "mend",
+        "weakest"
+      ],
+      "hp": 1.281,
+      "damage": 101,
+      "interval": 8.1,
+      "archetype": "lich",
+      "tier": 3,
+      "tint": 10934015
+    },
+    "lich-auric": {
+      "id": "lich-auric",
+      "name": "Gilded Pale Archivist",
+      "title": "GILDED · LEDGER LICH",
+      "description": "Pustakawan mati yang mencatat setiap cooldown. Lonceng senyapnya memundurkan skill seluruh party, lalu ia menambal dirinya dengan halaman curian. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Siapkan interrupt untuk Ritus Pemulihan dan Guard untuk Lonceng Senyap. Heal target lemah sebelum mark.",
+      "patterns": [
+        "strongest",
+        "mend",
+        "weakest",
+        "silence"
+      ],
+      "hp": 1.3860000000000001,
+      "damage": 106,
+      "interval": 7.800000000000001,
+      "archetype": "lich",
+      "tier": 4,
+      "tint": 16766874
+    },
+    "knight-ash": {
+      "id": "knight-ash",
+      "name": "Ashbound Hollow Knight",
+      "title": "ASHBOUND · OATHLESS KNIGHT",
+      "description": "Ksatria tanpa sumpah yang menghantam barisan depan dua kali berturut-turut sebelum menantang hero terkuat. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Rotasi barisan depan setelah tanda pertama. Tank dengan shield menahan hantaman kedua; Guard untuk ritual.",
+      "patterns": [
+        "front",
+        "front",
+        "strongest",
+        "all"
+      ],
+      "hp": 1.344,
+      "damage": 109,
+      "interval": 8.8,
+      "archetype": "knight",
+      "tier": 2,
+      "tint": 15840154
+    },
+    "knight-frost": {
+      "id": "knight-frost",
+      "name": "Frostbound Hollow Knight",
+      "title": "FROSTBOUND · OATHLESS KNIGHT",
+      "description": "Ksatria tanpa sumpah yang menghantam barisan depan dua kali berturut-turut sebelum menantang hero terkuat. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Rotasi barisan depan setelah tanda pertama. Tank dengan shield menahan hantaman kedua; Guard untuk ritual.",
+      "patterns": [
+        "front",
+        "strongest",
+        "all",
+        "front"
+      ],
+      "hp": 1.464,
+      "damage": 114,
+      "interval": 8.5,
+      "archetype": "knight",
+      "tier": 3,
+      "tint": 10934015
+    },
+    "knight-auric": {
+      "id": "knight-auric",
+      "name": "Gilded Hollow Knight",
+      "title": "GILDED · OATHLESS KNIGHT",
+      "description": "Ksatria tanpa sumpah yang menghantam barisan depan dua kali berturut-turut sebelum menantang hero terkuat. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Rotasi barisan depan setelah tanda pertama. Tank dengan shield menahan hantaman kedua; Guard untuk ritual.",
+      "patterns": [
+        "strongest",
+        "all",
+        "front",
+        "front"
+      ],
+      "hp": 1.584,
+      "damage": 120,
+      "interval": 8.200000000000001,
+      "archetype": "knight",
+      "tier": 4,
+      "tint": 16766874
+    },
+    "hydra-ash": {
+      "id": "hydra-ash",
+      "name": "Ashbound Glassmere Hydra",
+      "title": "ASHBOUND · MIRROR HYDRA",
+      "description": "Tiga kepala kaca menyembur lane paling ramai, lalu menumbuhkan sisik baru kecuali diputus. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Sebar hero ke beberapa lane agar breath kehilangan target. Interrupt Ritus Pemulihan.",
+      "patterns": [
+        "breath",
+        "breath",
+        "meteor",
+        "mend",
+        "all"
+      ],
+      "hp": 1.2320000000000002,
+      "damage": 103,
+      "interval": 8.2,
+      "archetype": "hydra",
+      "tier": 2,
+      "tint": 15840154
+    },
+    "hydra-frost": {
+      "id": "hydra-frost",
+      "name": "Frostbound Glassmere Hydra",
+      "title": "FROSTBOUND · MIRROR HYDRA",
+      "description": "Tiga kepala kaca menyembur lane paling ramai, lalu menumbuhkan sisik baru kecuali diputus. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Sebar hero ke beberapa lane agar breath kehilangan target. Interrupt Ritus Pemulihan.",
+      "patterns": [
+        "breath",
+        "meteor",
+        "mend",
+        "all",
+        "breath"
+      ],
+      "hp": 1.342,
+      "damage": 108,
+      "interval": 7.8999999999999995,
+      "archetype": "hydra",
+      "tier": 3,
+      "tint": 10934015
+    },
+    "hydra-auric": {
+      "id": "hydra-auric",
+      "name": "Gilded Glassmere Hydra",
+      "title": "GILDED · MIRROR HYDRA",
+      "description": "Tiga kepala kaca menyembur lane paling ramai, lalu menumbuhkan sisik baru kecuali diputus. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Sebar hero ke beberapa lane agar breath kehilangan target. Interrupt Ritus Pemulihan.",
+      "patterns": [
+        "meteor",
+        "mend",
+        "all",
+        "breath",
+        "breath"
+      ],
+      "hp": 1.4520000000000002,
+      "damage": 113,
+      "interval": 7.6,
+      "archetype": "hydra",
+      "tier": 4,
+      "tint": 16766874
+    },
+    "harpy-ash": {
+      "id": "harpy-ash",
+      "name": "Ashbound Gale Harrier",
+      "title": "ASHBOUND · STORM HARPY",
+      "description": "Pemburu cepat yang menjatuhkan bulu badai ke tile ramai dan menyambar hero paling lemah. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Interval pendek: bergerak lebih awal dan biarkan healer menjaga target lemah. Damage per hantaman lebih kecil.",
+      "patterns": [
+        "meteor",
+        "weakest",
+        "meteor",
+        "breath"
+      ],
+      "hp": 1.0080000000000002,
+      "damage": 88,
+      "interval": 7,
+      "archetype": "harpy",
+      "tier": 2,
+      "tint": 15840154
+    },
+    "harpy-frost": {
+      "id": "harpy-frost",
+      "name": "Frostbound Gale Harrier",
+      "title": "FROSTBOUND · STORM HARPY",
+      "description": "Pemburu cepat yang menjatuhkan bulu badai ke tile ramai dan menyambar hero paling lemah. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Interval pendek: bergerak lebih awal dan biarkan healer menjaga target lemah. Damage per hantaman lebih kecil.",
+      "patterns": [
+        "weakest",
+        "meteor",
+        "breath",
+        "meteor"
+      ],
+      "hp": 1.098,
+      "damage": 92,
+      "interval": 6.7,
+      "archetype": "harpy",
+      "tier": 3,
+      "tint": 10934015
+    },
+    "harpy-auric": {
+      "id": "harpy-auric",
+      "name": "Gilded Gale Harrier",
+      "title": "GILDED · STORM HARPY",
+      "description": "Pemburu cepat yang menjatuhkan bulu badai ke tile ramai dan menyambar hero paling lemah. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Interval pendek: bergerak lebih awal dan biarkan healer menjaga target lemah. Damage per hantaman lebih kecil.",
+      "patterns": [
+        "meteor",
+        "breath",
+        "meteor",
+        "weakest"
+      ],
+      "hp": 1.1880000000000002,
+      "damage": 97,
+      "interval": 6.4,
+      "archetype": "harpy",
+      "tier": 4,
+      "tint": 16766874
+    },
+    "colossus-ash": {
+      "id": "colossus-ash",
+      "name": "Ashbound Frostward Colossus",
+      "title": "ASHBOUND · GLACIER COLOSSUS",
+      "description": "Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Interval panjang memberi waktu reposisi. Simpan interrupt untuk Ritus Pemulihan dan Guard untuk hantaman grid.",
+      "patterns": [
+        "front",
+        "mend",
+        "all",
+        "strongest"
+      ],
+      "hp": 1.344,
+      "damage": 118,
+      "interval": 10,
+      "archetype": "colossus",
+      "tier": 2,
+      "tint": 15840154
+    },
+    "colossus-frost": {
+      "id": "colossus-frost",
+      "name": "Frostbound Frostward Colossus",
+      "title": "FROSTBOUND · GLACIER COLOSSUS",
+      "description": "Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Interval panjang memberi waktu reposisi. Simpan interrupt untuk Ritus Pemulihan dan Guard untuk hantaman grid.",
+      "patterns": [
+        "mend",
+        "all",
+        "strongest",
+        "front"
+      ],
+      "hp": 1.464,
+      "damage": 123,
+      "interval": 9.7,
+      "archetype": "colossus",
+      "tier": 3,
+      "tint": 10934015
+    },
+    "colossus-auric": {
+      "id": "colossus-auric",
+      "name": "Gilded Frostward Colossus",
+      "title": "GILDED · GLACIER COLOSSUS",
+      "description": "Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Interval panjang memberi waktu reposisi. Simpan interrupt untuk Ritus Pemulihan dan Guard untuk hantaman grid.",
+      "patterns": [
+        "all",
+        "strongest",
+        "front",
+        "mend"
+      ],
+      "hp": 1.584,
+      "damage": 129,
+      "interval": 9.4,
+      "archetype": "colossus",
+      "tier": 4,
+      "tint": 16766874
+    },
+    "choir-ash": {
+      "id": "choir-ash",
+      "name": "Ashbound The Hollow Choir",
+      "title": "ASHBOUND · BELL CHOIR",
+      "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Idealnya dua interrupt: satu untuk Lonceng Senyap, satu untuk Ritus Pemulihan. Guard menahan ritual grid.",
+      "patterns": [
+        "silence",
+        "strongest",
+        "all",
+        "mend"
+      ],
+      "hp": 1.288,
+      "damage": 105,
+      "interval": 8.5,
+      "archetype": "choir",
+      "tier": 2,
+      "tint": 15840154
+    },
+    "choir-frost": {
+      "id": "choir-frost",
+      "name": "Frostbound The Hollow Choir",
+      "title": "FROSTBOUND · BELL CHOIR",
+      "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Idealnya dua interrupt: satu untuk Lonceng Senyap, satu untuk Ritus Pemulihan. Guard menahan ritual grid.",
+      "patterns": [
+        "strongest",
+        "all",
+        "mend",
+        "silence"
+      ],
+      "hp": 1.4029999999999998,
+      "damage": 110,
+      "interval": 8.2,
+      "archetype": "choir",
+      "tier": 3,
+      "tint": 10934015
+    },
+    "choir-auric": {
+      "id": "choir-auric",
+      "name": "Gilded The Hollow Choir",
+      "title": "GILDED · BELL CHOIR",
+      "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "counter": "Idealnya dua interrupt: satu untuk Lonceng Senyap, satu untuk Ritus Pemulihan. Guard menahan ritual grid.",
+      "patterns": [
+        "all",
+        "mend",
+        "silence",
+        "strongest"
+      ],
+      "hp": 1.518,
+      "damage": 115,
+      "interval": 7.9,
+      "archetype": "choir",
+      "tier": 4,
+      "tint": 16766874
     }
   },
   "boons": [
@@ -3679,9 +5214,9 @@
       "outro": "Buku sensus tersimpan di rongga Ironroot. Setiap halaman memiliki cap lonceng. Tujuh belas nama telah dicoret, tetapi tinta di ujung jarinya masih basah.\n\nAldric membaca salah satunya: Elian. Ia tidak mengenali nama itu. Tubuhnya menangis lebih dulu. Di samping nama tersebut, tulisan tangannya berbunyi: SAYA SETUJU MENUKARNYA.",
       "enemies": [
         "wolf-ash",
+        "moth",
         "goblin-ash",
-        "spider-ash",
-        "shaman",
+        "revenant",
         "golem-ash"
       ],
       "beats": [
@@ -3691,7 +5226,9 @@
         "Cantor bernyanyi memakai suara anak yang tak seorang pun bisa ingat.",
         "Ironroot menutupi pintu arsip. Di pelat dadanya terukir: JANGAN BIARKAN MEREKA MEMBAYAR DUA KALI."
       ],
-      "recruit": [],
+      "recruit": [
+        9
+      ],
       "reward": 330,
       "stages": [
         {
@@ -3703,7 +5240,7 @@
           "combatHp": 9672
         },
         {
-          "enemy": "goblin-ash",
+          "enemy": "moth",
           "kind": "wave",
           "name": "Pursuit · The Empty Census",
           "hp": 1456,
@@ -3711,7 +5248,7 @@
           "combatHp": 11284
         },
         {
-          "enemy": "spider-ash",
+          "enemy": "goblin-ash",
           "kind": "wave",
           "name": "Pressure · The Empty Census",
           "hp": 1690,
@@ -3719,7 +5256,7 @@
           "combatHp": 13098
         },
         {
-          "enemy": "shaman",
+          "enemy": "revenant",
           "kind": "miniboss",
           "name": "The threshold · The Empty Census",
           "hp": 2470,
@@ -3747,10 +5284,10 @@
       "outro": "Di seberang, lagu Rowan terdengar dari mulut makhluk yang kita kalahkan. Wraith menyerahkan tiket balik: penumpangnya tercatat sebagai bahan bakar, bukan warga.\n\nLonceng tidak mengusir monster. Lonceng memisahkan ingatan yang menyakitkan dari pemiliknya. Yang dibuang ke hutan belajar berjalan. Monster pertama yang kita bunuh mungkin pernah menjadi rasa takut kita sendiri.",
       "enemies": [
         "spider-ash",
-        "wolf-ash",
-        "wraith",
-        "goblin-ash",
-        "wraith-ash"
+        "harpy",
+        "basilisk",
+        "wraith-ash",
+        "hydra"
       ],
       "beats": [
         "Air memantulkan party dengan satu orang tambahan. Jangan menoleh mencari wajahnya.",
@@ -3759,7 +5296,9 @@
         "Awak feri menumpuk tiket bertuliskan satu tanggal yang sama.",
         "Pengemudi melepas topeng. Tidak ada wajah, hanya mulut yang menyanyikan lagu Rowan."
       ],
-      "recruit": [],
+      "recruit": [
+        10
+      ],
       "reward": 375,
       "stages": [
         {
@@ -3771,7 +5310,7 @@
           "combatHp": 12648
         },
         {
-          "enemy": "wolf-ash",
+          "enemy": "harpy",
           "kind": "wave",
           "name": "Pursuit · The Glass Ferry",
           "hp": 1736,
@@ -3779,7 +5318,7 @@
           "combatHp": 14756
         },
         {
-          "enemy": "wraith",
+          "enemy": "basilisk",
           "kind": "wave",
           "name": "Pressure · The Glass Ferry",
           "hp": 2015,
@@ -3787,7 +5326,7 @@
           "combatHp": 17128
         },
         {
-          "enemy": "goblin-ash",
+          "enemy": "wraith-ash",
           "kind": "miniboss",
           "name": "The threshold · The Glass Ferry",
           "hp": 2945,
@@ -3795,7 +5334,7 @@
           "combatHp": 25033
         },
         {
-          "enemy": "wraith-ash",
+          "enemy": "hydra",
           "kind": "boss",
           "name": "The reckoning · The Glass Ferry",
           "hp": 4960,
@@ -3816,9 +5355,9 @@
       "enemies": [
         "shaman-ash",
         "spider-ash",
-        "goblin-ash",
-        "wraith-ash",
-        "shaman-ash"
+        "moth-ash",
+        "revenant-ash",
+        "lich"
       ],
       "beats": [
         "Botol obat berlabel kata-kata: amarah, rindu, malu. Semuanya kosong.",
@@ -3827,7 +5366,9 @@
         "Cantor menuntut Lyra pulang ke penciptanya. Party berdiri menghalangi pintu.",
         "Choirmaster mengaku dapat membuat rasa bersalah Lyra hilang. Ia menolak dengan mengangkat tongkatnya."
       ],
-      "recruit": [],
+      "recruit": [
+        11
+      ],
       "reward": 420,
       "stages": [
         {
@@ -3847,7 +5388,7 @@
           "combatHp": 18648
         },
         {
-          "enemy": "goblin-ash",
+          "enemy": "moth-ash",
           "kind": "wave",
           "name": "Pressure · The Choir Ward",
           "hp": 2340,
@@ -3855,7 +5396,7 @@
           "combatHp": 21645
         },
         {
-          "enemy": "wraith-ash",
+          "enemy": "revenant-ash",
           "kind": "miniboss",
           "name": "The threshold · The Choir Ward",
           "hp": 3420,
@@ -3863,7 +5404,7 @@
           "combatHp": 31635
         },
         {
-          "enemy": "shaman-ash",
+          "enemy": "lich",
           "kind": "boss",
           "name": "The reckoning · The Choir Ward",
           "hp": 5760,
@@ -3883,8 +5424,8 @@
       "outro": "Kita memutus pengulang di menara. Ingatan warga kembali sekaligus: cinta, kehilangan, dan semua janji yang mereka langgar. Tidak ada perayaan. Ada rumah yang pintunya dibuka kembali untuk orang asing yang ternyata keluarga.\n\nDari dalam lonceng, terdengar suara Elian: “Ayah, ini bukan putaran pertama.” Aldric menatap bekas luka yang selalu ia anggap tanda kemenangan. Ternyata itu tanda jumlah kegagalannya.",
       "enemies": [
         "goblin-ash",
-        "wolf-ash",
-        "treant-ash",
+        "knight",
+        "crab",
         "golem-ash",
         "dragon-ash"
       ],
@@ -3907,7 +5448,7 @@
           "combatHp": 19680
         },
         {
-          "enemy": "wolf-ash",
+          "enemy": "knight",
           "kind": "wave",
           "name": "Pursuit · The Thirteenth Stroke",
           "hp": 2296,
@@ -3915,7 +5456,7 @@
           "combatHp": 22960
         },
         {
-          "enemy": "treant-ash",
+          "enemy": "crab",
           "kind": "wave",
           "name": "Pressure · The Thirteenth Stroke",
           "hp": 2665,
@@ -3951,10 +5492,10 @@
       "outro": "Catatan terakhir menjelaskan mengapa penjara itu berulang. Jantung mesin bernama Elian, tetapi ia bukan anak yang ditawan. Ia adalah masa depan Elian yang tidak jadi terjadi, dijahit dari semua kemungkinan yang ditukar demi menyelamatkan kota.\n\nAldric tidak memilih melupakan anaknya. Ia memilih menyerahkan hari esok anaknya agar semua orang punya hari ini. Mesin menghapus ingatannya supaya ia sanggup memilih hal yang sama lagi.",
       "enemies": [
         "wolf-frost",
-        "spider-frost",
-        "goblin-frost",
-        "golem-frost",
-        "wraith-frost"
+        "harpy-frost",
+        "basilisk-frost",
+        "knight-frost",
+        "colossus"
       ],
       "beats": [
         "Tulisan di salju muncul sebelum langkah kaki kita menyentuhnya.",
@@ -3963,7 +5504,9 @@
         "Penjaga arsip menghitung sembilan pengunjung, lalu memanggil sepuluh nama.",
         "Wraith menawarkan satu masa depan tanpa kehilangan. Harganya adalah semua masa depan yang lain."
       ],
-      "recruit": [],
+      "recruit": [
+        12
+      ],
       "reward": 510,
       "stages": [
         {
@@ -3975,7 +5518,7 @@
           "combatHp": 23736
         },
         {
-          "enemy": "spider-frost",
+          "enemy": "harpy-frost",
           "kind": "wave",
           "name": "Pursuit · Winter Ledger",
           "hp": 2576,
@@ -3983,7 +5526,7 @@
           "combatHp": 27692
         },
         {
-          "enemy": "goblin-frost",
+          "enemy": "basilisk-frost",
           "kind": "wave",
           "name": "Pressure · Winter Ledger",
           "hp": 2990,
@@ -3991,7 +5534,7 @@
           "combatHp": 32143
         },
         {
-          "enemy": "golem-frost",
+          "enemy": "knight-frost",
           "kind": "miniboss",
           "name": "The threshold · Winter Ledger",
           "hp": 4370,
@@ -3999,7 +5542,7 @@
           "combatHp": 46978
         },
         {
-          "enemy": "wraith-frost",
+          "enemy": "colossus",
           "kind": "boss",
           "name": "The reckoning · Winter Ledger",
           "hp": 7360,
@@ -4019,8 +5562,8 @@
       "outro": "Benih yang kita dapat tidak memulihkan masa lalu. Ia membiarkan dua hal benar sekaligus: kota pernah diselamatkan, dan caranya salah.\n\nLyra berhenti mencoba membuktikan bahwa ia manusia. Ia mulai bertanya kehidupan seperti apa yang ingin ia jalani. Di belakang kita, kebun berbunga untuk sesuatu yang belum hilang.",
       "enemies": [
         "spider-frost",
-        "treant-frost",
-        "wolf-frost",
+        "moth-frost",
+        "hydra-frost",
         "shaman-frost",
         "treant-frost"
       ],
@@ -4043,7 +5586,7 @@
           "combatHp": 28152
         },
         {
-          "enemy": "treant-frost",
+          "enemy": "moth-frost",
           "kind": "wave",
           "name": "Pursuit · The Unborn Orchard",
           "hp": 2856,
@@ -4051,7 +5594,7 @@
           "combatHp": 32844
         },
         {
-          "enemy": "wolf-frost",
+          "enemy": "hydra-frost",
           "kind": "wave",
           "name": "Pressure · The Unborn Orchard",
           "hp": 3315,
@@ -4087,9 +5630,9 @@
       "outro": "Makam kosong tidak runtuh saat kita menang. Kita hanya mencabut tanggalnya. Kematian tetap mungkin; kepastian bukan takdir.\n\nBran meninggalkan surat di atas nisannya: kali ini kami menunggu. Kestrel mencatat semua nama agar kemenangan berikutnya tidak perlu dibayar dengan lupa.",
       "enemies": [
         "goblin-frost",
-        "wraith-frost",
-        "shaman-frost",
-        "golem-frost",
+        "revenant-frost",
+        "knight-frost",
+        "lich-frost",
         "wraith-frost"
       ],
       "beats": [
@@ -4099,7 +5642,9 @@
         "Bran memecah perisai yang serupa miliknya. Di baliknya ada surat yang ia tak pernah kirim.",
         "Unburied meminta kita memilih siapa yang akan ditinggal. Jawab dengan membawa semua yang masih berdiri."
       ],
-      "recruit": [],
+      "recruit": [
+        13
+      ],
       "reward": 600,
       "stages": [
         {
@@ -4111,7 +5656,7 @@
           "combatHp": 32928
         },
         {
-          "enemy": "wraith-frost",
+          "enemy": "revenant-frost",
           "kind": "wave",
           "name": "Pursuit · Nine Funerals",
           "hp": 3136,
@@ -4119,7 +5664,7 @@
           "combatHp": 38416
         },
         {
-          "enemy": "shaman-frost",
+          "enemy": "knight-frost",
           "kind": "wave",
           "name": "Pressure · Nine Funerals",
           "hp": 3640,
@@ -4127,7 +5672,7 @@
           "combatHp": 44590
         },
         {
-          "enemy": "golem-frost",
+          "enemy": "lich-frost",
           "kind": "miniboss",
           "name": "The threshold · Nine Funerals",
           "hp": 5320,
@@ -4155,9 +5700,9 @@
       "outro": "Pengulang waktu pecah. Untuk pertama kalinya, jam bergerak melewati tanggal yang tercatat di semua makam. Badai datang tanpa ramalan.\n\nElian tidak marah. Ia takut. Ia telah hidup sebagai kemungkinan selama ratusan putaran dan belum pernah punya satu menit yang benar-benar miliknya. Kita menyalakan api dan menunggu bersama sampai menit itu selesai.",
       "enemies": [
         "wolf-frost",
-        "shaman-frost",
-        "spider-frost",
-        "treant-frost",
+        "choir",
+        "crab-frost",
+        "colossus-frost",
         "dragon-frost"
       ],
       "beats": [
@@ -4179,7 +5724,7 @@
           "combatHp": 38064
         },
         {
-          "enemy": "shaman-frost",
+          "enemy": "choir",
           "kind": "wave",
           "name": "Pursuit · The Last Rehearsal",
           "hp": 3416,
@@ -4187,7 +5732,7 @@
           "combatHp": 44408
         },
         {
-          "enemy": "spider-frost",
+          "enemy": "crab-frost",
           "kind": "wave",
           "name": "Pressure · The Last Rehearsal",
           "hp": 3965,
@@ -4195,7 +5740,7 @@
           "combatHp": 51545
         },
         {
-          "enemy": "treant-frost",
+          "enemy": "colossus-frost",
           "kind": "miniboss",
           "name": "The threshold · The Last Rehearsal",
           "hp": 5795,
@@ -4223,10 +5768,10 @@
       "outro": "Kota bertahan tanpa menelan satu nama pun. Tidak semua bangunan selamat. Warga menuliskan yang hilang, lalu membangun lagi tanpa meminta siapa pun melupakannya.\n\nDi bekas sekolah, Aldric menggantung tujuh belas papan nama. Satu papan dibiarkan kosong, bukan karena lupa, tetapi karena pemiliknya belum memilih nama.",
       "enemies": [
         "goblin-auric",
-        "wolf-auric",
-        "spider-auric",
+        "harpy-auric",
+        "basilisk-auric",
         "golem-auric",
-        "treant-auric"
+        "hydra-auric"
       ],
       "beats": [
         "Barikade dibuat warga, bukan sihir. Beri mereka waktu menyelesaikannya.",
@@ -4235,7 +5780,9 @@
         "Golem memakai lonceng lama sebagai perisai. Pecahkan logamnya, bukan jalan evakuasi.",
         "Akar terakhir menutup saluran air. Lepaskan aliran sebelum api mencapai rumah."
       ],
-      "recruit": [],
+      "recruit": [
+        14
+      ],
       "reward": 690,
       "stages": [
         {
@@ -4247,7 +5794,7 @@
           "combatHp": 43560
         },
         {
-          "enemy": "wolf-auric",
+          "enemy": "harpy-auric",
           "kind": "wave",
           "name": "Pursuit · A City Without Bells",
           "hp": 3696,
@@ -4255,7 +5802,7 @@
           "combatHp": 50820
         },
         {
-          "enemy": "spider-auric",
+          "enemy": "basilisk-auric",
           "kind": "wave",
           "name": "Pressure · A City Without Bells",
           "hp": 4290,
@@ -4271,7 +5818,7 @@
           "combatHp": 86213
         },
         {
-          "enemy": "treant-auric",
+          "enemy": "hydra-auric",
           "kind": "boss",
           "name": "The reckoning · A City Without Bells",
           "hp": 10560,
@@ -4291,10 +5838,10 @@
       "outro": "Mereka tidak berdamai. Yang tua tetap yakin pengorbanannya benar. Namun saat Lyra merawat lukanya tanpa meminta balasan, ia mengingat satu nama. Bukan Elian. Nama orang yang pertama kali mengajarinya meminta maaf.\n\nIa menyerahkan mahkota kendali tanpa meminta pengampunan. Mesin akan berhenti hanya jika Elian sendiri melepaskannya. Kita tidak punya hak merampas keputusan itu.",
       "enemies": [
         "wraith-auric",
-        "goblin-auric",
-        "shaman-auric",
-        "golem-auric",
-        "wraith-auric"
+        "knight-auric",
+        "lich-auric",
+        "revenant-auric",
+        "choir-auric"
       ],
       "beats": [
         "Mahkota di dinding dibuat dari kunci rumah yang pernah diselamatkan.",
@@ -4315,7 +5862,7 @@
           "combatHp": 49416
         },
         {
-          "enemy": "goblin-auric",
+          "enemy": "knight-auric",
           "kind": "wave",
           "name": "Pursuit · The Borrowed Crown",
           "hp": 3976,
@@ -4323,7 +5870,7 @@
           "combatHp": 57652
         },
         {
-          "enemy": "shaman-auric",
+          "enemy": "lich-auric",
           "kind": "wave",
           "name": "Pressure · The Borrowed Crown",
           "hp": 4615,
@@ -4331,7 +5878,7 @@
           "combatHp": 66918
         },
         {
-          "enemy": "golem-auric",
+          "enemy": "revenant-auric",
           "kind": "miniboss",
           "name": "The threshold · The Borrowed Crown",
           "hp": 6745,
@@ -4339,7 +5886,7 @@
           "combatHp": 97803
         },
         {
-          "enemy": "wraith-auric",
+          "enemy": "choir-auric",
           "kind": "boss",
           "name": "The reckoning · The Borrowed Crown",
           "hp": 11360,
@@ -4358,11 +5905,11 @@
       "intro": "Elian ingin meninggalkan mesin, tetapi ia belum punya tubuh. Benih dari kebun bisa memberinya satu kehidupan biasa. Bukan hidup yang direncanakan Aldric, bukan hidup yang dijanjikan mesin.\n\nKonsekuensinya jelas: semua kemungkinan Elian yang lain akan berhenti. Ia tidak akan menjadi setiap hal yang bisa diinginkan ayahnya. Ia hanya akan menjadi dirinya sendiri.\n\n“Aku mau terlambat bangun,” katanya. “Aku mau buruk dalam sesuatu dan tetap boleh belajar.” Aldric mengangguk. Party menjaga ruangan tempat hari esok mulai tumbuh.",
       "outro": "Anak yang keluar dari ruangan tidak mengingat putaran-putaran itu. Ia tidak berutang rasa terima kasih atas hidup yang baru dimulainya.\n\nIa memilih nama Eda. Aldric menuliskannya di papan kosong tanpa menghapus nama Elian dari sensus. Keduanya pernah berarti sesuatu. Salah satunya kini boleh berarti sesuatu yang baru.",
       "enemies": [
+        "moth-auric",
         "spider-auric",
-        "wolf-auric",
-        "wraith-auric",
-        "shaman-auric",
-        "treant-auric"
+        "colossus-frost",
+        "crab-auric",
+        "colossus-auric"
       ],
       "beats": [
         "Benih membutuhkan waktu. Musuh mengejar sumber cahaya di tengah ruangan.",
@@ -4375,7 +5922,7 @@
       "reward": 780,
       "stages": [
         {
-          "enemy": "spider-auric",
+          "enemy": "moth-auric",
           "kind": "wave",
           "name": "Crossing · A Name for Tomorrow",
           "hp": 3648,
@@ -4383,7 +5930,7 @@
           "combatHp": 55632
         },
         {
-          "enemy": "wolf-auric",
+          "enemy": "spider-auric",
           "kind": "wave",
           "name": "Pursuit · A Name for Tomorrow",
           "hp": 4256,
@@ -4391,7 +5938,7 @@
           "combatHp": 64904
         },
         {
-          "enemy": "wraith-auric",
+          "enemy": "colossus-frost",
           "kind": "wave",
           "name": "Pressure · A Name for Tomorrow",
           "hp": 4940,
@@ -4399,7 +5946,7 @@
           "combatHp": 75335
         },
         {
-          "enemy": "shaman-auric",
+          "enemy": "crab-auric",
           "kind": "miniboss",
           "name": "The threshold · A Name for Tomorrow",
           "hp": 7220,
@@ -4407,7 +5954,7 @@
           "combatHp": 110105
         },
         {
-          "enemy": "treant-auric",
+          "enemy": "colossus-auric",
           "kind": "boss",
           "name": "The reckoning · A Name for Tomorrow",
           "hp": 12160,
@@ -4426,9 +5973,9 @@
       "intro": "Mesin yang kehilangan penjaganya melakukan satu hal terakhir: mencoba menyelamatkan dirinya. Ia mengambil bentuk semua ketakutan kota, lalu memakai Vharok sebagai sayap.\n\nTidak ada nubuat untuk pertarungan ini. Orin menutup bukunya. Kestrel berhenti menghitung. Lyra bertanya apakah semua sudah siap, bukan apakah semua akan selamat.\n\nDi town, Eda mencoba bersiul. Nadanya sumbang. Itulah suara masa depan yang sedang kita pertahankan.",
       "outro": "Saat inti mesin padam, Vharok terbang tanpa membawa mimpi siapa pun. Tidak ada cahaya yang mengembalikan rumah-rumah, tidak ada mantra yang membatalkan luka. Hanya pagi yang datang sekali.\n\nLyra membuka klinik atas namanya sendiri. Sable menjaga arsip agar tidak ada kontrak yang disembunyikan. Orin menulis buku yang boleh salah. Rowan mengajarkan lagu baru kepada Eda; ia tidak perlu mendapatkan lagu lamanya kembali untuk bisa bernyanyi.\n\nAldric menggantung perisai di samping pintu sekolah. Lonceng baru dibuat kecil, dari logam mesin yang dilebur. Ia berbunyi untuk memanggil makan siang. Di bawahnya tertulis: YANG HILANG AKAN DIINGAT. YANG HIDUP TIDAK BERUTANG MASA DEPANNYA.\n\nCampaign complete. Emberhollow tetap terbuka: raid hunt, respec, dan Sunken Bell menjadi tantangan postgame, bukan pengulangan ending.",
       "enemies": [
-        "goblin-auric",
+        "choir-frost",
         "wraith-auric",
-        "shaman-auric",
+        "lich-auric",
         "golem-auric",
         "dragon-auric"
       ],
@@ -4443,7 +5990,7 @@
       "reward": 825,
       "stages": [
         {
-          "enemy": "goblin-auric",
+          "enemy": "choir-frost",
           "kind": "wave",
           "name": "Crossing · The Unwritten Dawn",
           "hp": 3888,
@@ -4459,7 +6006,7 @@
           "combatHp": 72576
         },
         {
-          "enemy": "shaman-auric",
+          "enemy": "lich-auric",
           "kind": "wave",
           "name": "Pressure · The Unwritten Dawn",
           "hp": 5265,
