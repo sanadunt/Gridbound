@@ -1,7 +1,7 @@
 import { JOBS } from './jobs';
 export type ClassId = 'warrior' | 'rogue' | 'archer' | 'healer' | 'wizard' | 'bard' | 'hexer' | 'monk' | 'engineer';
 export const CLASS_IDS: readonly ClassId[] = ['warrior','rogue','archer','healer','wizard','bard','hexer','monk','engineer'];
-export type Mode = 'raid' | 'adventure' | 'endless';
+export type Mode = 'raid' | 'adventure' | 'endless' | 'dungeon';
 export type Skill = { name: string; label: string; cooldown: number; power: number; kind: 'attack'|'shield'|'heal'|'buff'|'steal'|'aoe'|'interrupt'|'partyshield'|'regen'|'mark'|'haste'|'weaken'|'delay'|'resolve'|'curse'|'drain'|'sacrifice'|'combo'|'counter'|'flurry'|'selfheal'|'turret'|'stun'|'repair'; description: string };
 export type Kit = { name: string; color: string; hp: number; role: string; skills: Skill[] };
 export const KITS: Record<ClassId, Kit> = {

@@ -81,13 +81,15 @@ for(const [classId,names] of Object.entries(weapons) as [ClassId,string[]][]) na
  const effects:GearEffect=classId==='warrior'?{shield:.08+i*.04}:classId==='healer'?{heal:.1+i*.04}:classId==='rogue'||classId==='bard'?{tapBonus:.04+i*.04}:classId==='archer'||classId==='engineer'?{openingBarrier:.06+i*.03}:classId==='monk'?{reduction:.03+i*.02}:classId==='hexer'?{heal:.06+i*.03}:{};
  GEAR.push({id:`${classId}-weapon-${i+1}`,name,slot:'weapon',cost:150+i*180,power:.16+i*.1,hp:classId==='warrior'?.05:0,tempo:classId==='wizard'?.03+i*.02:0,classId,minLevel:[5,10,20][i],rarity:i===2?'epic':'rare',source:'forge',effects,description:`${Math.round((.16+i*.1)*100)}% power. ${classId==='warrior'?`Shield +${8+i*4}%, HP +5%.`:classId==='healer'?`Heal diberikan +${10+i*4}%.`:classId==='rogue'?`Tap +${(.04+i*.04).toFixed(2)}s.`:classId==='archer'||classId==='engineer'?`Barrier awal ${6+i*3}% HP.`:classId==='bard'?`Tap +${(.04+i*.04).toFixed(2)}s.`:classId==='monk'?`Damage masuk −${3+i*2}%.`:classId==='hexer'?`Heal diberikan +${6+i*3}%.`:`Tempo +${3+i*2}%.`} Khusus ${classId}.`});
 });
-export function gearStats(gear:Record<string,string>={}) {
+export const REFINE_STEP=.15, MAX_REFINE=3;
+export function gearStats(gear:Record<string,string>={},refine:Record<string,number>={}) {
  const s={power:1,hp:1,tempo:1,reduction:0,heal:0,shield:0,openingBarrier:0,tapBonus:0};
  const pieces=new Map<string,number>();
  const add=(effects:GearEffect)=>{for(const [key,value] of Object.entries(effects))s[key as keyof GearEffect]+=value;};
  for(const [slot,id] of Object.entries(gear)){
   const g=GEAR.find(g=>g.id===id&&g.slot===slot);if(!g)continue;
-  s.power+=g.power;s.hp+=g.hp;s.tempo+=g.tempo;add(g.effects??{});
+   const r=1+REFINE_STEP*Math.max(0,Math.min(MAX_REFINE,refine[g.id]??0)),up=(v:number)=>v>0?v*r:v;
+  s.power+=up(g.power);s.hp+=up(g.hp);s.tempo+=up(g.tempo);add(g.effects??{});
   if(g.setId)pieces.set(g.setId,(pieces.get(g.setId)??0)+1);
  }
  for(const set of GEAR_SETS){const n=pieces.get(set.id)??0;if(n>=2)add(set.two);if(n>=3)add(set.three);}

@@ -5026,6 +5026,351 @@
       "description": "Tap hero berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 2 detik (+30% power, +20% tempo)."
     }
   ],
+  "recommendedPower": [
+    300,
+    450,
+    650,
+    850,
+    1080,
+    1200,
+    1490,
+    1620,
+    1870,
+    2210,
+    2470,
+    2690,
+    3360,
+    3480,
+    3590,
+    3790
+  ],
+  "stars": {
+    "parSeconds": 80,
+    "perChest": 8,
+    "max": 48,
+    "chests": [
+      {
+        "gold": 120,
+        "materials": {
+          "ember-shard": 2
+        }
+      },
+      {
+        "gold": 240,
+        "materials": {
+          "ember-shard": 2
+        }
+      },
+      {
+        "gold": 360,
+        "materials": {
+          "bell-bronze": 2
+        }
+      },
+      {
+        "gold": 480,
+        "materials": {
+          "bell-bronze": 2
+        }
+      },
+      {
+        "gold": 600,
+        "materials": {
+          "frost-glass": 2
+        }
+      },
+      {
+        "gold": 720,
+        "materials": {
+          "frost-glass": 2
+        }
+      }
+    ]
+  },
+  "heroic": {
+    "hp": 1.6,
+    "damage": 1.45,
+    "interval": 0.85,
+    "potions": 1,
+    "rewards": [
+      {
+        "gold": 150,
+        "materials": {
+          "ember-shard": 3
+        }
+      },
+      {
+        "gold": 185,
+        "materials": {
+          "ember-shard": 3
+        }
+      },
+      {
+        "gold": 220,
+        "materials": {
+          "ember-shard": 3
+        }
+      },
+      {
+        "gold": 255,
+        "materials": {
+          "ember-shard": 3
+        }
+      },
+      {
+        "gold": 290,
+        "materials": {
+          "bell-bronze": 3
+        }
+      },
+      {
+        "gold": 325,
+        "materials": {
+          "bell-bronze": 3
+        }
+      },
+      {
+        "gold": 360,
+        "materials": {
+          "bell-bronze": 3
+        }
+      },
+      {
+        "gold": 395,
+        "materials": {
+          "bell-bronze": 3
+        }
+      },
+      {
+        "gold": 430,
+        "materials": {
+          "bell-bronze": 3
+        }
+      },
+      {
+        "gold": 465,
+        "materials": {
+          "bell-bronze": 3
+        }
+      },
+      {
+        "gold": 500,
+        "materials": {
+          "frost-glass": 3
+        }
+      },
+      {
+        "gold": 535,
+        "materials": {
+          "frost-glass": 3
+        }
+      },
+      {
+        "gold": 570,
+        "materials": {
+          "frost-glass": 3
+        }
+      },
+      {
+        "gold": 605,
+        "materials": {
+          "frost-glass": 3
+        }
+      },
+      {
+        "gold": 640,
+        "materials": {
+          "frost-glass": 3
+        }
+      },
+      {
+        "gold": 675,
+        "materials": {
+          "frost-glass": 3
+        }
+      }
+    ]
+  },
+  "refine": {
+    "step": 0.15,
+    "max": 3,
+    "materials": [
+      "ember-shard",
+      "bell-bronze",
+      "frost-glass"
+    ]
+  },
+  "undercroft": {
+    "rows": 7,
+    "campRow": 5,
+    "hp": 1.45,
+    "damage": 1.3,
+    "depths": [
+      {
+        "id": 1,
+        "unlock": 1,
+        "enemies": [
+          "wolf",
+          "goblin",
+          "spider"
+        ],
+        "elite": [
+          "shaman"
+        ],
+        "guardian": "treant",
+        "material": "ember-shard",
+        "damageTrim": 1
+      },
+      {
+        "id": 2,
+        "unlock": 3,
+        "enemies": [
+          "shaman",
+          "moth",
+          "goblin"
+        ],
+        "elite": [
+          "golem"
+        ],
+        "guardian": "wraith",
+        "material": "ember-shard",
+        "damageTrim": 1
+      },
+      {
+        "id": 3,
+        "unlock": 5,
+        "enemies": [
+          "basilisk",
+          "harpy",
+          "spider-ash"
+        ],
+        "elite": [
+          "revenant"
+        ],
+        "guardian": "hydra",
+        "material": "bell-bronze",
+        "damageTrim": 1
+      },
+      {
+        "id": 4,
+        "unlock": 7,
+        "enemies": [
+          "revenant",
+          "goblin-ash",
+          "moth-ash"
+        ],
+        "elite": [
+          "lich"
+        ],
+        "guardian": "knight",
+        "material": "bell-bronze",
+        "damageTrim": 0.92
+      },
+      {
+        "id": 5,
+        "unlock": 9,
+        "enemies": [
+          "wolf-frost",
+          "harpy-frost",
+          "basilisk-frost"
+        ],
+        "elite": [
+          "knight-frost"
+        ],
+        "guardian": "colossus",
+        "material": "frost-glass",
+        "damageTrim": 1
+      },
+      {
+        "id": 6,
+        "unlock": 11,
+        "enemies": [
+          "treant-frost",
+          "moth-frost",
+          "crab-frost"
+        ],
+        "elite": [
+          "lich-frost"
+        ],
+        "guardian": "hydra-frost",
+        "material": "frost-glass",
+        "damageTrim": 0.8
+      },
+      {
+        "id": 7,
+        "unlock": 13,
+        "enemies": [
+          "choir",
+          "knight-auric",
+          "harpy-auric"
+        ],
+        "elite": [
+          "lich-auric"
+        ],
+        "guardian": "choir-auric",
+        "material": "frost-glass",
+        "damageTrim": 0.95
+      },
+      {
+        "id": 8,
+        "unlock": 15,
+        "enemies": [
+          "basilisk-auric",
+          "revenant-auric",
+          "colossus-auric"
+        ],
+        "elite": [
+          "hydra-auric"
+        ],
+        "guardian": "dragon-auric",
+        "material": "frost-glass",
+        "damageTrim": 0.78
+      }
+    ],
+    "events": {
+      "shrine": [
+        "pray",
+        "offering",
+        "leave"
+      ],
+      "archive": [
+        "search",
+        "leave"
+      ],
+      "lantern": [
+        "guide",
+        "keep"
+      ],
+      "merchant": [
+        "buy",
+        "leave"
+      ],
+      "bell": [
+        "ring",
+        "muffle"
+      ],
+      "well": [
+        "drink",
+        "coin"
+      ],
+      "letters": [
+        "read",
+        "burn"
+      ],
+      "forge": [
+        "temper",
+        "leave"
+      ],
+      "echo": [
+        "answer",
+        "silence"
+      ],
+      "cradle": [
+        "rock",
+        "leave"
+      ]
+    }
+  },
   "campaign": [
     {
       "id": "ashwood",

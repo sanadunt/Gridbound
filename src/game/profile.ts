@@ -10,12 +10,15 @@ import { normalizeStoryParty, benchExperience } from './story-party';
 import { createCurrencyState, creditCurrency, type CurrencyState } from '../economy/currency';
 import { bankRaidReward, bankRoguelikeReward, buyBankItem, normalizeChallengeUnlocks, raidReward, roguelikeBankReward, creditRunRoom, type RunWallet } from '../economy/challenge';
 import { normalizeNarrative } from './narrative';
-export type Loadout = { skills:number[]; talents:string[]; slot:number; xp?:number; job?:string; gear?:Record<string,string>; inventory?:string[] };
-export type Profile = { narrative?:Record<string,string>; version:3; gold:number; economy:CurrencyState; settlementReceipts:string[]; challengeUnlocks:string[]; claimedQuests:string[]; trackedQuest?:string; ledger:{raids:number;victories:number;enemies:Record<string,number>}; roster:number[]; storyActive:number[]; cleared:number[]; loadouts:Record<number,Loadout>; bestFloor:number; wins:number; sound:boolean; motion:boolean };
+import { createJourney, normalizeJourney, claimableChests, chestReward, recordStars, heroicReward, type Journey } from './journey';
+import type { Pouch } from './dungeon';
+import { MAX_REFINE } from './jobs';
+export type Loadout = { skills:number[]; talents:string[]; slot:number; xp?:number; job?:string; gear?:Record<string,string>; inventory?:string[]; refine?:Record<string,number> };
+export type Profile = { narrative?:Record<string,string>; journey:Journey; version:3; gold:number; economy:CurrencyState; settlementReceipts:string[]; challengeUnlocks:string[]; claimedQuests:string[]; trackedQuest?:string; ledger:{raids:number;victories:number;enemies:Record<string,number>}; roster:number[]; storyActive:number[]; cleared:number[]; loadouts:Record<number,Loadout>; bestFloor:number; wins:number; sound:boolean; motion:boolean };
 export function createProfile():Profile {
   const economy=createCurrencyState();
   economy.gold=60;
-  return {version:3,claimedQuests:[],settlementReceipts:[],challengeUnlocks:[],ledger:{raids:0,victories:0,enemies:{}},gold:60,economy,roster:[0,4,3],storyActive:[0,4,3],cleared:[],loadouts:{0:{skills:[0,1],talents:[],xp:0,slot:1},4:{skills:[0,1],talents:[],xp:0,slot:7},3:{skills:[0,1],talents:[],xp:0,slot:6}},bestFloor:0,wins:0,sound:true,motion:true};
+  return {version:3,journey:createJourney(),claimedQuests:[],settlementReceipts:[],challengeUnlocks:[],ledger:{raids:0,victories:0,enemies:{}},gold:60,economy,roster:[0,4,3],storyActive:[0,4,3],cleared:[],loadouts:{0:{skills:[0,1],talents:[],xp:0,slot:1},4:{skills:[0,1],talents:[],xp:0,slot:7},3:{skills:[0,1],talents:[],xp:0,slot:6}},bestFloor:0,wins:0,sound:true,motion:true};
 }
 function loadout(p:Profile,id:number) { return Number.isInteger(id)&&p.roster.includes(id)?p.loadouts[id]:undefined; }
 export function buyTalent(p:Profile,heroId:number,talentId:string) {
@@ -119,6 +122,8 @@ export function normalizeProfile(raw:unknown,legacy?:unknown):Profile {
     for(const talent of TALENTS)if(claimed.includes(talent.id)&&!talentReason(p,id,talent,true))h.talents.push(talent.id);
     const job=JOBS[String(source.job??'')];if(job&&job.base===ROSTER[id].classId&&job.level<=p.cleared.length+1)h.job=job.id;
     h.inventory=Array.isArray(source.inventory)?[...new Set(source.inventory.filter((id):id is string=>typeof id==='string'&&GEAR.some(g=>g.id===id)))]:[];
+    h.refine={};for(const [gearId,level] of Object.entries(record(source.refine)))if(h.inventory.includes(gearId)&&Number.isInteger(level)&&(level as number)>=1&&(level as number)<=MAX_REFINE)h.refine[gearId]=level as number;
+    if(!Object.keys(h.refine).length)delete h.refine;
     h.gear={};for(const [slot,gearId] of Object.entries(record(source.gear)))if(typeof gearId==='string'&&h.inventory.includes(gearId)&&GEAR.some(g=>g.id===gearId&&g.slot===slot)&&!gearReason(p,id,gearId,true))h.gear[slot]=gearId;
     const skills=Array.isArray(source.skills)?source.skills:[];
     const valid=[...new Set(skills)].filter((index):index is number=>typeof index==='number'&&legalSkill(index,h.talents,h.job));
@@ -135,6 +140,9 @@ export function normalizeProfile(raw:unknown,legacy?:unknown):Profile {
   const claims=Array.isArray(data.claimedQuests)?data.claimedQuests:[];
   for(const q of QUESTS)if(claims.includes(q.id)&&(!q.requires||p.claimedQuests.includes(q.requires)))p.claimedQuests.push(q.id);
   if(typeof data.trackedQuest==='string'&&QUESTS.some(q=>q.id===data.trackedQuest)&&!p.claimedQuests.includes(data.trackedQuest))p.trackedQuest=data.trackedQuest;
+  p.journey=normalizeJourney(data.journey,p.cleared);
+  if(p.journey.run)p.journey.run.party=p.journey.run.party.filter(id=>p.roster.includes(id));
+  if(p.journey.run&&!p.journey.run.party.length)delete p.journey.run;
   return p;
 }
 
@@ -196,7 +204,7 @@ export function settleProgress(p:Profile,b:Battle,runWallet?:RunWallet) {
   // Calculate every delta before mutating the profile.  The operations below
   // are bounded integer updates, so a settlement either commits as a whole or
   // returns without changing the profile.
-  const xp=b.mode==='adventure'?180+b.floor*75+b.stageCount*45:b.mode==='endless'?100+b.floor*35:180+b.floor*45;
+  const xp=b.mode==='adventure'?Math.round((180+b.floor*75+b.stageCount*45)*(b.heroic?1.3:1)):b.mode==='dungeon'?b.dungeon?.xp??0:b.mode==='endless'?100+b.floor*35:180+b.floor*45;
   const rewards=(b.mode==='endless'?[]:b.heroes).map(h=>{const amount=Math.floor(xp*(h.hp>0?1:.6));const before=heroProgress(p.loadouts[h.id]?.xp).level;return {id:h.id,kind:'active' as 'active'|'bench',bonus:0,xp:amount,before,after:heroProgress((p.loadouts[h.id]?.xp??0)+amount).level};});
   if(b.mode==='adventure') {
     const activeXP=b.heroes.map(h=>normalizedXP(p.loadouts[h.id]?.xp)).sort((a,b)=>a-b);
@@ -222,4 +230,33 @@ export function settleProgress(p:Profile,b:Battle,runWallet?:RunWallet) {
   for(const id of enemies){const base=ENEMIES[id]?.archetype??id;p.ledger.enemies[base]=(p.ledger.enemies[base]??0)+1;}
   syncProfileEconomy(p);
   return rewards;
+}
+
+/** Gold and materials to refine one owned gear piece from +n to +n+1. */
+export function refineCost(gearId:string,level:number):{gold:number;material:string;amount:number}|undefined {
+  const g=GEAR.find(g=>g.id===gearId);if(!g||!Number.isInteger(level)||level<0||level>=MAX_REFINE)return undefined;
+  return {gold:Math.round((60+(g.minLevel??1)*8)*(level+1)),material:['ember-shard','bell-bronze','frost-glass'][level],amount:2+level};
+}
+export function refineGear(p:Profile,heroId:number,gearId:string) {
+  const h=loadout(p,heroId);if(!h||!h.inventory?.includes(gearId))return false;
+  const level=h.refine?.[gearId]??0,cost=refineCost(gearId,level);if(!cost)return false;
+  if(p.gold<cost.gold||(p.economy.materials[cost.material]??0)<cost.amount)return false;
+  p.gold-=cost.gold;p.economy.materials[cost.material]-=cost.amount;
+  h.refine={...(h.refine??{}),[gearId]:level+1};syncProfileEconomy(p);return true;
+}
+/** Add a dungeon pouch, a star chest or a heroic reward to the story wallet. */
+export function bankPouch(p:Profile,pouch:Pouch) {
+  if(pouch.gold>0)p.gold=Math.min(1000000,p.gold+Math.floor(pouch.gold));
+  for(const [id,amount] of Object.entries(pouch.materials))if(Number.isSafeInteger(amount)&&amount>0)creditCurrency(p.economy,'story',`material:${id}`,amount);
+  syncProfileEconomy(p);
+}
+export function claimStarChest(p:Profile):Pouch|undefined {
+  if(!claimableChests(p.journey))return undefined;
+  p.journey.chests++;const reward=chestReward(p.journey.chests);bankPouch(p,reward);return reward;
+}
+/** Record a chapter clear's stars and, for a first Heroic clear, its reward. */
+export function recordChapterResult(p:Profile,chapter:number,stars:number,heroic:boolean):{improved:boolean;heroic?:Pouch} {
+  const improved=heroic?false:recordStars(p.journey,chapter,stars);
+  if(heroic&&p.cleared.includes(chapter)&&!p.journey.heroic.includes(chapter)){p.journey.heroic.push(chapter);p.journey.heroic.sort((a,b)=>a-b);const reward=heroicReward(chapter);bankPouch(p,reward);return {improved,heroic:reward};}
+  return {improved};
 }

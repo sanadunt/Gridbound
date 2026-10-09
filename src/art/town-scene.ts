@@ -617,7 +617,7 @@ const box = (id: string, target: Target, x0: number, y0: number, x1: number, y1:
 /** Tappable building rectangles (percent of the scene) and their name-plate anchors (percent, sign center). */
 export const TOWN_HOTSPOTS: ReadonlyArray<TownHotspot> = [
   box('gate', { facility: 'campaign' }, 76, 12, 140, 86, 108, 92),
-  box('chapel', { action: 'journal' }, 150, 0, 212, 142, 190, 74),
+  box('chapel', { facility: 'dungeon' }, 150, 0, 212, 142, 190, 74),
   box('archive', { facility: 'bestiary' }, 4, 60, 72, 134, 38, 140),
   box('hall', { facility: 'party' }, 2, 148, 84, 212, 40, 218),
   box('guild', { facility: 'quests' }, 136, 146, 214, 212, 176, 218),

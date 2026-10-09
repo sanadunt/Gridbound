@@ -12,13 +12,19 @@ import { QUESTS, questProgress } from '../game/quests';
 import { questBoard } from './quests';
 import { heroCanvas } from '../art/pixels';
 import { itemIcon, type ItemSlot } from '../art/items';
+import { dungeonIcon } from '../art/dungeon-icons';
 import { monsterCanvas } from '../art/monsters';
 import { townSceneCanvas, campfireCanvas, smokeCanvas, TOWN_HOTSPOTS, TOWN_W, TOWN_H, PLAZA, CAMPFIRE, CHIMNEYS, SMOKE_SIZE } from '../art/town-scene';
 import { renderWorldMap } from './world-map';
+import { dungeonScene } from './dungeon';
+import { heroPower, partyPower, powerVerdict, recommendedPower } from '../game/power';
+import { claimableChests } from '../game/journey';
+import { DEPTHS, unlockedDepth } from '../game/dungeon';
+import { refineCost } from '../game/profile';
 import { t, gameText, lang, type StringKey } from '../i18n';
 import { localizedRaidModifier } from '../i18n/content';
 
-export type TownTab = 'camp' | 'campaign' | 'mission' | 'party' | 'party-advanced' | 'more' | 'bestiary' | 'quests' | 'raid' | 'endless' | 'challenge-shop';
+export type TownTab = 'camp' | 'campaign' | 'mission' | 'dungeon' | 'party' | 'party-advanced' | 'more' | 'bestiary' | 'quests' | 'raid' | 'endless' | 'challenge-shop';
 export type TrainingTab = 'overview'|'skills'|'jobs'|'talents'|'gear'|'formation';
 export type PendingGear = { hero: number; slot: 'weapon'|'armor'|'charm'; gearId: string };
 export type TownState = {
@@ -39,6 +45,8 @@ export type TownState = {
   talentBranch?: string;
   selectedTalent?: string;
   pendingGear?: PendingGear;
+  heroic?: boolean;
+  dungeonOutcome?: string;
   gearSlot?: ItemSlot;
   rogueSetup?: RogueBuild;
 };
@@ -69,18 +77,26 @@ const className = (classId: keyof typeof KITS) => KITS[classId].name;
 
 /** Route title shown in the HUD strip. */
 export function routeTitle(tab: TownTab) {
-  const keys: Record<TownTab, StringKey> = { camp: 'town.name', campaign: 'route.campaign', mission: 'route.campaign', party: 'route.party', 'party-advanced': 'route.progression', more: 'route.menu', bestiary: 'route.bestiary', quests: 'route.quests', raid: 'route.raid', endless: 'route.endless', 'challenge-shop': 'route.shop' };
+  const keys: Record<TownTab, StringKey> = { camp: 'town.name', campaign: 'route.campaign', mission: 'route.campaign', dungeon: 'route.dungeon', party: 'route.party', 'party-advanced': 'route.progression', more: 'route.menu', bestiary: 'route.bestiary', quests: 'route.quests', raid: 'route.raid', endless: 'route.endless', 'challenge-shop': 'route.shop' };
   return t(keys[tab]);
 }
 
 const SPOT_LABELS: Record<string, StringKey> = { gate: 'town.spot.gate', hall: 'town.spot.hall', guild: 'town.spot.guild', archive: 'town.spot.archive', merchant: 'town.spot.merchant', lodge: 'town.spot.lodge', well: 'town.spot.well', inn: 'town.spot.inn', chapel: 'town.spot.chapel' };
 
-function nextObjective(p: Profile) {
+/** The single most useful next step, with the place it happens. */
+function nextObjective(p: Profile): { text: string; facility?: string } {
   const ready = QUESTS.filter(q => questProgress(p, q).ready).length;
-  if (!p.cleared.length) return t('town.msg.first');
-  if (ready) return t('town.msg.quests', { n: ready });
-  if (p.cleared.length >= CAMPAIGN.length) return t('town.msg.done');
-  return t('town.msg.next', { chapter: p.cleared.length + 1, name: CAMPAIGN[Math.min(p.cleared.length, CAMPAIGN.length - 1)].name });
+  if (!p.cleared.length) return { text: t('town.msg.first'), facility: 'campaign' };
+  if (p.journey.run?.status === 'active') return { text: t('guide.run'), facility: 'dungeon' };
+  if (claimableChests(p.journey)) return { text: t('guide.chest'), facility: 'campaign' };
+  if (ready) return { text: t('town.msg.quests', { n: ready }), facility: 'quests' };
+  const idle = normalizeStoryParty(p.storyActive, p.roster, p.cleared).find(id => availablePoints(p, id) >= 2);
+  if (idle !== undefined) return { text: t('guide.points', { name: ROSTER[idle].name, n: availablePoints(p, idle) }), facility: 'party-advanced' };
+  if (p.cleared.length >= CAMPAIGN.length) return { text: t('guide.heroic'), facility: 'campaign' };
+  const next = Math.min(p.cleared.length, CAMPAIGN.length - 1), power = partyPower(p), rec = recommendedPower(next);
+  if (powerVerdict(power, rec) === 'under') return { text: t('guide.underpowered', { n: power, rec, name: CAMPAIGN[next].name }), facility: unlockedDepth(p.cleared, p.journey.depth) ? 'dungeon' : 'party' };
+  if (unlockedDepth(p.cleared, p.journey.depth) > p.journey.depth && p.journey.depth < DEPTHS.length) return { text: t('guide.dungeon'), facility: 'dungeon' };
+  return { text: t('town.msg.next', { chapter: next + 1, name: CAMPAIGN[next].name }), facility: 'campaign' };
 }
 
 function campScene(p: Profile) {
@@ -109,7 +125,7 @@ function campScene(p: Profile) {
     </div>
     <div class="msg-window camp-copy">
       <h1 id="camp-title">${t('town.name')} <small>${t('town.seals', { n: p.cleared.length, total: CAMPAIGN.length })}</small></h1>
-      <p>${escape(nextObjective(p))}</p>
+      ${(() => { const goal = nextObjective(p); return `<p><b class="guide-label">${t('guide.title')}:</b> ${escape(goal.text)}</p>${goal.facility ? `<button class="btn guide-go" data-facility="${goal.facility}">${t('common.go')} ▶</button>` : ''}`; })()}
       <span class="msg-caret" aria-hidden="true">▼</span>
     </div>
   </section>`;
@@ -151,12 +167,12 @@ function secondaryScene(p: Profile, state: TownState) {
   return `<section class="secondary-scene" aria-labelledby="secondary-title"><h1 id="secondary-title" class="sr-only">${routeTitle(state.tab)}</h1>${modeNav}<div class="secondary-content">${body}</div>${deployment}</section>`;
 }
 
-export function expeditionModes(active: 'campaign' | 'raid' | 'endless') {
-  return `<nav class="tabs expedition-mode-nav" aria-label="${t('route.campaign')}">${([['campaign', 'mode.campaign'], ['raid', 'mode.raid'], ['endless', 'mode.endless']] as const).map(([id, key]) => `<button data-facility="${id}" ${active === id ? 'aria-current="page"' : ''}>${t(key)}</button>`).join('')}</nav>`;
+export function expeditionModes(active: 'campaign' | 'dungeon' | 'raid' | 'endless') {
+  return `<nav class="tabs expedition-mode-nav" aria-label="${t('route.campaign')}">${([['campaign', 'mode.campaign'], ['dungeon', 'mode.dungeon'], ['raid', 'mode.raid'], ['endless', 'mode.endless']] as const).map(([id, key]) => `<button data-facility="${id}" ${active === id ? 'aria-current="page"' : ''}>${t(key)}</button>`).join('')}</nav>`;
 }
 
 export function renderTown(root: HTMLElement, p: Profile, state: TownState) {
-  const content = state.tab === 'camp' ? campScene(p) : state.tab === 'campaign' || state.tab === 'mission' ? renderWorldMap(p, state) : state.tab === 'party' || state.tab === 'party-advanced' ? training(p, state, state.tab === 'party-advanced') : state.tab === 'more' ? moreScene(p) : secondaryScene(p, state);
+  const content = state.tab === 'camp' ? campScene(p) : state.tab === 'dungeon' ? dungeonScene(p, state.dungeonOutcome, expeditionModes('dungeon')) : state.tab === 'campaign' || state.tab === 'mission' ? renderWorldMap(p, state) : state.tab === 'party' || state.tab === 'party-advanced' ? training(p, state, state.tab === 'party-advanced') : state.tab === 'more' ? moreScene(p) : secondaryScene(p, state);
   root.innerHTML = `<div class="town-game-shell" data-town-route="${state.tab}"><section class="town-scene" aria-label="${escape(routeTitle(state.tab))}"><p id="town-notice" class="town-notice" role="status" ${state.notice ? '' : 'hidden'}>${escape(gameText(state.notice))}</p>${content}</section></div>`;
 }
 
@@ -187,7 +203,7 @@ function heroSheet(p: Profile, id: number, preview: ReturnType<Battle['hero']> &
   const r = ROSTER[id], kit = KITS[r.classId], loadout = p.loadouts[id];
   const job = JOBS[loadout.job ?? ''];
   const exp = progress.needed ? progress.current / progress.needed * 100 : 100;
-  const stats: [string, string][] = [['HP', String(preview.maxHp)], [t('party.cd'), `${preview.total.toFixed(2)}s`], [t('gear.power'), percent(preview.equipment.power - 1)], ['SP', String(availablePoints(p, id))]];
+  const stats: [string, string][] = [[t('power.hero'), String(heroPower(preview))], ['HP', String(preview.maxHp)], [t('party.cd'), `${preview.total.toFixed(2)}s`], ['SP', String(availablePoints(p, id))]];
   return `<div class="win hero-sheet training-identity" style="--class-color:${kit.color}">
     <div class="sheet-portrait"><img src="${portrait(r.classId)}" alt=""/><span>LV ${progress.level}</span></div>
     <div class="sheet-body"><small>${escape(job?.name ?? kit.name)} · ${escape(kit.role)}</small><h2>${r.name}</h2>
@@ -287,7 +303,7 @@ function forge(p: Profile, id: number, state: TownState) {
   const comparison = selected ? `<dl class="stat-table gear-comparison"><div><dt>${t('gear.power')}</dt><dd>${percent(selected.power - (current?.power ?? 0))}</dd></div><div><dt>HP</dt><dd>${percent(selected.hp - (current?.hp ?? 0))}</dd></div><div><dt>${t('gear.tempo')}</dt><dd>${percent(selected.tempo - (current?.tempo ?? 0))}</dd></div></dl>` : '';
   const slotButton = (slot: ItemSlot) => {
     const g = gearOf(h, slot);
-    return `<button class="equip-slot ${slot === activeSlot ? 'active' : ''} ${g ? `rarity-${g.rarity ?? 'common'}` : 'empty'}" data-gear-open="${slot}" aria-pressed="${slot === activeSlot}"><img class="item-icon" src="${itemIcon(slot, g?.rarity ?? 'common', !g)}" alt=""/><span><small>${t(`gear.slot.${slot}` as StringKey)}</small><b>${escape(g?.name ?? t('gear.empty'))}</b><em>${g ? gearStatsLine(g) : t('gear.none')}</em></span></button>`;
+    return `<button class="equip-slot ${slot === activeSlot ? 'active' : ''} ${g ? `rarity-${g.rarity ?? 'common'}` : 'empty'}" data-gear-open="${slot}" aria-pressed="${slot === activeSlot}"><img class="item-icon" src="${itemIcon(slot, g?.rarity ?? 'common', !g)}" alt=""/><span><small>${t(`gear.slot.${slot}` as StringKey)}</small><b>${escape(g?.name ?? t('gear.empty'))}${g && h.refine?.[g.id] ? ` +${h.refine[g.id]}` : ''}</b><em>${g ? gearStatsLine(g) : t('gear.none')}</em></span></button>`;
   };
   const items = GEAR.filter(g => g.slot === activeSlot && (!g.classId || g.classId === ROSTER[id].classId)).map(g => {
     const owned = h.inventory?.includes(g.id), equipped = h.gear?.[activeSlot] === g.id, why = gearReason(p, id, g.id);
@@ -295,7 +311,10 @@ function forge(p: Profile, id: number, state: TownState) {
     return `<button class="item-card rarity-${g.rarity ?? 'common'} ${equipped ? 'equipped' : ''} ${selected?.id === g.id ? 'chosen' : ''} ${why && !equipped ? 'unavailable' : ''}" data-gear-item="${g.id}" data-gear-slot-for="${activeSlot}" aria-pressed="${selected?.id === g.id}"><img class="item-icon" src="${itemIcon(activeSlot, g.rarity ?? 'common')}" alt=""/><span class="item-main"><b>${escape(g.name)}</b><small>LV ${g.minLevel ?? 1}${g.classId ? ` · ${className(g.classId as keyof typeof KITS)}` : ''} · ${gearStatsLine(g)}</small></span><em>${escape(tag)}</em></button>`;
   }).join('');
   const preview = selected ? `<section class="gear-preview rarity-${selected.rarity ?? 'common'}" data-gear-preview="${selected.id}" aria-live="polite"><small>${t('gear.inspect')} · ${escape(selected.rarity ?? 'common')}</small><h3>${escape(selected.name)}</h3><p>${escape(selected.description)}</p><p>${t('gear.req')}: ${selected.minLevel ? `LV ${selected.minLevel}` : t('gear.req.none')}${selected.classId ? ` · ${className(selected.classId as keyof typeof KITS)}` : ''}${selected.source === 'quest' ? ` · ${t('gear.quest')}` : ` · ${selected.cost}G`}</p>${comparison}<p class="gear-preview-status">${reason ? escape(gameText(reason)) : current?.id === selected.id ? t('gear.equipped') : t('gear.ready')}</p><div class="gear-preview-actions"><button class="btn primary" data-confirm-gear ${reason || current?.id === selected.id ? 'disabled' : ''}>${t('gear.confirm')}</button><button class="btn" data-cancel-gear>${t('common.cancel')}</button></div></section>` : `<p class="hint gear-preview-empty">${t('gear.hint')}</p>`;
-  return `<h3 class="subheading">${t('gear.title')} <span>${t('gear.sub')}</span></h3><div class="gear-slots equip-slots">${SLOTS.map(slotButton).join('')}</div>${preview}<h4 class="subheading">${t(`gear.slot.${activeSlot}` as StringKey)} <span>${t('gear.list.sub')}</span></h4><div class="item-list">${items}</div><details class="gear-set-status"><summary>${t('gear.sets')}</summary>${GEAR_SETS.map(set => { const count = Object.entries(h.gear ?? {}).filter(([slot, gearId]) => GEAR.some(g => g.id === gearId && g.slot === slot && g.setId === set.id)).length; return `<p><b>${escape(set.name)} · ${count}/3</b><br>${escape(set.description)} ${count >= 3 ? t('gear.set.all') : count >= 2 ? t('gear.set.two') : ''}</p>`; }).join('')}</details>`;
+  const equipped = gearOf(h, activeSlot), level = equipped ? h.refine?.[equipped.id] ?? 0 : 0, cost = equipped ? refineCost(equipped.id, level) : undefined;
+  const materials = (['ember-shard', 'bell-bronze', 'frost-glass'] as const).map(id => `<span class="mat-chip"><img src="${dungeonIcon(id)}" alt=""/>${escape(t(`material.${id}` as StringKey))} ×${p.economy.materials[id] ?? 0}</span>`).join('');
+  const refine = equipped ? `<div class="refine-row"><div><b>${escape(equipped.name)}${level ? ` +${level}` : ''}</b><small>${t('gear.refine.hint')}</small></div>${cost ? `<button class="btn" data-refine="${equipped.id}" ${p.gold >= cost.gold && (p.economy.materials[cost.material] ?? 0) >= cost.amount ? '' : 'disabled'}><span>${t('gear.refine', { n: level + 1 })}</span><small>${t('gear.refine.cost', { gold: cost.gold, mat: t(`material.${cost.material}` as StringKey), n: cost.amount })}</small></button>` : `<em>${t('gear.refine.max')}</em>`}</div>` : '';
+  return `<h3 class="subheading">${t('gear.title')} <span>${t('gear.sub')}</span></h3><div class="gear-slots equip-slots">${SLOTS.map(slotButton).join('')}</div><div class="mat-bar" aria-label="${t('gear.materials')}">${materials}</div>${refine}${preview}<h4 class="subheading">${t(`gear.slot.${activeSlot}` as StringKey)} <span>${t('gear.list.sub')}</span></h4><div class="item-list">${items}</div><details class="gear-set-status"><summary>${t('gear.sets')}</summary>${GEAR_SETS.map(set => { const count = Object.entries(h.gear ?? {}).filter(([slot, gearId]) => GEAR.some(g => g.id === gearId && g.slot === slot && g.setId === set.id)).length; return `<p><b>${escape(set.name)} · ${count}/3</b><br>${escape(set.description)} ${count >= 3 ? t('gear.set.all') : count >= 2 ? t('gear.set.two') : ''}</p>`; }).join('')}</details>`;
 }
 
 function formation(p: Profile, id: number, r: typeof ROSTER[number], loadout: Profile['loadouts'][number]) {

@@ -1,0 +1,120 @@
+/* Progress (power, stars, heroic), forge refinement and the Undercroft dungeon. */
+
+/* Party power vs recommendation */
+.power-line { margin: 6px 0; font-size: 13px; color: var(--ink-soft); }
+.power-line b { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+.power-line em { margin-left: 4px; padding: 1px 6px; border-radius: var(--radius); font-style: normal; font-weight: 700; font-size: 12px; }
+.power-ready em, em.power-ready { background: #1f3d2b; color: var(--hp); }
+.power-close em, em.power-close { background: #3a3519; color: var(--hp-low); }
+.power-under em, em.power-under { background: #3d1f1b; color: var(--danger); }
+
+/* Chapter stars */
+.star-row { font-family: var(--pixel); font-size: 10px; letter-spacing: 1px; color: var(--gold-bright); text-shadow: 1px 1px 0 #000; }
+.map-node-stars { display: flex; align-items: center; gap: 3px; margin-top: 1px; padding: 0 4px; border-radius: 3px; background: #000a; }
+.map-node-stars .star-row { font-size: 8px; }
+.heroic-mark { font-style: normal; font-family: var(--pixel); font-size: 7px; padding: 1px 2px; border-radius: 2px; background: var(--danger-deep); color: #ffe2dc; }
+.star-goals { display: flex; gap: 10px; align-items: flex-start; margin: 6px 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); }
+.star-goals .star-row { flex: none; padding-top: 2px; }
+.star-goals ul { margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--ink-dim); }
+.star-goals li::before { content: '☆ '; color: var(--faint); }
+.star-goals li.met { color: var(--ink); }
+.star-goals li.met::before { content: '★ '; color: var(--gold); }
+.star-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 8px 12px; font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+.star-bar small { font-family: var(--text); font-size: 12px; color: var(--ink-dim); }
+
+/* Heroic difficulty */
+.heroic-toggle { margin: 6px 0; }
+.heroic-toggle button[data-heroic="1"][aria-pressed="true"] { border-color: var(--danger); background: var(--danger-deep); color: #ffe2dc; }
+.heroic-note { margin: 6px 0; padding: 6px 8px; border: 1px solid var(--danger); border-radius: var(--radius); background: #2a1512; font-size: 12px; color: #f3d3cc; }
+.heroic-note b { font-family: var(--pixel); font-size: 9px; color: var(--danger); }
+.btn.primary.heroic-depart { background: #e89a84; border-color: #ffd3c6; box-shadow: 0 3px 0 #9a4a3a; }
+
+/* Next-step guide in town */
+.guide-label { color: var(--gold); }
+.guide-go { margin-top: 4px; }
+
+/* Forge refinement */
+.mat-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.mat-chip, .pouch-mat { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px 2px 3px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+.mat-chip img, .pouch-mat img, .depth-meta img { width: 18px; height: 18px; image-rendering: pixelated; }
+.refine-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0 10px; padding: 8px 10px; border: 1px solid var(--gold-border); border-radius: var(--radius); background: var(--gold-bg); }
+.refine-row b { display: block; color: var(--gold); }
+.refine-row small { display: block; font-size: 12px; color: var(--ink-dim); }
+.refine-row .btn { flex: none; }
+.refine-tag { margin-left: 4px; font-family: var(--pixel); font-size: 8px; color: var(--hp); }
+
+/* Undercroft: depth picker */
+.dungeon-scene { display: grid; gap: 10px; padding: 10px 12px 18px; }
+.dungeon-intro small, .dungeon-hud small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
+.dungeon-intro h2, .dungeon-hud h2, .dungeon-result h2 { margin: 6px 0; font-family: var(--pixel); font-size: 14px; line-height: 1.5; color: var(--gold); }
+.dungeon-intro p { margin: 6px 0; color: var(--ink-soft); }
+.dungeon-party { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.dungeon-party > img { width: 32px; height: 32px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); }
+.dungeon-party > span:not(.dungeon-hero) { margin-left: 6px; font-family: var(--pixel); font-size: 9px; color: var(--gold); }
+.depth-list { display: grid; gap: 6px; }
+.depth-card { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 10px; min-height: 56px; padding: 6px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: linear-gradient(180deg, var(--win-top), var(--win-bot)); color: var(--ink); text-align: left; }
+.depth-card:hover:not(:disabled) { border-color: var(--gold-border); }
+.depth-card.locked { opacity: .55; }
+.depth-card.beaten { border-color: var(--hp-deep); }
+.depth-num { display: grid; place-items: center; width: 34px; height: 34px; border: 2px solid var(--gold-border); border-radius: 50%; background: #0008; font-family: var(--pixel); font-size: 12px; color: var(--gold); }
+.depth-body b { display: block; font-size: 14px; }
+.depth-body small { display: block; font-size: 12px; color: var(--ink-dim); }
+.depth-meta { display: flex; align-items: center; gap: 6px; }
+.depth-meta em { padding: 1px 5px; border-radius: var(--radius); font-style: normal; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.depth-meta i { font-style: normal; color: var(--hp); }
+.dungeon-rules p { margin: 4px 0; font-size: 13px; color: var(--ink-soft); }
+.dungeon-rules b { color: var(--gold); }
+
+/* Undercroft: run HUD */
+.dungeon-hud { display: grid; gap: 6px; padding: 8px 12px; }
+.dungeon-hud h2 { margin: 2px 0; font-size: 12px; }
+.dungeon-pouch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.pouch-gold { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+.pouch-potions { font-size: 12px; color: var(--mana); }
+.dungeon-blessing { padding: 1px 6px; border-radius: var(--radius); background: #23304a; font-size: 12px; color: var(--mana); }
+.dungeon-hero { display: inline-grid; gap: 2px; width: 40px; }
+.dungeon-hero img { width: 40px; height: 40px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); }
+.dungeon-hero .gauge { height: 5px; }
+.dungeon-hero.low .gauge i { background: var(--hp-low); }
+.dungeon-hero.down img { filter: grayscale(1) brightness(.5); }
+
+/* Undercroft: room map (rows climb from the entrance at the bottom to the guardian at the top) */
+.dungeon-map { position: relative; height: min(64vh, 470px); min-height: 330px; border: 1px solid var(--win-edge); border-radius: var(--radius); background:
+  radial-gradient(ellipse at 50% 100%, #2b1f17 0%, transparent 60%),
+  repeating-linear-gradient(0deg, #0000 0 22px, #ffffff06 22px 23px),
+  linear-gradient(180deg, #120d10, #1b1612 55%, #221a13); overflow: hidden; }
+.dungeon-paths { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dungeon-paths line { stroke: #6d5a44; stroke-width: 2px; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.dungeon-paths line.walked { stroke: var(--gold); stroke-dasharray: none; }
+.room { position: absolute; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; transform: translate(-50%, -50%); border: 2px solid #6d5a44; border-radius: 50%; background: #1c1712; box-shadow: 0 2px 0 #000; }
+.room img { width: 28px; height: 28px; image-rendering: pixelated; }
+.room.closed { opacity: .45; cursor: default; }
+.room.visited { opacity: .7; border-color: var(--gold-deep); cursor: default; }
+.room.open { border-color: var(--gold-bright); background: #3a2d1b; animation: node-pulse 1s ease-in-out infinite; }
+.room.current { border-color: #fff; background: #4d3a1e; box-shadow: 0 0 0 3px var(--gold), 0 2px 0 #000; cursor: default; }
+.room-elite { border-radius: var(--radius); }
+.room-guardian { width: 52px; height: 52px; border-color: var(--danger); }
+.room-guardian img { width: 34px; height: 34px; }
+.room-panel { padding: 10px 12px; }
+.room-panel small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
+.room-panel h3 { margin: 6px 0; font-size: 16px; color: var(--ink); }
+.room-panel h3 span { font-size: 13px; color: var(--ink-dim); font-weight: 500; }
+.room-panel p { margin: 6px 0; color: var(--ink-soft); }
+.room-outcome { padding: 6px 8px; border-left: 3px solid var(--gold); background: var(--inset); color: var(--ink) !important; }
+.event-choices { display: grid; gap: 6px; margin-top: 8px; }
+.event-choices .btn { text-align: left; }
+.dungeon-scene .departure-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.dungeon-scene .departure-actions small { flex: 1 1 180px; font-size: 12px; }
+
+/* Undercroft: run finished */
+.dungeon-result { padding: 14px; text-align: center; }
+.dungeon-result .result-banner { margin: 0; font-family: var(--pixel); font-size: 12px; color: var(--gold); }
+.dungeon-result.wiped .result-banner { color: var(--danger); }
+.dungeon-result .dungeon-pouch { justify-content: center; margin: 10px 0; }
+
+@media (max-width: 420px) {
+  .room { width: 40px; height: 40px; }
+  .room img { width: 24px; height: 24px; }
+  .depth-card { grid-template-columns: 32px 1fr; }
+  .depth-meta { grid-column: 2; }
+}

@@ -51,7 +51,7 @@ Gridbound adalah tactical RPG single-player untuk browser dengan pixel art lokal
 | Pemain | Satu pemain lokal. Tidak ada multiplayer, akun wajib, atau leaderboard online. |
 | Platform | Browser desktop dan mobile. Tidak ada build native iOS atau Android. |
 | Runtime | TypeScript, Phaser, Vite, UI DOM, Canvas art, dan Web Audio. |
-| Konten inti | Empat act, 16 chapter, 76 encounter campaign; sembilan hero; Raid dan Roguelike yang dapat diulang. |
+| Konten inti | Empat act, 16 chapter, 76 encounter campaign; lima belas hero dari sembilan basic job; Undercroft (dungeon acak delapan depth), Heroic replay, Raid, dan Roguelike yang dapat diulang. |
 | Layanan | Tidak memerlukan backend, account service, atau CDN untuk menjalankan game. Save berada di penyimpanan browser. |
 | Model bisnis | Tidak ada ads, pembelian dalam aplikasi, loot box, atau mata uang berbayar yang diimplementasikan. Harga dan model distribusi belum ditetapkan di repo. |
 | Status perilisan | Build statis dapat dibuat, tetapi tidak ada klaim deployment live atau penerimaan produksi. |
@@ -190,12 +190,22 @@ Title screen memuat empat aksi: **Enter Emberhollow**, **Commander Profiles**, *
 
 World Map menampilkan empat act dengan route pins, status chapter terkunci/tersedia/selesai, dan seleksi chapter. Memilih route membuka mission dossier dengan informasi speaker, chapter, stage, reward, recruit, boss, intent, counter, dan cerita yang relevan. Pemain harus menekan aksi deploy; memilih node saja tidak memulai pertarungan.
 
+### Progres yang terlihat
+
+- **Party power** merangkum level, gear, refine, talent, dan job menjadi satu angka. World Map, dossier, dan daftar depth Undercroft membandingkannya dengan **recommended power** per chapter (power pemain casual hasil simulasi balance di awal chapter tersebut) dengan status Ready / Close / Under.
+- **Chapter stars:** ★ untuk clear, ★ jika semua hero masih berdiri, ★ jika boss kalah dalam 80 detik atau kurang. Setiap 8 bintang membuka **star chest** (Gold + material).
+- **Next step** di Camp selalu menunjuk satu tujuan berikutnya (dungeon yang sedang berjalan, chest, point yang belum dipakai, chapter berikutnya, Undercroft saat party under-power, atau Heroic setelah campaign tamat) dengan tombol Go.
+
+### Core loop Story
+
+Chapter → XP, Gold, recruit, bintang → bila power kurang: Undercroft untuk XP dan material → refine gear, talent, job → chapter berikutnya. Setelah chapter selesai, Heroic replay memberi tantangan dan reward material sekali per chapter.
+
 ## 6. Mode permainan
 
 | Aspek | Story / Campaign | Raid | Roguelike / The Sunken Bell |
 |---|---|---|---|
 | Tujuan | Menyelesaikan campaign dan memulihkan Emberhollow tanpa mengulang pengorbanan sanctuary. | Mengalahkan boss yang dipilih dalam kontrak dan konfigurasi party pilihan. | Bertahan melewati floor, mengembangkan build run, memilih boon, dan mencapai act milestone. |
-| Party | Roster sembilan hero. Party aktif mulai tiga, lalu cap bertambah menjadi empat, lima, dan enam setelah progres chapter berurutan. | Satu sampai enam slot dari hero yang direkrut; setiap slot dapat diberi salah satu basic job. | Tepat tiga recruit dengan basic job pilihan; job duplikat diizinkan. |
+| Party | Roster lima belas hero. Party aktif mulai tiga, lalu cap bertambah sampai sembilan (grid 3×3 penuh) seiring progres chapter berurutan. | Satu sampai enam slot dari hero yang direkrut; setiap slot dapat diberi salah satu basic job. | Tepat tiga recruit dengan basic job pilihan; job duplikat diizinkan. |
 | Progres yang dipakai | XP, job, skill, talent, gear, gold, quest, roster, story flags. | Build Raid, boss, variant, tier, modifier, dan konfigurasi Sandbox. | Build Rogue sementara, point job, boon run, floor, dan run wallet. |
 | Progres permanen | Chapter clear, recruit, hero build, quest, gold, narrative flags. | Ledger, reward Crystal jika kontrak tervalidasi, dan challenge unlock sesuai receipt. | Bank Crystal pada milestone act, best-floor data, dan challenge unlock. |
 | Perjalanan run | Chapter berisi beberapa stage berurutan. | Satu encounter boss per kontrak. | Satu floor/encounter per clear; milestone act berada di floor 3, 6, dan 9. |
@@ -204,6 +214,14 @@ World Map menampilkan empat act dengan route pins, status chapter terkunci/terse
 ### Story
 
 Chapter dibuka berurutan. First clear memberikan chapter progression dan membuka recruit yang ditetapkan. Pemain dapat memilih party yang lebih kecil dari cap aktif. Hero yang berada di bench dapat menerima XP catch-up terbatas pada mode Story. Replaying chapter dapat menghasilkan XP dan Gold, tetapi tidak memberi recruit atau bonus first clear untuk kedua kalinya.
+
+### Undercroft (dungeon)
+
+Dibuka dari Bell Tower di Emberhollow. Delapan depth; depth 1 terbuka setelah Chapter 1, depth berikutnya setelah guardian depth sebelumnya kalah dan chapter syaratnya selesai (Chapter 3, 5, 7, 9, 11, 13, 15). Setiap run membuat peta acak (seeded) tujuh baris: battle, elite, event, treasure, camp (baris keenam), dan satu guardian. Party Story masuk dengan HP, dua potion, dan blessing yang terbawa antar ruangan. Sepuluh event acak memberi pilihan (risiko HP demi Gold/material, blessing power/vitality, potion, lore). Gold dan material masuk ke **pouch**: aman bila pemain extract di camp atau mengalahkan guardian, hilang bila party wipe atau run ditinggalkan. Setiap pertarungan memberi XP Story. Material (Ember Shard, Bell Bronze, Frost Glass) dipakai untuk **refine** gear sampai +3 (+15% stat per level). Guardian clear membuka fragmen lore depth itu.
+
+### Heroic
+
+Chapter yang sudah selesai dapat diulang dalam mode Heroic: musuh +60% HP, +45% damage, serangan lebih cepat, hanya satu potion, dan boss menambah aftershock setelah phase 2. Clear Heroic pertama per chapter memberi Gold dan material; replay berikutnya tidak memberi reward chapter. Simulasi balance: pemain expert dengan level satu–dua chapter di atas syarat dapat menyelesaikan Heroic chapter 1–12; Heroic chapter 13–16 adalah konten post-game yang memerlukan level tambahan dari Undercroft.
 
 ### Raid
 
@@ -319,7 +337,7 @@ AI tidak memakai machine learning. `Battle` menjalankan intent generik yang dipi
 
 ### Basic job dan spesialisasi
 
-Lima basic job menentukan kit awal dan peran combat.
+Sembilan basic job menentukan kit awal dan peran combat.
 
 | Basic job | Peran ringkas | Dua cabang advanced | Jalur third job |
 |---|---|---|---|
@@ -328,15 +346,19 @@ Lima basic job menentukan kit awal dan peran combat.
 | Archer | Target lane dan pressure minion. | Marksman; Wild Ranger. | Astral Deadeye; Wild Warden. |
 | Healer | Heal, regen, dan buff tempo. | Dawn Priest; War Cantor. | Ember Seraph; Bell Oracle. |
 | Wizard | Burst magic, area damage, dan interrupt. | Elementalist; Chronist. | Prismatic Archon; Last Hourkeeper. |
+| Bard | Haste, resolve, dan buff seluruh party; makin kuat pada party besar. | Lihat `data/database.json`. | Lihat `data/database.json`. |
+| Hexer | Weaken, curse, drain, dan sacrifice; melemahkan boss dari belakang. | Lihat `data/database.json`. | Lihat `data/database.json`. |
+| Monk | Combo, flurry, counter, dan selfheal di garis depan. | Lihat `data/database.json`. | Lihat `data/database.json`. |
+| Engineer | Turret, repair, delay, dan stun; mengunci telegraph. | Lihat `data/database.json`. | Lihat `data/database.json`. |
 
-Setiap basic job memiliki delapan definisi skill, total 40. Empat skill dasar dan skill job membuka pilihan yang lebih spesifik. Promosi membuka skill job, tetapi tidak memasangnya otomatis; pemain harus memasukkannya sendiri ke salah satu dari dua slot. Promosi branch tier-2 terbuka pada campaign rank 4; tier-3 memerlukan rank 10 dan parent yang benar. Harga promosi yang didefinisikan adalah 180 Gold untuk tier-2 dan 420 Gold untuk tier-3.
+Setiap basic job memiliki delapan definisi skill, total 72. Empat skill dasar dan skill job membuka pilihan yang lebih spesifik. Promosi membuka skill job, tetapi tidak memasangnya otomatis; pemain harus memasukkannya sendiri ke salah satu dari dua slot. Promosi branch tier-2 terbuka pada campaign rank 4; tier-3 memerlukan rank 10 dan parent yang benar. Harga promosi yang didefinisikan adalah 180 Gold untuk tier-2 dan 420 Gold untuk tier-3.
 
 ### Hero XP, party Story, dan talent
 
 - XP dan level disimpan per hero. Level maksimum 40.
-- Setiap level di atas level 1 menambah modifier dasar power 1,5% dan HP 2%.
+- Setiap level di atas level 1 menambah power 5% dan HP 6% (`LEVEL_POWER`/`LEVEL_HP`); level adalah sumber utama pertumbuhan hero, ditambah gear (dan refine), talent, serta job.
 - Hero yang direkrut mengejar median level roster pada saat recruitment.
-- Story party dimulai dengan tiga hero aktif. Cap menjadi empat setelah dua chapter berurutan selesai, lima setelah tiga, dan enam setelah empat.
+- Story party dimulai dengan tiga hero aktif. Cap menjadi empat setelah dua chapter berurutan selesai, lima setelah tiga, enam setelah empat, tujuh setelah enam, delapan setelah sembilan, dan sembilan setelah dua belas.
 - Dalam Story, hero bench menerima setidaknya 50% dari victory XP dan catch-up tambahan yang dibatasi oleh selisih terhadap median XP party aktif. Formula ini tidak berlaku untuk Raid atau Roguelike.
 - Katalog talent memiliki 50 definisi; 34 berlaku untuk setiap hero: 15 foundational, 15 node shared Assault/Guard/Tempo, dan empat node khusus class. Talent dapat memerlukan level hero, Gold, skill point, node parent, atau dua prerequisite. Hanya satu keystone dari tiga pilihan dapat dipakai pada satu hero.
 - Respec mengembalikan Gold dan skill point yang dibelanjakan pada talent/job serta mengatur skill dasar kembali. XP dan gear milik hero tetap ada.

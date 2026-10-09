@@ -11,12 +11,15 @@ import './styles/town.css';
 import './styles/screens.css';
 import './styles/battle.css';
 import './styles/result.css';
+import './styles/dungeon.css';
 import { currencyAmount } from './ui/currency';
 import { townSceneCanvas } from './art/town-scene';
 import { Battle, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CAMPAIGN, BOONS, boonChoices } from './game/world';
-import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock } from './game/profile';
+import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult } from './game/profile';
+import { startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fightScale, dungeonXP, type Outcome } from './game/dungeon';
+import { chapterStars } from './game/journey';
 import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
 import { actArt } from './ui/world-map';
 import { playDialogue, paginate } from './ui/dialogue';
@@ -27,7 +30,7 @@ import { loadSave, saveProfile } from './game/save';
 import { createProfile } from './game/profile';
 import { CommanderSession } from './game/commander-session';
 import { copyLegacyToCommander, createCommanderDocument, createRunCheckpoint, terminalRun, storedStateFor, type CommanderDocument, type CommanderMode, type SlotId } from './game/commander';
-import { storyBattleOptions, setStoryParty } from './game/story-party';
+import { storyBattleOptions, setStoryParty, normalizeStoryParty } from './game/story-party';
 import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-build';
 import { createRaidBuild, setRaidJob, setRaidPartySize, normalizeRaidBuild } from './game/raid-build';
 import { QUESTS, questProgress } from './game/quests';
@@ -248,7 +251,7 @@ const resultScreen = $<HTMLElement>('result-screen');
 function modeForTownTab(tab: TownTab, fallback = commander.mode): CommanderMode {
   if (tab === 'raid') return 'raid';
   if (tab === 'endless') return 'roguelike';
-  if (tab === 'quests') return 'story';
+  if (tab === 'quests' || tab === 'dungeon') return 'story';
   if (tab === 'challenge-shop') return fallback === 'story' ? 'raid' : fallback;
   if (tab === 'camp' || tab === 'more' || tab === 'bestiary') return fallback;
   return 'story';
@@ -318,6 +321,58 @@ $('town-screen').addEventListener('click', event => {
     const ids=profile.storyActive.includes(id)?profile.storyActive.filter(hero=>hero!==id):[...profile.storyActive,id];
     const ok=setStoryParty(profile,ids);
     showTown('party',ok?t('notice.story.saved'):t('notice.story.invalid'), true);
+    return;
+  }
+  if (button.dataset.dungeonStart) {
+    const depth = Number(button.dataset.dungeonStart);
+    if (profile.journey.run?.status === 'active') return;
+    profile.journey.run = startRun(depth, Math.floor(Math.random() * 1e9), normalizeStoryParty(profile.storyActive, profile.roster, profile.cleared));
+    townState.dungeonOutcome = undefined; sound.play('confirm');
+    showTown('dungeon', '', true);
+    return;
+  }
+  if (button.dataset.dungeonNode && profile.journey.run) {
+    if (enterNode(profile.journey.run, Number(button.dataset.dungeonNode))) { townState.dungeonOutcome = undefined; sound.play('cursor'); showTown('dungeon'); }
+    return;
+  }
+  if (button.hasAttribute('data-dungeon-fight')) { startDungeonFight(); return; }
+  if (button.dataset.dungeonChoice && profile.journey.run) {
+    const out = chooseEvent(profile.journey.run, button.dataset.dungeonChoice);
+    if (out) { townState.dungeonOutcome = describeOutcome(out); sound.play(out.fight ? 'threat' : out.hurt ? 'hurt' : 'buff'); showTown('dungeon'); }
+    return;
+  }
+  if (button.hasAttribute('data-dungeon-open') && profile.journey.run) {
+    const out = openTreasure(profile.journey.run);
+    if (out) { townState.dungeonOutcome = describeOutcome(out); sound.play('coin'); showTown('dungeon'); }
+    return;
+  }
+  if (button.dataset.dungeonCamp && profile.journey.run) {
+    const run = profile.journey.run, choice = button.dataset.dungeonCamp as 'rest' | 'extract';
+    if (campChoice(run, choice)) {
+      if (choice === 'extract') bankPouch(profile, run.pouch);
+      townState.dungeonOutcome = choice === 'rest' ? t('dungeon.out.rest') : undefined;
+      sound.play(choice === 'rest' ? 'heal' : 'fanfare');
+      showTown('dungeon');
+    }
+    return;
+  }
+  if (button.hasAttribute('data-dungeon-leave')) {
+    openModal(`<h2 id="modal-title">${t('dungeon.leave.title')}</h2><p>${t('dungeon.leave.copy')}</p><button id="dungeon-abandon" class="btn danger">${t('dungeon.leave.yes')}</button><button class="btn" data-close>${t('common.cancel')}</button>`);
+    $('dungeon-abandon').addEventListener('click', () => { modal.close(); delete profile.journey.run; showTown('dungeon'); });
+    return;
+  }
+  if (button.hasAttribute('data-dungeon-close')) { delete profile.journey.run; townState.dungeonOutcome = undefined; showTown('dungeon'); return; }
+  if (button.hasAttribute('data-star-chest')) {
+    const reward = claimStarChest(profile);
+    if (reward) { sound.play('fanfare'); showTown(townState.tab, t('stars.chest.got', { gold: reward.gold, mat: materialList(reward.materials) })); }
+    return;
+  }
+  if (button.dataset.heroic !== undefined) { townState.heroic = button.dataset.heroic === '1'; showTown(townState.tab); return; }
+  if (button.dataset.refine) {
+    const ok = refineGear(profile, townState.hero, button.dataset.refine);
+    const level = profile.loadouts[townState.hero]?.refine?.[button.dataset.refine] ?? 0;
+    showTown('party', ok ? t('notice.refine.ok', { n: level }) : t('notice.refine.fail'), true);
+    if (ok) celebrate(`[data-gear-open], .hero-sheet`);
     return;
   }
   if (button.dataset.facility) {
@@ -515,6 +570,32 @@ $('town-screen').addEventListener('change', event => {
     showTown('raid',t('notice.raid.sandbox'));return;
   }
 });
+function materialList(materials: Record<string, number>) {
+  return Object.entries(materials).filter(([, n]) => n > 0).map(([id, n]) => `${t(`material.${id}` as never)} ×${n}`).join(', ');
+}
+function describeOutcome(out: Outcome): string {
+  const parts: string[] = [];
+  if (out.fight) parts.push(t('dungeon.out.fight'));
+  if (out.lore) parts.push(t('dungeon.out.lore'));
+  if (out.heal) parts.push(t('dungeon.out.heal', { n: Math.round(out.heal * 100) }));
+  if (out.hurt) parts.push(t('dungeon.out.hurt', { n: Math.round(out.hurt * 100) }));
+  if (out.gold && out.gold > 0) parts.push(t('dungeon.out.gold', { n: out.gold }));
+  if (out.gold && out.gold < 0) parts.push(t('dungeon.out.spent', { n: -out.gold }));
+  for (const [id, n] of Object.entries(out.materials ?? {})) parts.push(t('dungeon.out.material', { n, name: t(`material.${id}` as never) }));
+  if (out.power) parts.push(t('dungeon.out.power', { n: Math.round(out.power * 100) }));
+  if (out.vitality) parts.push(t('dungeon.out.vitality', { n: Math.round(out.vitality * 100) }));
+  if (out.potion) parts.push(t('dungeon.out.potion'));
+  return parts.join(' ') || t('dungeon.out.nothing');
+}
+/** Fight the pending dungeon room with the party's carried HP, potions and blessings. */
+function startDungeonFight() {
+  const run = profile.journey.run, fight = run?.pendingFight;
+  if (!run || !fight || run.status !== 'active') return;
+  const scale = fightScale(run, fight.kind);
+  commander.mode = 'story';
+  runBoons = [];
+  boot('dungeon', scale.chapter, { enemyId: fight.enemy, dungeon: { chapter: scale.chapter, hp: scale.hp, damage: scale.damage, xp: dungeonXP(run, fight.kind), startHp: { ...run.hp }, potions: run.potions, power: run.blessing.power, vitality: run.blessing.vitality } });
+}
 // Upgrade feedback: the changed element pops and the level-up jingle plays.
 function celebrate(selector: string) {
   sound.play('levelup');
@@ -571,7 +652,8 @@ function startDeparture(mode: Mode) {
   resetRunWallet(runWallet);
   runWallet = createRunWallet();
   runSeed = Date.now() % 1000000;
-  boot(mode, mode === 'adventure' ? townState.zone + 1 : mode === 'raid' ? profile.cleared.length+1 : 1, mode === 'endless' ? { rogueBuild: structuredClone(townState.rogueSetup ?? createRogueBuild()) } : {});
+  const heroic = mode === 'adventure' && townState.heroic === true && profile.cleared.includes(townState.zone);
+  boot(mode, mode === 'adventure' ? townState.zone + 1 : mode === 'raid' ? profile.cleared.length+1 : 1, mode === 'endless' ? { rogueBuild: structuredClone(townState.rogueSetup ?? createRogueBuild()) } : heroic ? { heroic: true } : {});
   void ensureCommander().then(() => {
     if (commander.document) {
       commander.document.activeMode = commander.mode;
@@ -603,7 +685,7 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
       raidSandbox: townState.raidSandbox ? structuredClone(townState.raidSandbox) : undefined,
     } : {}),
     ...(mode === 'endless' && milestone ? { runWallet, runAct: milestone.act, runActClear: milestone.actClear, runFinalClear: milestone.finalClear } : {}), ...options,
-    ...(mode === 'adventure' ? storyBattleOptions(profile) : {}),
+    ...(mode === 'adventure' || mode === 'dungeon' ? storyBattleOptions(profile) : {}),
   });
   recorded = false;
   experienceRewards=[];
@@ -655,11 +737,11 @@ function updateExpedition() {
   $('loot').textContent = battle.mode === 'endless' ? `${runWallet.crystal} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${battle.gold}G`;
   const runShopHost = document.getElementById('run-shop-host');
   if (runShopHost) runShopHost.innerHTML = battle.mode === 'endless' && battle.status === 'ready' ? CHALLENGE_SHOP.map(item => `<button class="btn" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${item.cost} ◇</button>`).join('') : '';
-  $('mode-label').textContent = battle.mode === 'adventure' ? t('battle.chapter', { n: battle.floor }) : battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : t('mode.raid');
+  $('mode-label').textContent = battle.mode === 'adventure' ? `${battle.heroic ? `${t('heroic.badge')} · ` : ''}${t('battle.chapter', { n: battle.floor })}` : battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : battle.mode === 'dungeon' ? t('dungeon.depth.label', { n: profile.journey.run?.depth ?? 1 }) : t('mode.raid');
   $('encounter-label').textContent = stageLabel();
   $('boss-name').textContent = battle.enemyName;
   $('boss-title').textContent = battle.enemyTitle;
-  $('expedition-label').textContent = battle.mode === 'adventure' ? t('mode.campaign') : battle.mode === 'endless' ? t('route.endless') : t('mode.raid');
+  $('expedition-label').textContent = battle.mode === 'adventure' ? t('mode.campaign') : battle.mode === 'endless' ? t('route.endless') : battle.mode === 'dungeon' ? t('route.dungeon') : t('mode.raid');
   $('journey-title').textContent = battle.mode === 'adventure' ? c.name : battle.mode === 'endless' ? t('route.endless') : battle.enemyName;
   $('journey-copy').textContent = battle.mode === 'adventure' ? c.subtitle : t('battle.journey.copy');
   $('stage-list').innerHTML = battle.mode === 'adventure' ? c.stages.map((s, i) => `<li class="${i === battle.stage ? 'current' : i < battle.stage ? 'completed' : ''}"><small>${t('map.wave', { n: i + 1 })}</small> <span>${s.name}</span></li>`).join('') : '';
@@ -1116,7 +1198,7 @@ function showBoonTray() {
   sound.cardDeal();
   const activeBoonIds = (runBoons.length > 0 ? runBoons : battle.boons) ?? [];
   const boons = activeBoonIds.map(id => BOONS.find(b => b.id === id)).filter(Boolean) as typeof BOONS;
-  const modeBadge = battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : battle.mode === 'raid' ? t('mode.raid') : stageLabel();
+  const modeBadge = battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : battle.mode === 'raid' ? t('mode.raid') : battle.mode === 'dungeon' ? t('route.dungeon') : stageLabel();
   const raidModifiers = battle.raidContract?.modifiers?.length ?? 0;
   openModal(`<div class="boon-tray-modal"><h2 id="modal-title">${t('boons.title', { n: boons.length })}</h2><p class="hint"><span class="boon-tray-mode-tag">${escapeUI(modeBadge)}</span>${raidModifiers ? ` · ${t('boons.pact', { n: raidModifiers })}` : ''}</p>
     ${boons.length ? `<div class="boon-tray-list">${boons.map(b => `<div class="boon-tray-card"><small class="boon-patron-badge">${escapeUI(b.patron)}</small><h3 class="boon-name">${escapeUI(b.name)}</h3><p class="boon-desc">${escapeUI(b.description)}</p></div>`).join('')}</div>` : `<div class="boon-tray-empty"><p>${t('boons.empty')}</p><small>${t('boons.empty.hint')}</small></div>`}
@@ -1348,11 +1430,13 @@ function result() {
   } else show();
 }
 async function presentResult() {
+  if (battle.mode === 'dungeon') return presentDungeonResult();
   const won = battle.status === 'victory';
   const moreWaves = won && battle.mode === 'adventure' && battle.stage + 1 < battle.stageCount;
   const zone = CAMPAIGN[battle.floor - 1];
   let recruited: string[] = [];
   let reward = 0;
+  if (!recorded) chapterResult = undefined;
   if (!recorded) {
     pendingSettlement = true;
     if (won && !moreWaves && !encounter?.settled) {
@@ -1367,10 +1451,12 @@ async function presentResult() {
       }
       reward = battle.gold + (battle.mode === 'adventure' ? zone.reward : 0);
       if (battle.mode === 'adventure') {
+        if (battle.heroic) reward = battle.gold;
         candidate.gold += reward;
         const before = new Set(candidate.roster);
         completeZone(candidate, battle.floor - 1);
         recruited = candidate.roster.filter(id => !before.has(id)).map(id => ROSTER[id].name);
+        chapterResult = { stars: chapterStars(battle.living().length === battle.heroes.length, battle.stageTime), ...recordChapterResult(candidate, battle.floor - 1, chapterStars(battle.living().length === battle.heroes.length, battle.stageTime), battle.heroic) };
       }
       candidate.wins++;
       if (battle.mode === 'endless') candidate.bestFloor = Math.max(candidate.bestFloor, battle.floor);
@@ -1439,6 +1525,8 @@ async function presentResult() {
         <h2 id="result-title" class="ceremony-title">${titleText}</h2>
         <p class="ceremony-desc">${escapeUI(description).replace(/\n/g, '<br>')}</p>
         ${recruited.length ? `<p class="recruit-notice">${t('result.recruited', { names: recruited.join(' & ') })}</p>` : ''}
+        ${chapterResult && won && !moreWaves ? `<p class="result-stars"><span>${t('result.stars')}</span> <b class="star-row">${'★'.repeat(chapterResult.stars)}${'☆'.repeat(3 - chapterResult.stars)}</b>${chapterResult.improved ? ` <em>${t('result.stars.new')}</em>` : ''}</p>` : ''}
+        ${chapterResult?.heroic ? `<p class="recruit-notice">${t('result.heroic', { gold: chapterResult.heroic.gold, mat: materialList(chapterResult.heroic.materials) })}</p>` : ''}
       </header>
       <section class="win result-summary" aria-label="${t('result.summary')}">
         <dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque gold"><dt>${moreWaves ? t('result.carried') : t('result.gold')}</dt><dd>${goldDisplay}G</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>
@@ -1512,10 +1600,48 @@ async function presentResult() {
   });
 }
 
+let chapterResult: { stars: number; improved: boolean; heroic?: { gold: number; materials: Record<string, number> } } | undefined;
+/** Result of one Undercroft room: XP, carried HP and the pouch update, then back to the map. */
+async function presentDungeonResult() {
+  const won = battle.status === 'victory';
+  let loot: { gold: number; materials: Record<string, number> } | undefined;
+  if (!recorded) {
+    pendingSettlement = true;
+    const candidate = structuredClone(profile), run = candidate.journey.run;
+    const rewards = won ? settleProgress(candidate, battle) ?? [] : [];
+    if (run) {
+      const hp = Object.fromEntries(battle.heroes.map(h => [h.id, h.maxHp > 0 ? h.hp / h.maxHp : 0]));
+      loot = resolveFight(run, won, hp, battle.potions);
+      if (run.status === 'cleared') { bankPouch(candidate, run.pouch); candidate.journey.depth = Math.max(candidate.journey.depth, run.depth); }
+    }
+    if (won) candidate.wins++;
+    profile = candidate; experienceRewards = rewards; dungeonLoot = loot;
+    await persist();
+    pendingSettlement = false; recorded = true;
+  }
+  loot = dungeonLoot;
+  const run = profile.journey.run, cleared = run?.status === 'cleared';
+  const xpRows = experienceRewards.map(r => { const hero = ROSTER[r.id], up = r.after > r.before; return `<p class="xp-card ${up ? 'leveled-up' : ''}"><img src="${portrait(hero.classId)}" alt=""/><span class="xp-hero-info"><b class="xp-hero-name">${hero.name}</b></span><span class="xp-points">+${r.xp} EXP</span><span class="xp-level-badge">${up ? t('result.levelup', { from: r.before, to: r.after }) : `LV ${r.after}`}</span></p>`; }).join('');
+  const desc = !won ? t('dungeon.end.wiped') : cleared ? t('dungeon.end.cleared') : loot ? `${t('dungeon.out.gold', { n: loot.gold })} ${Object.entries(loot.materials).map(([id, n]) => t('dungeon.out.material', { n, name: t(`material.${id}` as never) })).join(' ')}` : '';
+  $('start-overlay').hidden = false;
+  showResultScreen(`<div class="result-ceremony-modal ${won ? 'victory' : 'defeat'}">
+    <p class="result-banner" aria-hidden="true">${won ? cleared ? t('dungeon.end.cleared.banner') : t('result.banner.win') : t('dungeon.end.wiped.banner')}</p>
+    <header class="win ceremony-header"><h2 id="result-title" class="ceremony-title">${t('route.dungeon')} · ${t('dungeon.depth.label', { n: run?.depth ?? 1 })}</h2><p class="ceremony-desc">${escapeUI(desc)}</p></header>
+    <section class="win result-summary"><dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque"><dt>${t('dungeon.pouch')}</dt><dd>${run?.pouch.gold ?? 0}G</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>${xpRows ? `<div class="xp-results">${xpRows}</div>` : ''}</section>
+    <div class="ceremony-actions"><button id="result-dungeon" class="btn primary">${t('dungeon.result.back')} ▶</button></div>
+  </div>`);
+  sound.play(won ? 'fanfare' : 'defeat');
+  if (experienceRewards.some(r => r.after > r.before)) window.setTimeout(() => sound.play('levelup'), 1300);
+  animateCeremony();
+  $('result-dungeon').addEventListener('click', () => { closeWithoutResume(); inTown = true; townState.dungeonOutcome = undefined; showTown('dungeon', '', true); });
+  return true;
+}
+let dungeonLoot: { gold: number; materials: Record<string, number> } | undefined;
 function makeEncounter(settled = false): NonNullable<typeof encounter> {
   return { runId: encounter?.runId ?? crypto.randomUUID(), seq: (encounter?.seq ?? 0) + 1, battle: battle.checkpoint(), purse: runWallet.crystal, boons: [...runBoons], seed: runSeed, settled };
 }
 async function checkpoint(terminal = false, slotId: SlotId = 'auto') {
+  if (battle.mode === 'dungeon') return persist(slotId);
   if (!terminal && battle.status === 'ready') encounter = makeEncounter();
   if (!encounter) return false;
   const frozen = structuredClone(encounter);
@@ -1600,7 +1726,7 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
 async function leaveSafely(action: () => void | Promise<void>) {
   if (pendingSettlement || presentingResult || commander.stale) { storageStatus(); return; }
   if (!(await commander.flush())) { storageStatus(); return; }
-  if (inTown) { closeWithoutResume(); await action(); return; }
+  if (inTown || battle.mode === 'dungeon') { closeWithoutResume(); inTown = true; await action(); return; }
   const hasCommander = Boolean(commander.document);
   openModal(hasCommander
     ? `<h2 id="modal-title">${t('leave.title')}</h2><p>${t('leave.copy')}</p><nav class="menu-list"><button id="suspend-run" class="menu-item">${t('leave.suspend')}</button><button id="abandon-run" class="menu-item">${t('leave.abandon')}</button><button data-close class="menu-item">${t('common.cancel')}</button></nav>`

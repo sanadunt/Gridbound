@@ -32,6 +32,7 @@ export type StoredStoryState = {
   loadouts: Record<number, Loadout>;
   sound: boolean;
   motion: boolean;
+  journey?: Profile['journey'];
 };
 
 export type RunCheckpoint = {
@@ -194,6 +195,7 @@ export function storyStateFromProfile(profile: Profile): StoredStoryState {
     loadouts: clone(profile.loadouts),
     sound: profile.sound,
     motion: profile.motion,
+    journey: clone(profile.journey),
   };
 }
 
@@ -212,6 +214,7 @@ function profileFromStoryState(raw: StoredStoryState | undefined): Profile {
     claimedQuests: raw.claimedQuests,
     trackedQuest: raw.trackedQuest,
     loadouts: raw.loadouts,
+    journey: raw.journey as Profile['journey'],
     sound: raw.sound,
     motion: raw.motion,
     bestFloor: 0,
