@@ -272,7 +272,12 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   document.body.dataset.screen = tab === 'camp' ? 'camp' : 'town';
   $('hud-title').textContent = routeTitle(tab);
   $('home').setAttribute('aria-label', tab === 'camp' ? t('menu.title.sub') : t('hud.home'));
+  // Keep the scroll position when a panel re-renders in place (equipping, inspecting, learning).
+  const oldPanel = $('town-screen').querySelector<HTMLElement>('[data-training-panel]');
+  const keptScroll = !routeChanged && oldPanel ? { panel: oldPanel.dataset.trainingPanel, top: oldPanel.scrollTop } : undefined;
   renderTown($('town-screen'), profile, townState);
+  const newPanel = $('town-screen').querySelector<HTMLElement>('[data-training-panel]');
+  if (newPanel && keptScroll && newPanel.dataset.trainingPanel === keptScroll.panel) newPanel.scrollTop = keptScroll.top;
   if (routeChanged) {
     const scene = $('town-screen').querySelector<HTMLElement>('.town-scene');
     const heading = scene?.querySelector<HTMLElement>('h1') ?? scene;
@@ -321,8 +326,32 @@ $('town-screen').addEventListener('click', event => {
     return;
   }
   if (button.dataset.talent) {
-    const ok = buyTalent(profile, townState.hero, button.dataset.talent);
+    const id = button.dataset.talent;
+    const ok = buyTalent(profile, townState.hero, id);
     showTown('party-advanced', ok ? t('notice.talent.ok') : t('notice.talent.fail'), true);
+    if (ok) celebrate(`[data-inspect-talent="${id}"], [data-talent="${id}"], .hero-sheet`);
+    return;
+  }
+  if (button.dataset.gearOpen) {
+    townState.gearSlot = button.dataset.gearOpen as TownState['gearSlot'];
+    townState.pendingGear = undefined;
+    townState.trainingTab = 'gear';
+    showTown('party', '', true);
+    return;
+  }
+  if (button.dataset.gearItem) {
+    const slot = button.dataset.gearSlotFor as 'weapon' | 'armor' | 'charm';
+    townState.gearSlot = slot;
+    townState.trainingTab = 'gear';
+    townState.pendingGear = { hero: townState.hero, slot, gearId: button.dataset.gearItem };
+    showTown('party', '', true);
+    document.querySelector('[data-gear-preview]')?.scrollIntoView({ block: 'nearest' });
+    return;
+  }
+  if (button.dataset.equipSkill !== undefined) {
+    const ok = equipSkill(profile, townState.hero, Number(button.dataset.skillSlot), Number(button.dataset.equipSkill));
+    showTown('party', ok ? t('notice.loadout') : '', true);
+    if (ok) celebrate(`[data-loadout-slot="${button.dataset.skillSlot}"]`);
     return;
   }
   if (button.dataset.inspectTalent) {
@@ -398,6 +427,7 @@ $('town-screen').addEventListener('click', event => {
       const ok = equipGear(profile, pending.hero, pending.gearId);
       townState.pendingGear = undefined;
       showTown('party', ok ? t('notice.gear.ok') : t('notice.gear.fail'));
+      if (ok) celebrate(`[data-gear-open="${pending.slot}"], .hero-sheet`);
     }
     return;
   }
@@ -406,7 +436,7 @@ $('town-screen').addEventListener('click', event => {
     showTown('party');
     return;
   }
-  if (button.dataset.promote) { const ok=promote(profile,townState.hero,button.dataset.promote);showTown('party-advanced',ok?t('notice.job.ok'):t('notice.job.fail')); }
+  if (button.dataset.promote) { const job=button.dataset.promote;const ok=promote(profile,townState.hero,job);showTown('party-advanced',ok?t('notice.job.ok'):t('notice.job.fail'));if(ok)celebrate(`[data-promote="${job}"], .hero-sheet`); }
 
   if (button.dataset.formation) {
     moveFormation(profile, townState.hero, Number(button.dataset.formation));
@@ -484,18 +514,12 @@ $('town-screen').addEventListener('change', event => {
     townState.raidSandbox={...current,[key]:Number(input.value)};
     showTown('raid',t('notice.raid.sandbox'));return;
   }
-  if(el.matches('[data-gear-slot]')){
-    const slot = el.dataset.gearSlot as 'weapon' | 'armor' | 'charm';
-    townState.trainingTab = 'gear';
-    if (!el.value) { townState.pendingGear = undefined; showTown('party'); return; }
-    townState.pendingGear = { hero: townState.hero, slot, gearId: el.value };
-    showTown('party');
-    return;
-  }
-  if (!el.matches('[data-equip-slot]')) return;
-  equipSkill(profile, townState.hero, Number(el.dataset.equipSlot), Number(el.value));
-  showTown('party', t('notice.loadout'));
 });
+// Upgrade feedback: the changed element pops and the level-up jingle plays.
+function celebrate(selector: string) {
+  sound.play('levelup');
+  document.querySelectorAll<HTMLElement>(selector).forEach(el => { el.classList.remove('just-upgraded'); void el.offsetWidth; el.classList.add('just-upgraded'); });
+}
 
 let ensureCommanderPromise: Promise<CommanderDocument | undefined> | undefined;
 async function ensureCommander() {

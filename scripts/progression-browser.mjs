@@ -16,7 +16,7 @@ for(const width of [390,1440])await withBrowser(async({send,evaluate,wait,click,
  await click('[data-training-tab="talents"]');await click('[data-branch="assault"]');await click('[data-talent="assault-root"]');await click('[data-training-tab="overview"]');assert.equal(await evaluate('Number(document.querySelector("[data-skill-points]").textContent)'),points-1);await click('[data-training-tab="talents"]');await click('[data-inspect-talent="assault-break"]');
  assert.equal(await evaluate('document.querySelector("[data-talent=assault-break]").disabled'),true);
  await click.nav('party');
- await click('[data-training-tab="gear"]');for(const slot of ['weapon','armor','charm']){await select(`[data-gear-slot="${slot}"]`,`scout-${slot}`);await click('[data-confirm-gear]');}
+ await click('[data-training-tab="gear"]');for(const slot of ['weapon','armor','charm']){await click(`[data-gear-open="${slot}"]`);await click(`[data-gear-item="scout-${slot}"]`);await click('[data-confirm-gear]');}
  assert.match(await evaluate('document.querySelector(".gear-set-status").textContent'),/FULL SET ACTIVE/);
  await screenshot(`artifacts/rpg-tree-${width}.png`);
  await click.nav('more');

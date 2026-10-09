@@ -61,14 +61,12 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await click.nav('party');
   await click('[data-training-tab="gear"]');
   await wait('Boolean(document.querySelector(".gear-slots"))');
-  assert.equal(await evaluate('document.querySelectorAll("[data-gear-slot]").length'), 3, '3 gear slot selectors');
+  assert.equal(await evaluate('document.querySelectorAll("[data-gear-open]").length'), 3, '3 equipment slots');
+  assert.ok(await evaluate('document.querySelectorAll("[data-gear-item]").length') >= 1, 'Item cards list the gear for the open slot');
 
   // Inspect a piece of gear
-  await evaluate(`(() => {
-    const el = document.querySelector('[data-gear-slot="weapon"]');
-    el.value = 'scout-weapon';
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  await click('[data-gear-open="weapon"]');
+  await click('[data-gear-item="scout-weapon"]');
   await wait('Boolean(document.querySelector("[data-gear-preview]"))');
   assert.equal(await evaluate('Boolean(document.querySelector(".gear-comparison"))'), true, 'Gear comparison stats must display');
   assert.equal(await evaluate('Boolean(document.querySelector("[data-confirm-gear]"))'), true, 'Confirm gear CTA must exist');

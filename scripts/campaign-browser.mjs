@@ -31,7 +31,7 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
       await click.nav('party');
       await click('[data-training-tab="skills"]');
       const skill = chapter === 3 ? 4 : 6;
-      await evaluate(`(() => { const select = document.querySelector('[data-equip-slot="0"]'); select.value = '${skill}'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await click(`[data-equip-skill="${skill}"][data-skill-slot="0"]`);
       assert.ok(await evaluate(`window.gridbound.profile().loadouts[0].skills.includes(${skill})`));
       await screenshot(`artifacts/${chapter === 3 ? 'advanced' : 'third'}-class.png`);
       await click.nav('campaign');

@@ -112,6 +112,8 @@ export const EN = {
   'party.job': 'Job',
   'party.basejob': 'Base class',
   'party.overview.hint': 'Each level grants +2% base HP and +1.5% power. EXP is awarded when an expedition ends.',
+  'party.status.attributes': 'Attributes',
+  'party.status.loadout': 'Equipped',
   'party.skills.title': 'Skills',
   'party.skills.sub': '2 slots',
   'party.skills.slot': 'Slot {n}',
@@ -170,6 +172,14 @@ export const EN = {
   'gear.sets': 'Equipment sets',
   'gear.set.all': '— FULL SET ACTIVE',
   'gear.set.two': '— 2-PIECE ACTIVE',
+  'party.skills.book': 'Skill book',
+  'party.skills.book.sub': 'tap I or II to equip',
+  'party.skills.lock.talent': 'Learn it in the talent tree first.',
+  'party.skills.lock.job': 'Unlocked by a job promotion.',
+  'party.skills.equip': 'Equip {name} in slot {n}',
+  'gear.empty': 'Empty',
+  'gear.list.sub': 'tap an item to inspect',
+  'gear.tag.equipped': 'EQUIPPED',
 
   // Formation
   'formation.title': 'Formation',

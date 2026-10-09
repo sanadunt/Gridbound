@@ -11,6 +11,7 @@ import { createRaidBuild, validRaidBuild, type RaidBuild } from '../game/raid-bu
 import { QUESTS, questProgress } from '../game/quests';
 import { questBoard } from './quests';
 import { heroCanvas } from '../art/pixels';
+import { itemIcon, type ItemSlot } from '../art/items';
 import { monsterCanvas } from '../art/monsters';
 import { townSceneCanvas, campfireCanvas, smokeCanvas, TOWN_HOTSPOTS, TOWN_W, TOWN_H, PLAZA, CAMPFIRE, CHIMNEYS, SMOKE_SIZE } from '../art/town-scene';
 import { renderWorldMap } from './world-map';
@@ -38,6 +39,7 @@ export type TownState = {
   talentBranch?: string;
   selectedTalent?: string;
   pendingGear?: PendingGear;
+  gearSlot?: ItemSlot;
   rogueSetup?: RogueBuild;
 };
 
@@ -167,14 +169,33 @@ function training(p: Profile, state: TownState, advanced: boolean) {
   const panel = active === 'overview' ? trainingOverview(p, state, preview, progress) : active === 'skills' ? skillsPanel(loadout, kit) : active === 'jobs' ? advancement(p, state.hero) : active === 'talents' ? talentsPanel(p, state, r, kit, loadout) : active === 'gear' ? forge(p, state.hero, state) : formation(p, state.hero, r, loadout) + storyPartyPanel(p);
   const zone = CAMPAIGN[state.zone];
   const deployable = zone !== undefined && canEnterZone(p, state.zone);
-  return `<section class="party-scene" aria-labelledby="party-title">
+  return `<section class="party-scene" aria-labelledby="party-title" style="--class-color:${kit.color}">
     <h1 id="party-title" class="sr-only">${advanced ? t('route.progression') : t('route.party')}</h1>
     <nav class="party-roster" aria-label="${t('party.choose')}">${p.roster.map(id => `<button data-town-hero="${id}" class="${state.hero === id ? 'active' : ''}" aria-pressed="${state.hero === id}"><img src="${portrait(ROSTER[id].classId)}" alt=""/><span>${ROSTER[id].name}</span><small>LV ${heroProgress(p.loadouts[id].xp).level}</small></button>`).join('')}</nav>
-    <div class="win training-identity"><img src="${portrait(r.classId)}" alt=""/><div><small>${escape(JOBS[loadout.job??'']?.name ?? kit.name)} · LV ${progress.level}</small><h2>${r.name}</h2><p>${escape(kit.role)}</p><div class="stat-line"><span>HP <b>${preview.maxHp}</b></span><span>${t('party.cd')} <b>${preview.total.toFixed(2)}s</b></span><span>SP <b>${availablePoints(p, state.hero)}</b></span></div></div></div>
+    ${heroSheet(p, state.hero, preview, progress)}
     <nav class="tabs training-tabs" aria-label="${t('party.sections')}">${tabs.map(([id,key]) => `<button data-training-tab="${id}" class="${active === id ? 'active' : ''}" aria-current="${active === id ? 'page' : 'false'}">${t(key)}</button>`).join('')}<button class="party-advanced-link" data-facility="${advanced ? 'party' : 'party-advanced'}">${advanced ? `◀ ${t('route.party')}` : `${t('route.progression')} ▶`}</button></nav>
     <section class="win training-panel" data-training-panel="${active}">${panel}</section>
     <div class="deploy-bar party-deploy"><button type="button" class="btn primary party-deploy-button" data-depart="adventure" aria-label="${escape(t('party.deploy', { name: zone?.name ?? '' }))}" ${deployable ? '' : 'disabled'}><span>${escape(t('party.deploy', { name: zone?.name ?? '' }))}</span><small>${deployable ? t('party.deploy.go') : t('party.deploy.locked')}</small></button></div>
   </section>`;
+}
+
+const SLOTS: ItemSlot[] = ['weapon', 'armor', 'charm'];
+const gearOf = (loadout: Profile['loadouts'][number], slot: ItemSlot) => GEAR.find(g => g.id === loadout.gear?.[slot] && g.slot === slot);
+const gearStatsLine = (g: typeof GEAR[number]) => [g.power ? `${t('gear.power')} ${percent(g.power)}` : '', g.hp ? `HP ${percent(g.hp)}` : '', g.tempo ? `${t('gear.tempo')} ${percent(g.tempo)}` : ''].filter(Boolean).join(' · ');
+
+function heroSheet(p: Profile, id: number, preview: ReturnType<Battle['hero']> & {}, progress: ReturnType<typeof heroProgress>) {
+  const r = ROSTER[id], kit = KITS[r.classId], loadout = p.loadouts[id];
+  const job = JOBS[loadout.job ?? ''];
+  const exp = progress.needed ? progress.current / progress.needed * 100 : 100;
+  const stats: [string, string][] = [['HP', String(preview.maxHp)], [t('party.cd'), `${preview.total.toFixed(2)}s`], [t('gear.power'), percent(preview.equipment.power - 1)], ['SP', String(availablePoints(p, id))]];
+  return `<div class="win hero-sheet training-identity" style="--class-color:${kit.color}">
+    <div class="sheet-portrait"><img src="${portrait(r.classId)}" alt=""/><span>LV ${progress.level}</span></div>
+    <div class="sheet-body"><small>${escape(job?.name ?? kit.name)} · ${escape(kit.role)}</small><h2>${r.name}</h2>
+      <div class="sheet-exp"><span class="gauge xp" aria-hidden="true"><i style="width:${exp}%"></i></span><small>${progress.needed ? `EXP ${progress.current}/${progress.needed}` : t('party.xp.cap')}</small></div>
+      <dl class="sheet-stats">${stats.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>
+    </div>
+    <div class="sheet-gear" aria-label="${t('gear.title')}">${SLOTS.map(slot => { const g = gearOf(loadout, slot); return `<span class="sheet-gear-slot ${g ? 'filled' : ''}" title="${t(`gear.slot.${slot}` as StringKey)}: ${escape(g?.name ?? t('gear.none'))}"><img src="${itemIcon(slot, g?.rarity ?? 'common', !g)}" alt="${t(`gear.slot.${slot}` as StringKey)}"/></span>`; }).join('')}</div>
+  </div>`;
 }
 
 function storyPartyPanel(p: Profile) {
@@ -183,14 +204,28 @@ function storyPartyPanel(p: Profile) {
 }
 
 function trainingOverview(p: Profile, state: TownState, preview: ReturnType<Battle['hero']> & {}, progress: ReturnType<typeof heroProgress>) {
-  const h = p.loadouts[state.hero];
-  return `<section class="hero-progression" data-hero-level="${progress.level}"><label>EXP <span>${progress.needed ? t('party.xp.next', { current: progress.current, needed: progress.needed, level: progress.level + 1 }) : t('party.xp.cap')}</span><span class="gauge xp" aria-hidden="true"><i style="width:${progress.needed ? progress.current / progress.needed * 100 : 100}%"></i></span></label><dl class="stat-table"><div><dt>${t('party.maxhp')}</dt><dd>${preview.maxHp}</dd></div><div><dt>${t('party.opening')}</dt><dd>${preview.total.toFixed(2)}s</dd></div><div><dt>${t('party.sp')}</dt><dd data-skill-points>${availablePoints(p, state.hero)}</dd></div><div><dt>${t('party.tab.talents')}</dt><dd>${h.talents.length}</dd></div><div><dt>${t('party.job')}</dt><dd>${escape(h.job ? JOBS[h.job]?.name ?? '' : t('party.basejob'))}</dd></div></dl><p class="hint">${t('party.overview.hint')}</p></section>`;
+  const h = p.loadouts[state.hero], kit = KITS[ROSTER[state.hero].classId], e = preview.equipment;
+  const rows: [string, string][] = [[t('party.maxhp'), String(preview.maxHp)], [t('party.opening'), `${preview.total.toFixed(2)}s`], [`${t('gear.power')} (${t('party.tab.gear')})`, percent(e.power - 1)], [`HP (${t('party.tab.gear')})`, percent(e.hp - 1)], [`${t('gear.tempo')} (${t('party.tab.gear')})`, percent(e.tempo - 1)], [t('party.tab.talents'), String(h.talents.length)], [t('party.job'), escape(h.job ? JOBS[h.job]?.name ?? '' : t('party.basejob'))]];
+  return `<section class="hero-progression" data-hero-level="${progress.level}"><label>EXP <span>${progress.needed ? t('party.xp.next', { current: progress.current, needed: progress.needed, level: progress.level + 1 }) : t('party.xp.cap')}</span><span class="gauge xp" aria-hidden="true"><i style="width:${progress.needed ? progress.current / progress.needed * 100 : 100}%"></i></span></label>
+    <div class="status-points"><span>${t('party.sp')}</span><b data-skill-points>${availablePoints(p, state.hero)}</b></div>
+    <h4 class="subheading">${t('party.status.attributes')}</h4><dl class="stat-table">${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>
+    <h4 class="subheading">${t('party.status.loadout')}</h4><div class="status-loadout">${SLOTS.map(slot => { const g = gearOf(h, slot); return `<div class="status-item ${g ? `rarity-${g.rarity ?? 'common'}` : 'empty'}"><img class="item-icon" src="${itemIcon(slot, g?.rarity ?? 'common', !g)}" alt=""/><span><small>${t(`gear.slot.${slot}` as StringKey)}</small><b>${escape(g?.name ?? t('gear.empty'))}</b></span></div>`; }).join('')}${[0, 1].map(slot => { const skill = kit.skills[h.skills[slot]]; return `<div class="status-item skill"><span class="skill-emblem" aria-hidden="true">${escape(skill.label.slice(0, 2))}</span><span><small>${t('party.skills.slot', { n: slot + 1 })}</small><b>${escape(skill.name)}</b></span></div>`; }).join('')}</div>
+    <p class="hint">${t('party.overview.hint')}</p></section>`;
 }
 
 function skillsPanel(loadout: Profile['loadouts'][number], kit: typeof KITS[keyof typeof KITS]) {
   const unlocked = (index: number) => index < 2 || loadout.talents.includes(`active-${index}`) || (index >= 4 && Boolean(loadout.job));
-  const skillOptions = (slot: number) => kit.skills.map((s, i) => `<option value="${i}" ${loadout.skills[slot] === i ? 'selected' : ''} ${unlocked(i) ? '' : 'disabled'}>${escape(s.name)}${unlocked(i) ? '' : ` (${t('party.skills.locked')})`}</option>`).join('');
-  return `<h3 class="subheading">${t('party.skills.title')} <span>${t('party.skills.sub')}</span></h3><div class="loadout-slots">${[0, 1].map(slot => `<label><span>${t('party.skills.slot', { n: slot + 1 })}${slot === 0 ? ` · ${t('party.skills.opening')}` : ''}</span><select data-equip-slot="${slot}" aria-label="${t('party.skills.slot', { n: slot + 1 })}">${skillOptions(slot)}</select><small>${escape(kit.skills[loadout.skills[slot]].description)}</small></label>`).join('')}</div><p class="hint">${t('party.skills.hint')}</p>`;
+  const lockReason = (index: number) => index >= 4 ? t('party.skills.lock.job') : t('party.skills.lock.talent');
+  const slotCard = (slot: number) => { const skill = kit.skills[loadout.skills[slot]]; return `<div class="skill-slot" data-loadout-slot="${slot}"><small>${t('party.skills.slot', { n: slot + 1 })}${slot === 0 ? ` · ${t('party.skills.opening')}` : ''}</small><b>${escape(skill.name)}</b><span>${escape(skill.label)} · ${skill.cooldown.toFixed(1)}s</span></div>`; };
+  const card = (skill: typeof kit.skills[number], index: number) => {
+    const open = unlocked(index), slot = loadout.skills.indexOf(index);
+    return `<article class="skill-card ${slot >= 0 ? 'equipped' : ''} ${open ? '' : 'locked'}" data-skill-card="${index}">
+      <span class="skill-emblem" aria-hidden="true">${escape(skill.label.slice(0, 2))}</span>
+      <div class="skill-card-body"><b>${escape(skill.name)}</b><small>${escape(skill.label)} · ${skill.cooldown.toFixed(1)}s${slot >= 0 ? ` · ${t('party.skills.slot', { n: slot + 1 })}` : ''}</small><p>${escape(skill.description)}</p>${open ? '' : `<em class="skill-lock">${lockReason(index)}</em>`}</div>
+      ${open ? `<div class="skill-card-actions">${[0, 1].map(s => `<button class="btn" data-equip-skill="${index}" data-skill-slot="${s}" aria-pressed="${loadout.skills[s] === index}" aria-label="${escape(t('party.skills.equip', { name: skill.name, n: s + 1 }))}" ${loadout.skills[s] === index ? 'disabled' : ''}>${['I', 'II'][s]}</button>`).join('')}</div>` : ''}
+    </article>`;
+  };
+  return `<h3 class="subheading">${t('party.skills.title')} <span>${t('party.skills.sub')}</span></h3><div class="skill-loadout">${[0, 1].map(slotCard).join('')}</div><h4 class="subheading skill-book-title">${t('party.skills.book')} <span>${t('party.skills.book.sub')}</span></h4><div class="skill-book">${kit.skills.map(card).join('')}</div><p class="hint">${t('party.skills.hint')}</p>`;
 }
 
 function talentsPanel(p: Profile, state: TownState, r: typeof ROSTER[number], kit: typeof KITS[keyof typeof KITS], loadout: Profile['loadouts'][number]) {
@@ -208,8 +243,8 @@ function talentsPanel(p: Profile, state: TownState, r: typeof ROSTER[number], ki
   const tierLabels: StringKey[] = ['talent.tier.root', 'talent.tier.core', 'talent.tier.spec', 'talent.tier.keystone'];
   const lanes = [0, 1, 2, 3].map(level => nodes.filter(node => depth(node) === level)).filter(lane => lane.length);
   return `<section class="talent-workspace" aria-label="${t('party.tab.talents')}"><div class="talent-workspace-heading"><h3>${t(`talent.branch.${branch}` as StringKey)}</h3><span class="talent-count">${t('talent.learned', { n: nodes.filter(node => loadout.talents.includes(node.id)).length, total: nodes.length })}</span></div><nav class="tabs branch-tabs" aria-label="${t('party.tab.talents')}">${branches.map(b => `<button data-branch="${b}" aria-pressed="${b === branch}">${t(`talent.branch.${b}` as StringKey)}</button>`).join('')}</nav><div class="talent-flow">${lanes.map((lane, index) => `<div class="talent-flow-lane"><div class="talent-flow-label">${t(tierLabels[index])}</div><div class="talent-flow-cards">${lane.map(node => {
-    const isLearned = loadout.talents.includes(node.id);
-    return `<button data-inspect-talent="${node.id}" class="talent-flow-node ${node.id === chosen?.id ? 'chosen' : ''} ${isLearned ? 'learned' : ''} ${node.exclusive ? 'keystone' : ''}" aria-label="${escape(node.name)}"><b>${escape(node.name)}${isLearned ? ' ✓' : ''}</b><span>${isLearned ? t('talent.learned.short') : `${node.cost}G`}</span></button>`;
+    const isLearned = loadout.talents.includes(node.id), available = !isLearned && !talentReason(p, state.hero, node);
+    return `<button data-inspect-talent="${node.id}" class="talent-flow-node ${node.id === chosen?.id ? 'chosen' : ''} ${isLearned ? 'learned' : available ? 'available' : 'locked'} ${node.exclusive ? 'keystone' : ''}" aria-label="${escape(node.name)}"><i class="talent-gem" aria-hidden="true">${isLearned ? '✓' : node.exclusive ? '★' : '◆'}</i><b>${escape(node.name)}</b><span>${isLearned ? t('talent.learned.short') : `${node.cost}G${node.points ? ` · ${node.points} SP` : ''}`}</span></button>`;
   }).join('')}</div></div>`).join('')}</div><div class="talent-inspector-section">${chosen ? talentCard(p, state.hero, kit, loadout)(chosen) : ''}</div></section>`;
 }
 
@@ -244,20 +279,23 @@ function advancement(p: Profile, id: number) {
 
 function forge(p: Profile, id: number, state: TownState) {
   const h = p.loadouts[id];
-  const slots = ['weapon','armor','charm'] as const;
-  const optionFor = (slot: typeof slots[number]) => {
-    const pending = state.pendingGear?.hero === id && state.pendingGear.slot === slot ? state.pendingGear.gearId : h.gear?.[slot] ?? '';
-    return GEAR.filter(g => g.slot === slot && (!g.classId || g.classId === ROSTER[id].classId)).map(g => {
-      const owned = h.inventory?.includes(g.id), reason = gearReason(p, id, g.id);
-      return `<option value="${g.id}" ${pending === g.id ? 'selected' : ''}>${escape(g.name)} · LV ${g.minLevel ?? 1} · ${owned ? t('gear.owned') : g.source === 'quest' ? t('gear.quest') : g.cost + 'G'}${reason ? ` · ${escape(gameText(reason))}` : ''}</option>`;
-    }).join('');
-  };
   const pending = state.pendingGear?.hero === id ? state.pendingGear : undefined;
+  const activeSlot: ItemSlot = pending?.slot ?? state.gearSlot ?? 'weapon';
   const selected = pending ? GEAR.find(g => g.id === pending.gearId && g.slot === pending.slot) : undefined;
   const current = selected ? GEAR.find(g => g.id === h.gear?.[selected.slot]) : undefined;
   const reason = selected ? gearReason(p, id, selected.id) : '';
   const comparison = selected ? `<dl class="stat-table gear-comparison"><div><dt>${t('gear.power')}</dt><dd>${percent(selected.power - (current?.power ?? 0))}</dd></div><div><dt>HP</dt><dd>${percent(selected.hp - (current?.hp ?? 0))}</dd></div><div><dt>${t('gear.tempo')}</dt><dd>${percent(selected.tempo - (current?.tempo ?? 0))}</dd></div></dl>` : '';
-  return `<h3 class="subheading">${t('gear.title')} <span>${t('gear.sub')}</span></h3><div class="gear-slots">${slots.map(slot => `<label>${t(`gear.slot.${slot}` as StringKey)}<select data-gear-slot="${slot}" aria-label="${t(`gear.slot.${slot}` as StringKey)}"><option value="">${t('gear.choose')}</option>${optionFor(slot)}</select><small>${escape(GEAR.find(g => g.id === h.gear?.[slot])?.description ?? t('gear.none'))}</small></label>`).join('')}</div>${selected ? `<section class="gear-preview" data-gear-preview="${selected.id}" aria-live="polite"><small>${t('gear.inspect')} · ${escape(selected.rarity ?? 'common')}</small><h3>${escape(selected.name)}</h3><p>${escape(selected.description)}</p><p>${t('gear.req')}: ${selected.minLevel ? `LV ${selected.minLevel}` : t('gear.req.none')}${selected.classId ? ` · ${className(selected.classId as keyof typeof KITS)}` : ''}${selected.source === 'quest' ? ` · ${t('gear.quest')}` : ` · ${selected.cost}G`}</p>${comparison}<p class="gear-preview-status">${reason ? escape(gameText(reason)) : current?.id === selected.id ? t('gear.equipped') : t('gear.ready')}</p><div class="gear-preview-actions"><button class="btn primary" data-confirm-gear ${reason || current?.id === selected.id ? 'disabled' : ''}>${t('gear.confirm')}</button><button class="btn" data-cancel-gear>${t('common.cancel')}</button></div></section>` : `<p class="hint gear-preview-empty">${t('gear.hint')}</p>`}<details class="gear-set-status"><summary>${t('gear.sets')}</summary>${GEAR_SETS.map(set => { const count = Object.entries(h.gear ?? {}).filter(([slot, gearId]) => GEAR.some(g => g.id === gearId && g.slot === slot && g.setId === set.id)).length; return `<p><b>${escape(set.name)} · ${count}/3</b><br>${escape(set.description)} ${count >= 3 ? t('gear.set.all') : count >= 2 ? t('gear.set.two') : ''}</p>`; }).join('')}</details>`;
+  const slotButton = (slot: ItemSlot) => {
+    const g = gearOf(h, slot);
+    return `<button class="equip-slot ${slot === activeSlot ? 'active' : ''} ${g ? `rarity-${g.rarity ?? 'common'}` : 'empty'}" data-gear-open="${slot}" aria-pressed="${slot === activeSlot}"><img class="item-icon" src="${itemIcon(slot, g?.rarity ?? 'common', !g)}" alt=""/><span><small>${t(`gear.slot.${slot}` as StringKey)}</small><b>${escape(g?.name ?? t('gear.empty'))}</b><em>${g ? gearStatsLine(g) : t('gear.none')}</em></span></button>`;
+  };
+  const items = GEAR.filter(g => g.slot === activeSlot && (!g.classId || g.classId === ROSTER[id].classId)).map(g => {
+    const owned = h.inventory?.includes(g.id), equipped = h.gear?.[activeSlot] === g.id, why = gearReason(p, id, g.id);
+    const tag = equipped ? t('gear.tag.equipped') : owned ? t('gear.owned') : g.source === 'quest' ? t('gear.quest') : `${g.cost}G`;
+    return `<button class="item-card rarity-${g.rarity ?? 'common'} ${equipped ? 'equipped' : ''} ${selected?.id === g.id ? 'chosen' : ''} ${why && !equipped ? 'unavailable' : ''}" data-gear-item="${g.id}" data-gear-slot-for="${activeSlot}" aria-pressed="${selected?.id === g.id}"><img class="item-icon" src="${itemIcon(activeSlot, g.rarity ?? 'common')}" alt=""/><span class="item-main"><b>${escape(g.name)}</b><small>LV ${g.minLevel ?? 1}${g.classId ? ` · ${className(g.classId as keyof typeof KITS)}` : ''} · ${gearStatsLine(g)}</small></span><em>${escape(tag)}</em></button>`;
+  }).join('');
+  const preview = selected ? `<section class="gear-preview rarity-${selected.rarity ?? 'common'}" data-gear-preview="${selected.id}" aria-live="polite"><small>${t('gear.inspect')} · ${escape(selected.rarity ?? 'common')}</small><h3>${escape(selected.name)}</h3><p>${escape(selected.description)}</p><p>${t('gear.req')}: ${selected.minLevel ? `LV ${selected.minLevel}` : t('gear.req.none')}${selected.classId ? ` · ${className(selected.classId as keyof typeof KITS)}` : ''}${selected.source === 'quest' ? ` · ${t('gear.quest')}` : ` · ${selected.cost}G`}</p>${comparison}<p class="gear-preview-status">${reason ? escape(gameText(reason)) : current?.id === selected.id ? t('gear.equipped') : t('gear.ready')}</p><div class="gear-preview-actions"><button class="btn primary" data-confirm-gear ${reason || current?.id === selected.id ? 'disabled' : ''}>${t('gear.confirm')}</button><button class="btn" data-cancel-gear>${t('common.cancel')}</button></div></section>` : `<p class="hint gear-preview-empty">${t('gear.hint')}</p>`;
+  return `<h3 class="subheading">${t('gear.title')} <span>${t('gear.sub')}</span></h3><div class="gear-slots equip-slots">${SLOTS.map(slotButton).join('')}</div>${preview}<h4 class="subheading">${t(`gear.slot.${activeSlot}` as StringKey)} <span>${t('gear.list.sub')}</span></h4><div class="item-list">${items}</div><details class="gear-set-status"><summary>${t('gear.sets')}</summary>${GEAR_SETS.map(set => { const count = Object.entries(h.gear ?? {}).filter(([slot, gearId]) => GEAR.some(g => g.id === gearId && g.slot === slot && g.setId === set.id)).length; return `<p><b>${escape(set.name)} · ${count}/3</b><br>${escape(set.description)} ${count >= 3 ? t('gear.set.all') : count >= 2 ? t('gear.set.two') : ''}</p>`; }).join('')}</details>`;
 }
 
 function formation(p: Profile, id: number, r: typeof ROSTER[number], loadout: Profile['loadouts'][number]) {

@@ -114,6 +114,8 @@ export const ID: Record<keyof typeof EN, string> = {
   'party.job': 'Job',
   'party.basejob': 'Class dasar',
   'party.overview.hint': 'Tiap level memberi +2% HP dasar dan +1,5% power. EXP diberikan saat ekspedisi selesai.',
+  'party.status.attributes': 'Atribut',
+  'party.status.loadout': 'Terpasang',
   'party.skills.title': 'Skill',
   'party.skills.sub': '2 slot',
   'party.skills.slot': 'Slot {n}',
@@ -172,6 +174,14 @@ export const ID: Record<keyof typeof EN, string> = {
   'gear.sets': 'Set equipment',
   'gear.set.all': '— SET LENGKAP AKTIF',
   'gear.set.two': '— BONUS 2 BAGIAN AKTIF',
+  'party.skills.book': 'Buku skill',
+  'party.skills.book.sub': 'ketuk I atau II untuk memasang',
+  'party.skills.lock.talent': 'Pelajari dulu di pohon talenta.',
+  'party.skills.lock.job': 'Terbuka lewat promosi job.',
+  'party.skills.equip': 'Pasang {name} di slot {n}',
+  'gear.empty': 'Kosong',
+  'gear.list.sub': 'ketuk item untuk melihat',
+  'gear.tag.equipped': 'TERPASANG',
 
   // Formasi
   'formation.title': 'Formasi',

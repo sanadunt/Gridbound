@@ -20,12 +20,13 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   assert.ok((await evaluate('window.gridbound.profile().loadouts[0].talents')).includes('active-2'));
   await click.nav('party');
   await click('[data-training-tab="skills"]');
-  await evaluate(`(() => { const select = document.querySelector('[data-equip-slot="1"]'); select.value = '2'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  await click('[data-equip-skill="2"][data-skill-slot="1"]');
   assert.deepEqual(await evaluate('window.gridbound.profile().loadouts[0].skills'), [0, 2]);
 
   await click('[data-training-tab="gear"]');
   const goldBeforePreview = await evaluate('window.gridbound.profile().gold');
-  await evaluate(`(() => { const select = document.querySelector('[data-gear-slot="charm"]'); select.value = 'ember-charm'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  await click('[data-gear-open="charm"]');
+  await click('[data-gear-item="ember-charm"]');
   assert.equal(await evaluate('Boolean(document.querySelector("[data-gear-preview=ember-charm]"))'), true);
   assert.equal(await evaluate('window.gridbound.profile().gold'), goldBeforePreview, 'equipment inspection must not spend gold');
   await click('[data-confirm-gear]');
