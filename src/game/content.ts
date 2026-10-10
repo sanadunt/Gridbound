@@ -12,19 +12,19 @@ export const KITS: Record<ClassId, Kit> = {
   {name:'Twin Fang',label:'SERANG',cooldown:2.8,power:43,kind:'attack',description:'Dua tebasan cepat dengan total 43 damage pada lane yang sama.'},
   {name:'Pilfer',label:'CURI',cooldown:4,power:21,kind:'steal',description:'21 damage dan curi 8 gold dari kantong encounter. Maksimal 120 gold.'}]},
  archer: {name:'Archer',color:'#b3cf80',hp:290,role:'Pemburu minion dan weak point',skills:[
-  {name:'Split Arrow',label:'VOLLEY',cooldown:4.4,power:62,kind:'aoe',description:'62 damage terbagi ke minion; jika lane bersih, semua panah mengenai boss.'},
+  {name:'Split Arrow',label:'VOLLEY',cooldown:4.4,power:62,kind:'aoe',description:'105 damage dibagi rata ke semua minion; jika tidak ada minion, 62 damage ke boss.'},
   {name:'Pinpoint',label:'TARGET',cooldown:4.8,power:96,kind:'attack',description:'96 damage pada target pilihan. Klik salah satu lane musuh untuk mengarahkan.'}]},
  healer: {name:'Healer',color:'#73d8cc',hp:310,role:'Pemulihan dan tempo party',skills:[
   {name:'Mending Light',label:'HEAL',cooldown:5,power:78,kind:'heal',description:'Pulihkan 78 HP rekan paling terluka dan 20 HP pada seluruh party.'},
   {name:'Battle Hymn',label:'BUFF',cooldown:6,power:0,kind:'buff',description:'Seluruh party mendapat +30% damage dan +20% kecepatan cooldown selama 7 detik.'}]},
  wizard: {name:'Wizard',color:'#91b7ef',hp:255,role:'Burst besar, cooldown panjang',skills:[
   {name:'Arc Lance',label:'LANCE',cooldown:6,power:98,kind:'attack',description:'98 magic damage ke boss atau target lane pilihan.'},
-  {name:'Starfall',label:'NOVA',cooldown:9.4,power:160,kind:'aoe',description:'Ledakan 160 damage ke boss dan 95 damage ke setiap minion. Cooldown panjang.'},
+  {name:'Starfall',label:'NOVA',cooldown:9.4,power:160,kind:'aoe',description:'Ledakan 160 damage ke boss dan 96 damage (60%) ke setiap minion. Cooldown panjang.'},
   {name:'Time Bomb',label:'BURST',cooldown:8,power:210,kind:'attack',description:'Segel meledak setelah 1,5 detik: 210 damage. Tepatkan dengan jendela Break.'}]},
  bard: {name:'Bard',color:'#f29fc5',hp:300,role:'Irama yang mempercepat party',skills:[
   {name:'Quickstep Reel',label:'HASTE',cooldown:6,power:1.7,kind:'haste',description:'Cooldown tersisa setiap hero lain berkurang 1,7 detik. Tempo party jadi senjata.'},
   {name:'Discordant Note',label:'DISCORD',cooldown:5,power:58,kind:'weaken',description:'58 damage dan lemahkan musuh 5 detik: semua damage musuh −25%.'},
-  {name:'Lullaby',label:'LULL',cooldown:8,power:2.2,kind:'delay',description:'Tunda intent musuh berikutnya 2,2 detik. Telegraph yang sudah muncul tetap berjalan.'},
+  {name:'Lullaby',label:'LULL',cooldown:8,power:2.2,kind:'delay',description:'Tunda intent musuh berikutnya 2,2 detik. Telegraph yang sudah muncul tetap berjalan. Tunda bertumpuk dibatasi per intent.'},
   {name:'Encore',label:'ENCORE',cooldown:9,power:14,kind:'resolve',description:'Isi 14 Resolve. Ninefold Dawn datang lebih cepat.'}]},
  hexer: {name:'Hexer',color:'#d0638a',hp:265,role:'Kutukan dan damage berkelanjutan',skills:[
   {name:'Withering Hex',label:'HEX',cooldown:5,power:18,kind:'curse',description:'Kutuk boss: 18 damage per detik selama 6 detik. Recast memperbarui kutukan.'},
@@ -38,7 +38,7 @@ export const KITS: Record<ClassId, Kit> = {
   {name:'Inner Calm',label:'CALM',cooldown:8,power:.3,kind:'selfheal',description:'Pulihkan 30% HP sendiri dan hapus semua fatigue.'}]},
  engineer: {name:'Engineer',color:'#d98f5c',hp:320,role:'Turret, perangkap, dan perbaikan',skills:[
   {name:'Spark Turret',label:'TURRET',cooldown:7,power:22,kind:'turret',description:'Pasang turret di lane sendiri: 22 damage per detik selama 6 detik ke target terdepan.'},
-  {name:'Flash Mine',label:'STUN',cooldown:7.5,power:1.6,kind:'stun',description:'Tunda serangan musuh berikutnya 1,6 detik dan isi stagger boss 120.'},
+  {name:'Flash Mine',label:'STUN',cooldown:7.5,power:1.6,kind:'stun',description:'Tunda serangan musuh berikutnya 1,6 detik dan isi stagger boss 120. Tunda bertumpuk dibatasi per intent.'},
   {name:'Patch Kit',label:'REPAIR',cooldown:14,power:1,kind:'repair',description:'Tambah 1 potion (maks 3). Sekali per stage.'},
   {name:'Overclock',label:'OVERCLOCK',cooldown:8,power:1.8,kind:'haste',description:'Cooldown tersisa setiap hero berkurang 1,8 detik.'}]}
 };
@@ -52,7 +52,7 @@ KITS.rogue.skills.push(
 );
 KITS.archer.skills.push(
  {name:'Silence Arrow',label:'SILENCE',cooldown:6.8,power:61,kind:'interrupt',description:'61 damage ke boss dan putus ritual all-grid. Hanya tersedia jika dipasang sebelum berangkat.'},
- {name:'Ricochet',label:'RICOCHET',cooldown:5.8,power:105,kind:'aoe',description:'105 power dibagi ke minion, atau seluruhnya ke boss saat lane bersih.'}
+ {name:'Ricochet',label:'RICOCHET',cooldown:5.8,power:105,kind:'aoe',description:'179 damage dibagi rata ke semua minion; jika tidak ada minion, 105 damage ke boss.'}
 );
 KITS.healer.skills.push(
  {name:'Aegis of Dawn',label:'AEGIS',cooldown:6.5,power:51,kind:'partyshield',description:'51 shield untuk setiap hero. Cegah damage sebelum terjadi; tidak menghidupkan yang tumbang.'},

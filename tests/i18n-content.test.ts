@@ -81,7 +81,8 @@ test('Indonesian prose becomes English under "en"', () => {
   assert.equal(CAMPAIGN[4].intro.split('\n\n').length, 3, 'paragraph breaks survive');
   assert.equal(CAMPAIGN[4].stages[0].beat, (CAMPAIGN[4] as unknown as { beats: string[] }).beats[0]);
   assert.match(ENEMIES.wolf.description, /^A hunter of wounds\./);
-  assert.match(ENEMIES['wolf-ash'].description, /Ashbound variant: the intent order shifts/);
+  assert.match(ENEMIES['wolf-ash'].description, /Ashbound variant: same intent order, more HP and damage\.$/);
+  assert.match(ENEMIES['wolf-frost'].description, /Frostbound variant: the intent order shifts, intents come faster/);
   assert.equal(ENEMIES['wolf-ash'].counter, ENEMIES.wolf.counter);
   assert.equal(CHARACTERS[0].bio.startsWith('Aldric remembers every way'), true);
   assert.equal(STORY_CHOICES[0].title, 'A bell for the school');

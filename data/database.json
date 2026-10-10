@@ -207,7 +207,7 @@
           "cooldown": 7,
           "power": 220,
           "kind": "aoe",
-          "description": "220 damage ke boss, 55% power ke setiap minion."
+          "description": "220 damage ke boss, 60% power ke setiap minion."
         }
       ]
     },
@@ -295,7 +295,7 @@
           "cooldown": 4.4,
           "power": 62,
           "kind": "aoe",
-          "description": "62 damage terbagi ke minion; jika lane bersih, semua panah mengenai boss."
+          "description": "105 damage dibagi rata ke semua minion; jika tidak ada minion, 62 damage ke boss."
         },
         {
           "name": "Pinpoint",
@@ -319,7 +319,7 @@
           "cooldown": 5.8,
           "power": 105,
           "kind": "aoe",
-          "description": "105 power dibagi ke minion, atau seluruhnya ke boss saat lane bersih."
+          "description": "179 damage dibagi rata ke semua minion; jika tidak ada minion, 105 damage ke boss."
         },
         {
           "name": "Deadeye",
@@ -335,7 +335,7 @@
           "cooldown": 5.2,
           "power": 116,
           "kind": "aoe",
-          "description": "116 power dibagi ke minion; semuanya ke boss jika lane bersih."
+          "description": "197 damage dibagi rata ke semua minion; jika tidak ada minion, 116 damage ke boss."
         },
         {
           "name": "Falling Constellation",
@@ -447,7 +447,7 @@
           "cooldown": 9.4,
           "power": 160,
           "kind": "aoe",
-          "description": "Ledakan 160 damage ke boss dan 95 damage ke setiap minion. Cooldown panjang."
+          "description": "Ledakan 160 damage ke boss dan 96 damage (60%) ke setiap minion. Cooldown panjang."
         },
         {
           "name": "Time Bomb",
@@ -471,7 +471,7 @@
           "cooldown": 8,
           "power": 190,
           "kind": "aoe",
-          "description": "190 damage ke boss, 55% ke setiap minion, sebelum bonus Elements."
+          "description": "190 damage ke boss, 60% ke setiap minion, sebelum bonus Elements."
         },
         {
           "name": "Stolen Second",
@@ -487,7 +487,7 @@
           "cooldown": 9.5,
           "power": 280,
           "kind": "aoe",
-          "description": "280 damage ke boss, 55% ke minion; bonus Elements berlaku."
+          "description": "280 damage ke boss, 60% ke minion; bonus Elements berlaku."
         },
         {
           "name": "Tomorrow on Loan",
@@ -527,7 +527,7 @@
           "cooldown": 8,
           "power": 2.2,
           "kind": "delay",
-          "description": "Tunda intent musuh berikutnya 2,2 detik. Telegraph yang sudah muncul tetap berjalan."
+          "description": "Tunda intent musuh berikutnya 2,2 detik. Telegraph yang sudah muncul tetap berjalan. Tunda bertumpuk dibatasi per intent."
         },
         {
           "name": "Encore",
@@ -567,7 +567,7 @@
           "cooldown": 7.5,
           "power": 165,
           "kind": "aoe",
-          "description": "165 power dibagi ke minion; seluruhnya ke boss saat lane bersih."
+          "description": "281 damage dibagi rata ke semua minion; jika tidak ada minion, 165 damage ke boss."
         }
       ]
     },
@@ -735,7 +735,7 @@
           "cooldown": 7.5,
           "power": 1.6,
           "kind": "stun",
-          "description": "Tunda serangan musuh berikutnya 1,6 detik dan isi stagger boss 120."
+          "description": "Tunda serangan musuh berikutnya 1,6 detik dan isi stagger boss 120. Tunda bertumpuk dibatasi per intent."
         },
         {
           "name": "Patch Kit",
@@ -759,7 +759,7 @@
           "cooldown": 7,
           "power": 150,
           "kind": "aoe",
-          "description": "150 power dibagi ke minion; seluruhnya ke boss saat lane bersih."
+          "description": "255 damage dibagi rata ke semua minion; jika tidak ada minion, 150 damage ke boss."
         },
         {
           "name": "Ember Mine",
@@ -767,7 +767,7 @@
           "cooldown": 8,
           "power": 2.4,
           "kind": "stun",
-          "description": "Tunda serangan musuh berikutnya 2,4 detik dan isi stagger 120."
+          "description": "Tunda serangan musuh berikutnya 2,4 detik dan isi stagger 120. Tunda bertumpuk dibatasi per intent."
         },
         {
           "name": "Brass Sentinel",
@@ -837,6 +837,9 @@
       "cost": 420,
       "index": 6,
       "effect": "sanctuary",
+      "perk": {
+        "barrier": 0.25
+      },
       "description": "Sanctuary tetap aktif. Mulai tiap expedition dengan barrier 25% max HP.",
       "skill": {
         "name": "Worldwall",
@@ -857,6 +860,9 @@
       "cost": 420,
       "index": 7,
       "effect": "rage",
+      "perk": {
+        "castLeech": 0.08
+      },
       "description": "Rage tetap aktif; setiap cast ofensif memulihkan 8% power skill.",
       "skill": {
         "name": "Red Horizon",
@@ -864,7 +870,7 @@
         "cooldown": 7,
         "power": 220,
         "kind": "aoe",
-        "description": "220 damage ke boss, 55% power ke setiap minion."
+        "description": "220 damage ke boss, 60% power ke setiap minion."
       }
     },
     "duelist": {
@@ -915,6 +921,9 @@
       "cost": 420,
       "index": 6,
       "effect": "leech",
+      "perk": {
+        "echo": 0.4
+      },
       "description": "Leech tetap aktif. Setiap cast kelima memicu 40% echo damage.",
       "skill": {
         "name": "Thousand Cuts",
@@ -935,6 +944,9 @@
       "cost": 420,
       "index": 7,
       "effect": "execute",
+      "perk": {
+        "barrier": 0.25
+      },
       "description": "Execute tetap aktif. Mulai expedition dengan barrier 25% HP.",
       "skill": {
         "name": "Unwritten Name",
@@ -980,7 +992,7 @@
         "cooldown": 5.2,
         "power": 116,
         "kind": "aoe",
-        "description": "116 power dibagi ke minion; semuanya ke boss jika lane bersih."
+        "description": "197 damage dibagi rata ke semua minion; jika tidak ada minion, 116 damage ke boss."
       }
     },
     "starshot": {
@@ -993,6 +1005,9 @@
       "cost": 420,
       "index": 6,
       "effect": "precision",
+      "perk": {
+        "echo": 0.4
+      },
       "description": "Precision tetap aktif. Cast ofensif kelima menghasilkan echo 40%.",
       "skill": {
         "name": "Falling Constellation",
@@ -1013,6 +1028,9 @@
       "cost": 420,
       "index": 7,
       "effect": "hunter",
+      "perk": {
+        "minionHeal": 18
+      },
       "description": "Hunter tetap aktif. Membunuh minion memulihkan party 18 HP.",
       "skill": {
         "name": "Thorn Silence",
@@ -1071,6 +1089,9 @@
       "cost": 420,
       "index": 6,
       "effect": "mercy",
+      "perk": {
+        "overhealBarrier": 0.25
+      },
       "description": "Mercy tetap aktif. 25% overheal berubah menjadi barrier.",
       "skill": {
         "name": "Second Sunrise",
@@ -1091,6 +1112,9 @@
       "cost": 420,
       "index": 7,
       "effect": "hymn",
+      "perk": {
+        "barrier": 0.25
+      },
       "description": "Hymn tetap aktif. Mulai expedition dengan barrier 25% HP.",
       "skill": {
         "name": "Silence Between Bells",
@@ -1117,7 +1141,7 @@
         "cooldown": 8,
         "power": 190,
         "kind": "aoe",
-        "description": "190 damage ke boss, 55% ke setiap minion, sebelum bonus Elements."
+        "description": "190 damage ke boss, 60% ke setiap minion, sebelum bonus Elements."
       }
     },
     "chronist": {
@@ -1149,6 +1173,9 @@
       "cost": 420,
       "index": 6,
       "effect": "elements",
+      "perk": {
+        "echo": 0.4
+      },
       "description": "Elements tetap aktif. Cast ofensif kelima menghasilkan echo 40%.",
       "skill": {
         "name": "Prismatic Ruin",
@@ -1156,7 +1183,7 @@
         "cooldown": 9.5,
         "power": 280,
         "kind": "aoe",
-        "description": "280 damage ke boss, 55% ke minion; bonus Elements berlaku."
+        "description": "280 damage ke boss, 60% ke minion; bonus Elements berlaku."
       }
     },
     "hourkeeper": {
@@ -1169,7 +1196,10 @@
       "cost": 420,
       "index": 7,
       "effect": "time",
-      "description": "Tempo Chronist tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik.",
+      "perk": {
+        "intentDelay": 0.25
+      },
+      "description": "Tempo Chronist tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik. Tunda bertumpuk dibatasi per intent.",
       "skill": {
         "name": "Tomorrow on Loan",
         "label": "TOMORROW",
@@ -1227,6 +1257,9 @@
       "cost": 420,
       "index": 6,
       "effect": "hymn",
+      "perk": {
+        "barrier": 0.25
+      },
       "description": "Hymn tetap aktif. Mulai expedition dengan barrier 25% HP.",
       "skill": {
         "name": "Grand Finale",
@@ -1247,14 +1280,17 @@
       "cost": 420,
       "index": 7,
       "effect": "time",
-      "description": "Tempo Skald tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik.",
+      "perk": {
+        "intentDelay": 0.25
+      },
+      "description": "Tempo Skald tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik. Tunda bertumpuk dibatasi per intent.",
       "skill": {
         "name": "Storm Cadence",
         "label": "CADENCE",
         "cooldown": 7.5,
         "power": 165,
         "kind": "aoe",
-        "description": "165 power dibagi ke minion; seluruhnya ke boss saat lane bersih."
+        "description": "281 damage dibagi rata ke semua minion; jika tidak ada minion, 165 damage ke boss."
       }
     },
     "witch": {
@@ -1305,6 +1341,9 @@
       "cost": 420,
       "index": 6,
       "effect": "execute",
+      "perk": {
+        "echo": 0.4
+      },
       "description": "Execute tetap aktif. Setiap cast kelima memicu echo 40%.",
       "skill": {
         "name": "Black Harvest",
@@ -1325,6 +1364,9 @@
       "cost": 420,
       "index": 7,
       "effect": "leech",
+      "perk": {
+        "barrier": 0.25
+      },
       "description": "Leech tetap aktif. Mulai expedition dengan barrier 25% HP.",
       "skill": {
         "name": "Ossuary Ward",
@@ -1383,6 +1425,9 @@
       "cost": 420,
       "index": 6,
       "effect": "precision",
+      "perk": {
+        "echo": 0.4
+      },
       "description": "Precision tetap aktif. Setiap cast kelima memicu echo 40%.",
       "skill": {
         "name": "Void Palm",
@@ -1403,6 +1448,9 @@
       "cost": 420,
       "index": 7,
       "effect": "rage",
+      "perk": {
+        "castLeech": 0.08
+      },
       "description": "Rage tetap aktif; setiap cast ofensif memulihkan 8% power skill.",
       "skill": {
         "name": "Temple Wall",
@@ -1429,7 +1477,7 @@
         "cooldown": 7,
         "power": 150,
         "kind": "aoe",
-        "description": "150 power dibagi ke minion; seluruhnya ke boss saat lane bersih."
+        "description": "255 damage dibagi rata ke semua minion; jika tidak ada minion, 150 damage ke boss."
       }
     },
     "sapper": {
@@ -1448,7 +1496,7 @@
         "cooldown": 8,
         "power": 2.4,
         "kind": "stun",
-        "description": "Tunda serangan musuh berikutnya 2,4 detik dan isi stagger 120."
+        "description": "Tunda serangan musuh berikutnya 2,4 detik dan isi stagger 120. Tunda bertumpuk dibatasi per intent."
       }
     },
     "clockwright": {
@@ -1461,6 +1509,9 @@
       "cost": 420,
       "index": 6,
       "effect": "elements",
+      "perk": {
+        "echo": 0.4
+      },
       "description": "Elements tetap aktif. Setiap cast kelima memicu echo 40%.",
       "skill": {
         "name": "Brass Sentinel",
@@ -1481,6 +1532,9 @@
       "cost": 420,
       "index": 7,
       "effect": "hunter",
+      "perk": {
+        "minionHeal": 18
+      },
       "description": "Hunter tetap aktif. Membunuh minion memulihkan party 18 HP.",
       "skill": {
         "name": "Siege Charge",
@@ -2114,12 +2168,12 @@
     {
       "id": "bard-2",
       "name": "Warm Voice",
-      "description": "Heal yang diberikan +10% dan barrier awal 6% HP.",
+      "description": "+8% HP dan barrier awal 6% HP.",
       "level": 9,
       "points": 1,
       "requires": "bard-1",
       "effect": {
-        "heal": 0.1,
+        "hp": 0.08,
         "openingBarrier": 0.06
       },
       "cost": 56,
@@ -3965,7 +4019,7 @@
       "id": "wolf-ash",
       "name": "Ashbound Ashfang",
       "title": "ASHBOUND · CINDER WOLF",
-      "description": "Pemburu luka. Menandai hero dengan HP absolut terendah, lalu menerkam garis depan. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Pemburu luka. Menandai hero dengan HP absolut terendah, lalu menerkam garis depan. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Marked mengikuti hero. Pulihkan target atau lindungi dengan Guard; hindari sapuan tanah.",
       "patterns": [
         "weakest",
@@ -3983,7 +4037,7 @@
       "id": "wolf-frost",
       "name": "Frostbound Ashfang",
       "title": "FROSTBOUND · CINDER WOLF",
-      "description": "Pemburu luka. Menandai hero dengan HP absolut terendah, lalu menerkam garis depan. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Pemburu luka. Menandai hero dengan HP absolut terendah, lalu menerkam garis depan. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Marked mengikuti hero. Pulihkan target atau lindungi dengan Guard; hindari sapuan tanah.",
       "patterns": [
         "front",
@@ -4001,7 +4055,7 @@
       "id": "wolf-auric",
       "name": "Gilded Ashfang",
       "title": "GILDED · CINDER WOLF",
-      "description": "Pemburu luka. Menandai hero dengan HP absolut terendah, lalu menerkam garis depan. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Pemburu luka. Menandai hero dengan HP absolut terendah, lalu menerkam garis depan. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Marked mengikuti hero. Pulihkan target atau lindungi dengan Guard; hindari sapuan tanah.",
       "patterns": [
         "strongest",
@@ -4019,7 +4073,7 @@
       "id": "goblin-ash",
       "name": "Ashbound Scrap Marshal",
       "title": "ASHBOUND · GOBLIN WAR BAND",
-      "description": "Taktisi pemulung mengincar hero dengan kekuatan skill tertinggi. Sisa kelompoknya melempar bom ke tile ramai. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Taktisi pemulung mengincar hero dengan kekuatan skill tertinggi. Sisa kelompoknya melempar bom ke tile ramai. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Strongest dihitung dari power skill per cooldown. Ganti stance sebelum mark untuk mengubah prioritas musuh.",
       "patterns": [
         "strongest",
@@ -4038,7 +4092,7 @@
       "id": "goblin-frost",
       "name": "Frostbound Scrap Marshal",
       "title": "FROSTBOUND · GOBLIN WAR BAND",
-      "description": "Taktisi pemulung mengincar hero dengan kekuatan skill tertinggi. Sisa kelompoknya melempar bom ke tile ramai. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Taktisi pemulung mengincar hero dengan kekuatan skill tertinggi. Sisa kelompoknya melempar bom ke tile ramai. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Strongest dihitung dari power skill per cooldown. Ganti stance sebelum mark untuk mengubah prioritas musuh.",
       "patterns": [
         "strongest",
@@ -4057,7 +4111,7 @@
       "id": "goblin-auric",
       "name": "Gilded Scrap Marshal",
       "title": "GILDED · GOBLIN WAR BAND",
-      "description": "Taktisi pemulung mengincar hero dengan kekuatan skill tertinggi. Sisa kelompoknya melempar bom ke tile ramai. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Taktisi pemulung mengincar hero dengan kekuatan skill tertinggi. Sisa kelompoknya melempar bom ke tile ramai. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Strongest dihitung dari power skill per cooldown. Ganti stance sebelum mark untuk mengubah prioritas musuh.",
       "patterns": [
         "meteor",
@@ -4076,7 +4130,7 @@
       "id": "spider-ash",
       "name": "Ashbound Silk Widow",
       "title": "ASHBOUND · VENOM BROOD",
-      "description": "Mengurung hero yang terluka dan memenuhi grid dengan brood venom setelah dua pola pembuka. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Mengurung hero yang terluka dan memenuhi grid dengan brood venom setelah dua pola pembuka. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Keluar dari tile web sebelum impact. Simpan Guard untuk venom seluruh grid.",
       "patterns": [
         "weakest",
@@ -4094,7 +4148,7 @@
       "id": "spider-frost",
       "name": "Frostbound Silk Widow",
       "title": "FROSTBOUND · VENOM BROOD",
-      "description": "Mengurung hero yang terluka dan memenuhi grid dengan brood venom setelah dua pola pembuka. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Mengurung hero yang terluka dan memenuhi grid dengan brood venom setelah dua pola pembuka. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Keluar dari tile web sebelum impact. Simpan Guard untuk venom seluruh grid.",
       "patterns": [
         "meteor",
@@ -4112,7 +4166,7 @@
       "id": "spider-auric",
       "name": "Gilded Silk Widow",
       "title": "GILDED · VENOM BROOD",
-      "description": "Mengurung hero yang terluka dan memenuhi grid dengan brood venom setelah dua pola pembuka. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Mengurung hero yang terluka dan memenuhi grid dengan brood venom setelah dua pola pembuka. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Keluar dari tile web sebelum impact. Simpan Guard untuk venom seluruh grid.",
       "patterns": [
         "all",
@@ -4130,7 +4184,7 @@
       "id": "shaman-ash",
       "name": "Ashbound Hollow Cantor",
       "title": "ASHBOUND · BELL CULT SHAMAN",
-      "description": "Ritual lonceng retak menghantam semua tile. Ia mengincar healer yang terluka setelah ritual selesai. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Ritual lonceng retak menghantam semua tile. Ia mengincar healer yang terluka setelah ritual selesai. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "All-grid bisa diputus Shield Bash, Silence Arrow, atau Null Field. Tanpa skill itu, timing Party Guard.",
       "patterns": [
         "all",
@@ -4148,7 +4202,7 @@
       "id": "shaman-frost",
       "name": "Frostbound Hollow Cantor",
       "title": "FROSTBOUND · BELL CULT SHAMAN",
-      "description": "Ritual lonceng retak menghantam semua tile. Ia mengincar healer yang terluka setelah ritual selesai. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Ritual lonceng retak menghantam semua tile. Ia mengincar healer yang terluka setelah ritual selesai. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "All-grid bisa diputus Shield Bash, Silence Arrow, atau Null Field. Tanpa skill itu, timing Party Guard.",
       "patterns": [
         "weakest",
@@ -4166,7 +4220,7 @@
       "id": "shaman-auric",
       "name": "Gilded Hollow Cantor",
       "title": "GILDED · BELL CULT SHAMAN",
-      "description": "Ritual lonceng retak menghantam semua tile. Ia mengincar healer yang terluka setelah ritual selesai. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Ritual lonceng retak menghantam semua tile. Ia mengincar healer yang terluka setelah ritual selesai. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "All-grid bisa diputus Shield Bash, Silence Arrow, atau Null Field. Tanpa skill itu, timing Party Guard.",
       "patterns": [
         "breath",
@@ -4184,7 +4238,7 @@
       "id": "golem-ash",
       "name": "Ashbound Ironroot",
       "title": "ASHBOUND · RUIN GOLEM",
-      "description": "Sapuannya menggilas barisan terdepan yang masih ditempati. Ketika marah, semua lantai runtuh. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Sapuannya menggilas barisan terdepan yang masih ditempati. Ketika marah, semua lantai runtuh. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Front mengikuti ROW terdepan yang dihuni saat telegraph dimulai, bukan selalu row pertama. Reposisi setelah tanda muncul.",
       "patterns": [
         "front",
@@ -4202,7 +4256,7 @@
       "id": "golem-frost",
       "name": "Frostbound Ironroot",
       "title": "FROSTBOUND · RUIN GOLEM",
-      "description": "Sapuannya menggilas barisan terdepan yang masih ditempati. Ketika marah, semua lantai runtuh. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Sapuannya menggilas barisan terdepan yang masih ditempati. Ketika marah, semua lantai runtuh. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Front mengikuti ROW terdepan yang dihuni saat telegraph dimulai, bukan selalu row pertama. Reposisi setelah tanda muncul.",
       "patterns": [
         "strongest",
@@ -4220,7 +4274,7 @@
       "id": "golem-auric",
       "name": "Gilded Ironroot",
       "title": "GILDED · RUIN GOLEM",
-      "description": "Sapuannya menggilas barisan terdepan yang masih ditempati. Ketika marah, semua lantai runtuh. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Sapuannya menggilas barisan terdepan yang masih ditempati. Ketika marah, semua lantai runtuh. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Front mengikuti ROW terdepan yang dihuni saat telegraph dimulai, bukan selalu row pertama. Reposisi setelah tanda muncul.",
       "patterns": [
         "all",
@@ -4238,7 +4292,7 @@
       "id": "wraith-ash",
       "name": "Ashbound The Unburied",
       "title": "ASHBOUND · OATHBOUND WRAITH",
-      "description": "Memburu jiwa terlemah, lalu memukul seluruh party dengan ratapan. Mark tetap mengikuti target saat dipindah. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Memburu jiwa terlemah, lalu memukul seluruh party dengan ratapan. Mark tetap mengikuti target saat dipindah. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Heal menjelang mark, Guard saat ratapan. Bunuh spirit minion agar mereka tidak menghabisi target.",
       "patterns": [
         "weakest",
@@ -4256,7 +4310,7 @@
       "id": "wraith-frost",
       "name": "Frostbound The Unburied",
       "title": "FROSTBOUND · OATHBOUND WRAITH",
-      "description": "Memburu jiwa terlemah, lalu memukul seluruh party dengan ratapan. Mark tetap mengikuti target saat dipindah. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Memburu jiwa terlemah, lalu memukul seluruh party dengan ratapan. Mark tetap mengikuti target saat dipindah. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Heal menjelang mark, Guard saat ratapan. Bunuh spirit minion agar mereka tidak menghabisi target.",
       "patterns": [
         "all",
@@ -4274,7 +4328,7 @@
       "id": "wraith-auric",
       "name": "Gilded The Unburied",
       "title": "GILDED · OATHBOUND WRAITH",
-      "description": "Memburu jiwa terlemah, lalu memukul seluruh party dengan ratapan. Mark tetap mengikuti target saat dipindah. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Memburu jiwa terlemah, lalu memukul seluruh party dengan ratapan. Mark tetap mengikuti target saat dipindah. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Heal menjelang mark, Guard saat ratapan. Bunuh spirit minion agar mereka tidak menghabisi target.",
       "patterns": [
         "strongest",
@@ -4292,7 +4346,7 @@
       "id": "treant-ash",
       "name": "Ashbound Mournbark",
       "title": "ASHBOUND · ANCIENT TREANT",
-      "description": "Penjaga hutan yang terinfeksi: akar menyapu depan, spora menelan grid, lalu duri menghantam tile ramai. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Penjaga hutan yang terinfeksi: akar menyapu depan, spora menelan grid, lalu duri menghantam tile ramai. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Jangan bertahan di front yang ditandai. Guard spora atau interrupt; shield satu lane membantu attrition.",
       "patterns": [
         "front",
@@ -4310,7 +4364,7 @@
       "id": "treant-frost",
       "name": "Frostbound Mournbark",
       "title": "FROSTBOUND · ANCIENT TREANT",
-      "description": "Penjaga hutan yang terinfeksi: akar menyapu depan, spora menelan grid, lalu duri menghantam tile ramai. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Penjaga hutan yang terinfeksi: akar menyapu depan, spora menelan grid, lalu duri menghantam tile ramai. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Jangan bertahan di front yang ditandai. Guard spora atau interrupt; shield satu lane membantu attrition.",
       "patterns": [
         "all",
@@ -4328,7 +4382,7 @@
       "id": "treant-auric",
       "name": "Gilded Mournbark",
       "title": "GILDED · ANCIENT TREANT",
-      "description": "Penjaga hutan yang terinfeksi: akar menyapu depan, spora menelan grid, lalu duri menghantam tile ramai. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Penjaga hutan yang terinfeksi: akar menyapu depan, spora menelan grid, lalu duri menghantam tile ramai. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Jangan bertahan di front yang ditandai. Guard spora atau interrupt; shield satu lane membantu attrition.",
       "patterns": [
         "meteor",
@@ -4346,7 +4400,7 @@
       "id": "dragon-ash",
       "name": "Ashbound Vharok",
       "title": "ASHBOUND · THE EMERALD GATE",
-      "description": "Penjaga segel terakhir. Breath satu lane, sapuan depan, meteor, lalu Emerald Cataclysm ke seluruh grid. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Penjaga segel terakhir. Breath satu lane, sapuan depan, meteor, lalu Emerald Cataclysm ke seluruh grid. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Baca empat pola. Sisakan Guard untuk Cataclysm; phase lanjut menambahkan aftershock tertunda.",
       "patterns": [
         "breath",
@@ -4365,7 +4419,7 @@
       "id": "dragon-frost",
       "name": "Frostbound Vharok",
       "title": "FROSTBOUND · THE EMERALD GATE",
-      "description": "Penjaga segel terakhir. Breath satu lane, sapuan depan, meteor, lalu Emerald Cataclysm ke seluruh grid. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Penjaga segel terakhir. Breath satu lane, sapuan depan, meteor, lalu Emerald Cataclysm ke seluruh grid. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Baca empat pola. Sisakan Guard untuk Cataclysm; phase lanjut menambahkan aftershock tertunda.",
       "patterns": [
         "front",
@@ -4384,7 +4438,7 @@
       "id": "dragon-auric",
       "name": "Gilded Vharok",
       "title": "GILDED · THE EMERALD GATE",
-      "description": "Penjaga segel terakhir. Breath satu lane, sapuan depan, meteor, lalu Emerald Cataclysm ke seluruh grid. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Penjaga segel terakhir. Breath satu lane, sapuan depan, meteor, lalu Emerald Cataclysm ke seluruh grid. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Baca empat pola. Sisakan Guard untuk Cataclysm; phase lanjut menambahkan aftershock tertunda.",
       "patterns": [
         "meteor",
@@ -4403,7 +4457,7 @@
       "id": "moth-ash",
       "name": "Ashbound Lantern Eater",
       "title": "ASHBOUND · CINDERWING MOTH",
-      "description": "Ngengat yang memburu cahaya skill terkuat, lalu menghamburkan debu ke tile ramai dan satu lane. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Ngengat yang memburu cahaya skill terkuat, lalu menghamburkan debu ke tile ramai dan satu lane. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Mark mengikuti hero terkuat; lindungi dia, kemudian pindah dari tanda meteor dan lane breath.",
       "patterns": [
         "strongest",
@@ -4421,7 +4475,7 @@
       "id": "moth-frost",
       "name": "Frostbound Lantern Eater",
       "title": "FROSTBOUND · CINDERWING MOTH",
-      "description": "Ngengat yang memburu cahaya skill terkuat, lalu menghamburkan debu ke tile ramai dan satu lane. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Ngengat yang memburu cahaya skill terkuat, lalu menghamburkan debu ke tile ramai dan satu lane. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Mark mengikuti hero terkuat; lindungi dia, kemudian pindah dari tanda meteor dan lane breath.",
       "patterns": [
         "meteor",
@@ -4439,7 +4493,7 @@
       "id": "moth-auric",
       "name": "Gilded Lantern Eater",
       "title": "GILDED · CINDERWING MOTH",
-      "description": "Ngengat yang memburu cahaya skill terkuat, lalu menghamburkan debu ke tile ramai dan satu lane. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Ngengat yang memburu cahaya skill terkuat, lalu menghamburkan debu ke tile ramai dan satu lane. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Mark mengikuti hero terkuat; lindungi dia, kemudian pindah dari tanda meteor dan lane breath.",
       "patterns": [
         "breath",
@@ -4457,7 +4511,7 @@
       "id": "basilisk-ash",
       "name": "Ashbound Glassjaw",
       "title": "ASHBOUND · MIRROR BASILISK",
-      "description": "Reptil cermin menyerang hero terlemah, menyembur satu lane, lalu mengunci target terkuat. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Reptil cermin menyerang hero terlemah, menyembur satu lane, lalu mengunci target terkuat. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Tidak ada petrify tersembunyi. Baca lane breath, heal target lemah, dan Guard mark yang mengikuti hero.",
       "patterns": [
         "weakest",
@@ -4476,7 +4530,7 @@
       "id": "basilisk-frost",
       "name": "Frostbound Glassjaw",
       "title": "FROSTBOUND · MIRROR BASILISK",
-      "description": "Reptil cermin menyerang hero terlemah, menyembur satu lane, lalu mengunci target terkuat. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Reptil cermin menyerang hero terlemah, menyembur satu lane, lalu mengunci target terkuat. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Tidak ada petrify tersembunyi. Baca lane breath, heal target lemah, dan Guard mark yang mengikuti hero.",
       "patterns": [
         "breath",
@@ -4495,7 +4549,7 @@
       "id": "basilisk-auric",
       "name": "Gilded Glassjaw",
       "title": "GILDED · MIRROR BASILISK",
-      "description": "Reptil cermin menyerang hero terlemah, menyembur satu lane, lalu mengunci target terkuat. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Reptil cermin menyerang hero terlemah, menyembur satu lane, lalu mengunci target terkuat. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Tidak ada petrify tersembunyi. Baca lane breath, heal target lemah, dan Guard mark yang mengikuti hero.",
       "patterns": [
         "strongest",
@@ -4514,7 +4568,7 @@
       "id": "crab-ash",
       "name": "Ashbound Bellshore Claw",
       "title": "ASHBOUND · RELIC CRAB",
-      "description": "Kepiting pengangkut lonceng menyapu row depan dan menjatuhkan puing ke tile ramai sebelum meruntuhkan grid. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Kepiting pengangkut lonceng menyapu row depan dan menjatuhkan puing ke tile ramai sebelum meruntuhkan grid. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "HP tinggi tetapi interval panjang. Reposisi dari front dan meteor; interrupt atau Guard runtuhan all-grid.",
       "patterns": [
         "front",
@@ -4532,7 +4586,7 @@
       "id": "crab-frost",
       "name": "Frostbound Bellshore Claw",
       "title": "FROSTBOUND · RELIC CRAB",
-      "description": "Kepiting pengangkut lonceng menyapu row depan dan menjatuhkan puing ke tile ramai sebelum meruntuhkan grid. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Kepiting pengangkut lonceng menyapu row depan dan menjatuhkan puing ke tile ramai sebelum meruntuhkan grid. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "HP tinggi tetapi interval panjang. Reposisi dari front dan meteor; interrupt atau Guard runtuhan all-grid.",
       "patterns": [
         "meteor",
@@ -4550,7 +4604,7 @@
       "id": "crab-auric",
       "name": "Gilded Bellshore Claw",
       "title": "GILDED · RELIC CRAB",
-      "description": "Kepiting pengangkut lonceng menyapu row depan dan menjatuhkan puing ke tile ramai sebelum meruntuhkan grid. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Kepiting pengangkut lonceng menyapu row depan dan menjatuhkan puing ke tile ramai sebelum meruntuhkan grid. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "HP tinggi tetapi interval panjang. Reposisi dari front dan meteor; interrupt atau Guard runtuhan all-grid.",
       "patterns": [
         "all",
@@ -4568,7 +4622,7 @@
       "id": "revenant-ash",
       "name": "Ashbound The Last Watch",
       "title": "ASHBOUND · HOLLOW REVENANT",
-      "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka.",
       "patterns": [
         "strongest",
@@ -4587,7 +4641,7 @@
       "id": "revenant-frost",
       "name": "Frostbound The Last Watch",
       "title": "FROSTBOUND · HOLLOW REVENANT",
-      "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka.",
       "patterns": [
         "front",
@@ -4606,7 +4660,7 @@
       "id": "revenant-auric",
       "name": "Gilded The Last Watch",
       "title": "GILDED · HOLLOW REVENANT",
-      "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka.",
       "patterns": [
         "all",
@@ -4625,7 +4679,7 @@
       "id": "lich-ash",
       "name": "Ashbound Pale Archivist",
       "title": "ASHBOUND · LEDGER LICH",
-      "description": "Pustakawan mati yang mencatat setiap cooldown. Lonceng senyapnya memundurkan skill seluruh party, lalu ia menambal dirinya dengan halaman curian. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Pustakawan mati yang mencatat setiap cooldown. Lonceng senyapnya memundurkan skill seluruh party, lalu ia menambal dirinya dengan halaman curian. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Siapkan interrupt untuk Ritus Pemulihan dan Guard untuk Lonceng Senyap. Heal target lemah sebelum mark.",
       "patterns": [
         "weakest",
@@ -4644,7 +4698,7 @@
       "id": "lich-frost",
       "name": "Frostbound Pale Archivist",
       "title": "FROSTBOUND · LEDGER LICH",
-      "description": "Pustakawan mati yang mencatat setiap cooldown. Lonceng senyapnya memundurkan skill seluruh party, lalu ia menambal dirinya dengan halaman curian. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Pustakawan mati yang mencatat setiap cooldown. Lonceng senyapnya memundurkan skill seluruh party, lalu ia menambal dirinya dengan halaman curian. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Siapkan interrupt untuk Ritus Pemulihan dan Guard untuk Lonceng Senyap. Heal target lemah sebelum mark.",
       "patterns": [
         "silence",
@@ -4663,7 +4717,7 @@
       "id": "lich-auric",
       "name": "Gilded Pale Archivist",
       "title": "GILDED · LEDGER LICH",
-      "description": "Pustakawan mati yang mencatat setiap cooldown. Lonceng senyapnya memundurkan skill seluruh party, lalu ia menambal dirinya dengan halaman curian. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Pustakawan mati yang mencatat setiap cooldown. Lonceng senyapnya memundurkan skill seluruh party, lalu ia menambal dirinya dengan halaman curian. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Siapkan interrupt untuk Ritus Pemulihan dan Guard untuk Lonceng Senyap. Heal target lemah sebelum mark.",
       "patterns": [
         "strongest",
@@ -4682,7 +4736,7 @@
       "id": "knight-ash",
       "name": "Ashbound Hollow Knight",
       "title": "ASHBOUND · OATHLESS KNIGHT",
-      "description": "Ksatria tanpa sumpah yang menghantam barisan depan dua kali berturut-turut sebelum menantang hero terkuat. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Ksatria tanpa sumpah yang menghantam barisan depan dua kali berturut-turut sebelum menantang hero terkuat. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Rotasi barisan depan setelah tanda pertama. Tank dengan shield menahan hantaman kedua; Guard untuk ritual.",
       "patterns": [
         "front",
@@ -4701,7 +4755,7 @@
       "id": "knight-frost",
       "name": "Frostbound Hollow Knight",
       "title": "FROSTBOUND · OATHLESS KNIGHT",
-      "description": "Ksatria tanpa sumpah yang menghantam barisan depan dua kali berturut-turut sebelum menantang hero terkuat. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Ksatria tanpa sumpah yang menghantam barisan depan dua kali berturut-turut sebelum menantang hero terkuat. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Rotasi barisan depan setelah tanda pertama. Tank dengan shield menahan hantaman kedua; Guard untuk ritual.",
       "patterns": [
         "front",
@@ -4720,7 +4774,7 @@
       "id": "knight-auric",
       "name": "Gilded Hollow Knight",
       "title": "GILDED · OATHLESS KNIGHT",
-      "description": "Ksatria tanpa sumpah yang menghantam barisan depan dua kali berturut-turut sebelum menantang hero terkuat. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Ksatria tanpa sumpah yang menghantam barisan depan dua kali berturut-turut sebelum menantang hero terkuat. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Rotasi barisan depan setelah tanda pertama. Tank dengan shield menahan hantaman kedua; Guard untuk ritual.",
       "patterns": [
         "strongest",
@@ -4739,7 +4793,7 @@
       "id": "hydra-ash",
       "name": "Ashbound Glassmere Hydra",
       "title": "ASHBOUND · MIRROR HYDRA",
-      "description": "Tiga kepala kaca menyembur lane paling ramai, lalu menumbuhkan sisik baru kecuali diputus. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Tiga kepala kaca menyembur lane paling ramai, lalu menumbuhkan sisik baru kecuali diputus. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Sebar hero ke beberapa lane agar breath kehilangan target. Interrupt Ritus Pemulihan.",
       "patterns": [
         "breath",
@@ -4759,7 +4813,7 @@
       "id": "hydra-frost",
       "name": "Frostbound Glassmere Hydra",
       "title": "FROSTBOUND · MIRROR HYDRA",
-      "description": "Tiga kepala kaca menyembur lane paling ramai, lalu menumbuhkan sisik baru kecuali diputus. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Tiga kepala kaca menyembur lane paling ramai, lalu menumbuhkan sisik baru kecuali diputus. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Sebar hero ke beberapa lane agar breath kehilangan target. Interrupt Ritus Pemulihan.",
       "patterns": [
         "breath",
@@ -4779,7 +4833,7 @@
       "id": "hydra-auric",
       "name": "Gilded Glassmere Hydra",
       "title": "GILDED · MIRROR HYDRA",
-      "description": "Tiga kepala kaca menyembur lane paling ramai, lalu menumbuhkan sisik baru kecuali diputus. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Tiga kepala kaca menyembur lane paling ramai, lalu menumbuhkan sisik baru kecuali diputus. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Sebar hero ke beberapa lane agar breath kehilangan target. Interrupt Ritus Pemulihan.",
       "patterns": [
         "meteor",
@@ -4799,7 +4853,7 @@
       "id": "harpy-ash",
       "name": "Ashbound Gale Harrier",
       "title": "ASHBOUND · STORM HARPY",
-      "description": "Pemburu cepat yang menjatuhkan bulu badai ke tile ramai dan menyambar hero paling lemah. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Pemburu cepat yang menjatuhkan bulu badai ke tile ramai dan menyambar hero paling lemah. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Interval pendek: bergerak lebih awal dan biarkan healer menjaga target lemah. Damage per hantaman lebih kecil.",
       "patterns": [
         "meteor",
@@ -4818,7 +4872,7 @@
       "id": "harpy-frost",
       "name": "Frostbound Gale Harrier",
       "title": "FROSTBOUND · STORM HARPY",
-      "description": "Pemburu cepat yang menjatuhkan bulu badai ke tile ramai dan menyambar hero paling lemah. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Pemburu cepat yang menjatuhkan bulu badai ke tile ramai dan menyambar hero paling lemah. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Interval pendek: bergerak lebih awal dan biarkan healer menjaga target lemah. Damage per hantaman lebih kecil.",
       "patterns": [
         "weakest",
@@ -4837,7 +4891,7 @@
       "id": "harpy-auric",
       "name": "Gilded Gale Harrier",
       "title": "GILDED · STORM HARPY",
-      "description": "Pemburu cepat yang menjatuhkan bulu badai ke tile ramai dan menyambar hero paling lemah. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Pemburu cepat yang menjatuhkan bulu badai ke tile ramai dan menyambar hero paling lemah. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Interval pendek: bergerak lebih awal dan biarkan healer menjaga target lemah. Damage per hantaman lebih kecil.",
       "patterns": [
         "meteor",
@@ -4856,7 +4910,7 @@
       "id": "colossus-ash",
       "name": "Ashbound Frostward Colossus",
       "title": "ASHBOUND · GLACIER COLOSSUS",
-      "description": "Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Interval panjang memberi waktu reposisi. Simpan interrupt untuk Ritus Pemulihan dan Guard untuk hantaman grid.",
       "patterns": [
         "front",
@@ -4875,7 +4929,7 @@
       "id": "colossus-frost",
       "name": "Frostbound Frostward Colossus",
       "title": "FROSTBOUND · GLACIER COLOSSUS",
-      "description": "Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Interval panjang memberi waktu reposisi. Simpan interrupt untuk Ritus Pemulihan dan Guard untuk hantaman grid.",
       "patterns": [
         "mend",
@@ -4894,7 +4948,7 @@
       "id": "colossus-auric",
       "name": "Gilded Frostward Colossus",
       "title": "GILDED · GLACIER COLOSSUS",
-      "description": "Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Interval panjang memberi waktu reposisi. Simpan interrupt untuk Ritus Pemulihan dan Guard untuk hantaman grid.",
       "patterns": [
         "all",
@@ -4913,7 +4967,7 @@
       "id": "choir-ash",
       "name": "Ashbound The Hollow Choir",
       "title": "ASHBOUND · BELL CHOIR",
-      "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Ashbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Idealnya dua interrupt: satu untuk Lonceng Senyap, satu untuk Ritus Pemulihan. Guard menahan ritual grid.",
       "patterns": [
         "silence",
@@ -4932,7 +4986,7 @@
       "id": "choir-frost",
       "name": "Frostbound The Hollow Choir",
       "title": "FROSTBOUND · BELL CHOIR",
-      "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Frostbound: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Idealnya dua interrupt: satu untuk Lonceng Senyap, satu untuk Ritus Pemulihan. Guard menahan ritual grid.",
       "patterns": [
         "strongest",
@@ -4951,7 +5005,7 @@
       "id": "choir-auric",
       "name": "Gilded The Hollow Choir",
       "title": "GILDED · BELL CHOIR",
-      "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Gilded: urutan intent bergeser dan tekanan meningkat.",
+      "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Idealnya dua interrupt: satu untuk Lonceng Senyap, satu untuk Ritus Pemulihan. Guard menahan ritual grid.",
       "patterns": [
         "all",
@@ -5020,7 +5074,7 @@
       "id": "frost",
       "name": "Winter Between Beats",
       "patron": "FROST · CONTROL",
-      "description": "Setiap cast memperlambat jadwal intent berikutnya 0,16 detik. Telegraph aktif tetap berjalan."
+      "description": "Setiap cast memperlambat jadwal intent berikutnya 0,16 detik dan menambah 1 Resolve. Tunda bertumpuk dibatasi per intent; telegraph aktif tetap berjalan."
     },
     {
       "id": "feast",
@@ -5038,7 +5092,7 @@
       "id": "chorus",
       "name": "Many Hands, One Song",
       "patron": "CHORUS · ROTATION",
-      "description": "Tap hero berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 2 detik (+30% power, +20% tempo)."
+      "description": "Tap hero berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 1 detik (+30% power, +20% tempo), maksimal sekali per hero setiap 4 detik."
     }
   ],
   "recommendedPower": [

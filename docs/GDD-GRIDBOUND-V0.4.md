@@ -276,10 +276,10 @@ Dua belas boon:
 | Dancer in Ash | Penalti relokasi turun dari 0,9 ke 0,2 detik; hero yang dipindah mendapat 30 shield. |
 | Dawn Runs Deep | Semua sumber Resolve mengisi 60% lebih cepat. |
 | Last Light | Damage ke boss di bawah 30% HP meningkat 40%. |
-| Winter Between Beats | Setiap cast menunda intent berikutnya 0,16 detik; telegraph aktif tetap berjalan. |
+| Winter Between Beats | Setiap cast menunda intent berikutnya 0,16 detik (dalam anggaran kontrol per intent) dan menambah 1 Resolve; telegraph aktif tetap berjalan. |
 | For the Living | Setiap minion yang tumbang memulihkan 24 HP pada seluruh party. |
 | Not Yet, Little Flame | Sekali per hero per floor, damage fatal menyisakan 20% HP. |
-| Many Hands, One Song | Tap hero yang berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 2 detik: +30% power dan +20% tempo. |
+| Many Hands, One Song | Tap hero yang berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 1 detik (+30% power dan +20% tempo), maksimal sekali per hero setiap 4 detik. |
 
 ### Batas antar-mode
 
@@ -305,6 +305,13 @@ Hero memakai dua active skill yang dipasang pada loadout. Ketika cooldown stance
 
 Resolve dimulai pada 25 dan bertambah dari damage, tap (0,3 per tap), cast/talent tertentu, Guard, dan boon tertentu. Nilainya dibatasi 100.
 
+### Cast ofensif, efek bertumpuk, dan kontrol
+
+- **Cast ofensif** adalah semua skill selain shield, partyshield, heal, regen, buff, haste, delay, stun, resolve, selfheal, repair, dan counter (`SUPPORT_KINDS` di `simulation.ts`). Precision (1,6× power pada setiap cast ofensif ketiga), echo talent dan job (setiap cast ofensif kelima), Second Thunder, dan leech hanya menghitung cast ofensif. Ranking target Strongest memakai power tanpa proc Precision, sehingga target tidak berganti-ganti karena hitungan cast.
+- **Efek yang tumpang tindih tidak saling merugikan.** Regen baru hanya mengganti regen yang sedang berjalan bila alirannya sama kuat atau lebih kuat; durasinya selalu diperbarui ke 6 detik, bukan ditumpuk. Battle Hymn memakai durasi terpanjang yang aktif. Kutukan disimpan per hexer (`curses` di snapshot): recast hanya memperbarui kutukan hexer itu, jadi dua hexer menghasilkan dua kutukan.
+- **Bonus heal yang diberikan** (talent dan gear `heal`) berlaku untuk heal dan regen, bagian heal dari drain, dan semua leech. Mark Expose/Black Warrant menambah 20% damage ke boss dan minion. AoE wizard/warrior memberi power penuh ke boss dan 60% ke setiap minion; AoE class lain membagi rata 1,7× power ke semua minion, atau memberi power penuh ke boss bila tidak ada minion.
+- **Anggaran kontrol.** Delay dan stun (Lullaby, Flash Mine, Ember Mine), intent delay job tier-3, dan Winter Between Beats berbagi anggaran per siklus intent: total tunda yang ditambahkan di antara dua telegraph paling banyak max(3 detik, 40% interval intent saat itu) (`CONTROL_MIN`/`CONTROL_SHARE`), dan jadwal intent tidak pernah melewati 14 detik. Anggaran terisi lagi pada setiap telegraph baru; stagger dari stun tetap berlaku penuh. Karena itu kontrol bertumpuk tidak bisa menghentikan intent boss sepenuhnya.
+
 ### Telegraph dan counterplay
 
 Pola setiap musuh authored sebagai daftar intent yang berulang. Intent dan area yang ditandai terlihat sebelum impact. Lokasi pada telegraph dapat mengikuti target hero atau tetap berada di grid, bergantung jenisnya.
@@ -326,11 +333,11 @@ Boss memiliki tiga phase yang ditentukan oleh HP: di atas 65%, 30% sampai 65%, d
 
 Minion masuk sebagai tekanan tambahan di lane. Minion cenderung menyerang hero terdepan pada lane mereka, atau hero terlemah jika lane kosong. Claw hit dan summon berjalan sebagai timer terpisah dari intent utama.
 
-Victory terjadi saat HP boss habis dan setidaknya satu hero masih hidup. Defeat terjadi saat seluruh hero tumbang. Tidak ada revive umum di tengah encounter. Campaign memerlukan kemenangan sebelum stage berikutnya disiapkan; Raid dan Roguelike memakai satu encounter per kontrak/floor. Hasil dan payout menggunakan settlement receipt untuk mencegah penyelesaian yang sama dibayar dua kali.
+Victory terjadi saat HP boss habis. Bila counter atau thorns menghabisi boss pada pukulan yang sama yang seharusnya menumbangkan hero terakhir, boss dihitung kalah lebih dulu: hero itu tetap berdiri dengan 1 HP dan hasilnya victory (tidak ada hero yang tumbang setelah boss kalah), sehingga wave berikutnya atau ruangan Undercroft berikutnya tidak dimulai tanpa hero hidup. Defeat terjadi saat seluruh hero tumbang sementara boss masih hidup. Tidak ada revive umum di tengah encounter. Campaign memerlukan kemenangan sebelum stage berikutnya disiapkan; Raid dan Roguelike memakai satu encounter per kontrak/floor. Hasil dan payout menggunakan settlement receipt untuk mencegah penyelesaian yang sama dibayar dua kali.
 
 ### Musuh
 
-Runtime memuat 12 archetype dengan 3 varian warna/tekanan per archetype, total 48 records musuh. Ashbound, Frostbound, dan Gilded masing-masing mengalikan HP menjadi 1,12/1,22/1,32 dan damage menjadi 1,05/1,10/1,15; tiap varian juga memendekkan interval dan memutar urutan intent.
+Runtime memuat 12 archetype dengan 3 varian warna/tekanan per archetype, total 48 records musuh. Ashbound, Frostbound, dan Gilded masing-masing mengalikan HP menjadi 1,12/1,22/1,32 dan damage menjadi 1,05/1,10/1,15; Frostbound dan Gilded juga memendekkan interval (0,3/0,6 detik) dan memutar urutan intent, sedangkan Ashbound mempertahankan urutan dan interval dasar. Deskripsi varian menyebutkan perbedaan itu.
 
 | Archetype | Nama dalam game | Pola utama |
 |---|---|---|
@@ -368,6 +375,19 @@ Sembilan basic job menentukan kit awal dan peran combat.
 | Engineer | Turret, repair, delay, dan stun; mengunci telegraph. | Lihat `data/database.json`. | Lihat `data/database.json`. |
 
 Setiap basic job memiliki delapan definisi skill, total 72. Empat skill dasar dan skill job membuka pilihan yang lebih spesifik. Promosi membuka skill job, tetapi tidak memasangnya otomatis; pemain harus memasukkannya sendiri ke salah satu dari dua slot. Promosi branch tier-2 terbuka pada campaign rank 4; tier-3 memerlukan rank 10 dan parent yang benar. Harga promosi yang didefinisikan adalah 180 Gold untuk tier-2 dan 420 Gold untuk tier-3.
+
+Setiap job tier-3 mempertahankan efek parent-nya dan membawa satu perk unik. Perk adalah data (`perk` pada job di `jobs.ts`) yang dibaca `Battle`, bukan daftar id job di simulasi:
+
+| Perk | Job tier-3 |
+|---|---|
+| Barrier awal 25% HP maksimum (juga langsung saat promosi Roguelike) | Aegis Sovereign, Veil Reaper, Bell Oracle, Maestro, Lich Warden |
+| Echo 40% power ke boss pada setiap cast ofensif kelima | Blade Saint, Astral Deadeye, Prismatic Archon, Plague Saint, Void Palm, Clockwright |
+| Setiap cast menunda intent berikutnya 0,25 detik (dalam anggaran kontrol) | Last Hourkeeper, Thunder Skald |
+| Setiap cast ofensif memulihkan diri 8% power skill | Crimson Warlord, Temple Wall |
+| Minion yang dibunuh hero ini memulihkan seluruh party 18 HP | Wild Warden, Demolisher |
+| 25% overheal dari heal hero ini menjadi barrier pada target | Ember Seraph |
+
+`tests/job-perks.test.ts` memeriksa bahwa setiap perk aktif di pertempuran dan bahwa deskripsi job (sumber, EN, dan ID) menyebut angka yang sama.
 
 ### Hero XP, party Story, dan talent
 

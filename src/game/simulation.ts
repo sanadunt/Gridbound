@@ -7,7 +7,7 @@ import { normalizeRaidBuild, validRaidBuild, type RaidBuild } from './raid-build
 import { KITS, ROSTER, GRID_SIZE, type ClassId, type Mode } from './content';
 import { CAMPAIGN, ENEMIES, BOONS, type Intent } from './world';
 import { getRaidContractForEnemy, normalizeRaidSandbox, sandboxRaidContract, validateRaidContract, WARD_RELIC, type RaidContract, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from '../economy/challenge';
-export type Hero = { offensiveActs:number; level:number; perks:ReturnType<typeof talentStats>; equipment:ReturnType<typeof gearStats>; id:number; name:string; classId:ClassId; slot:number; hp:number; maxHp:number; shield:number; stance:number; remaining:number; total:number; fatigue:number; lastTap:number; moveLock:number; buff:number; acts:number; talents:string[]; skills:number[]; regen:number; regenPower:number; rescued:boolean; combo:number; counterLeft:number; counterPower:number; job?:string; gear:Record<string,string>; gearPower:number; gearTempo:number };
+export type Hero = { offensiveActs:number; level:number; perks:ReturnType<typeof talentStats>; equipment:ReturnType<typeof gearStats>; id:number; name:string; classId:ClassId; slot:number; hp:number; maxHp:number; shield:number; stance:number; remaining:number; total:number; fatigue:number; lastTap:number; moveLock:number; buff:number; acts:number; talents:string[]; skills:number[]; regen:number; regenPower:number; regenSource:number; rescued:boolean; combo:number; counterLeft:number; counterPower:number; job?:string; gear:Record<string,string>; gearPower:number; gearTempo:number };
 export type Telegraph = { id:number; name:string; type:'front'|'meteor'|'breath'|'target'|'all'|'channel'; slots:number[]; effect?:'silence'|'mend'; left:number; total:number; targetId?:number; counter?:string; damage?:number };
 export type Minion = { id:number; lane:number; hp:number; maxHp:number; timer:number; enemyId?:string };
 export type BattleEvent = { type:string; source?:number; slot?:number; lane?:number; amount?:number; color?:string; text?:string; targets?:number[]; kind?:string };
@@ -30,6 +30,10 @@ export const MEND_HEAL=.05;
 // Heroic chapters: more HP, harder hits, faster intents, one potion and aftershocks after phase 2.
 export const HEROIC_HP=1.6,HEROIC_DMG=1.45,HEROIC_INTERVAL=.85;
 export const TELEGRAPH_SHARE=.5,CLAW_BASE=24,CLAW_EVERY=4.2,MINION_HIT=22;
+// Skill kinds that are not offensive casts: they never count toward precision, echoes, Second Thunder or cast leech.
+export const SUPPORT_KINDS:readonly string[]=['shield','partyshield','heal','regen','buff','haste','delay','stun','resolve','selfheal','repair','counter'];
+// Control budget: delay/stun/frost/intent-delay add at most max(CONTROL_MIN, CONTROL_SHARE × intent interval) seconds per intent cycle.
+export const CONTROL_MIN=3,CONTROL_SHARE=.4,CHORUS_BUFF=1,CHORUS_EVERY=4;
 const chapterHp=(floor:number)=>CHAPTER_HP[Math.min(CHAPTER_HP.length,floor)-1];
 const chapterDmg=(floor:number)=>CHAPTER_DMG[Math.min(CHAPTER_DMG.length,floor)-1];
 export class Battle {
@@ -42,13 +46,13 @@ export class Battle {
   bossHp=0; bossMax=0; enemyId='dragon'; enemyName=''; enemyTitle=''; stageName=''; stageCount=1;
   stagger=0; breakLeft=0; phase=1; resolve=25; gold=0; purse=120; potions=2;
   guardLeft=0; guardCooldown=0; markLeft=0; weakenLeft=0; repairUsed=false;
-  curse={left:0,power:0,source:-1,tick:1}; turrets:{lane:number;left:number;power:number;source:number;tick:number}[]=[];
+  curses:{source:number;left:number;power:number;tick:number}[]=[]; turrets:{lane:number;left:number;power:number;source:number;tick:number}[]=[];
   targetLane=-1; selected=0; damage=0; healed=0; blocked=0; dodged=0; taps=0; relocations=0;
   heroic=false; dungeon?:NonNullable<BattleOptions['dungeon']>;
   power=1; vitality=1; tempo=1; boons:string[]=[]; relics:string[]=[]; raidParty=1; settlementId=''; raidContract?: RaidContract; runWallet?: RunWallet; runAct?: 1|2|3; runActClear=false; runFinalClear=false;
   private seed=271828; private eventId=0; private pattern=0;
   private attackIn=5; private clawIn=7; private summonIn=18;
-  private lastTapped=-1; private castCount=0;
+  private lastTapped=-1; private castCount=0; private delayThisCycle=0; private chorusAt:Record<number,number>={};
   private delayed:{left:number;source:number;lane:number;power:number}[]=[];
   private options:BattleOptions={};
   constructor(mode:Mode='raid',floor=1,upgrades=defaultUpgrades,options:BattleOptions={}) { this.reset(mode,floor,upgrades,options); }
@@ -60,6 +64,7 @@ export class Battle {
     if (!['ready', 'victory', 'defeat'].includes(state.status)) throw new Error('Not an encounter boundary');
     Object.assign(this, structuredClone(state));
     this.events = [];
+    Reflect.deleteProperty(this, 'curse'); // pre-`curses` checkpoints carried one shared curse slot
   }
   random() { this.seed=(Math.imul(1664525,this.seed)+1013904223)>>>0; return this.seed/4294967296; }
   reset(mode:Mode,floor=1,upgrades=defaultUpgrades,options:BattleOptions={}) {
@@ -108,16 +113,16 @@ export class Battle {
       occupied.add(slot);
       const maxHp=Math.round(k.hp*this.vitality*stats.hp*perks.hp*growth.hp*(talents.includes('vigor')?1.18:1)*(talents.includes('vigor-2')?1.2:1));
       const total=k.skills[skills[0]].cooldown/(this.tempo*stats.tempo*perks.tempo*(talents.includes('focus')?1.1:1)*(talents.includes('focus-2')?1.08:1)*(JOBS[job??'']?.effect==='time'?1.15:1));
-      return {offensiveActs:0,level,perks,equipment:stats,id,name:r.name,classId:r.classId,slot,hp:maxHp,maxHp,shield:maxHp*Math.min(.6,perks.openingBarrier+(stats.openingBarrier??0)+(talents.includes('shelter')?.2:0)+(['aegis','veil','bell-oracle'].includes(job??'')?.25:0)+(ward?WARD_RELIC_BARRIER:0)),job,gear:loadout?.gear??{},gearPower:stats.power*perks.power*growth.power,gearTempo:stats.tempo*perks.tempo,stance:skills[0],remaining:1.2+i*.25,total,fatigue:0,lastTap:-10,moveLock:0,buff:0,acts:0,talents,skills,regen:0,regenPower:0,rescued:false,combo:0,counterLeft:0,counterPower:0};
+      return {offensiveActs:0,level,perks,equipment:stats,id,name:r.name,classId:r.classId,slot,hp:maxHp,maxHp,shield:maxHp*Math.min(.6,perks.openingBarrier+(stats.openingBarrier??0)+(talents.includes('shelter')?.2:0)+(JOBS[job??'']?.perk?.barrier??0)+(ward?WARD_RELIC_BARRIER:0)),job,gear:loadout?.gear??{},gearPower:stats.power*perks.power*growth.power,gearTempo:stats.tempo*perks.tempo,stance:skills[0],remaining:1.2+i*.25,total,fatigue:0,lastTap:-10,moveLock:0,buff:0,acts:0,talents,skills,regen:0,regenPower:0,regenSource:-1,rescued:false,combo:0,counterLeft:0,counterPower:0};
     });
     const extra=mode==='raid'||mode==='endless'?Math.max(0,Math.min(2,Math.floor(Number(options.extraPotions)||0))):0;
     this.time=0; this.gold=0; this.potions=(this.mode==='raid' && this.raidContract?.modifiers.includes('RM02') || this.heroic ? 1 : this.dungeon ? Math.max(0,Math.min(3,this.dungeon.potions??2)) : 2)+(ward?1:0)+extra;
     // Dungeon fights continue a run: heroes enter with the HP they left the last room with.
-    if(this.dungeon?.startHp)for(const h of this.heroes){const ratio=this.dungeon.startHp[h.id];if(typeof ratio==='number'&&Number.isFinite(ratio)){h.hp=Math.round(h.maxHp*Math.max(0,Math.min(1,ratio)));if(h.hp<=0){h.hp=0;h.shield=0;}}} this.resolve=25; this.taps=0; this.damage=0; this.healed=0; this.blocked=0; this.dodged=0; this.relocations=0; this.seed=271828; this.eventId=0; this.events=[]; this.castCount=0; this.lastTapped=-1; this.selected=this.heroes[0].id;
+    if(this.dungeon?.startHp)for(const h of this.heroes){const ratio=this.dungeon.startHp[h.id];if(typeof ratio==='number'&&Number.isFinite(ratio)){h.hp=Math.round(h.maxHp*Math.max(0,Math.min(1,ratio)));if(h.hp<=0){h.hp=0;h.shield=0;}}} this.resolve=25; this.taps=0; this.damage=0; this.healed=0; this.blocked=0; this.dodged=0; this.relocations=0; this.seed=271828; this.eventId=0; this.events=[]; this.castCount=0; this.lastTapped=-1; this.chorusAt={}; this.selected=this.heroes[0].id;
     this.prepareStage();
   }
   private prepareStage() {
-    this.status='ready'; this.stageTime=0; this.phase=1; this.pattern=0; this.threats=[]; this.minions=[]; this.delayed=[]; this.stagger=0; this.breakLeft=0; this.markLeft=0; this.targetLane=-1; this.weakenLeft=0; this.repairUsed=false; this.curse={left:0,power:0,source:-1,tick:1}; this.turrets=[];
+    this.status='ready'; this.stageTime=0; this.phase=1; this.pattern=0; this.threats=[]; this.minions=[]; this.delayed=[]; this.stagger=0; this.breakLeft=0; this.markLeft=0; this.targetLane=-1; this.weakenLeft=0; this.repairUsed=false; this.curses=[]; this.turrets=[]; this.delayThisCycle=0;
     for(const h of this.heroes){h.combo=0;h.counterLeft=0;}
     this.guardLeft=0; this.guardCooldown=0; this.attackIn=4.5; this.clawIn=7; this.summonIn=this.mode==='adventure'?10:16; this.purse=120;
     if(this.mode==='adventure') {
@@ -151,7 +156,7 @@ export class Battle {
     if(!promoteRogue(this.rogueBuild,id,jobId))return false;
     const h=this.hero(id)!,j=JOBS[jobId];
     h.job=jobId;h.skills=[0,j.index];h.stance=j.index;h.total=this.cooldown(h);h.remaining=h.total;
-    if(['aegis','veil','bell-oracle'].includes(jobId))h.shield=Math.max(h.shield,h.maxHp*.25);
+    if(j.perk?.barrier)h.shield=Math.max(h.shield,h.maxHp*j.perk.barrier);
     return true;
   }
   abandonRogue() {
@@ -175,7 +180,7 @@ export class Battle {
     const amount=((sync?.88:.64)+(h.talents.includes('momentum')?.2:0)+h.perks.tapBonus+(h.equipment.tapBonus??0))*(h.fatigue>70?.14:h.fatigue>40?.5:1);
     h.remaining=Math.max(0,h.remaining-amount);h.fatigue=Math.min(100,h.fatigue+5.5);h.lastTap=this.time;this.taps++;
     this.gainResolve(.3);
-    if(this.boons.includes('chorus')&&this.lastTapped!==id)h.buff=Math.max(h.buff,2);
+    if(this.boons.includes('chorus')&&this.lastTapped!==id&&this.time-(this.chorusAt[id]??-99)>=CHORUS_EVERY){h.buff=Math.max(h.buff,CHORUS_BUFF);this.chorusAt[id]=this.time;}
     this.lastTapped=id;
     this.emit({type:'tap',source:id,slot:h.slot,amount,text:sync?'SYNC!':`−${amount.toFixed(1)}s`});
     if(this.boons.includes('ember')&&this.taps%3===0)this.hitBoss(18*this.power,id,'fire');
@@ -212,13 +217,14 @@ export class Battle {
     if(this.phase!==oldPhase)this.emit({type:'phase',text:`${this.enemyName.toUpperCase()} · PHASE ${this.phase}`});
     if(this.phase>oldPhase&&this.pact('RM05'))this.summon();
     this.breakLeft=Math.max(0,this.breakLeft-dt);this.guardLeft=Math.max(0,this.guardLeft-dt);this.guardCooldown=Math.max(0,this.guardCooldown-dt);this.markLeft=Math.max(0,this.markLeft-dt);this.weakenLeft=Math.max(0,this.weakenLeft-dt);
-    if(this.curse.left>0){this.curse.left-=dt;this.curse.tick-=dt;if(this.curse.tick<=0){this.curse.tick+=1;this.hitBoss(this.curse.power,this.curse.source,'curse');}}
+    for(const c of this.curses){c.left-=dt;c.tick-=dt;if(c.tick<=0){c.tick+=1;this.hitBoss(c.power,c.source,'curse');}}
+    this.curses=this.curses.filter(c=>c.left>0);
     for(const t of this.turrets){t.left-=dt;t.tick-=dt;if(t.tick<=0){t.tick+=1;this.attack(t.source,t.lane,t.power,'arrow');}}
     this.turrets=this.turrets.filter(t=>t.left>0);
     for(const h of this.heroes){
       if(h.hp<=0)continue;
       h.moveLock=Math.max(0,h.moveLock-dt);h.buff=Math.max(0,h.buff-dt);h.counterLeft=Math.max(0,h.counterLeft-dt);
-      if(h.regen>0){this.heal(h,h.regenPower*dt);h.regen=Math.max(0,h.regen-dt);}
+      if(h.regen>0){this.heal(h,h.regenPower*dt,this.hero(h.regenSource));h.regen=Math.max(0,h.regen-dt);}
       if(this.time-h.lastTap>.5)h.fatigue=Math.max(0,h.fatigue-dt*32*(h.talents.includes('composure')?1.5:1));
       h.remaining=Math.max(0,h.remaining-dt*(h.buff>0?1.2:1));
       if(h.remaining<=0&&h.moveLock<=0){this.act(h);h.total=this.cooldown(h);h.remaining=h.total;}
@@ -226,7 +232,7 @@ export class Battle {
     for(const d of [...this.delayed]){d.left-=dt;if(d.left<=0){this.attack(d.source,d.lane,d.power,'burst');this.delayed.splice(this.delayed.indexOf(d),1);}}
     if(this.finish())return;
     this.attackIn-=dt;this.clawIn-=dt;this.summonIn-=dt;
-    if(this.attackIn<=0&&this.breakLeft<=0){this.telegraph();this.attackIn=(ENEMIES[this.enemyId].interval-(this.phase-1)*.6)*(this.raidSandbox?.intervalScale??1)*(this.heroic?HEROIC_INTERVAL:1);}
+    if(this.attackIn<=0&&this.breakLeft<=0){this.telegraph();this.attackIn=this.intentInterval();}
     if(this.clawIn<=0&&this.breakLeft<=0){const h=this.living().sort((a,b)=>a.slot-b.slot)[0];if(h){this.hurt(h,(CLAW_BASE+this.phase*6)*this.enemyScale());this.emit({type:'claw',slot:h.slot});}this.clawIn=CLAW_EVERY*(this.raidSandbox?.intervalScale??1);}
     if(this.summonIn<=0){this.summon();this.summonIn=25*(this.raidSandbox?.intervalScale??1);}
     for(const t of [...this.threats]){
@@ -240,16 +246,24 @@ export class Battle {
     this.minions=this.minions.filter(m=>m.hp>0);this.finish();
   }
   private finish() {
-    if(!this.living().length){this.status='defeat';this.abandonRogue();this.emit({type:'defeat'});return true;}
+    // Boss death is checked first: a boss that falls on the same frame as the last hero is a victory.
     if(this.bossHp<=0){this.status='victory';if(this.rogueBuild)rewardRogueRoom(this.rogueBuild,this.floor);this.gold+=this.mode==='adventure'?20+this.stage*12+this.floor*6:this.mode==='dungeon'?0:80+this.floor*15;this.emit({type:'victory'});return true;}
+    if(!this.living().length){this.status='defeat';this.abandonRogue();this.emit({type:'defeat'});return true;}
     return false;
   }
   enemyScale() { return (this.mode==='adventure'?chapterDmg(this.floor)*(this.heroic?HEROIC_DMG:1):this.mode==='dungeon'?chapterDmg(this.dungeon?.chapter??this.floor)*(this.dungeon?.damage??1):this.mode==='endless'?.82*Math.pow(ENDLESS_DMG_GROWTH,this.floor-1):RAID_DMG*chapterDmg(this.floor)*Math.pow(1.06,Math.max(0,this.floor-CAMPAIGN.length)))*(this.stageTime>150?1.7:1)*(this.mode==='raid'?(this.raidSandbox?.damageScale??1)*(this.raidTier()?.dmg??1)*Math.pow(Math.min(1,this.raidParty),RAID_PARTY_DMG):1); }
   /** The certified contract tier's scale; undefined outside rewarded raids (sandbox practice uses its sliders). */
   raidTier() { const c=this.mode==='raid'?this.raidContract:undefined;return c&&!c.sandbox?RAID_TIER_SCALE[c.tier]:undefined; }
+  /** Seconds between two telegraphs at the current phase. */
+  intentInterval() { return (ENEMIES[this.enemyId].interval-(this.phase-1)*.6)*(this.raidSandbox?.intervalScale??1)*(this.heroic?HEROIC_INTERVAL:1); }
+  /** Push the next intent back, within this cycle's control budget and the 14 s cap; returns the seconds actually added. */
+  private delayIntent(amount:number) {
+    const before=this.attackIn,room=Math.max(0,Math.max(CONTROL_MIN,CONTROL_SHARE*this.intentInterval())-this.delayThisCycle);
+    this.attackIn=Math.max(before,Math.min(14,before+Math.min(amount,room)));this.delayThisCycle+=this.attackIn-before;return this.attackIn-before;
+  }
   pact(id:RaidModifierId) { return this.mode==='raid'&&this.raidContract?.modifiers.includes(id)===true; }
   telegraph() {
-    const enemy=ENEMIES[this.enemyId],intent:Intent=enemy.patterns[this.pattern++%enemy.patterns.length];
+    const enemy=ENEMIES[this.enemyId],intent:Intent=enemy.patterns[this.pattern++%enemy.patterns.length];this.delayThisCycle=0;
     let slots:number[]=[],targetId:number|undefined,type:Telegraph['type']='meteor',name='',counter='',effect:Telegraph['effect'];
     const alive=this.living();if(!alive.length)return;
     if(intent==='weakest'||intent==='strongest'){
@@ -282,13 +296,13 @@ export class Battle {
     this.threats.push({id:this.eventId++,name:'AFTERSHOCK',type:'meteor',slots:[slot],left:5,total:5,damage:75,counter:'GROUND: ledakan kedua tertunda. Jangan buru-buru kembali ke tile ini.'});
     return slot;
   }
-  private skillPower(h:Hero) {
+  private skillPower(h:Hero,precise=false) {
     const s=KITS[h.classId].skills[h.stance],effect=JOBS[h.job??'']?.effect;
     let value=this.power*h.gearPower*(h.talents.includes('mastery')?1.18:1)*(h.talents.includes('mastery-2')?1.2:1);
     if(effect==='sanctuary'&&['shield','partyshield'].includes(s.kind))value*=1.35;
     if(effect==='rage'&&h.hp/h.maxHp<.5)value*=1.4;
     if(effect==='execute'&&this.bossHp/this.bossMax<.4)value*=1.35;
-    if(effect==='precision'&&h.acts%3===0)value*=1.6;
+    if(effect==='precision'&&precise)value*=1.6;
     if(effect==='mercy'&&['heal','regen'].includes(s.kind))value*=1.3;
     if(effect==='elements'&&s.kind==='aoe')value*=1.3;
     return value;
@@ -303,41 +317,42 @@ export class Battle {
   }
   act(h:Hero) {
     if(h.hp<=0)return;
-    const s=KITS[h.classId].skills[h.stance];h.acts++;
-    let p=s.power*this.skillPower(h)*(h.buff>0?1.3:1);const lane=h.slot%3;
-    if(['heal','regen'].includes(s.kind))p*=1+h.perks.heal+(h.equipment.heal??0);
+    const s=KITS[h.classId].skills[h.stance],job=JOBS[h.job??''],perk=job?.perk,offensive=!SUPPORT_KINDS.includes(s.kind);h.acts++;
+    if(offensive){this.castCount++;h.offensiveActs++;}
+    let p=s.power*this.skillPower(h,offensive&&h.offensiveActs%3===0)*(h.buff>0?1.3:1);const lane=h.slot%3,heals=1+h.perks.heal+(h.equipment.heal??0);
+    if(['heal','regen'].includes(s.kind))p*=heals;
     if(['shield','partyshield'].includes(s.kind))p*=1+h.perks.shield+(h.equipment.shield??0);
     this.emit({type:'cast',source:h.id,slot:h.slot,kind:s.kind,text:s.name,color:KITS[h.classId].color});
-    if(h.talents.includes('resolve')||JOBS[h.job??'']?.effect==='hymn')this.gainResolve(2);
-    if(h.job==='hourkeeper')this.attackIn=Math.min(14,this.attackIn+.25);
-    if(this.boons.includes('frost'))this.attackIn=Math.min(14,this.attackIn+.16);
+    if(h.talents.includes('resolve')||job?.effect==='hymn')this.gainResolve(2);
+    if(perk?.intentDelay)this.delayIntent(perk.intentDelay);
+    if(this.boons.includes('frost')){this.delayIntent(.16);this.gainResolve(1);}
     if(s.kind==='shield'||s.kind==='partyshield'){
       this.living().filter(a=>s.kind==='partyshield'||a.slot%3===lane).forEach(a=>this.shield(a,p));
       if(h.classId==='rogue')h.buff=Math.max(2,h.buff);
     }else if(s.kind==='heal'){
-      const lowest=this.living().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(lowest)this.heal(lowest,p);this.living().forEach(a=>this.heal(a,20*this.power));
+      const lowest=this.living().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(lowest)this.heal(lowest,p,h);this.living().forEach(a=>this.heal(a,20*this.power,h));
     }else if(s.kind==='regen'){
-      this.living().forEach(a=>{a.regen=6;a.regenPower=p;});
+      // Overlapping regens keep the stronger flow; a recast refreshes the duration instead of stacking.
+      this.living().forEach(a=>{if(a.regen<=0||p>=a.regenPower){a.regenPower=p;a.regenSource=h.id;}a.regen=Math.max(a.regen,6);});
     }else if(s.kind==='buff'){
-      this.living().forEach(a=>{a.buff=JOBS[h.job??'']?.effect==='hymn'?10:7;this.emit({type:'buff',source:a.id,slot:a.slot});});
+      this.living().forEach(a=>{a.buff=Math.max(a.buff,job?.effect==='hymn'?10:7);this.emit({type:'buff',source:a.id,slot:a.slot});});
     }else if(s.kind==='haste'){
       // Seconds, not power: gear and level make it stronger only slightly so tempo cannot run away.
       const seconds=s.power*Math.min(1.5,1+(this.skillPower(h)-1)*.2);
       this.living().forEach(a=>{if(a!==h)a.remaining=Math.max(0,a.remaining-seconds);this.emit({type:'buff',source:a.id,slot:a.slot});});
     }else if(s.kind==='delay'||s.kind==='stun'){
-      this.attackIn=Math.min(14,this.attackIn+s.power);
+      this.delayIntent(s.power);
       if(s.kind==='stun')this.addStagger(120*this.skillPower(h));
       this.emit({type:'break',text:s.kind==='stun'?'STUNNED':'LULLED'});
     }else if(s.kind==='resolve'){
       this.gainResolve(s.power);
     }else if(s.kind==='selfheal'){
-      this.heal(h,h.maxHp*s.power*Math.min(1.5,1+(this.skillPower(h)-1)*.3));h.fatigue=0;
+      this.heal(h,h.maxHp*s.power*Math.min(1.5,1+(this.skillPower(h)-1)*.3),h);h.fatigue=0;
     }else if(s.kind==='repair'){
       if(!this.repairUsed&&this.potions<3){this.potions++;this.repairUsed=true;this.emit({type:'buff',source:h.id,slot:h.slot,text:'+1 POTION'});}
     }else if(s.kind==='counter'){
       h.counterLeft=3.5;h.counterPower=p;
     }else{
-      this.castCount++;h.offensiveActs++;
       if(s.kind==='interrupt'){
         const active=this.threats.filter(t=>t.type==='all'||t.type==='channel');this.threats=this.threats.filter(t=>t.type!=='all'&&t.type!=='channel');
         if(active.length)this.emit({type:'break',text:'RITUAL INTERRUPTED'});
@@ -347,9 +362,10 @@ export class Battle {
       }else if(s.kind==='weaken'){
         this.hitBoss(p,h.id,'magic');this.weakenLeft=5;
       }else if(s.kind==='curse'){
-        this.curse={left:6,power:p,source:h.id,tick:Math.min(1,this.curse.left>0?this.curse.tick:1)};
+        // One curse per hexer: a recast refreshes only that caster's curse and keeps its tick phase.
+        const old=this.curses.find(c=>c.source===h.id);this.curses=this.curses.filter(c=>c!==old);this.curses.push({source:h.id,left:6,power:p,tick:old?Math.min(1,old.tick):1});
       }else if(s.kind==='drain'){
-        this.attack(h.id,lane,p,'magic');const lowest=this.living().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(lowest)this.heal(lowest,p*.5);
+        this.attack(h.id,lane,p,'magic');const lowest=this.living().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(lowest)this.heal(lowest,p*.5*heals,h);
       }else if(s.kind==='sacrifice'){
         const cost=Math.min(h.hp-1,Math.round(h.maxHp*.08));if(cost>0){h.hp-=cost;this.emit({type:'hurt',source:h.id,slot:h.slot,amount:cost,text:'PACT'});}this.hitBoss(p,h.id,'magic');
       }else if(s.kind==='combo'){
@@ -366,19 +382,21 @@ export class Battle {
       }else if(h.classId==='wizard'&&h.stance===2){this.delayed.push({left:1.5,source:h.id,lane:this.targetLane,power:p});this.emit({type:'bomb',source:h.id,lane:this.targetLane});}
       else this.attack(h.id,(h.classId==='archer'||h.classId==='wizard')?this.targetLane:lane,p,h.classId==='archer'?'arrow':h.classId==='wizard'?'magic':'slash');
       if(h.perks.echo&&h.offensiveActs%5===0)this.hitBoss(p*h.perks.echo,h.id,'magic');
-      if(h.perks.leech)this.heal(h,p*h.perks.leech);
+      if(h.perks.leech)this.heal(h,p*h.perks.leech*heals,h);
       if(this.boons.includes('storm')&&this.castCount%5===0)this.hitBoss(p*.55,h.id,'magic');
-      if(['blade-saint','starshot','archon'].includes(h.job??'')&&h.acts%5===0)this.hitBoss(p*.4,h.id,'magic');
-      if(JOBS[h.job??'']?.effect==='leech'||h.job==='warlord')this.heal(h,p*(h.job==='warlord'?.08:.12));
+      if(perk?.echo&&h.offensiveActs%5===0)this.hitBoss(p*perk.echo,h.id,'magic');
+      if(job?.effect==='leech')this.heal(h,p*.12*heals,h);
+      if(perk?.castLeech)this.heal(h,p*perk.castLeech*heals,h);
     }
   }
   attack(source:number,lane:number,power:number,kind:string) { const m=this.minions.find(m=>m.lane===lane&&m.hp>0);if(m)this.hitMinion(m,power,source,kind);else this.hitBoss(power,source,kind); }
   hitMinion(m:Minion,amount:number,source:number,kind:string) {
     if(m.hp<=0||!Number.isFinite(amount)||amount<=0)return;
-    if(JOBS[this.hero(source)?.job??'']?.effect==='hunter')amount*=1.45;
-    amount*=1+(this.hero(source)?.perks.minionDamage??0);
+    const killer=this.hero(source),minionHeal=JOBS[killer?.job??'']?.perk?.minionHeal;
+    if(JOBS[killer?.job??'']?.effect==='hunter')amount*=1.45;
+    amount*=(1+(killer?.perks.minionDamage??0))*(this.markLeft>0?1.2:1);
     const actual=Math.min(m.hp,amount);m.hp=Math.max(0,m.hp-amount);this.damage+=actual;this.gainResolve(actual*.008);this.emit({type:'projectile',source,lane:m.lane,amount:actual,kind});
-    if(m.hp===0&&this.hero(source)?.job==='wildwarden')this.living().forEach(h=>this.heal(h,18));
+    if(m.hp===0&&minionHeal)this.living().forEach(h=>this.heal(h,minionHeal,killer));
     if(m.hp===0){this.emit({type:'minionDown',lane:m.lane});if(this.boons.includes('feast'))this.living().forEach(h=>this.heal(h,24));}
   }
   addStagger(amount:number) {
@@ -395,13 +413,14 @@ export class Battle {
     this.emit({type:'projectile',source,lane:-1,amount:dmg,kind});
   }
   private shield(h:Hero,amount:number) { if(h.hp<=0)return;const gained=Math.min(h.maxHp*.6-h.shield,amount*(this.pact('RM01')?RM01_BARRIER:1));h.shield+=Math.max(0,gained);if(gained>1)this.emit({type:'shield',source:h.id,slot:h.slot,amount:gained}); }
-  heal(h:Hero,amount:number) {
+  /** Heal a hero; `source` is the healer, whose job perk can turn overheal on the target into barrier (Ember Seraph). */
+  heal(h:Hero,amount:number,source?:Hero) {
     if(h.hp<=0||!Number.isFinite(amount)||amount<=0)return;
     if(h.talents.includes('recovery'))amount*=1.15;
-    const value=Math.min(amount,h.maxHp-h.hp);h.hp+=value;this.healed+=value;
-    if(h.job==='seraph')this.shield(h,(amount-value)*.25);
-    if(h.perks.overheal)this.shield(h,(amount-value)*h.perks.overheal);
-    if(this.boons.includes('tide'))this.shield(h,(amount-value)*.35);
+    const value=Math.min(amount,h.maxHp-h.hp),over=amount-value,barrier=JOBS[source?.job??'']?.perk?.overhealBarrier;h.hp+=value;this.healed+=value;
+    if(barrier)this.shield(h,over*barrier);
+    if(h.perks.overheal)this.shield(h,over*h.perks.overheal);
+    if(this.boons.includes('tide'))this.shield(h,over*.35);
     if(value>1)this.emit({type:'heal',source:h.id,slot:h.slot,amount:value});
   }
   hurt(h:Hero,amount:number) {
@@ -415,9 +434,11 @@ export class Battle {
     const dmg=Math.round(amount-absorbed);h.hp=Math.max(0,h.hp-dmg);this.gainResolve(amount*.028);
     if(this.boons.includes('thorn'))this.hitBoss((absorbed+guard)*.35,h.id,'thorn');
     if(h.perks.thorns)this.hitBoss((absorbed+guard)*h.perks.thorns,h.id,'thorn');
+    // Nobody is downed once the boss has fallen: a counter or thorn kill on this hit leaves the hero standing at 1 HP.
+    if(h.hp===0&&this.bossHp<=0)h.hp=1;
     this.emit({type:'hurt',source:h.id,slot:h.slot,amount:dmg,text:absorbed+guard>0?'BLOCK':''});
     if(h.hp===0&&this.boons.includes('lifeline')&&!h.rescued){h.rescued=true;h.hp=Math.round(h.maxHp*.2);this.emit({type:'heal',source:h.id,slot:h.slot,amount:h.hp,text:'NOT YET'});}
     else if(h.hp===0)this.emit({type:'down',source:h.id,slot:h.slot});
   }
-  snapshot() { return {rogueBuild:this.rogueBuild?normalizeRogueBuild(this.rogueBuild):undefined,status:this.status,mode:this.mode,floor:this.floor,stage:this.stage,stageCount:this.stageCount,enemyId:this.enemyId,time:this.time,bossHp:this.bossHp,bossMax:this.bossMax,phase:this.phase,resolve:this.resolve,gold:this.gold,taps:this.taps,relocations:this.relocations,potions:this.potions,guardLeft:this.guardLeft,guardCooldown:this.guardCooldown,boons:[...this.boons],heroes:this.heroes.map(h=>({...h,skills:[...h.skills],talents:[...h.talents]})),threats:this.threats.map(t=>({...t,slots:[...t.slots]})),minions:this.minions.map(m=>({...m}))}; }
+  snapshot() { return {rogueBuild:this.rogueBuild?normalizeRogueBuild(this.rogueBuild):undefined,status:this.status,mode:this.mode,floor:this.floor,stage:this.stage,stageCount:this.stageCount,enemyId:this.enemyId,time:this.time,bossHp:this.bossHp,bossMax:this.bossMax,phase:this.phase,resolve:this.resolve,gold:this.gold,taps:this.taps,relocations:this.relocations,potions:this.potions,guardLeft:this.guardLeft,guardCooldown:this.guardCooldown,boons:[...this.boons],curses:this.curses.map(c=>({...c})),heroes:this.heroes.map(h=>({...h,skills:[...h.skills],talents:[...h.talents]})),threats:this.threats.map(t=>({...t,slots:[...t.slots]})),minions:this.minions.map(m=>({...m}))}; }
 }

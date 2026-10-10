@@ -38,10 +38,10 @@ const AUTHORED: Record<string, ContentText> = {
   "kit.rogue.skills.2.description": { en: "42 damage and marks the boss for 4 seconds: all attacks deal +20% damage.", id: "42 damage dan tandai boss selama 4 detik: semua serangan +20% damage." },
   "kit.rogue.skills.3.description": { en: "40 shield for the whole party and a 2-second buff for yourself.", id: "40 shield untuk seluruh party dan 2 detik buff untuk diri sendiri." },
   "kit.archer.role": { en: "Hunter of minions and weak points", id: "Pemburu minion dan weak point" },
-  "kit.archer.skills.0.description": { en: "62 damage split among minions; if the lane is clear, every arrow strikes the boss.", id: "62 damage terbagi ke minion; jika lane bersih, semua panah mengenai boss." },
+  "kit.archer.skills.0.description": { en: "105 damage shared evenly among all minions; with no minions up, 62 damage hits the boss.", id: "105 damage dibagi rata ke semua minion; jika tidak ada minion, 62 damage ke boss." },
   "kit.archer.skills.1.description": { en: "96 damage to a chosen target. Click an enemy lane to take aim.", id: "96 damage pada target pilihan. Klik salah satu lane musuh untuk mengarahkan." },
   "kit.archer.skills.2.description": { en: "61 damage to the boss and breaks all-grid rituals. Only available if equipped before setting out.", id: "61 damage ke boss dan putus ritual all-grid. Hanya tersedia jika dipasang sebelum berangkat." },
-  "kit.archer.skills.3.description": { en: "105 power split among minions, or all of it into the boss when the lane is clear.", id: "105 power dibagi ke minion, atau seluruhnya ke boss saat lane bersih." },
+  "kit.archer.skills.3.description": { en: "179 damage shared evenly among all minions; with no minions up, 105 damage hits the boss.", id: "179 damage dibagi rata ke semua minion; jika tidak ada minion, 105 damage ke boss." },
   "kit.healer.role": { en: "Recovery and party tempo", id: "Pemulihan dan tempo party" },
   "kit.healer.skills.0.description": { en: "Restores 78 HP to the most wounded ally and 20 HP to the whole party.", id: "Pulihkan 78 HP rekan paling terluka dan 20 HP pada seluruh party." },
   "kit.healer.skills.1.description": { en: "The whole party gains +30% damage and +20% cooldown speed for 7 seconds.", id: "Seluruh party mendapat +30% damage dan +20% kecepatan cooldown selama 7 detik." },
@@ -49,7 +49,7 @@ const AUTHORED: Record<string, ContentText> = {
   "kit.healer.skills.3.description": { en: "Restores 12 HP per second to the whole party for 6 seconds. Recasting refreshes the duration instead of stacking.", id: "Pulihkan seluruh party 12 HP per detik selama 6 detik. Recast memperbarui durasi, bukan menumpuk." },
   "kit.wizard.role": { en: "Huge burst, long cooldowns", id: "Burst besar, cooldown panjang" },
   "kit.wizard.skills.0.description": { en: "98 magic damage to the boss or a chosen lane target.", id: "98 magic damage ke boss atau target lane pilihan." },
-  "kit.wizard.skills.1.description": { en: "A blast dealing 160 damage to the boss and 95 damage to every minion. Long cooldown.", id: "Ledakan 160 damage ke boss dan 95 damage ke setiap minion. Cooldown panjang." },
+  "kit.wizard.skills.1.description": { en: "A blast dealing 160 damage to the boss and 96 damage (60%) to every minion. Long cooldown.", id: "Ledakan 160 damage ke boss dan 96 damage (60%) ke setiap minion. Cooldown panjang." },
   "kit.wizard.skills.2.description": { en: "A seal that detonates after 1.5 seconds: 210 damage. Time it with the Break window.", id: "Segel meledak setelah 1,5 detik: 210 damage. Tepatkan dengan jendela Break." },
   "kit.wizard.skills.3.description": { en: "100 damage and breaks all-grid rituals. A powerful control window on a long cooldown.", id: "100 damage dan putus ritual all-grid. Jendela kontrol kuat dengan cooldown panjang." },
   "job.paladin.description": { en: "Shields you grant are 35% stronger. Holding your lane becomes the party's source of defense.", id: "Shield yang diberikan +35%. Menjaga lane menjadi sumber pertahanan party." },
@@ -59,7 +59,7 @@ const AUTHORED: Record<string, ContentText> = {
   "job.aegis.description": { en: "Sanctuary stays active. Begin every expedition with a barrier worth 25% of max HP.", id: "Sanctuary tetap aktif. Mulai tiap expedition dengan barrier 25% max HP." },
   "job.aegis.skill.description": { en: "122 barrier for the whole party. The answer to pressure across the entire grid.", id: "122 barrier ke seluruh party. Jawaban untuk tekanan seluruh grid." },
   "job.warlord.description": { en: "Rage stays active; every offensive cast restores 8% of skill power.", id: "Rage tetap aktif; setiap cast ofensif memulihkan 8% power skill." },
-  "job.warlord.skill.description": { en: "220 damage to the boss and 55% power to every minion.", id: "220 damage ke boss, 55% power ke setiap minion." },
+  "job.warlord.skill.description": { en: "220 damage to the boss and 60% power to every minion.", id: "220 damage ke boss, 60% power ke setiap minion." },
   "job.duelist.description": { en: "Offensive casts restore 12% of power. Long duels become a source of sustain.", id: "Cast ofensif memulihkan 12% power. Duel panjang menjadi sumber sustain." },
   "job.duelist.skill.description": { en: "70 damage plus recovery from Leech.", id: "70 damage dan pemulihan dari Leech." },
   "job.shade.description": { en: "Power +35% while the main enemy is below 40% HP.", id: "Power +35% ketika musuh utama di bawah 40% HP." },
@@ -71,7 +71,7 @@ const AUTHORED: Record<string, ContentText> = {
   "job.marksman.description": { en: "Every third offensive cast deals 1.6× power; no RNG involved.", id: "Setiap cast ofensif ketiga menghasilkan 1,6× power; tidak bergantung RNG." },
   "job.marksman.skill.description": { en: "142 directed damage. Aims at a chosen lane or the boss.", id: "142 directed damage. Mengincar lane pilihan atau boss." },
   "job.ranger.description": { en: "All attacks against minions +45%. Clearing lanes opens up the boss.", id: "Semua serangan ke minion +45%. Membersihkan lane membuka boss." },
-  "job.ranger.skill.description": { en: "116 power split among minions; all of it into the boss if the lane is clear.", id: "116 power dibagi ke minion; semuanya ke boss jika lane bersih." },
+  "job.ranger.skill.description": { en: "197 damage shared evenly among all minions; with no minions up, 116 damage hits the boss.", id: "197 damage dibagi rata ke semua minion; jika tidak ada minion, 116 damage ke boss." },
   "job.starshot.description": { en: "Precision stays active. The fifth offensive cast produces a 40% echo.", id: "Precision tetap aktif. Cast ofensif kelima menghasilkan echo 40%." },
   "job.starshot.skill.description": { en: "244 directed damage. Precision timing decides the burst.", id: "244 directed damage. Timing Precision menentukan burst." },
   "job.wildwarden.description": { en: "Hunter stays active. Slaying a minion restores 18 HP to the party.", id: "Hunter tetap aktif. Membunuh minion memulihkan party 18 HP." },
@@ -85,12 +85,12 @@ const AUTHORED: Record<string, ContentText> = {
   "job.bell-oracle.description": { en: "Hymn stays active. Begin each expedition with a 25% HP barrier.", id: "Hymn tetap aktif. Mulai expedition dengan barrier 25% HP." },
   "job.bell-oracle.skill.description": { en: "96 damage and cancels rituals. Adds Resolve through Hymn.", id: "96 damage dan batalkan ritual. Menambah Resolve dari Hymn." },
   "job.elementalist.description": { en: "AoE skill power +30%. Mage AoE still strikes both the boss and minions.", id: "Power skill AoE +30%. AoE mage tetap menghantam boss dan minion." },
-  "job.elementalist.skill.description": { en: "190 damage to the boss and 55% to every minion, before the Elements bonus.", id: "190 damage ke boss, 55% ke setiap minion, sebelum bonus Elements." },
+  "job.elementalist.skill.description": { en: "190 damage to the boss and 60% to every minion, before the Elements bonus.", id: "190 damage ke boss, 60% ke setiap minion, sebelum bonus Elements." },
   "job.chronist.description": { en: "All of this hero's cooldowns run 15% faster.", id: "Semua cooldown milik hero ini 15% lebih cepat." },
   "job.chronist.skill.description": { en: "101 damage and breaks rituals. Cooldown hastened by Chronist.", id: "101 damage dan memutus ritual. Cooldown dipercepat Chronist." },
   "job.archon.description": { en: "Elements stays active. The fifth offensive cast produces a 40% echo.", id: "Elements tetap aktif. Cast ofensif kelima menghasilkan echo 40%." },
-  "job.archon.skill.description": { en: "280 damage to the boss and 55% to minions; the Elements bonus applies.", id: "280 damage ke boss, 55% ke minion; bonus Elements berlaku." },
-  "job.hourkeeper.description": { en: "Chronist tempo stays active. Every cast delays the next intent by 0.25 seconds.", id: "Tempo Chronist tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik." },
+  "job.archon.skill.description": { en: "280 damage to the boss and 60% to minions; the Elements bonus applies.", id: "280 damage ke boss, 60% ke minion; bonus Elements berlaku." },
+  "job.hourkeeper.description": { en: "Chronist tempo stays active. Every cast delays the next intent by 0.25 seconds. Stacked delays are capped per intent.", id: "Tempo Chronist tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik. Tunda bertumpuk dibatasi per intent." },
   "job.hourkeeper.skill.description": { en: "147 damage and breaks rituals; pushes back the schedule of the next intent.", id: "147 damage dan putus ritual; mendorong mundur jadwal intent berikutnya." },
   "gearSet.scout.description": { en: "2 pieces: tap +0.08s. 3 pieces: opening barrier of 10% HP.", id: "2 bagian: tap +0,08s. 3 bagian: barrier awal 10% HP." },
   "gearSet.wind.description": { en: "2 pieces: tap +0.10s. 3 pieces: incoming damage −5%.", id: "2 bagian: tap +0,10s. 3 bagian: damage masuk −5%." },
@@ -413,13 +413,13 @@ const AUTHORED: Record<string, ContentText> = {
   "boon.execution.patron": { en: "ASH · EXECUTE", id: "ABU · EXECUTE" },
   "boon.execution.description": { en: "Damage to a boss below 30% HP is increased by 40%. A final burst for the most dangerous phase.", id: "Damage ke boss di bawah 30% HP meningkat 40%. Ledakan akhir saat phase paling berbahaya." },
   "boon.frost.patron": { en: "FROST · CONTROL", id: "BEKU · KONTROL" },
-  "boon.frost.description": { en: "Every cast delays the next intent by 0.16 seconds. Active telegraphs keep running.", id: "Setiap cast memperlambat jadwal intent berikutnya 0,16 detik. Telegraph aktif tetap berjalan." },
+  "boon.frost.description": { en: "Every cast delays the next intent by 0.16 seconds and adds 1 Resolve. Stacked delays are capped per intent; active telegraphs keep running.", id: "Setiap cast memperlambat jadwal intent berikutnya 0,16 detik dan menambah 1 Resolve. Tunda bertumpuk dibatasi per intent; telegraph aktif tetap berjalan." },
   "boon.feast.patron": { en: "HARVEST · MINIONS", id: "PANEN · MINION" },
   "boon.feast.description": { en: "Every fallen minion restores 24 HP to the whole party. Never ignore summons.", id: "Setiap minion tumbang memulihkan 24 HP seluruh party. Jangan abaikan summon." },
   "boon.lifeline.patron": { en: "HEARTH · SURVIVAL", id: "PERAPIAN · BERTAHAN" },
   "boon.lifeline.description": { en: "Once per hero per floor, a fatal blow leaves you at 20% HP. A second chance, not invincibility.", id: "Sekali per hero per floor, pukulan fatal menyisakan 20% HP. Kesempatan kedua, bukan kebal." },
   "boon.chorus.patron": { en: "CHORUS · ROTATION", id: "PADUAN · ROTASI" },
-  "boon.chorus.description": { en: "Tapping a different hero than your previous tap grants that hero Battle Hymn for 2 seconds (+30% power, +20% tempo).", id: "Tap hero berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 2 detik (+30% power, +20% tempo)." },
+  "boon.chorus.description": { en: "Tapping a different hero than your previous tap grants that hero Battle Hymn for 1 second (+30% power, +20% tempo), at most once per hero every 4 seconds.", id: "Tap hero berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 1 detik (+30% power, +20% tempo), maksimal sekali per hero setiap 4 detik." },
   "choice.school.title": { en: "A bell for the school", id: "Lonceng untuk sekolah" },
   "choice.school.text": { en: "The townsfolk find a small bell in the ruins. Where should they take it?", id: "Warga menemukan lonceng kecil di reruntuhan. Ke mana mereka harus membawanya?" },
   "choice.school.options.restore.label": { en: "Return it to the school", id: "Kembalikan ke sekolah" },
@@ -561,14 +561,14 @@ function derived(): Record<string, ContentText> {
     const title = pair(`enemy.${base.id}.title`, base.title);
     const description = pair(`enemy.${base.id}.description`, base.description);
     const counter = pair(`enemy.${base.id}.counter`, base.counter);
-    for (const v of VARIANTS) {
+    for (const [i, v] of VARIANTS.entries()) {
       const id = `${base.id}-${v.id}`;
       if (!ENEMIES[id]) continue;
       const tag = v.name.toUpperCase();
       if (title.en !== title.id) out[`enemy.${id}.title`] = { en: `${tag} · ${title.en}`, id: `${tag} · ${title.id}` };
       out[`enemy.${id}.description`] = {
-        en: `${description.en} ${v.name} variant: the intent order shifts and the pressure mounts.`,
-        id: `${description.id} Varian ${v.name}: urutan intent bergeser dan tekanan meningkat.`,
+        en: `${description.en} ${v.name} variant: ${i ? 'the intent order shifts, intents come faster,' : 'same intent order,'} more HP and damage.`,
+        id: `${description.id} Varian ${v.name}: ${i ? 'urutan intent bergeser, intent datang lebih cepat,' : 'urutan intent sama,'} HP dan damage lebih tinggi.`,
       };
       if (counter.en !== counter.id) out[`enemy.${id}.counter`] = counter;
     }

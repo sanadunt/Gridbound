@@ -23,7 +23,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   choir:{id:'choir',name:'The Hollow Choir',title:'BELL CHOIR',description:'Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka.',counter:'Idealnya dua interrupt: satu untuk Lonceng Senyap, satu untuk Ritus Pemulihan. Guard menahan ritual grid.',patterns:['silence','strongest','all','mend'],hp:1.15,damage:100,interval:8.5},
 };
 export const VARIANTS=[{id:'ash',name:'Ashbound',tint:0xf1b39a,hp:1.12,damage:1.05},{id:'frost',name:'Frostbound',tint:0xa6d6ff,hp:1.22,damage:1.1},{id:'auric',name:'Gilded',tint:0xffd79a,hp:1.32,damage:1.15}];
-for(const enemy of Object.values(ENEMIES)){enemy.archetype=enemy.id;enemy.tier=1;for(const [i,v] of VARIANTS.entries()){const id=`${enemy.id}-${v.id}`;ENEMIES[id]={...enemy,id,name:`${v.name} ${enemy.name}`,title:`${v.name.toUpperCase()} · ${enemy.title}`,tint:v.tint,tier:i+2,hp:enemy.hp*v.hp,damage:Math.round(enemy.damage*v.damage),interval:enemy.interval-i*.3,patterns:[...enemy.patterns.slice(i%enemy.patterns.length),...enemy.patterns.slice(0,i%enemy.patterns.length)],description:`${enemy.description} Varian ${v.name}: urutan intent bergeser dan tekanan meningkat.`};}}
+for(const enemy of Object.values(ENEMIES)){enemy.archetype=enemy.id;enemy.tier=1;for(const [i,v] of VARIANTS.entries()){const id=`${enemy.id}-${v.id}`;ENEMIES[id]={...enemy,id,name:`${v.name} ${enemy.name}`,title:`${v.name.toUpperCase()} · ${enemy.title}`,tint:v.tint,tier:i+2,hp:enemy.hp*v.hp,damage:Math.round(enemy.damage*v.damage),interval:enemy.interval-i*.3,patterns:[...enemy.patterns.slice(i%enemy.patterns.length),...enemy.patterns.slice(0,i%enemy.patterns.length)],description:`${enemy.description} Varian ${v.name}: ${i?'urutan intent bergeser, intent datang lebih cepat,':'urutan intent sama,'} HP dan damage lebih tinggi.`};}}
 export type StageDef = { enemy: EnemyId; kind:'wave'|'miniboss'|'boss'; name:string; hp:number; beat?:string };
 export type CampaignDef = { id:string; name:string; subtitle:string; speaker:string; intro:string; outro:string; recruit:number[]; reward:number; stages:StageDef[] };
 export const CAMPAIGN: CampaignDef[] = [
@@ -47,10 +47,10 @@ export const BOONS: BoonDef[] = [
   {id:'fleet',name:'Dancer in Ash',patron:'GALE · MOVEMENT',description:'Penalti relokasi turun dari 0,9 ke 0,2 detik. Hero yang dipindah mendapat 30 shield.'},
   {id:'resolve',name:'Dawn Runs Deep',patron:'DAWN · ULTIMATE',description:'Seluruh sumber Resolve mengisi 60% lebih cepat. Lebih banyak Ninefold Dawn dalam satu fight.'},
   {id:'execution',name:'Last Light',patron:'ASH · EXECUTE',description:'Damage ke boss di bawah 30% HP meningkat 40%. Ledakan akhir saat phase paling berbahaya.'},
-  {id:'frost',name:'Winter Between Beats',patron:'FROST · CONTROL',description:'Setiap cast memperlambat jadwal intent berikutnya 0,16 detik. Telegraph aktif tetap berjalan.'},
+  {id:'frost',name:'Winter Between Beats',patron:'FROST · CONTROL',description:'Setiap cast memperlambat jadwal intent berikutnya 0,16 detik dan menambah 1 Resolve. Tunda bertumpuk dibatasi per intent; telegraph aktif tetap berjalan.'},
   {id:'feast',name:'For the Living',patron:'HARVEST · MINIONS',description:'Setiap minion tumbang memulihkan 24 HP seluruh party. Jangan abaikan summon.'},
   {id:'lifeline',name:'Not Yet, Little Flame',patron:'HEARTH · SURVIVAL',description:'Sekali per hero per floor, pukulan fatal menyisakan 20% HP. Kesempatan kedua, bukan kebal.'},
-  {id:'chorus',name:'Many Hands, One Song',patron:'CHORUS · ROTATION',description:'Tap hero berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 2 detik (+30% power, +20% tempo).'},
+  {id:'chorus',name:'Many Hands, One Song',patron:'CHORUS · ROTATION',description:'Tap hero berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 1 detik (+30% power, +20% tempo), maksimal sekali per hero setiap 4 detik.'},
 ];
 /** A seeded boon draft of `count` not-yet-owned boons (3, or 4 with the Fate Relic). */
 export function boonChoices(owned: string[], seed: number, count = 3): BoonDef[] {

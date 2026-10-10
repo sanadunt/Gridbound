@@ -53,9 +53,9 @@ Each basic job branches into two mutually exclusive advanced jobs at campaign ra
 | healer | Dawn Priest → Ember Seraph | Heal dan regenerasi yang diberikan +30%. / Mercy tetap aktif. 25% overheal berubah menjadi barrier. | Sunwell → Second Sunrise |
 | healer | War Cantor → Bell Oracle | Buff berlangsung 3 detik lebih lama. Setiap cast menambah 2 Resolve. / Hymn tetap aktif. Mulai expedition dengan barrier 25% HP. | March of Embers → Silence Between Bells |
 | wizard | Elementalist → Prismatic Archon | Power skill AoE +30%. AoE mage tetap menghantam boss dan minion. / Elements tetap aktif. Cast ofensif kelima menghasilkan echo 40%. | Cinder Sea → Prismatic Ruin |
-| wizard | Chronist → Last Hourkeeper | Semua cooldown milik hero ini 15% lebih cepat. / Tempo Chronist tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik. | Stolen Second → Tomorrow on Loan |
+| wizard | Chronist → Last Hourkeeper | Semua cooldown milik hero ini 15% lebih cepat. / Tempo Chronist tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik. Tunda bertumpuk dibatasi per intent. | Stolen Second → Tomorrow on Loan |
 | bard | Troubadour → Maestro | Buff berlangsung 3 detik lebih lama. Setiap cast menambah 2 Resolve. / Hymn tetap aktif. Mulai expedition dengan barrier 25% HP. | Rousing Chorus → Grand Finale |
-| bard | War Skald → Thunder Skald | Semua cooldown milik hero ini 15% lebih cepat. / Tempo Skald tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik. | War Drum → Storm Cadence |
+| bard | War Skald → Thunder Skald | Semua cooldown milik hero ini 15% lebih cepat. / Tempo Skald tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik. Tunda bertumpuk dibatasi per intent. | War Drum → Storm Cadence |
 | hexer | Bog Witch → Plague Saint | Power +35% ketika musuh utama di bawah 40% HP. / Execute tetap aktif. Setiap cast kelima memicu echo 40%. | Rot Bloom → Black Harvest |
 | hexer | Soulbinder → Lich Warden | Cast ofensif memulihkan 12% power. Kutukan menjadi sustain. / Leech tetap aktif. Mulai expedition dengan barrier 25% HP. | Grave Tithe → Ossuary Ward |
 | monk | Ascetic → Void Palm | Setiap cast ofensif ketiga menghasilkan 1,6× power. / Precision tetap aktif. Setiap cast kelima memicu echo 40%. | Seven Gates → Void Palm |
@@ -78,7 +78,7 @@ Forty definitions: four foundational and four job-specific skills per basic job.
 | 4 | Consecration | partyshield | 7 | 75 | 75 shield ke seluruh party, diperkuat Sanctuary. |
 | 5 | Blood Oath | attack | 4.8 | 112 | 112 damage. Rage memberi +40% power saat HP di bawah 50%. |
 | 6 | Worldwall | partyshield | 9 | 122 | 122 barrier ke seluruh party. Jawaban untuk tekanan seluruh grid. |
-| 7 | Red Horizon | aoe | 7 | 220 | 220 damage ke boss, 55% power ke setiap minion. |
+| 7 | Red Horizon | aoe | 7 | 220 | 220 damage ke boss, 60% power ke setiap minion. |
 ### Rogue
 
 | Index | Skill | Kind | Cooldown | Power | Effect |
@@ -95,12 +95,12 @@ Forty definitions: four foundational and four job-specific skills per basic job.
 
 | Index | Skill | Kind | Cooldown | Power | Effect |
 | --- | --- | --- | --- | --- | --- |
-| 0 | Split Arrow | aoe | 4.4 | 62 | 62 damage terbagi ke minion; jika lane bersih, semua panah mengenai boss. |
+| 0 | Split Arrow | aoe | 4.4 | 62 | 105 damage dibagi rata ke semua minion; jika tidak ada minion, 62 damage ke boss. |
 | 1 | Pinpoint | attack | 4.8 | 96 | 96 damage pada target pilihan. Klik salah satu lane musuh untuk mengarahkan. |
 | 2 | Silence Arrow | interrupt | 6.8 | 61 | 61 damage ke boss dan putus ritual all-grid. Hanya tersedia jika dipasang sebelum berangkat. |
-| 3 | Ricochet | aoe | 5.8 | 105 | 105 power dibagi ke minion, atau seluruhnya ke boss saat lane bersih. |
+| 3 | Ricochet | aoe | 5.8 | 105 | 179 damage dibagi rata ke semua minion; jika tidak ada minion, 105 damage ke boss. |
 | 4 | Deadeye | attack | 6 | 142 | 142 directed damage. Mengincar lane pilihan atau boss. |
-| 5 | Briar Volley | aoe | 5.2 | 116 | 116 power dibagi ke minion; semuanya ke boss jika lane bersih. |
+| 5 | Briar Volley | aoe | 5.2 | 116 | 197 damage dibagi rata ke semua minion; jika tidak ada minion, 116 damage ke boss. |
 | 6 | Falling Constellation | attack | 8 | 244 | 244 directed damage. Timing Precision menentukan burst. |
 | 7 | Thorn Silence | interrupt | 6 | 109 | 109 damage ke boss dan membatalkan semua ritual all-grid aktif. |
 ### Healer
@@ -120,12 +120,12 @@ Forty definitions: four foundational and four job-specific skills per basic job.
 | Index | Skill | Kind | Cooldown | Power | Effect |
 | --- | --- | --- | --- | --- | --- |
 | 0 | Arc Lance | attack | 6 | 98 | 98 magic damage ke boss atau target lane pilihan. |
-| 1 | Starfall | aoe | 9.4 | 160 | Ledakan 160 damage ke boss dan 95 damage ke setiap minion. Cooldown panjang. |
+| 1 | Starfall | aoe | 9.4 | 160 | Ledakan 160 damage ke boss dan 96 damage (60%) ke setiap minion. Cooldown panjang. |
 | 2 | Time Bomb | attack | 8 | 210 | Segel meledak setelah 1,5 detik: 210 damage. Tepatkan dengan jendela Break. |
 | 3 | Null Field | interrupt | 8.5 | 100 | 100 damage dan putus ritual all-grid. Jendela kontrol kuat dengan cooldown panjang. |
-| 4 | Cinder Sea | aoe | 8 | 190 | 190 damage ke boss, 55% ke setiap minion, sebelum bonus Elements. |
+| 4 | Cinder Sea | aoe | 8 | 190 | 190 damage ke boss, 60% ke setiap minion, sebelum bonus Elements. |
 | 5 | Stolen Second | interrupt | 6.5 | 101 | 101 damage dan memutus ritual. Cooldown dipercepat Chronist. |
-| 6 | Prismatic Ruin | aoe | 9.5 | 280 | 280 damage ke boss, 55% ke minion; bonus Elements berlaku. |
+| 6 | Prismatic Ruin | aoe | 9.5 | 280 | 280 damage ke boss, 60% ke minion; bonus Elements berlaku. |
 | 7 | Tomorrow on Loan | interrupt | 7.6 | 147 | 147 damage dan putus ritual; mendorong mundur jadwal intent berikutnya. |
 ### Bard
 
@@ -133,12 +133,12 @@ Forty definitions: four foundational and four job-specific skills per basic job.
 | --- | --- | --- | --- | --- | --- |
 | 0 | Quickstep Reel | haste | 6 | 1.7 | Cooldown tersisa setiap hero lain berkurang 1,7 detik. Tempo party jadi senjata. |
 | 1 | Discordant Note | weaken | 5 | 58 | 58 damage dan lemahkan musuh 5 detik: semua damage musuh −25%. |
-| 2 | Lullaby | delay | 8 | 2.2 | Tunda intent musuh berikutnya 2,2 detik. Telegraph yang sudah muncul tetap berjalan. |
+| 2 | Lullaby | delay | 8 | 2.2 | Tunda intent musuh berikutnya 2,2 detik. Telegraph yang sudah muncul tetap berjalan. Tunda bertumpuk dibatasi per intent. |
 | 3 | Encore | resolve | 9 | 14 | Isi 14 Resolve. Ninefold Dawn datang lebih cepat. |
 | 4 | Rousing Chorus | buff | 6.5 | 0 | Battle Hymn seluruh party: +30% damage dan +20% tempo. |
 | 5 | War Drum | haste | 7 | 2 | Cooldown tersisa setiap hero berkurang 2 detik. |
 | 6 | Grand Finale | resolve | 9 | 24 | Isi 24 Resolve sekaligus. Ninefold Dawn menjadi ritme party. |
-| 7 | Storm Cadence | aoe | 7.5 | 165 | 165 power dibagi ke minion; seluruhnya ke boss saat lane bersih. |
+| 7 | Storm Cadence | aoe | 7.5 | 165 | 281 damage dibagi rata ke semua minion; jika tidak ada minion, 165 damage ke boss. |
 ### Hexer
 
 | Index | Skill | Kind | Cooldown | Power | Effect |
@@ -168,11 +168,11 @@ Forty definitions: four foundational and four job-specific skills per basic job.
 | Index | Skill | Kind | Cooldown | Power | Effect |
 | --- | --- | --- | --- | --- | --- |
 | 0 | Spark Turret | turret | 7 | 22 | Pasang turret di lane sendiri: 22 damage per detik selama 6 detik ke target terdepan. |
-| 1 | Flash Mine | stun | 7.5 | 1.6 | Tunda serangan musuh berikutnya 1,6 detik dan isi stagger boss 120. |
+| 1 | Flash Mine | stun | 7.5 | 1.6 | Tunda serangan musuh berikutnya 1,6 detik dan isi stagger boss 120. Tunda bertumpuk dibatasi per intent. |
 | 2 | Patch Kit | repair | 14 | 1 | Tambah 1 potion (maks 3). Sekali per stage. |
 | 3 | Overclock | haste | 8 | 1.8 | Cooldown tersisa setiap hero berkurang 1,8 detik. |
-| 4 | Shrapnel Bloom | aoe | 7 | 150 | 150 power dibagi ke minion; seluruhnya ke boss saat lane bersih. |
-| 5 | Ember Mine | stun | 8 | 2.4 | Tunda serangan musuh berikutnya 2,4 detik dan isi stagger 120. |
+| 4 | Shrapnel Bloom | aoe | 7 | 150 | 255 damage dibagi rata ke semua minion; jika tidak ada minion, 150 damage ke boss. |
+| 5 | Ember Mine | stun | 8 | 2.4 | Tunda serangan musuh berikutnya 2,4 detik dan isi stagger 120. Tunda bertumpuk dibatasi per intent. |
 | 6 | Brass Sentinel | turret | 9 | 48 | Turret besar: 48 damage per detik selama 6 detik di lane sendiri. |
 | 7 | Siege Charge | attack | 8 | 260 | 260 damage ke target terdepan di lane sendiri. |
 
@@ -233,7 +233,7 @@ Fifty catalog nodes; thirty-four apply to each hero: fifteen retained foundation
 | Prism Echo | class | 14 | 76g / 2 SP | wizard-2 | Echo ofensif kelima +18%. |
 | Unwritten Formula | class | 18 | 92g / 2 SP | wizard-3 | +10% power dan tap +0,05s. |
 | Steady Tempo | class | 5 | 40g / 1 SP | focus | +6% tempo. |
-| Warm Voice | class | 9 | 56g / 1 SP | bard-1 | Heal yang diberikan +10% dan barrier awal 6% HP. |
+| Warm Voice | class | 9 | 56g / 1 SP | bard-1 | +8% HP dan barrier awal 6% HP. |
 | Counterpoint | class | 14 | 76g / 2 SP | bard-2 | Echo ofensif kelima +15%. |
 | Standing Ovation | class | 18 | 92g / 2 SP | bard-3 | +8% tempo dan tap +0,08s. |
 | Bitter Ink | class | 5 | 40g / 1 SP | focus | +8% power. |
@@ -314,7 +314,7 @@ Three slots: weapon, armor and charm. Forty-two items include nine original item
 
 Intent selection is an authored per-archetype pattern with phase-dependent pace and seeded lane/tile choices, not a machine-learned agent. Marked weakest-target attacks choose the lowest living HP ratio. Strongest-target attacks rank living skill throughput. Their marker follows the hero until resolution; dragging does not evade a tracking attack. Front-row, lane breath and meteor attacks stay at their ground locations. Ritual attacks target all nine tiles. Guard mitigates party damage by 65% for 2.3 seconds with a 12-second cooldown. Interrupt skills can cancel an all-grid ritual; ultimate also interrupts. Shield/heal timing gives additional counterplay. Encounters enrage after 150 seconds.
 
-The twelve base silhouettes have ash/frost/auric palette variants. Variants also adjust intent order or cadence. Strength in campaign additionally comes from encounter HP and chapter scaling.
+The twelve base silhouettes have ash/frost/auric palette variants. Ashbound variants keep the base intent order; Frostbound and Gilded variants rotate it and shorten the interval. Strength in campaign additionally comes from encounter HP and chapter scaling.
 
 | Monster | Title | Pattern | Counter |
 | --- | --- | --- | --- |
@@ -802,10 +802,10 @@ Raids select any of twelve base silhouettes and all forty-eight variants. The ne
 | Dancer in Ash | GALE · MOVEMENT | Penalti relokasi turun dari 0,9 ke 0,2 detik. Hero yang dipindah mendapat 30 shield. |
 | Dawn Runs Deep | DAWN · ULTIMATE | Seluruh sumber Resolve mengisi 60% lebih cepat. Lebih banyak Ninefold Dawn dalam satu fight. |
 | Last Light | ASH · EXECUTE | Damage ke boss di bawah 30% HP meningkat 40%. Ledakan akhir saat phase paling berbahaya. |
-| Winter Between Beats | FROST · CONTROL | Setiap cast memperlambat jadwal intent berikutnya 0,16 detik. Telegraph aktif tetap berjalan. |
+| Winter Between Beats | FROST · CONTROL | Setiap cast memperlambat jadwal intent berikutnya 0,16 detik dan menambah 1 Resolve. Tunda bertumpuk dibatasi per intent; telegraph aktif tetap berjalan. |
 | For the Living | HARVEST · MINIONS | Setiap minion tumbang memulihkan 24 HP seluruh party. Jangan abaikan summon. |
 | Not Yet, Little Flame | HEARTH · SURVIVAL | Sekali per hero per floor, pukulan fatal menyisakan 20% HP. Kesempatan kedua, bukan kebal. |
-| Many Hands, One Song | CHORUS · ROTATION | Tap hero berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 2 detik (+30% power, +20% tempo). |
+| Many Hands, One Song | CHORUS · ROTATION | Tap hero berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 1 detik (+30% power, +20% tempo), maksimal sekali per hero setiap 4 detik. |
 
 ## 12. Architecture, saves and delivery
 

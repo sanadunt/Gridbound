@@ -108,3 +108,11 @@ test('new heroes join through the story and the grid grows to nine', () => {
   assert.ok(moveFormation(p, first, tile));
   assert.equal(new Set(p.storyActive.map(id => p.loadouts[id].slot)).size, 9);
 });
+
+test('variant descriptions match their intent order and pace', () => {
+  for (const base of Object.values(ENEMIES).filter(e => e.archetype === e.id)) for (const v of ['ash', 'frost', 'auric']) {
+    const e = ENEMIES[`${base.id}-${v}`], shifted = e.patterns.join() !== base.patterns.join();
+    assert.equal(shifted, v !== 'ash', e.id); assert.equal(e.interval < base.interval, v !== 'ash', e.id);
+    assert.match(e.description, shifted ? /urutan intent bergeser, intent datang lebih cepat/ : /urutan intent sama/, e.id);
+  }
+});
