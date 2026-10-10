@@ -2,7 +2,7 @@ import { ENEMIES } from '../game/world';
 import { creditCurrency, debitCurrency, type CurrencyState } from './currency';
 
 export type RunWallet = { crystal: number };
-export type ChallengeShopItem = { id: string; name: string; cost: number; description: string };
+export type ChallengeShopItem = { id: string; name: string; cost: number; description: string; consumable?: boolean };
 export type RaidTier = 'bronze' | 'silver' | 'gold';
 export type RaidModifierId = 'RM01' | 'RM02' | 'RM03' | 'RM04' | 'RM05' | 'RM06' | 'RM07' | 'RM08';
 export type RaidModifier = Readonly<{
@@ -36,20 +36,26 @@ export const CHALLENGE_SHOP: readonly ChallengeShopItem[] = Object.freeze([
   { id: 'run-reroll', name: 'Fate Reroll', cost: 12, description: 'Reroll the boons offered after this room.' },
   { id: 'run-upgrade', name: 'Ember Upgrade', cost: 18, description: 'Party power +15% for this room.' },
 ]);
+export const WARD_RELIC = 'bank-relic-ward', FATE_RELIC = 'bank-relic-fate', BELL_TONIC = 'bell-tonic';
+/** Relics are permanent unlocks read when a Roguelike floor starts; the Bell Tonic is a repeatable consumable paid at departure. */
 export const BANK_SHOP: readonly ChallengeShopItem[] = Object.freeze([
-  { id: 'bank-relic-ward', name: 'Ward Relic', cost: 24, description: 'Unlock a certified Roguelike challenge relic.' },
-  { id: 'bank-relic-fate', name: 'Fate Relic', cost: 36, description: 'Unlock a second certified Roguelike relic.' },
+  { id: WARD_RELIC, name: 'Ward Relic', cost: 24, description: 'Every Roguelike floor: +1 potion, and each hero starts with a barrier worth 15% of max HP.' },
+  { id: FATE_RELIC, name: 'Fate Relic', cost: 36, description: 'Roguelike boon drafts offer 4 choices instead of 3.' },
+  { id: BELL_TONIC, name: 'Bell Tonic', cost: 6, description: 'Repeatable: +1 potion in a Raid, or on the first floor of a Roguelike run. Tick it before departing; the Crystal is paid when the run starts.', consumable: true },
 ]);
+export const RELIC_IDS: readonly string[] = Object.freeze(BANK_SHOP.filter(item => !item.consumable).map(item => item.id));
+/** Boon draft size for a Roguelike run: the Fate Relic adds a fourth card. */
+export const boonDraftSize = (unlocks: readonly string[]) => unlocks.includes(FATE_RELIC) ? 4 : 3;
 export const challengeShopItem = (itemId: string) => CHALLENGE_SHOP.find(item => item.id === itemId) ?? null;
 export const bankShopItem = (itemId: string) => BANK_SHOP.find(item => item.id === itemId) ?? null;
 export const RAID_TIER_BASE: Record<RaidTier, number> = { bronze: 12, silver: 18, gold: 26 };
 
 const RAID_MODIFIER_ENTRIES: RaidModifier[] = [
-  { id: 'RM01', name: 'Fractured Armor', description: 'Barrier efektif −25%.', riskPoints: 1 },
+  { id: 'RM01', name: 'Fractured Armor', description: 'Barrier yang didapat selama raid −25%.', riskPoints: 1 },
   { id: 'RM02', name: 'Long Night', description: 'Potion limit −1; solo tetap mendapat minimum 1.', riskPoints: 1 },
-  { id: 'RM03', name: 'Echo Pulse', description: 'Aftershock telegraphed menyusul ritual.', riskPoints: 2 },
+  { id: 'RM03', name: 'Echo Pulse', description: 'Setiap serangan seluruh grid yang mendarat disusul aftershock bertelegraph pada tile satu hero.', riskPoints: 2 },
   { id: 'RM04', name: 'Hunting Choir', description: 'Weakest mark menyusul breath.', riskPoints: 2 },
-  { id: 'RM05', name: 'Restless Brood', description: 'Extra minion wave pada phase transition.', riskPoints: 1 },
+  { id: 'RM05', name: 'Restless Brood', description: 'Gelombang minion tambahan setiap boss masuk phase berikutnya.', riskPoints: 1 },
   { id: 'RM06', name: 'Narrow Paths', description: 'Satu tile temporary blocked bergilir.', riskPoints: 1 },
   { id: 'RM07', name: 'Patient Colossus', description: 'Boss HP +20%, windup +10%.', riskPoints: 0 },
   { id: 'RM08', name: 'Last Lantern', description: 'Optional lantern objective mengurangi bonus bila gagal.', riskPoints: 2 },
@@ -57,12 +63,14 @@ const RAID_MODIFIER_ENTRIES: RaidModifier[] = [
 export const RAID_MODIFIERS: readonly RaidModifier[] = Object.freeze(RAID_MODIFIER_ENTRIES.map(modifier => Object.freeze(modifier)));
 const modifierById = new Map<RaidModifierId, RaidModifier>(RAID_MODIFIERS.map(modifier => [modifier.id, modifier]));
 
-// Only combinations exercised by the current calibration slice can be rewarded.
-// Other authored modifiers remain selectable in Sandbox until their interaction
-// has a deterministic counter and a balance review.
+/** Modifiers the Battle simulates. The others are authored for later and shown as not yet available. */
+export const IMPLEMENTED_RAID_MODIFIERS: readonly RaidModifierId[] = Object.freeze(['RM01', 'RM02', 'RM03', 'RM05']);
+export const raidModifierAvailable = (id: unknown) => IMPLEMENTED_RAID_MODIFIERS.includes(id as RaidModifierId);
+// Only combinations exercised by the balance harness (scripts/balance.ts) can be rewarded.
 const CALIBRATED_MODIFIER_COMBOS: readonly (readonly RaidModifierId[])[] = Object.freeze([
-  [], ['RM01'], ['RM02'], ['RM03'], ['RM05'], ['RM06'], ['RM01', 'RM02'],
+  [], ['RM01'], ['RM02'], ['RM03'], ['RM05'], ['RM01', 'RM02'],
 ].map(combo => Object.freeze([...combo] as RaidModifierId[])));
+export const CERTIFIED_RAID_MODIFIER_COMBOS = CALIBRATED_MODIFIER_COMBOS;
 const comboKey = (ids: readonly RaidModifierId[]) => [...ids].sort().join('+');
 const calibratedKeys = new Set(CALIBRATED_MODIFIER_COMBOS.map(comboKey));
 
@@ -216,15 +224,20 @@ export const runShopAction = buyRunItem;
 
 /** Spend bank Crystal and record the unlock in the same domain operation. */
 export function buyBankItem(state: CurrencyState, itemId: string, owned: string[] = []): ChallengeShopItem | null {
-  const item = BANK_SHOP.find(x => x.id === itemId);
+  const item = BANK_SHOP.find(x => x.id === itemId && !x.consumable);
   if (!item || !Array.isArray(owned) || owned.includes(item.id) || !debitCurrency(state, 'raid', 'crystal', item.cost)) return null;
   owned.push(item.id);
   return item;
 }
 export const purchaseBankUnlock = buyBankItem;
+/** Pay for one Bell Tonic when a Raid or Roguelike run departs; returns the extra potions it grants (0 when unaffordable). */
+export function buyBellTonic(state: CurrencyState, mode: 'raid' | 'roguelike'): number {
+  const item = bankShopItem(BELL_TONIC)!;
+  return debitCurrency(state, mode, 'crystal', item.cost) ? 1 : 0;
+}
 export function normalizeChallengeUnlocks(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  const ids = new Set(BANK_SHOP.map(item => item.id));
+  const ids = new Set(RELIC_IDS);
   return [...new Set(value.filter((id): id is string => typeof id === 'string' && ids.has(id)))];
 }
 export function bankRaidReward(state: CurrencyState, amount: number): boolean {

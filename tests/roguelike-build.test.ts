@@ -46,7 +46,8 @@ test('D4 every authored job path is playable with its signature skill and passiv
     assert.equal(b.upgradeRogue(0,job.id),false);win(b);
     assert.equal(b.upgradeRogue(0,job.id),true);assert.deepEqual(b.hero(0)!.skills,[0,job.index]);
     const next=new Battle('endless',2,undefined,{rogueBuild:b.snapshot().rogueBuild!});
-    assert.equal(next.hero(0)!.job,job.id);assert.equal(next.stance(0,job.index),true);
+    // A promoted recruit opens every later floor on its job skill.
+    assert.equal(next.hero(0)!.job,job.id);assert.deepEqual(next.hero(0)!.skills,[job.index,0]);assert.equal(next.hero(0)!.stance,job.index);assert.equal(next.stance(0,0),true);
     win(next);const third=Object.values(JOBS).find(j=>j.parent===job.id)!;
     assert.equal(next.upgradeRogue(0,third.id),true);
   }

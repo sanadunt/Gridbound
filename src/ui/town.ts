@@ -6,8 +6,8 @@ import { heroProgress } from '../game/levels';
 import { storyPartyCap, normalizeStoryParty } from '../game/story-party';
 import { BASIC_JOBS, createRogueBuild, type RogueBuild } from '../game/roguelike-build';
 import { Battle } from '../game/simulation';
-import { BANK_SHOP, CHALLENGE_SHOP, RAID_MODIFIERS, getRaidContractForEnemy, raidReward, type RaidModifierId, type RaidSandbox, type RaidTier } from '../economy/challenge';
-import { createRaidBuild, validRaidBuild, type RaidBuild } from '../game/raid-build';
+import { BANK_SHOP, BELL_TONIC, CHALLENGE_SHOP, RAID_MODIFIERS, RELIC_IDS, bankShopItem, getRaidContractForEnemy, raidModifierAvailable, raidReward, type RaidModifierId, type RaidSandbox, type RaidTier } from '../economy/challenge';
+import { RAID_BASIC_JOBS, RAID_QUARRIES, defaultRaidBuild, openRaidQuarry, raidQuarryUnlockAt, raidQuarryUnlocked, validRaidBuild, type RaidBuild } from '../game/raid-build';
 import { QUESTS, questProgress } from '../game/quests';
 import { questBoard } from './quests';
 import { heroCanvas } from '../art/pixels';
@@ -49,6 +49,8 @@ export type TownState = {
   dungeonOutcome?: string;
   gearSlot?: ItemSlot;
   rogueSetup?: RogueBuild;
+  /** Bell Tonic ticked for the next Raid/Roguelike departure (paid with bank Crystal when the run starts). */
+  tonic?: boolean;
 };
 
 const portraits = new Map<string, string>();
@@ -160,7 +162,7 @@ function secondaryScene(p: Profile, state: TownState) {
   const body = tab === 'quests' ? questBoard(p, state.hero, state.questFilter, state.questPage) : tab === 'bestiary' ? bestiary(state.bestiaryPage) : tab === 'challenge-shop' ? challengeShop(p) : tab === 'raid' ? raids(p, state) : endless(p, state);
   const modeNav = tab === 'raid' || tab === 'endless' ? expeditionModes(tab) : '';
   const deployment = tab === 'raid'
-    ? `<div class="deploy-bar secondary-deploy" role="group" aria-label="${t('common.depart')}"><button class="btn primary" data-depart="raid">${t('raid.hunt', { name: escape(ENEMIES[state.raid]?.name ?? '?') })} ▶</button></div>`
+    ? `<div class="deploy-bar secondary-deploy" role="group" aria-label="${t('common.depart')}">${raidQuarryUnlocked(p, state.raid) ? `<button class="btn primary" data-depart="raid">${t('raid.hunt', { name: escape(ENEMIES[state.raid]?.name ?? '?') })} ▶</button>` : `<button class="btn primary" data-depart="raid" disabled>${t('raid.none')}</button>`}</div>`
     : tab === 'endless'
       ? `<div class="deploy-bar secondary-deploy" role="group" aria-label="${t('common.depart')}"><button class="btn primary" data-depart="endless">${t('endless.descend')} ▶</button></div>`
       : '';
@@ -330,24 +332,37 @@ function bestiary(pageIndex: number) {
   return `<div class="bestiary-list paged-collection" data-page="${page}"><article class="win"><div class="bestiary-art"><img src="${monster(e.id)}" alt="${escape(e.name)}"/></div><div><small>${escape(e.title)} · ${t('bestiary.tier', { n: e.tier ?? 1 })}</small><h3>${escape(e.name)}</h3><p>${escape(e.description)}</p><p class="intent-row">${e.patterns.map((intent, i) => `<span class="intent-chip intent-${intent}">${i + 1}. ${t(`intent.${intent}` as StringKey)}</span>`).join('')}</p><p class="counter-note"><b>${t('bestiary.counter')}</b> ${escape(e.counter)}</p></div></article>${pager('bestiary', page, total)}<p class="hint">${t('bestiary.hint')}</p></div>`;
 }
 
+/** The Bell Tonic toggle shared by the Raid and Roguelike setups. */
+function tonicToggle(p: Profile, state: TownState) {
+  const item = bankShopItem(BELL_TONIC)!, affordable = p.economy.commanderCrystal >= item.cost;
+  return `<label class="raid-modifier bell-tonic"><input type="checkbox" data-bell-tonic ${state.tonic && affordable ? 'checked' : ''} ${affordable ? '' : 'disabled'}/><span><b>${escape(item.name)} · ${item.cost} ◆</b><small>${escape(item.description)}</small></span></label>`;
+}
+
 function raids(p: Profile, state: TownState) {
-  const choices = Object.values(ENEMIES).filter(e => e.archetype === e.id).map(e => e.id);
-  const selected = ENEMIES[state.raid] ?? ENEMIES.golem;
-  const build = state.raidBuild && validRaidBuild(state.raidBuild, p.roster) ? state.raidBuild : createRaidBuild(p.roster, Math.min(3, p.roster.length, 6));
-  const contract = state.raidSandbox ? undefined : getRaidContractForEnemy(state.raid, state.raidTier, state.raidModifiers);
+  const quarry = openRaidQuarry(p, state.raid) ?? state.raid;
+  const selected = ENEMIES[quarry] ?? ENEMIES.golem, base = selected.archetype ?? selected.id;
+  const build = state.raidBuild && validRaidBuild(state.raidBuild, p.roster) ? state.raidBuild : defaultRaidBuild(p);
+  const contract = state.raidSandbox ? undefined : getRaidContractForEnemy(quarry, state.raidTier, state.raidModifiers);
   const tiers = (['bronze', 'silver', 'gold'] as const).map(tier => {
-    const tierContract = getRaidContractForEnemy(state.raid, tier, state.raidModifiers);
-    return `<option value="${tier}" ${state.raidTier === tier ? 'selected' : ''} ${tierContract ? '' : 'disabled'}>${t(`raid.tier.${tier}` as StringKey)} · ${tierContract ? t('raid.tier.reward', { risk: tierContract.riskPoints, n: raidReward(tierContract, state.raid) }) : t('raid.sandbox')}</option>`;
+    const tierContract = getRaidContractForEnemy(quarry, tier, state.raidModifiers);
+    return `<option value="${tier}" ${state.raidTier === tier ? 'selected' : ''} ${tierContract ? '' : 'disabled'}>${t(`raid.tier.${tier}` as StringKey)} · ${tierContract ? t('raid.tier.reward', { risk: tierContract.riskPoints, n: raidReward(tierContract, quarry) }) : t('raid.sandbox')}</option>`;
   }).join('');
-  const modifiers = RAID_MODIFIERS.map(raw => localizedRaidModifier(raw, lang())).map(modifier => `<label class="raid-modifier"><input type="checkbox" data-raid-modifier="${modifier.id}" ${state.raidModifiers.includes(modifier.id) ? 'checked' : ''}/><span><b>${escape(modifier.name)}</b><small>${escape(modifier.description)}</small></span></label>`).join('');
-  const party = build.slots.map((slot, index) => `<label class="raid-party-slot"><span>${index + 1}. ${ROSTER[slot.heroId].name}</span><select data-raid-job="${index}" aria-label="${t('raid.job', { n: index + 1 })}">${['warrior', 'rogue', 'archer', 'healer', 'wizard'].map(job => `<option value="${job}" ${slot.classId === job ? 'selected' : ''}>${KITS[job as keyof typeof KITS].name}</option>`).join('')}</select></label>`).join('');
+  // Only simulated modifiers can be ticked; authored-but-unbuilt ones are listed as not yet available.
+  const modifiers = RAID_MODIFIERS.map(raw => localizedRaidModifier(raw, lang())).map(modifier => { const ready = raidModifierAvailable(modifier.id), on = ready && state.raidModifiers.includes(modifier.id), open = ready && (on || state.raidModifiers.length < 3); return `<label class="raid-modifier ${ready ? '' : 'unavailable'}"><input type="checkbox" data-raid-modifier="${modifier.id}" ${on ? 'checked' : ''} ${open ? '' : 'disabled'}/><span><b>${escape(modifier.name)}</b><small>${escape(ready ? modifier.description : t('raid.modifier.soon'))}</small></span></label>`; }).join('');
+  const taken = new Set(build.slots.map(slot => slot.heroId));
+  const party = build.slots.map((slot, index) => `<div class="raid-party-slot"><span>${index + 1}.</span><select data-raid-hero="${index}" aria-label="${t('raid.hero', { n: index + 1 })}">${p.roster.map(id => `<option value="${id}" ${slot.heroId === id ? 'selected' : ''} ${slot.heroId !== id && taken.has(id) ? 'disabled' : ''}>${t('raid.hero.option', { name: ROSTER[id].name, lv: heroProgress(p.loadouts[id]?.xp).level })}</option>`).join('')}</select><select data-raid-job="${index}" aria-label="${t('raid.job', { n: index + 1 })}">${RAID_BASIC_JOBS.map(job => `<option value="${job}" ${slot.classId === job ? 'selected' : ''}>${escape(KITS[job].name)}</option>`).join('')}</select></div>`).join('');
   const sandbox = state.raidSandbox;
-  const status = contract && !sandbox ? t('raid.contract', { n: raidReward(contract, state.raid) }) : t('raid.sandbox.short');
+  const status = contract && !sandbox ? t('raid.contract', { n: raidReward(contract, quarry) }) : t('raid.sandbox.short');
+  const total = contract && !sandbox ? t('raid.total', { tier: t(`raid.tier.${contract.tier}` as StringKey), pacts: contract.modifiers.length, n: raidReward(contract, quarry) }) : t('raid.total.practice');
+  const quarries = RAID_QUARRIES.map(id => raidQuarryUnlocked(p, id)
+    ? `<button data-raid="${id}" class="${base === id ? 'chosen' : ''}" aria-pressed="${base === id}"><img src="${monster(id)}" alt=""/><b>${escape(ENEMIES[id].name)}</b></button>`
+    : `<button data-raid="${id}" class="locked" disabled aria-label="${t('raid.locked', { n: raidQuarryUnlockAt(id) })}"><span class="raid-lock" aria-hidden="true">?</span><b>???</b><small>${t('raid.locked', { n: raidQuarryUnlockAt(id) })}</small></button>`).join('');
+  const variants = Object.values(ENEMIES).filter(e => e.archetype === base).map(e => `<button class="raid-variant-chip ${quarry === e.id ? 'chosen' : ''}" data-raid-variant="${e.id}" aria-pressed="${quarry === e.id}">T${e.tier ?? 1} · ${escape(e.name)}</button>`).join('');
   return `<article class="win mission-brief raid-departure"><img class="brief-art" src="${monster(selected.id)}" alt=""/><div><small>${status}</small><h3>${escape(selected.name)}</h3><p>${escape(selected.title)}</p><p class="counter-note">${escape(selected.counter)}</p></div></article>
-  <div class="win raid-pick"><h3 class="subheading">${t('raid.quarry')}</h3><div class="raid-roster">${choices.map(id => `<button data-raid="${id}" class="${state.raid === id ? 'chosen' : ''}" aria-pressed="${state.raid === id}"><img src="${monster(id)}" alt=""/><b>${escape(ENEMIES[id].name)}</b></button>`).join('')}</div>
-  <label class="raid-variant">${t('raid.variant')}<select data-raid-variant aria-label="${t('raid.variant')}">${Object.values(ENEMIES).map(e => `<option value="${e.id}" ${state.raid === e.id ? 'selected' : ''}>${escape(e.name)} · T${e.tier}</option>`).join('')}</select></label>
-  <label class="raid-tier">${t('raid.reward')}<select data-raid-tier aria-label="${t('raid.reward')}">${tiers}</select></label></div>
-  <details class="win" open><summary>${t('raid.party', { n: build.slots.length })}</summary><label class="raid-party-size">${t('raid.size')}<select data-raid-party-size aria-label="${t('raid.size')}">${[1,2,3,4,5,6].map(size => `<option value="${size}" ${build.slots.length === size ? 'selected' : ''} ${size > p.roster.length ? 'disabled' : ''}>${size}</option>`).join('')}</select></label><div class="raid-party-grid">${party}</div><p class="hint">${t('raid.party.hint')}</p></details>
+  <div class="win raid-pick"><h3 class="subheading">${t('raid.quarry')}</h3><div class="raid-roster">${quarries}</div>
+  <div class="raid-variants" role="group" aria-label="${t('raid.variant')}">${variants}</div>
+  <label class="raid-tier">${t('raid.reward')}<select data-raid-tier aria-label="${t('raid.reward')}">${tiers}</select></label><p class="raid-total" data-raid-total>${total}</p></div>
+  <details class="win" open><summary>${t('raid.party', { n: build.slots.length })}</summary><label class="raid-party-size">${t('raid.size')}<select data-raid-party-size aria-label="${t('raid.size')}">${[1,2,3,4,5,6].map(size => `<option value="${size}" ${build.slots.length === size ? 'selected' : ''} ${size > p.roster.length ? 'disabled' : ''}>${size}</option>`).join('')}</select></label><div class="raid-party-grid">${party}</div><p class="hint">${t('raid.party.hint')}</p>${tonicToggle(p, state)}</details>
   <section class="win raid-modifiers-box"><h3 class="subheading">${t('raid.modifiers')}</h3><fieldset class="raid-modifiers"><legend class="sr-only">${t('raid.modifiers')}</legend>${modifiers}</fieldset><p class="hint">${t('raid.modifiers.hint')}</p></section>
   <details class="win raid-sandbox"><summary>${t('raid.practice')}</summary><p class="hint">${t('raid.practice.hint')}</p>
     <label>${t('raid.slider.hp')} <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.hpScale ?? 1}" data-raid-sandbox="hpScale"/><output>${(sandbox?.hpScale ?? 1).toFixed(1)}×</output></label>
@@ -357,13 +372,14 @@ function raids(p: Profile, state: TownState) {
 }
 
 function challengeShop(p: Profile) {
-  return `<div class="win shop-keeper"><p>${t('shop.greeting')}</p><span class="shop-purse">${t('shop.purse', { n: p.economy.commanderCrystal })}</span></div><section class="challenge-shop-grid"><article class="win"><h3 class="subheading">${t('shop.bank')}</h3>${BANK_SHOP.map(item => { const owned = p.challengeUnlocks.includes(item.id); return `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div><button class="btn ${owned ? '' : 'primary'}" data-bank-buy="${item.id}" ${owned || p.economy.commanderCrystal < item.cost ? 'disabled' : ''}>${owned ? t('shop.owned') : `${item.cost} ◆`}</button></div>`; }).join('')}</article><article class="win"><h3 class="subheading">${t('shop.journey')}</h3><p class="hint">${t('shop.journey.hint')}</p>${CHALLENGE_SHOP.map(item => `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div><span class="shop-cost">${item.cost} ◇</span></div>`).join('')}</article></section>`;
+  return `<div class="win shop-keeper"><p>${t('shop.greeting')}</p><span class="shop-purse">${t('shop.purse', { n: p.economy.commanderCrystal })}</span></div><section class="challenge-shop-grid"><article class="win"><h3 class="subheading">${t('shop.bank')}</h3>${BANK_SHOP.map(item => { const owned = p.challengeUnlocks.includes(item.id); return `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div>${item.consumable ? `<span class="shop-cost consumable" data-bank-consumable="${item.id}">${item.cost} ◆<small>${t('shop.atdeparture')}</small></span>` : `<button class="btn ${owned ? '' : 'primary'}" data-bank-buy="${item.id}" ${owned || p.economy.commanderCrystal < item.cost ? 'disabled' : ''}>${owned ? t('shop.owned') : `${item.cost} ◆`}</button>`}</div>`; }).join('')}</article><article class="win"><h3 class="subheading">${t('shop.journey')}</h3><p class="hint">${t('shop.journey.hint')}</p>${CHALLENGE_SHOP.map(item => `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div><span class="shop-cost">${item.cost} ◇</span></div>`).join('')}</article></section>`;
 }
 
 function endless(p: Profile, state: TownState) {
   const build = state.rogueSetup ?? createRogueBuild();
   return `<article class="win mission-brief"><div><small>${t('endless.best', { n: p.bestFloor })}</small><h3>${t('route.endless')}</h3><p>${t('endless.intro')}</p></div></article>
   <fieldset class="win loadout-slots"><legend>${t('endless.recruits')}</legend>${build.recruits.map((r, i) => `<label>${t('endless.recruit', { n: i + 1 })}<select data-rogue-slot="${i}" aria-label="${t('endless.recruit', { n: i + 1 })}">${BASIC_JOBS.map(id => `<option value="${id}" ${r.classId === id ? 'selected' : ''}>${KITS[id].name}</option>`).join('')}</select></label>`).join('')}<p class="hint">${t('endless.recruits.hint')}</p></fieldset>
+  <div class="win endless-kit">${RELIC_IDS.some(id => p.challengeUnlocks.includes(id)) ? `<p class="hint" data-relics>${t('endless.relics', { list: BANK_SHOP.filter(item => RELIC_IDS.includes(item.id) && p.challengeUnlocks.includes(item.id)).map(item => escape(item.name)).join(', ') })}</p>` : ''}${tonicToggle(p, state)}</div>
   <div class="win endless-rules"><p><b>${t('endless.rule1.title')}</b> ${t('endless.rule1')}</p><p><b>${t('endless.rule2.title')}</b> ${t('endless.rule2')}</p><p><b>${t('endless.rule3.title')}</b> ${t('endless.rule3')}</p><p><b>${t('endless.rule4.title')}</b> ${t('endless.rule4')}</p></div>
   <div class="departure-actions"><button class="btn" data-facility="challenge-shop">${t('route.shop')}</button></div>`;
 }

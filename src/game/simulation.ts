@@ -6,19 +6,26 @@ import { createRogueBuild, validRogueBuild, normalizeRogueBuild, rewardRogueRoom
 import { normalizeRaidBuild, validRaidBuild, type RaidBuild } from './raid-build';
 import { KITS, ROSTER, GRID_SIZE, type ClassId, type Mode } from './content';
 import { CAMPAIGN, ENEMIES, BOONS, type Intent } from './world';
-import { getRaidContractForEnemy, normalizeRaidSandbox, sandboxRaidContract, validateRaidContract, type RaidContract, type RaidSandbox, type RunWallet } from '../economy/challenge';
+import { getRaidContractForEnemy, normalizeRaidSandbox, sandboxRaidContract, validateRaidContract, WARD_RELIC, type RaidContract, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from '../economy/challenge';
 export type Hero = { offensiveActs:number; level:number; perks:ReturnType<typeof talentStats>; equipment:ReturnType<typeof gearStats>; id:number; name:string; classId:ClassId; slot:number; hp:number; maxHp:number; shield:number; stance:number; remaining:number; total:number; fatigue:number; lastTap:number; moveLock:number; buff:number; acts:number; talents:string[]; skills:number[]; regen:number; regenPower:number; rescued:boolean; combo:number; counterLeft:number; counterPower:number; job?:string; gear:Record<string,string>; gearPower:number; gearTempo:number };
 export type Telegraph = { id:number; name:string; type:'front'|'meteor'|'breath'|'target'|'all'|'channel'; slots:number[]; effect?:'silence'|'mend'; left:number; total:number; targetId?:number; counter?:string; damage?:number };
 export type Minion = { id:number; lane:number; hp:number; maxHp:number; timer:number; enemyId?:string };
 export type BattleEvent = { type:string; source?:number; slot?:number; lane?:number; amount?:number; color?:string; text?:string; targets?:number[]; kind?:string };
 export type Status = 'ready'|'fighting'|'paused'|'victory'|'defeat';
-export type BattleOptions = { rogueBuild?:RogueBuild; raidBuild?:RaidBuild; raidSandbox?:RaidSandbox; roster?:number[]; storyCleared?:number[]; storyRecruited?:number[]; loadouts?:Record<number,{skills:number[];talents:string[];xp?:number;slot?:number;job?:string;gear?:Record<string,string>;refine?:Record<string,number>}>; boons?:string[]; enemyId?:string; stage?:number; settlementId?:string; raidContract?:RaidContract; runWallet?:RunWallet; runAct?:1|2|3; runActClear?:boolean; runFinalClear?:boolean; heroic?:boolean; dungeon?:{chapter:number;hp:number;damage:number;xp:number;startHp?:Record<number,number>;potions?:number;power?:number;vitality?:number} };
+export type BattleOptions = { rogueBuild?:RogueBuild; raidBuild?:RaidBuild; raidSandbox?:RaidSandbox; roster?:number[]; storyCleared?:number[]; storyRecruited?:number[]; loadouts?:Record<number,{skills:number[];talents:string[];xp?:number;slot?:number;job?:string;gear?:Record<string,string>;refine?:Record<string,number>}>; boons?:string[]; enemyId?:string; stage?:number; settlementId?:string; raidContract?:RaidContract; runWallet?:RunWallet; runAct?:1|2|3; runActClear?:boolean; runFinalClear?:boolean; heroic?:boolean; relics?:string[]; extraPotions?:number; dungeon?:{chapter:number;hp:number;damage:number;xp:number;startHp?:Record<number,number>;potions?:number;power?:number;vitality?:number} };
 const defaultUpgrades = {power:1,vitality:1,tempo:1};
 // Per-chapter enemy tuning, calibrated by scripts/calibrate.ts against the balance harness's casual player.
 export const CHAPTER_HP:number[]=[2.78,2.29,1.73,1.62,3.63,2.89,2.85,3.77,3.04,3.35,3.36,4.05,3.94,3.1,2.35,3.89];
 export const CHAPTER_DMG:number[]=[2.32,3.33,4.22,3.96,4.45,5.3,8.02,6.58,7.65,7.79,9.64,8.73,12.9,14.62,15.23,13.97];
 // Damage shape: telegraphs are punishing but survivable; steady front-row strikes and minions keep healers busy.
-export const RAID_HP=1.25,RAID_DMG=1.1,ENDLESS_HP=1300,ENDLESS_HP_GROWTH=1.13,ENDLESS_DMG_GROWTH=1.075;
+// Raids (tuned with scripts/balance.ts on the shipped path): story heroes vs the next chapter's boss; RAID_PARTY_DMG eases hits for a party smaller than that chapter's story party.
+export const RAID_HP=1.1,RAID_DMG=1.1,RAID_PARTY_DMG=.5,ENDLESS_HP=1300,ENDLESS_HP_GROWTH=1.13,ENDLESS_DMG_GROWTH=1.075;
+// Contract tiers scale the raid boss on top of the story curve; sandbox practice uses its own sliders instead.
+export const RAID_TIER_SCALE:Record<RaidTier,{hp:number;dmg:number}>={bronze:{hp:1,dmg:1},silver:{hp:1.15,dmg:1.1},gold:{hp:1.3,dmg:1.2}};
+// Pact modifiers: RM01 cuts barrier gains, RM03 adds an aftershock after each all-grid impact, RM05 summons a wave on each phase change.
+export const RM01_BARRIER=.75;
+// Roguelike relics bought with bank Crystal.
+export const WARD_RELIC_BARRIER=.15;
 export const MEND_HEAL=.05;
 // Heroic chapters: more HP, harder hits, faster intents, one potion and aftershocks after phase 2.
 export const HEROIC_HP=1.6,HEROIC_DMG=1.45,HEROIC_INTERVAL=.85;
@@ -38,7 +45,7 @@ export class Battle {
   curse={left:0,power:0,source:-1,tick:1}; turrets:{lane:number;left:number;power:number;source:number;tick:number}[]=[];
   targetLane=-1; selected=0; damage=0; healed=0; blocked=0; dodged=0; taps=0; relocations=0;
   heroic=false; dungeon?:NonNullable<BattleOptions['dungeon']>;
-  power=1; vitality=1; tempo=1; boons:string[]=[]; settlementId=''; raidContract?: RaidContract; runWallet?: RunWallet; runAct?: 1|2|3; runActClear=false; runFinalClear=false;
+  power=1; vitality=1; tempo=1; boons:string[]=[]; relics:string[]=[]; raidParty=1; settlementId=''; raidContract?: RaidContract; runWallet?: RunWallet; runAct?: 1|2|3; runActClear=false; runFinalClear=false;
   private seed=271828; private eventId=0; private pattern=0;
   private attackIn=5; private clawIn=7; private summonIn=18;
   private lastTapped=-1; private castCount=0;
@@ -71,6 +78,7 @@ export class Battle {
     const requestedContract=options.raidContract ?? getRaidContractForEnemy(options.enemyId ?? 'dragon');
     this.raidContract=mode==='raid' ? (options.raidSandbox ? sandboxRaidContract(requestedContract) : validateRaidContract(requestedContract)) : undefined;
     this.runWallet=options.runWallet; this.runAct=options.runAct; this.runActClear=options.runActClear===true; this.runFinalClear=options.runFinalClear===true; this.boons=[...new Set(options.boons??[])].filter(id=>BOONS.some(b=>b.id===id));
+    this.relics=mode==='endless'?[...new Set(options.relics??[])].filter(id=>typeof id==='string'):[];const ward=this.relics.includes(WARD_RELIC);
     this.stage=Math.max(0,Math.min(mode==='adventure'?CAMPAIGN[this.floor-1].stages.length-1:0,Number.isInteger(options.stage)?options.stage!:0));
     const defaults=mode==='adventure'?[[0,4,3],[0,4,3,2],[0,4,3,2,7],[0,4,3,2,7,1,5]][this.floor-1]??ROSTER.map((_,id)=>id):ROSTER.map((_,id)=>id);
     let ids=[...new Set(options.roster??defaults)].filter(id=>Number.isInteger(id)&&ROSTER[id]);
@@ -86,7 +94,9 @@ export class Battle {
       const recruit=this.rogueBuild?.recruits[id];
       const raidSlot=this.raidBuild?.slots.find(slot=>slot.heroId===id);
       const r=raidSlot?{...ROSTER[id],classId:raidSlot.classId,slot:raidSlot.slot??ROSTER[id].slot}:recruit?{name:`Recruit ${id+1}`,classId:recruit.classId,slot:[1,7,6][i]}:ROSTER[id],k=KITS[r.classId];
-      const loadout:NonNullable<BattleOptions['loadouts']>[number]|undefined=raidSlot?{skills:[0,1],talents:[],slot:raidSlot.slot??r.slot}:recruit?{skills:recruit.job?[0,JOBS[recruit.job].index]:[0,1],talents:[],job:recruit.job}:options.loadouts?.[id];
+      // Raid heroes bring their Story progression (xp, gear, refine, talents); a raid class swap drops a mismatched job and the stored skills.
+      const story=options.loadouts?.[id];
+      const loadout:NonNullable<BattleOptions['loadouts']>[number]|undefined=raidSlot?{...story,skills:raidSlot.classId===ROSTER[id].classId?story?.skills??[0,1]:[0,1],talents:story?.talents??[],slot:raidSlot.slot??r.slot}:recruit?{skills:recruit.job?[JOBS[recruit.job].index,0]:[0,1],talents:[],job:recruit.job}:story;
       const talents=[...new Set(loadout?.talents??[])].filter(t=>TALENTS.some(def=>def.id===t));
       const job=JOBS[loadout?.job??'']?.base===r.classId?loadout?.job:undefined,stats=gearStats(loadout?.gear,loadout?.refine);
       const perks=talentStats(talents,r.classId),growth=levelStats(loadout?.xp),level=heroProgress(loadout?.xp).level;
@@ -98,9 +108,10 @@ export class Battle {
       occupied.add(slot);
       const maxHp=Math.round(k.hp*this.vitality*stats.hp*perks.hp*growth.hp*(talents.includes('vigor')?1.18:1)*(talents.includes('vigor-2')?1.2:1));
       const total=k.skills[skills[0]].cooldown/(this.tempo*stats.tempo*perks.tempo*(talents.includes('focus')?1.1:1)*(talents.includes('focus-2')?1.08:1)*(JOBS[job??'']?.effect==='time'?1.15:1));
-      return {offensiveActs:0,level,perks,equipment:stats,id,name:r.name,classId:r.classId,slot,hp:maxHp,maxHp,shield:maxHp*Math.min(.6,perks.openingBarrier+(stats.openingBarrier??0)+(talents.includes('shelter')?.2:0)+(['aegis','veil','bell-oracle'].includes(job??'')?.25:0)),job,gear:loadout?.gear??{},gearPower:stats.power*perks.power*growth.power,gearTempo:stats.tempo*perks.tempo,stance:skills[0],remaining:1.2+i*.25,total,fatigue:0,lastTap:-10,moveLock:0,buff:0,acts:0,talents,skills,regen:0,regenPower:0,rescued:false,combo:0,counterLeft:0,counterPower:0};
+      return {offensiveActs:0,level,perks,equipment:stats,id,name:r.name,classId:r.classId,slot,hp:maxHp,maxHp,shield:maxHp*Math.min(.6,perks.openingBarrier+(stats.openingBarrier??0)+(talents.includes('shelter')?.2:0)+(['aegis','veil','bell-oracle'].includes(job??'')?.25:0)+(ward?WARD_RELIC_BARRIER:0)),job,gear:loadout?.gear??{},gearPower:stats.power*perks.power*growth.power,gearTempo:stats.tempo*perks.tempo,stance:skills[0],remaining:1.2+i*.25,total,fatigue:0,lastTap:-10,moveLock:0,buff:0,acts:0,talents,skills,regen:0,regenPower:0,rescued:false,combo:0,counterLeft:0,counterPower:0};
     });
-    this.time=0; this.gold=0; this.potions=this.mode==='raid' && this.raidContract?.modifiers.includes('RM02') || this.heroic ? 1 : this.dungeon ? Math.max(0,Math.min(3,this.dungeon.potions??2)) : 2;
+    const extra=mode==='raid'||mode==='endless'?Math.max(0,Math.min(2,Math.floor(Number(options.extraPotions)||0))):0;
+    this.time=0; this.gold=0; this.potions=(this.mode==='raid' && this.raidContract?.modifiers.includes('RM02') || this.heroic ? 1 : this.dungeon ? Math.max(0,Math.min(3,this.dungeon.potions??2)) : 2)+(ward?1:0)+extra;
     // Dungeon fights continue a run: heroes enter with the HP they left the last room with.
     if(this.dungeon?.startHp)for(const h of this.heroes){const ratio=this.dungeon.startHp[h.id];if(typeof ratio==='number'&&Number.isFinite(ratio)){h.hp=Math.round(h.maxHp*Math.max(0,Math.min(1,ratio)));if(h.hp<=0){h.hp=0;h.shield=0;}}} this.resolve=25; this.taps=0; this.damage=0; this.healed=0; this.blocked=0; this.dodged=0; this.relocations=0; this.seed=271828; this.eventId=0; this.events=[]; this.castCount=0; this.lastTapped=-1; this.selected=this.heroes[0].id;
     this.prepareStage();
@@ -124,8 +135,10 @@ export class Battle {
       this.stageCount=1; this.stageName=this.mode==='endless'?`Descent ${this.floor}`:this.raidContract?.sandbox?'Practice arena · no Crystal':'Raid contract';
       const hpScale=this.mode==='raid' ? this.raidSandbox?.hpScale ?? 1 : 1;
       // Raids follow the story curve: a raid at level N is a tougher version of chapter N's boss for the party size of that point.
-      const raidHp=()=>{const ch=Math.min(CAMPAIGN.length,this.floor),boss=CAMPAIGN[ch-1].stages.at(-1)!.hp*chapterHp(ch)*RAID_HP;return boss*Math.pow(1.15,Math.max(0,this.floor-CAMPAIGN.length))*Math.pow(this.heroes.length/storyPartyCap(Array.from({length:ch-1},(_,i)=>i)),.9);};
-      this.bossMax=Math.round((this.mode==='endless'?ENDLESS_HP*Math.pow(this.heroes.length/3,.9)*Math.pow(ENDLESS_HP_GROWTH,this.floor-1):raidHp())*ENEMIES[this.enemyId].hp*hpScale);
+      // A party smaller than that chapter's story party faces less HP and (more gently, RAID_PARTY_DMG) lighter hits.
+      const ch=Math.min(CAMPAIGN.length,this.floor);this.raidParty=this.mode==='raid'?this.heroes.length/storyPartyCap(Array.from({length:ch-1},(_,i)=>i)):1;
+      const raidHp=()=>CAMPAIGN[ch-1].stages.at(-1)!.hp*chapterHp(ch)*RAID_HP*Math.pow(1.15,Math.max(0,this.floor-CAMPAIGN.length))*Math.pow(this.raidParty,.9);
+      this.bossMax=Math.round((this.mode==='endless'?ENDLESS_HP*Math.pow(this.heroes.length/3,.9)*Math.pow(ENDLESS_HP_GROWTH,this.floor-1):raidHp()*(this.raidTier()?.hp??1))*ENEMIES[this.enemyId].hp*hpScale);
     }
     this.bossHp=this.bossMax; this.enemyName=ENEMIES[this.enemyId].name; this.enemyTitle=ENEMIES[this.enemyId].title;
   }
@@ -197,6 +210,7 @@ export class Battle {
     this.time+=dt;this.stageTime+=dt;
     const oldPhase=this.phase;this.phase=this.bossHp/this.bossMax>.65?1:this.bossHp/this.bossMax>.3?2:3;
     if(this.phase!==oldPhase)this.emit({type:'phase',text:`${this.enemyName.toUpperCase()} · PHASE ${this.phase}`});
+    if(this.phase>oldPhase&&this.pact('RM05'))this.summon();
     this.breakLeft=Math.max(0,this.breakLeft-dt);this.guardLeft=Math.max(0,this.guardLeft-dt);this.guardCooldown=Math.max(0,this.guardCooldown-dt);this.markLeft=Math.max(0,this.markLeft-dt);this.weakenLeft=Math.max(0,this.weakenLeft-dt);
     if(this.curse.left>0){this.curse.left-=dt;this.curse.tick-=dt;if(this.curse.tick<=0){this.curse.tick+=1;this.hitBoss(this.curse.power,this.curse.source,'curse');}}
     for(const t of this.turrets){t.left-=dt;t.tick-=dt;if(t.tick<=0){t.tick+=1;this.attack(t.source,t.lane,t.power,'arrow');}}
@@ -219,7 +233,8 @@ export class Battle {
       if(t.targetId!==undefined){const target=this.hero(t.targetId);t.slots=target&&target.hp>0?[target.slot]:[];}
       t.left-=dt;
       if(t.left<=0){if(t.effect==='mend'&&this.bossHp>0){this.bossHp=Math.min(this.bossMax,this.bossHp+Math.round(this.bossMax*MEND_HEAL));this.emit({type:'banner',text:'THE WOUND CLOSES'});}
-        for(const slot of t.slots){const h=this.heroes.find(a=>a.slot===slot&&a.hp>0);if(h){this.hurt(h,(t.damage??83)*this.enemyScale());h.combo=0;if(t.effect==='silence'&&this.guardLeft<=0)h.remaining=Math.min(h.total,h.remaining+1.5);}else this.dodged++;}this.emit({type:'impact',targets:t.slots,kind:t.type});this.threats.splice(this.threats.indexOf(t),1);}
+        for(const slot of t.slots){const h=this.heroes.find(a=>a.slot===slot&&a.hp>0);if(h){this.hurt(h,(t.damage??83)*this.enemyScale());h.combo=0;if(t.effect==='silence'&&this.guardLeft<=0)h.remaining=Math.min(h.total,h.remaining+1.5);}else this.dodged++;}this.emit({type:'impact',targets:t.slots,kind:t.type});this.threats.splice(this.threats.indexOf(t),1);
+        if(t.type==='all'&&this.pact('RM03')){const slot=this.aftershock(this.living());if(slot!==undefined)this.emit({type:'warning',text:'AFTERSHOCK',targets:[slot]});}}
     }
     for(const m of this.minions){if(m.hp<=0)continue;m.timer-=dt;if(m.timer<=0){const h=this.living().filter(a=>a.slot%3===m.lane).sort((a,b)=>a.slot-b.slot)[0]??this.living().sort((a,b)=>a.hp-b.hp)[0];if(h){this.hurt(h,MINION_HIT*this.enemyScale());this.emit({type:'minionAttack',slot:h.slot,lane:m.lane});}m.timer=5.5;}}
     this.minions=this.minions.filter(m=>m.hp>0);this.finish();
@@ -229,7 +244,10 @@ export class Battle {
     if(this.bossHp<=0){this.status='victory';if(this.rogueBuild)rewardRogueRoom(this.rogueBuild,this.floor);this.gold+=this.mode==='adventure'?20+this.stage*12+this.floor*6:this.mode==='dungeon'?0:80+this.floor*15;this.emit({type:'victory'});return true;}
     return false;
   }
-  enemyScale() { return (this.mode==='adventure'?chapterDmg(this.floor)*(this.heroic?HEROIC_DMG:1):this.mode==='dungeon'?chapterDmg(this.dungeon?.chapter??this.floor)*(this.dungeon?.damage??1):this.mode==='endless'?.82*Math.pow(ENDLESS_DMG_GROWTH,this.floor-1):RAID_DMG*chapterDmg(this.floor)*Math.pow(1.06,Math.max(0,this.floor-CAMPAIGN.length)))*(this.stageTime>150?1.7:1)*(this.mode==='raid'?(this.raidSandbox?.damageScale??1):1); }
+  enemyScale() { return (this.mode==='adventure'?chapterDmg(this.floor)*(this.heroic?HEROIC_DMG:1):this.mode==='dungeon'?chapterDmg(this.dungeon?.chapter??this.floor)*(this.dungeon?.damage??1):this.mode==='endless'?.82*Math.pow(ENDLESS_DMG_GROWTH,this.floor-1):RAID_DMG*chapterDmg(this.floor)*Math.pow(1.06,Math.max(0,this.floor-CAMPAIGN.length)))*(this.stageTime>150?1.7:1)*(this.mode==='raid'?(this.raidSandbox?.damageScale??1)*(this.raidTier()?.dmg??1)*Math.pow(Math.min(1,this.raidParty),RAID_PARTY_DMG):1); }
+  /** The certified contract tier's scale; undefined outside rewarded raids (sandbox practice uses its sliders). */
+  raidTier() { const c=this.mode==='raid'?this.raidContract:undefined;return c&&!c.sandbox?RAID_TIER_SCALE[c.tier]:undefined; }
+  pact(id:RaidModifierId) { return this.mode==='raid'&&this.raidContract?.modifiers.includes(id)===true; }
   telegraph() {
     const enemy=ENEMIES[this.enemyId],intent:Intent=enemy.patterns[this.pattern++%enemy.patterns.length];
     let slots:number[]=[],targetId:number|undefined,type:Telegraph['type']='meteor',name='',counter='',effect:Telegraph['effect'];
@@ -254,9 +272,15 @@ export class Battle {
     this.threats.push({id:this.eventId++,name,type,slots,left:total,total,targetId,counter,effect,damage:enemy.damage*TELEGRAPH_SHARE*(effect==='silence'?.5:type==='all'?.85:1)*(1+(this.phase-1)*.1)});
     this.emit({type:'warning',text:name,targets:slots});
     if(this.phase>=2&&(this.enemyId.startsWith('dragon')&&intent==='meteor'||this.heroic&&(intent==='meteor'||intent==='front'||intent==='breath'))){
-      const slot=alive[Math.floor(this.random()*alive.length)].slot;
-      this.threats.push({id:this.eventId++,name:'AFTERSHOCK',type:'meteor',slots:[slot],left:5,total:5,damage:75,counter:'GROUND: ledakan kedua tertunda. Jangan buru-buru kembali ke tile ini.'});
+      this.aftershock(alive);
     }
+  }
+  /** A delayed second blast on one living hero's tile (dragon/Heroic phase 2+, RM03 after an all-grid impact). */
+  private aftershock(alive:Hero[]) {
+    if(!alive.length)return undefined;
+    const slot=alive[Math.floor(this.random()*alive.length)].slot;
+    this.threats.push({id:this.eventId++,name:'AFTERSHOCK',type:'meteor',slots:[slot],left:5,total:5,damage:75,counter:'GROUND: ledakan kedua tertunda. Jangan buru-buru kembali ke tile ini.'});
+    return slot;
   }
   private skillPower(h:Hero) {
     const s=KITS[h.classId].skills[h.stance],effect=JOBS[h.job??'']?.effect;
@@ -272,8 +296,10 @@ export class Battle {
   private threatPower(h:Hero) { const s=KITS[h.classId].skills[h.stance];return s.power/this.cooldown(h)*this.skillPower(h)*(h.buff>0?1.3:1); }
   summon() {
     const lanes=this.heroes.length<=3?[1]:this.heroes.length<=5?[0,2]:[0,1,2];
-    for(const lane of lanes){if(this.minions.some(m=>m.lane===lane&&m.hp>0))continue;const hp=Math.round((this.mode==='adventure'?36*chapterHp(this.floor)*(this.heroic?HEROIC_HP:1):this.mode==='dungeon'?36*chapterHp(this.dungeon?.chapter??1):170)*Math.pow(1.1,this.mode==='adventure'?0:this.floor-1));this.minions.push({id:this.eventId++,lane,hp,maxHp:hp,timer:4,enemyId:['wolf','spider','goblin'][(this.stage+lane)%3]});}
-    this.emit({type:'summon',text:'REINFORCEMENTS'});
+    let spawned=0;
+    for(const lane of lanes){if(this.minions.some(m=>m.lane===lane&&m.hp>0))continue;spawned++;const hp=Math.round((this.mode==='adventure'?36*chapterHp(this.floor)*(this.heroic?HEROIC_HP:1):this.mode==='dungeon'?36*chapterHp(this.dungeon?.chapter??1):170)*Math.pow(1.1,this.mode==='adventure'?0:this.floor-1));this.minions.push({id:this.eventId++,lane,hp,maxHp:hp,timer:4,enemyId:['wolf','spider','goblin'][(this.stage+lane)%3]});}
+    if(spawned)this.emit({type:'summon',text:'REINFORCEMENTS'});
+    return spawned;
   }
   act(h:Hero) {
     if(h.hp<=0)return;
@@ -368,7 +394,7 @@ export class Battle {
     this.addStagger(amount);
     this.emit({type:'projectile',source,lane:-1,amount:dmg,kind});
   }
-  private shield(h:Hero,amount:number) { if(h.hp<=0)return;const gained=Math.min(h.maxHp*.6-h.shield,amount);h.shield+=Math.max(0,gained);if(gained>1)this.emit({type:'shield',source:h.id,slot:h.slot,amount:gained}); }
+  private shield(h:Hero,amount:number) { if(h.hp<=0)return;const gained=Math.min(h.maxHp*.6-h.shield,amount*(this.pact('RM01')?RM01_BARRIER:1));h.shield+=Math.max(0,gained);if(gained>1)this.emit({type:'shield',source:h.id,slot:h.slot,amount:gained}); }
   heal(h:Hero,amount:number) {
     if(h.hp<=0||!Number.isFinite(amount)||amount<=0)return;
     if(h.talents.includes('recovery'))amount*=1.15;

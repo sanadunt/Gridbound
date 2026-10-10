@@ -27,7 +27,7 @@
 .boon-modal-title { font-family: var(--pixel); font-size: 13px; color: var(--gold); line-height: 1.6; }
 .boon-modal-subtitle, .boon-run-wallet { color: var(--ink-soft); font-size: 14px; margin: 4px 0; }
 .boon-draft-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-@media (min-width: 480px) { .boon-draft-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 480px) { .boon-draft-grid { grid-template-columns: repeat(3, 1fr); } .boon-draft-grid[data-cards="4"] { grid-template-columns: repeat(2, 1fr); } }
 .boon-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 12px 12px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: linear-gradient(180deg, var(--win-top), var(--win-bot)); box-shadow: 0 0 0 3px var(--win-shadow), 0 8px 24px #0008; color: var(--ink); text-align: center; }
 .boon-card:hover, .boon-card:focus-visible { border-color: var(--card-accent, var(--gold)); transform: translateY(-3px); box-shadow: 0 0 0 2px var(--win-shadow), 0 0 18px var(--card-accent, var(--gold)); }
 .boon-card-gem { width: 18px; height: 18px; transform: rotate(45deg); border: 1px solid var(--gold-bright); background: var(--card-accent, var(--gold)); box-shadow: 0 0 10px var(--card-accent, var(--gold)); margin-bottom: 4px; }

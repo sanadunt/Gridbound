@@ -30,7 +30,7 @@ for(const width of [390,1440])await withBrowser(async({send,evaluate,wait,click,
  await screenshot(`artifacts/rpg-quests-${width}.png`);
  await click('[data-quest-hunt="moth"]');
  assert.equal(await evaluate('document.querySelectorAll("[data-raid]").length'),18);
- await select('[data-raid-variant]','moth-frost');await click('[data-depart="raid"]');await click('#start');
+ await click('[data-raid-variant="moth-frost"]');await click('[data-depart="raid"]');await click('#start');
  assert.equal(await evaluate('window.gridbound.battle.enemyId'),'moth-frost');
  assert.equal(await evaluate('window.gridbound.battle.floor'),5);
  const xp0=await evaluate('window.gridbound.profile().loadouts[0].xp');

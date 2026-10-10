@@ -213,8 +213,8 @@ Chapter → XP, Gold, recruit, bintang → bila power kurang: Undercroft untuk X
 | Aspek | Story / Campaign | Raid | Roguelike / The Sunken Bell |
 |---|---|---|---|
 | Tujuan | Menyelesaikan campaign dan memulihkan Emberhollow tanpa mengulang pengorbanan sanctuary. | Mengalahkan boss yang dipilih dalam kontrak dan konfigurasi party pilihan. | Bertahan melewati floor, mengembangkan build run, memilih boon, dan mencapai act milestone. |
-| Party | Roster lima belas hero. Party aktif mulai tiga, lalu cap bertambah sampai sembilan (grid 3×3 penuh) seiring progres chapter berurutan. | Satu sampai enam slot dari hero yang direkrut; setiap slot dapat diberi salah satu basic job. | Tepat tiga recruit dengan basic job pilihan; job duplikat diizinkan. |
-| Progres yang dipakai | XP, job, skill, talent, gear, gold, quest, roster, story flags. | Build Raid, boss, variant, tier, modifier, dan konfigurasi Sandbox. | Build Rogue sementara, point job, boon run, floor, dan run wallet. |
+| Party | Roster lima belas hero. Party aktif mulai tiga, lalu cap bertambah sampai sembilan (grid 3×3 penuh) seiring progres chapter berurutan. | Satu sampai enam slot; setiap slot memilih hero yang direkrut (unik) dan salah satu dari sembilan basic job. Hero membawa level, gear, refine, dan talent Story. | Tepat tiga recruit dengan basic job pilihan; job duplikat diizinkan. |
+| Progres yang dipakai | XP, job, skill, talent, gear, gold, quest, roster, story flags. | Loadout Story (XP, gear, refine, talent, job/skill bila class sama), build Raid, boss, variant, tier, modifier, dan konfigurasi Sandbox. | Build Rogue sementara, point job, boon run, floor, dan run wallet. |
 | Progres permanen | Chapter clear, recruit, hero build, quest, gold, narrative flags. | Ledger, reward Crystal jika kontrak tervalidasi, dan challenge unlock sesuai receipt. | Bank Crystal pada milestone act, best-floor data, dan challenge unlock. |
 | Perjalanan run | Chapter berisi beberapa stage berurutan. | Satu encounter boss per kontrak. | Satu floor/encounter per clear; milestone act berada di floor 3, 6, dan 9. |
 | Gagal/keluar | Chapter yang tidak selesai tidak memberi first-clear progression. Hero yang tumbang tidak dibangkitkan di tengah stage. | Kontrak Sandbox/practice tidak memberi bank reward. | Defeat, abandon, atau akhir run menghapus wallet Crystal sementara dan boons run. |
@@ -233,28 +233,36 @@ Chapter yang sudah selesai dapat diulang dalam mode Heroic: musuh +60% HP, +45% 
 
 ### Raid
 
-Pemain memilih boss archetype atau variant, tier Bronze/Silver/Gold, modifier, jumlah party 1 sampai 6, dan basic job untuk setiap slot. Kontrak yang tercatat dalam katalog immutable dan kombinasi modifier yang dikalibrasi dapat memberi bank Crystal pada victory. Slider Sandbox atau modifier di luar daftar kombinasi reward menjadikan encounter practice; kemenangan practice tidak menghasilkan bank Crystal.
+Pemain memilih boss archetype dan variant (chip T1–T4), tier Bronze/Silver/Gold, modifier pakta (maksimal tiga), jumlah party 1 sampai 6, hero untuk setiap slot (hero yang direkrut, tidak boleh dobel), dan basic job slot itu (sembilan class). Party bawaan adalah party Story lebih dulu, lalu roster sesuai urutan rekrut. Mengubah jumlah party mempertahankan hero, class, dan tile yang sudah dipilih; hero tambahan masuk ke tile kosong. Archetype hanya bisa diburu setelah tercatat di ledger (pernah dikalahkan), chapter pertamanya selesai, atau hunt quest-nya terbuka; archetype lain tampil sebagai tile terkunci "???" dengan petunjuk chapter. Kontrak yang tercatat dalam katalog immutable dan kombinasi modifier yang dikalibrasi memberi bank Crystal pada victory; layar setup menampilkan total bayaran (tier dan jumlah pakta). Slider Sandbox atau modifier di luar daftar kombinasi reward menjadikan encounter practice; kemenangan practice tidak menghasilkan bank Crystal.
 
-Delapan modifier yang didefinisikan saat ini:
+Hero Raid memakai loadout Story: XP (level), gear, refine, dan talent ikut. Job dan dua skill Story hanya ikut bila class slot sama dengan class asli hero; jika pemain mengganti class untuk raid, job dilepas dan skill kembali ke dua skill dasar. Loadout Story tidak pernah diubah oleh build Raid.
 
-| Modifier | Tekanan | Risk points |
-|---|---|---:|
-| Fractured Armor | Barrier efektif berkurang 25%. | 1 |
-| Long Night | Jatah potion berkurang satu, minimum satu untuk party solo. | 1 |
-| Echo Pulse | Aftershock menyusul ritual. | 2 |
-| Hunting Choir | Weakest mark menyusul breath. | 2 |
-| Restless Brood | Gelombang minion tambahan saat pergantian phase. | 1 |
-| Narrow Paths | Satu tile tertutup sementara secara bergilir. | 1 |
-| Patient Colossus | HP boss naik 20%, windup naik 10%. | 0 |
-| Last Lantern | Objective lantern opsional mengurangi bonus jika gagal. | 2 |
+Floor raid adalah jumlah chapter Story yang selesai + 1. Boss memakai HP boss chapter itu × `RAID_HP` (1,1) dan damage chapter itu × `RAID_DMG` (1,1); setelah chapter terakhir keduanya terus naik per floor. HP boss diskalakan ke ukuran party relatif terhadap cap party Story chapter itu (pangkat 0,9), dan party yang lebih kecil dari cap juga menerima damage lebih ringan (pangkat `RAID_PARTY_DMG` = 0,5; party lebih besar tidak menambah damage). Tier kontrak menambah tekanan di atasnya (`RAID_TIER_SCALE`): Bronze ×1 HP / ×1 damage, Silver ×1,15 / ×1,1, Gold ×1,3 / ×1,2. Practice (Sandbox) mengabaikan tier dan memakai slider sendiri.
 
-Tidak semua kombinasi modifier mempunyai status reward-eligible. Source saat ini mengizinkan kombinasi terkalibrasi: tanpa modifier, RM01, RM02, RM03, RM05, RM06, serta RM01+RM02. Kombinasi lain dapat dipakai sebagai Sandbox tetapi tidak memberi payout kontrak.
+Delapan modifier didefinisikan; empat disimulasikan saat ini dan sisanya tampil nonaktif dengan label "belum tersedia":
+
+| Modifier | Tekanan | Risk points | Status |
+|---|---|---:|---|
+| Fractured Armor (RM01) | Barrier yang didapat selama raid (skill shield, ultimate, overheal) berkurang 25%. | 1 | Aktif |
+| Long Night (RM02) | Jatah potion menjadi satu. | 1 | Aktif |
+| Echo Pulse (RM03) | Setiap serangan seluruh grid yang mendarat disusul aftershock bertelegraph (5 detik) pada tile satu hero; interrupt yang memutus ritual mencegahnya. | 2 | Aktif |
+| Hunting Choir (RM04) | Weakest mark menyusul breath. | 2 | Belum tersedia |
+| Restless Brood (RM05) | Setiap kali boss masuk phase berikutnya, gelombang minion tambahan muncul di lane yang kosong. | 1 | Aktif |
+| Narrow Paths (RM06) | Satu tile tertutup sementara secara bergilir. | 1 | Belum tersedia |
+| Patient Colossus (RM07) | HP boss naik 20%, windup naik 10%. | 0 | Belum tersedia |
+| Last Lantern (RM08) | Objective lantern opsional mengurangi bonus jika gagal. | 2 | Belum tersedia |
+
+Kombinasi reward-eligible: tanpa modifier, RM01, RM02, RM03, RM05, serta RM01+RM02, pada setiap tier. Kombinasi lain tetap dimainkan dengan paktanya, tetapi sebagai practice tanpa payout kontrak. Bell Tonic (lihat Currency) dapat dicentang di setup untuk +1 potion.
+
+Gate balance (`npm run balance`) membangun raid persis seperti runtime (roster dan loadout Story, build Raid tiga hero, kontrak authored): pemain expert harus menang melawan semua 72 musuh di Bronze, setiap archetype di Silver dan Gold, setiap kombinasi pakta bersertifikat, party enam hero, dan raid Bronze setiap archetype setelah chapter 2, 6, dan 10. Win rate pemain casual dilaporkan sebagai informasi (sekitar 90% di Bronze pada akhir campaign; Silver dan Gold makin sulit).
 
 ### Roguelike
 
-Run dimulai dengan tiga recruit dan satu pilihan basic job per recruit. Room clear memberi point untuk promosi job run; satu job tier-2 menghabiskan satu point dan tier-3 menghabiskan total dua. Point dibelanjakan di layar draft boon antar-floor, dan job baru berlaku untuk sisa run. Setiap kemenangan menawarkan sampai tiga boon yang belum dimiliki. Memilih boon memulihkan party sebelum descent berikutnya. Jika semua 12 boon telah dikumpulkan, tombol continuation tetap mengizinkan run berlanjut tanpa draft baru.
+Run dimulai dengan tiga recruit dan satu pilihan basic job per recruit. Room clear memberi point untuk promosi job run; satu job tier-2 menghabiskan satu point dan tier-3 menghabiskan total dua. Point dibelanjakan di layar draft boon antar-floor, dan job baru berlaku untuk sisa run; recruit yang sudah dipromosikan memulai setiap floor berikutnya dengan skill job-nya. Setiap kemenangan menawarkan sampai tiga boon yang belum dimiliki (empat dengan Fate Relic). Memilih boon memulihkan party sebelum descent berikutnya. Jika semua 12 boon telah dikumpulkan, tombol continuation tetap mengizinkan run berlanjut tanpa draft baru.
 
 Roguelike memiliki tiga act milestone pada floor 3, 6, dan 9. Bank reward milestone adalah 6, 8, dan 22 Crystal. Floor setelah act ketiga adalah practice yang dapat diulang tanpa receipt milestone baru. Run wallet mendapatkan tiga Crystal per room dan terpisah dari bank Commander. Shop run (sebelum room dimulai): Mending Shard memberi setiap hero barrier 30% HP maksimum untuk room itu, Fate Reroll mengacak ulang boon yang ditawarkan setelah room itu, dan Ember Upgrade memberi power party +15% untuk room itu. Wallet sementara hilang saat run selesai, ditinggalkan, atau kalah.
+
+Relik bank (dibeli permanen dengan Commander Crystal) berlaku di setiap run: Ward Relic memberi +1 potion dan barrier 15% HP maksimum untuk setiap hero di awal setiap floor; Fate Relic menambah kartu boon keempat di setiap draft.
 
 Dua belas boon:
 
@@ -275,7 +283,7 @@ Dua belas boon:
 
 ### Batas antar-mode
 
-Story Gold, hero XP, recruitment, gear, dan story flags tetap berada di Story state. Raid dan Roguelike memakai build mode masing-masing. Bank Commander Crystal dan challenge unlocks dirancang untuk digunakan lintas Challenge mode; run Crystal hanya berlaku di dalam run. Tidak ada pertukaran Story Gold menjadi run currency. Satu-satunya hasil Challenge yang masuk ke party Story adalah XP hero dari kemenangan Raid: XP itu menaikkan slot Story `auto` (nilai terbesar yang dipakai), sedangkan gear, job, talent, gold, dan slot manual Story tidak disentuh. Ledger (jumlah kill per musuh, victory, raid), total kemenangan, settlement receipt, dan floor Roguelike terdalam adalah statistik akun yang dibaca semua mode, sehingga hunt quest, Bestiary, dan descent quest di Story ikut menghitung progres dari Raid dan Roguelike. HUD selalu menampilkan Story Gold dan bank Crystal; Gold hanya bisa dibelanjakan di Story dan Crystal hanya di Challenge.
+Story Gold, hero XP, recruitment, gear, dan story flags tetap berada di Story state. Roguelike memakai build run sendiri (recruit level 1). Raid membaca loadout Story (level, gear, refine, talent) tanpa mengubahnya; build Raid hanya memilih hero, class sementara, dan tile. Bank Commander Crystal dan challenge unlocks dirancang untuk digunakan lintas Challenge mode; run Crystal hanya berlaku di dalam run. Tidak ada pertukaran Story Gold menjadi run currency. Satu-satunya hasil Challenge yang masuk ke party Story adalah XP hero dari kemenangan Raid: XP itu menaikkan slot Story `auto` (nilai terbesar yang dipakai), sedangkan gear, job, talent, gold, dan slot manual Story tidak disentuh. Ledger (jumlah kill per musuh, victory, raid), total kemenangan, settlement receipt, dan floor Roguelike terdalam adalah statistik akun yang dibaca semua mode, sehingga hunt quest, Bestiary, dan descent quest di Story ikut menghitung progres dari Raid dan Roguelike. HUD selalu menampilkan Story Gold dan bank Crystal; Gold hanya bisa dibelanjakan di Story dan Crystal hanya di Challenge.
 
 ## 7. Aturan combat
 
@@ -412,13 +420,13 @@ Objective dihitung dari progres tercatat. Pemain harus menekan claim; reward tid
 | Currency | Pemakaian | Batas |
 |---|---|---|
 | Gold | Talent, job promotion, gear, quest reward, dan reward encounter Story. Profile baru mulai dengan 60 Gold. | Tidak dijual dengan uang nyata dalam runtime. |
-| Commander Crystal | Bank Challenge lintas Raid/Roguelike dan pembelian unlock di Challenge Shop. | Tidak sama dengan run Crystal. |
+| Commander Crystal | Bank Challenge lintas Raid/Roguelike: relik permanen di Challenge Shop dan Bell Tonic yang bisa dibeli berulang saat berangkat. | Tidak sama dengan run Crystal; hanya bisa dibelanjakan di mode Raid/Roguelike. |
 | Run Crystal | Mata uang sementara untuk pilihan item dalam run Roguelike. | Bertambah tiga per room; hilang saat run berakhir, abandon, atau defeat. |
 | Material map | Field pada economy profile tersedia. | Loop material gathering/crafting tidak dinyatakan sebagai fitur baseline yang lengkap oleh source/GDD ini. |
 
 Raid Crystal hanya dibayar oleh victory pada kontrak authored dan tervalidasi. Kontrak practice atau Sandbox memberi nol bank reward. Base payout Bronze/Silver/Gold adalah 12/18/26 Crystal. Risk points kontrak mencakup tier (0/3/6) dan modifier; bonus risk dibatasi maksimum 60%, lalu setiap modifier memberi bonus 3 Crystal. Final payout dibulatkan ke integer terdekat.
 
-Challenge Shop menyediakan tiga item run: Mending Shard seharga 8 Run Crystal, Fate Reroll seharga 12, dan Ember Upgrade seharga 18. Bank unlock Ward Relic seharga 24 Commander Crystal dan Fate Relic seharga 36. Definisi unlock ada di economy catalog. Efek gameplay lanjutan setiap unlock tidak boleh disimpulkan hanya dari nama item.
+Challenge Shop menyediakan tiga item run: Mending Shard seharga 8 Run Crystal, Fate Reroll seharga 12, dan Ember Upgrade seharga 18. Bank unlock permanen: Ward Relic seharga 24 Commander Crystal (setiap floor Roguelike +1 potion dan barrier awal 15% HP maksimum per hero) dan Fate Relic seharga 36 (draft boon Roguelike menawarkan 4 pilihan). Sink berulang: Bell Tonic seharga 6 Commander Crystal, dicentang di setup Raid atau Roguelike dan dibayar saat run dimulai (setelah encounter berhasil dibuat, sehingga keberangkatan yang gagal tidak memotong Crystal), memberi +1 potion untuk raid itu atau floor pertama run Roguelike itu (bila Crystal tidak cukup, centang dinonaktifkan).
 
 ### Settlement dan kegagalan
 

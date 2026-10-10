@@ -18,7 +18,7 @@ import { Battle, type BattleEvent, type BattleOptions } from './game/simulation'
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
 import { CAMPAIGN, BOONS, boonChoices } from './game/world';
-import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult } from './game/profile';
+import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, ownsChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult } from './game/profile';
 import { startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fightScale, dungeonXP, type Outcome } from './game/dungeon';
 import { chapterStars } from './game/journey';
 import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
@@ -34,9 +34,9 @@ import { copyLegacyToCommander, createCommanderDocument, createRunCheckpoint, te
 import { storyBattleOptions, setStoryParty, normalizeStoryParty } from './game/story-party';
 import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-build';
 import { JOBS } from './game/jobs';
-import { createRaidBuild, setRaidJob, setRaidPartySize, normalizeRaidBuild } from './game/raid-build';
+import { defaultRaidBuild, setRaidJob, setRaidHero, setRaidPartySize, normalizeRaidBuild, openRaidQuarry, raidQuarryUnlocked } from './game/raid-build';
 import { QUESTS, questProgress } from './game/quests';
-import { CHALLENGE_SHOP, createRunWallet, creditRun, resetRunWallet, getRaidContractForEnemy, roguelikeMilestoneForFloor, buyRunItem, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
+import { BELL_TONIC, CHALLENGE_SHOP, RELIC_IDS, bankShopItem, createRunWallet, creditRun, resetRunWallet, getRaidContractForEnemy, sandboxRaidContract, roguelikeMilestoneForFloor, buyRunItem, buyBellTonic, boonDraftSize, raidModifierAvailable, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
 import { t, lang, setLang, gameText, type Lang } from './i18n';
 import { localizeContent, eventText } from './i18n/content';
 
@@ -190,6 +190,7 @@ let runWallet: RunWallet = createRunWallet();
 let runSeed = Date.now() % 1000000;
 /** Fate Rerolls bought for the current room; shifts the seed of the boon draft that follows it. */
 let boonReroll = 0;
+let huntTarget: string | undefined;
 let offeredBoons: typeof BOONS = [];
 let resumeOnClose = false;
 let pauseForDetails = false;
@@ -198,7 +199,7 @@ type PartyHero = (typeof battle.heroes)[number];
 const partyHealthViews = new Map<number, PartyHealthView[]>();
 let resultGeneration: ResultGateGeneration | undefined;
 const townState: TownState = {
-  tab: 'camp', hero: 0, zone: Math.min(profile.cleared.length, CAMPAIGN.length - 1), raid: 'golem', raidTier: 'bronze', raidModifiers: [], raidBuild: createRaidBuild(profile.roster, Math.min(3, profile.roster.length, 6)), notice: '',
+  tab: 'camp', hero: 0, zone: Math.min(profile.cleared.length, CAMPAIGN.length - 1), raid: 'golem', raidTier: 'bronze', raidModifiers: [], raidBuild: defaultRaidBuild(profile), notice: '',
   trainingTab: 'formation', campaignPage: 0, questPage: 0, bestiaryPage: 0,
 };
 
@@ -303,6 +304,8 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   if (battle.status === 'fighting') battle.pause();
   townState.tab = tab;
   townState.notice = notice;
+  // A locked quarry (unseen boss, chapter not cleared) is never offered: fall back to the first open one.
+  if (tab === 'raid') { townState.raid = openRaidQuarry(profile, townState.raid) ?? townState.raid; huntTarget = undefined; }
   $('town-screen').hidden = false;
   $('battle-screen').hidden = true;
   document.body.dataset.screen = tab === 'camp' ? 'camp' : 'town';
@@ -499,6 +502,7 @@ $('town-screen').addEventListener('click', event => {
     return;
   }
   if (button.dataset.raid) { townState.raid = button.dataset.raid; townState.raidSandbox = undefined; showTown('raid', '', true); return; }
+  if (button.dataset.raidVariant) { townState.raid = button.dataset.raidVariant; townState.raidSandbox = undefined; showTown('raid'); return; }
   if (button.dataset.bankBuy) {
     const item = buyChallengeUnlock(profile, button.dataset.bankBuy);
     showTown(townState.tab, item ? t('notice.bank.ok', { name: item.name }) : t('notice.bank.fail'));
@@ -547,7 +551,8 @@ $('town-screen').addEventListener('click', event => {
     }
   }
   if(button.dataset.trackQuest){const q=QUESTS.find(q=>q.id===button.dataset.trackQuest);if(q&&questProgress(profile,q).unlocked){profile.trackedQuest=q.id;showTown('quests',t('notice.quest.track'));}}
-  if(button.dataset.questHunt){townState.raid=button.dataset.questHunt;townState.raidSandbox=undefined;navigateTown('raid');}
+  // The hunt target survives the switch into Raid mode (activateCommander would restore the stored contract's boss).
+  if(button.dataset.questHunt){townState.raid=huntTarget=button.dataset.questHunt;townState.raidSandbox=undefined;navigateTown('raid');}
   if (button.dataset.depart) {
     depart(button.dataset.depart as Mode);
   }
@@ -564,7 +569,13 @@ $('town-screen').addEventListener('change', event => {
     if(Number.isInteger(slot)&&slot>=0&&slot<3){jobs[slot]=el.value as never;if(setRogueJobs(build,jobs))townState.rogueSetup=build;}
     showTown('endless');return;
   }
-  if(el.matches('[data-raid-variant]')){townState.raid=el.value;townState.raidSandbox=undefined;showTown('raid');return;}
+  if(el.matches('[data-bell-tonic]')){const item=bankShopItem(BELL_TONIC)!;townState.tonic=(el as unknown as HTMLInputElement).checked;showTown(townState.tab,townState.tonic?t('notice.tonic.on',{n:item.cost}):t('notice.tonic.off'));return;}
+  if(el.matches('[data-raid-hero]')){
+    const build=(townState.raidBuild&&normalizeRaidBuild(townState.raidBuild,profile.roster))??defaultRaidBuild(profile);
+    const ok=setRaidHero(build,Number(el.dataset.raidHero),Number(el.value),profile.roster);
+    if(ok)townState.raidBuild=build;
+    showTown('raid',ok?t('notice.raid.hero.ok'):t('notice.raid.hero.fail'));return;
+  }
   if(el.matches('[data-raid-tier]')){
     townState.raidTier=el.value as RaidTier;
     const certified=getRaidContractForEnemy(townState.raid,townState.raidTier,townState.raidModifiers);
@@ -576,6 +587,8 @@ $('town-screen').addEventListener('change', event => {
   if(el.matches('[data-raid-modifier]')){
     const input=el as unknown as HTMLInputElement;
     const id=input.dataset.raidModifier as RaidModifierId;
+    // At most three pacts at once (the contract format's limit); unbuilt pacts are never applied.
+    if(!raidModifierAvailable(id)||input.checked&&townState.raidModifiers.length>=3){showTown('raid');return;}
     townState.raidModifiers=input.checked?[...townState.raidModifiers,id]:townState.raidModifiers.filter(value=>value!==id);
     const certified=getRaidContractForEnemy(townState.raid,townState.raidTier,townState.raidModifiers);
     const sandbox=townState.raidSandbox;
@@ -584,13 +597,13 @@ $('town-screen').addEventListener('change', event => {
     showTown('raid');return;
   }
   if(el.matches('[data-raid-party-size]')){
-    const build=(townState.raidBuild&&normalizeRaidBuild(townState.raidBuild,profile.roster))??createRaidBuild(profile.roster,Math.min(3,profile.roster.length,6));
+    const build=(townState.raidBuild&&normalizeRaidBuild(townState.raidBuild,profile.roster))??defaultRaidBuild(profile);
     const ok=setRaidPartySize(build,Number(el.value),profile.roster);
     if(ok)townState.raidBuild=build;
     showTown('raid',ok?t('notice.raid.party.ok'):t('notice.raid.party.fail'));return;
   }
   if(el.matches('[data-raid-job]')){
-    const build=(townState.raidBuild&&normalizeRaidBuild(townState.raidBuild,profile.roster))??createRaidBuild(profile.roster,Math.min(3,profile.roster.length,6));
+    const build=(townState.raidBuild&&normalizeRaidBuild(townState.raidBuild,profile.roster))??defaultRaidBuild(profile);
     const ok=setRaidJob(build,Number(el.dataset.raidJob),el.value);
     if(ok)townState.raidBuild=build;
     showTown('raid',ok?t('notice.raid.job.ok'):t('notice.raid.job.fail'));return;
@@ -724,6 +737,7 @@ function depart(mode: Mode) {
   if (mode === 'adventure' && !canEnterZone(profile, townState.zone)) return;
   const existing = commander.document?.encounters?.[commander.mode];
   if (existing && !existing.settled) { void restoreEncounter(existing); return; }
+  if (mode === 'raid' && !raidQuarryUnlocked(profile, townState.raid)) return;
   const firstVisit = mode === 'adventure' && !profile.cleared.includes(townState.zone) && !introSeen(townState.zone);
   if (firstVisit && typeof navigator !== 'undefined' && !navigator.webdriver) { sound.unlock(); void chapterIntro(townState.zone).then(() => startDeparture(mode)); return; }
   startDeparture(mode);
@@ -734,7 +748,11 @@ function startDeparture(mode: Mode) {
   runWallet = createRunWallet();
   runSeed = Date.now() % 1000000;
   const heroic = mode === 'adventure' && townState.heroic === true && profile.cleared.includes(townState.zone);
-  boot(mode, mode === 'adventure' ? townState.zone + 1 : mode === 'raid' ? profile.cleared.length+1 : 1, mode === 'endless' ? { rogueBuild: structuredClone(townState.rogueSetup ?? createRogueBuild()) } : heroic ? { heroic: true } : {});
+  // A ticked Bell Tonic adds one potion to this raid or the run's first floor; its bank Crystal is paid only once the battle exists.
+  const tonic = (mode === 'raid' || mode === 'endless') && townState.tonic === true && profile.economy.commanderCrystal >= bankShopItem(BELL_TONIC)!.cost;
+  townState.tonic = false;
+  boot(mode, mode === 'adventure' ? townState.zone + 1 : mode === 'raid' ? profile.cleared.length+1 : 1, { ...(mode === 'endless' ? { rogueBuild: structuredClone(townState.rogueSetup ?? createRogueBuild()) } : heroic ? { heroic: true } : {}), ...(tonic ? { extraPotions: 1 } : {}) });
+  if (tonic) { if (buyBellTonic(profile.economy, mode === 'raid' ? 'raid' : 'roguelike')) syncProfileEconomy(profile); else battle.potions = Math.max(0, battle.potions - 1); }
   void ensureCommander().then(() => {
     if (commander.document) {
       commander.document.activeMode = commander.mode;
@@ -747,6 +765,23 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   if (commander.document && commander.mode !== commanderMode) {
     activateCommander(commander.document, commanderMode);
   }
+  const milestone = mode === 'endless' ? roguelikeMilestoneForFloor(floor) : undefined;
+  // A raid build that no longer fits the roster falls back to the default party instead of failing the departure.
+  if (mode === 'raid') townState.raidBuild = (townState.raidBuild && normalizeRaidBuild(townState.raidBuild, profile.roster)) ?? defaultRaidBuild(profile);
+  // Build the battle before leaving town, so a refused setup leaves the town (and any unpaid tonic) untouched.
+  const next = new Battle(mode, floor, profileModifiers(profile), {
+    roster: [...profile.roster], loadouts: structuredClone(profile.loadouts),
+    boons: [...runBoons], settlementId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    ...(mode === 'raid' ? {
+      enemyId: townState.raid,
+      // An uncertified pact combo still plays its pacts, as practice (no Crystal).
+      raidContract: getRaidContractForEnemy(townState.raid, townState.raidTier, townState.raidModifiers) ?? sandboxRaidContract({ bossId: townState.raid, tier: townState.raidTier, modifiers: townState.raidModifiers }),
+      raidBuild: structuredClone(townState.raidBuild),
+      raidSandbox: townState.raidSandbox ? structuredClone(townState.raidSandbox) : undefined,
+    } : {}),
+    ...(mode === 'endless' && milestone ? { runWallet, runAct: milestone.act, runActClear: milestone.actClear, runFinalClear: milestone.finalClear, relics: RELIC_IDS.filter(id => ownsChallengeUnlock(profile, id)) } : {}), ...options,
+    ...(mode === 'adventure' || mode === 'dungeon' ? storyBattleOptions(profile) : {}),
+  });
   inTown = false;
   resultRequest++;
   presentingResult = false;
@@ -755,19 +790,7 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   $('battle-screen').dataset.battleView = 'arena';
   document.querySelectorAll<HTMLButtonElement>('.battle-view-tabs [data-battle-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.battleView === 'arena')));
   $('battle-detail-pause-note').hidden = true;
-  const milestone = mode === 'endless' ? roguelikeMilestoneForFloor(floor) : undefined;
-  battle = new Battle(mode, floor, profileModifiers(profile), {
-    roster: [...profile.roster], loadouts: structuredClone(profile.loadouts),
-    boons: [...runBoons], settlementId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    ...(mode === 'raid' ? {
-      enemyId: townState.raid,
-      raidContract: getRaidContractForEnemy(townState.raid, townState.raidTier, townState.raidModifiers),
-      raidBuild: structuredClone(townState.raidBuild),
-      raidSandbox: townState.raidSandbox ? structuredClone(townState.raidSandbox) : undefined,
-    } : {}),
-    ...(mode === 'endless' && milestone ? { runWallet, runAct: milestone.act, runActClear: milestone.actClear, runFinalClear: milestone.finalClear } : {}), ...options,
-    ...(mode === 'adventure' || mode === 'dungeon' ? storyBattleOptions(profile) : {}),
-  });
+  battle = next;
   recorded = false;
   experienceRewards=[];
   offeredBoons = [];
@@ -1566,7 +1589,7 @@ async function presentResult() {
     pendingSettlement = false;
     recorded = true;
   }
-  if (won && battle.mode === 'endless') { offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 7919 + boonReroll * 104729); boonReroll = 0; }
+  if (won && battle.mode === 'endless') { offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 7919 + boonReroll * 104729, boonDraftSize(profile.challengeUnlocks)); boonReroll = 0; }
   $('start-overlay').hidden = false;
   $('ready-label').textContent = '';
   $('ready-title').textContent = won ? moreWaves ? t('ready.after.wave') : t('ready.after.win') : t('ready.after.lose');
@@ -1593,7 +1616,7 @@ async function presentResult() {
       </header>
       <section class="win rogue-promote" id="rogue-promote" aria-live="polite"></section>
       ${!offeredBoons.length ? `<button id="next-floor" class="btn primary">${t('boon.allcollected')}</button>` : ''}
-      <div class="boon-draft-grid">${cardsHtml}</div>
+      <div class="boon-draft-grid" data-cards="${offeredBoons.length}">${cardsHtml}</div>
       <footer class="boon-modal-footer"><button id="result-town" class="btn">${t('boon.abandon')}</button></footer>
     </div>`);
     renderRoguePromote();
@@ -1836,9 +1859,9 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
   const rogue = storedStateFor(document, 'roguelike', 'auto');
   const raid = storedStateFor(document, 'raid', 'auto');
   townState.rogueSetup = rogue && 'bestFloor' in rogue ? structuredClone(rogue.build) : createRogueBuild();
-  townState.raidBuild = raid && 'build' in raid && raid.build && 'slots' in raid.build ? structuredClone(raid.build) : createRaidBuild(profile.roster, Math.min(3,profile.roster.length,6));
+  townState.raidBuild = raid && 'build' in raid && raid.build && 'slots' in raid.build ? structuredClone(raid.build) : defaultRaidBuild(profile);
   const contract = raid && 'contract' in raid ? raid.contract : undefined;
-  townState.raid = contract?.bossId ?? 'golem'; townState.raidTier = contract?.tier ?? 'bronze'; townState.raidModifiers = [...(contract?.modifiers ?? [])];
+  townState.raid = huntTarget ?? contract?.bossId ?? 'golem'; townState.raidTier = contract?.tier ?? 'bronze'; townState.raidModifiers = (contract?.modifiers ?? []).filter(raidModifierAvailable);
   townState.raidSandbox = raid && 'sandbox' in raid ? raid.sandbox : undefined;
   townState.pendingGear = undefined; townState.hero = profile.roster[0]; townState.zone = Math.min(profile.cleared.length,CAMPAIGN.length-1);
   sound.enabled = profile.sound; scene.reducedMotion = !profile.motion;

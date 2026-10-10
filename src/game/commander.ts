@@ -1,6 +1,6 @@
 import { getRaidContractForEnemy, normalizeRaidSandbox, normalizeRaidModifiers, type RaidContract, type RaidSandbox } from '../economy/challenge';
 import { createProfile, normalizeProfile, type Loadout, type Profile } from './profile';
-import { createRaidBuild, normalizeRaidBuild, validRaidBuild, type RaidBuild } from './raid-build';
+import { defaultRaidBuild as createDefaultRaidBuild, normalizeRaidBuild, validRaidBuild, type RaidBuild } from './raid-build';
 import { createRogueBuild, normalizeRogueBuild, validRogueBuild, type RogueBuild } from './roguelike-build';
 import { ENEMIES } from './world';
 
@@ -266,7 +266,7 @@ function applyShared(profile: Profile, shared: SharedCommanderState): void {
 function defaultRaidBuild(profile: Profile): RaidBuild | undefined {
   if (profile.roster.length < 1) return undefined;
   try {
-    return createRaidBuild(profile.roster, Math.min(3, profile.roster.length, 6));
+    return createDefaultRaidBuild(profile);
   } catch {
     return undefined;
   }

@@ -21,7 +21,8 @@ const qaProfile = {
   wins: 5,
   sound: false,
   motion: true,
-  economy: { commanderCrystal: 120, journeyPurse: 0 }
+  // A complete economy record: an incomplete one makes the save malformed and the game boots a fresh profile instead.
+  economy: { gold: 1500, materials: {}, commanderCrystal: 120 }
 };
 
 // 1. Desktop Suite (1440x900)

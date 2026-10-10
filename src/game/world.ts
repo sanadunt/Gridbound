@@ -52,12 +52,13 @@ export const BOONS: BoonDef[] = [
   {id:'lifeline',name:'Not Yet, Little Flame',patron:'HEARTH · SURVIVAL',description:'Sekali per hero per floor, pukulan fatal menyisakan 20% HP. Kesempatan kedua, bukan kebal.'},
   {id:'chorus',name:'Many Hands, One Song',patron:'CHORUS · ROTATION',description:'Tap hero berbeda dari tap sebelumnya memberi hero itu Battle Hymn selama 2 detik (+30% power, +20% tempo).'},
 ];
-export function boonChoices(owned: string[], seed: number): BoonDef[] {
+/** A seeded boon draft of `count` not-yet-owned boons (3, or 4 with the Fate Relic). */
+export function boonChoices(owned: string[], seed: number, count = 3): BoonDef[] {
   const pool = BOONS.filter(b => !owned.includes(b.id));
   let state = seed >>> 0;
   for (let i = pool.length - 1; i > 0; i--) {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
     const j = state % (i + 1); [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return pool.slice(0, 3);
+  return pool.slice(0, Math.max(1, Math.min(4, Math.floor(count) || 3)));
 }

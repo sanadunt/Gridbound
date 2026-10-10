@@ -116,7 +116,7 @@ test('frozen raid modifiers are served through contentText', () => {
   assert.equal(localizedRaidModifier(RAID_MODIFIERS[1], 'en').description, 'Potion limit −1; solo runs still get at least 1.');
   assert.equal(localizedRaidModifier(RAID_MODIFIERS[1], 'en').name, 'Long Night');
   assert.equal(contentText('raidModifier.RM07.description', 'id'), 'Boss HP +20%, windup +10%.');
-  assert.equal(contentText('raidModifier.RM01.description', 'en'), 'Effective barrier −25%.');
+  assert.equal(contentText('raidModifier.RM01.description', 'en'), 'Barrier gained during the raid −25%.');
 });
 
 test('eventText maps simulation strings in both directions', () => {

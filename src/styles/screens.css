@@ -110,9 +110,20 @@
 .raid-roster button img { width: 56px; height: 56px; object-fit: contain; }
 .raid-roster button b { font-weight: 600; font-size: 12px; }
 .raid-roster button.chosen { border-color: var(--gold); background: #e5c68722; }
+.raid-roster button.locked { opacity: .55; cursor: not-allowed; border-style: dashed; }
+.raid-roster button.locked small { font-size: 10px; color: var(--ink-dim); text-align: center; line-height: 1.2; }
+.raid-lock { display: grid; place-items: center; width: 56px; height: 56px; font-family: var(--pixel); font-size: 22px; color: var(--ink-dim); }
+.raid-variants { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+.raid-variant-chip { min-height: 44px; padding: 6px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink); font-size: 12px; flex: 1 1 140px; }
+.raid-variant-chip.chosen { border-color: var(--gold); background: #e5c68722; color: var(--gold); }
 .raid-variant, .raid-tier, .raid-party-size { margin-top: 8px; color: var(--ink-soft); }
-.raid-party-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 8px 0; }
+.raid-total { margin: 8px 0 0; font-family: var(--pixel); font-size: 9px; line-height: 1.6; color: var(--gold); }
+.raid-party-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 8px 0; }
+.raid-party-slot { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); gap: 6px; align-items: center; }
 .raid-party-slot span { font-size: 14px; }
+.raid-party-slot select { min-width: 0; width: 100%; }
+.raid-modifier.unavailable { opacity: .55; }
+.bell-tonic { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
 .raid-modifiers { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .raid-modifier { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; padding: 4px 0; }
 .raid-modifier small { display: block; color: var(--ink-dim); }
@@ -128,10 +139,14 @@
 .shop-item p { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); }
 .shop-item .btn { flex-shrink: 0; }
 .shop-cost { font-family: var(--pixel); font-size: 10px; color: var(--mana); white-space: nowrap; }
+.shop-cost.consumable { text-align: right; flex-shrink: 0; }
+.shop-cost.consumable small { display: block; margin-top: 4px; font-family: var(--text); font-size: 11px; color: var(--ink-dim); white-space: nowrap; }
 
 /* Roguelike */
 .endless-rules p { margin: 0; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .endless-rules b { color: var(--gold); font-weight: 600; }
+.endless-kit [data-relics] { margin: 0 0 4px; color: var(--gold); }
+.endless-kit .bell-tonic:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
 
 /* Quests */
 .quest-head p { margin: 0 0 8px; }
