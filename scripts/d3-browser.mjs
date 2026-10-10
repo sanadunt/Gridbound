@@ -35,7 +35,8 @@ try {
     assert.ok(await evaluate('window.gridbound.battle.heroes.some(h=>h.acts>0)'));
     report.checks.push({name:'fresh3 real combat',ids:[0,4,3]});
     // Seed only this disposable origin, through the actual profile/recruitment functions.
-    await evaluate(`(async()=>{const {createProfile,completeZone}=await import('/src/game/profile.ts');const p=createProfile();p.motion=false;for(let i=0;i<4;i++)completeZone(p,i);p.storyActive=[0,4,3,2,7,1];for(const id of p.storyActive)p.loadouts[id].xp=1000;localStorage.setItem('gridbound.v3',JSON.stringify(p));})()`);
+    // The first visit already created a Commander from the starting profile; drop it so the seeded save is migrated instead.
+    await evaluate(`(async()=>{indexedDB.deleteDatabase('gridbound.commanders.r1');const {createProfile,completeZone}=await import('/src/game/profile.ts');const p=createProfile();p.motion=false;for(let i=0;i<4;i++)completeZone(p,i);p.storyActive=[0,4,3,2,7,1];for(const id of p.storyActive)p.loadouts[id].xp=1000;localStorage.setItem('gridbound.v3',JSON.stringify(p));})()`);
     await send('Page.reload');await wait('window.gridbound?.profile().roster.length===9');
     await click.nav('more');
     await wait('Boolean(document.querySelector(".more-scene"))');

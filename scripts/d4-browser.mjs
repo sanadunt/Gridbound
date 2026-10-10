@@ -242,6 +242,14 @@ async function runBrowserScenario() {
         await action('leave Raid baseline', leaveBattle);
       }
 
+      // Every session has a Commander, so the Roguelike setup shows the materialized Roguelike profile (gold 0):
+      // take the Story baseline in camp, where the Story profile is active.
+      let storyProfileBeforeRogue;
+      await action('capture the Story profile in camp', async () => {
+        await click.nav('camp');
+        await wait(`${townReady()} && document.querySelector(".town-game-shell")?.dataset.townRoute === "camp"`, 10000);
+        storyProfileBeforeRogue = await evaluate('window.gridbound.profile()');
+      });
       const rogueOpened = await action('open Roguelike setup', async () => {
         await click.nav('campaign');
         await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
@@ -287,7 +295,6 @@ async function runBrowserScenario() {
         return { values, departureDisabled: departure };
       });
 
-      const storyProfileBeforeRogue = await evaluate('window.gridbound.profile()');
       const rogueStarted = await action('depart selected Roguelike build', async () => {
         await click('[data-depart="endless"]');
         await wait(battleReady('endless'), 10000);

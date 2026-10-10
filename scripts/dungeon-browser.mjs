@@ -1,5 +1,7 @@
 // Undercroft, progress and Heroic: the camp guide, party power and chapter stars on the map, the
-// Heroic toggle, a dungeon run (map, rooms, a fight and its result) and forge refinement.
+// Heroic toggle, a dungeon run (map, rooms, a fight and its result) and forge refinement. Room results are
+// saved the moment they appear: a reload on the result screen keeps a win and cannot undo a wipe, and a failed
+// save there offers retry/export and the retry saves the same outcome once.
 import assert from 'node:assert/strict';
 import { withBrowser } from './browser-harness.mjs';
 
@@ -17,6 +19,8 @@ const qaProfile = {
 for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop' }, { width: 390, height: 844, mobile: true, tag: 'mobile' }]) {
   console.log(`--- Undercroft & progress (${viewport.tag}) ---`);
   await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) => {
+    // QA switch: while localStorage['qa.failPut'] is set, IndexedDB writes fail as if storage were full.
+    await send('Page.addScriptToEvaluateOnNewDocument', { source: `{ const put = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function (...args) { if (localStorage.getItem('qa.failPut')) throw new DOMException('QA quota exceeded', 'QuotaExceededError'); return put.apply(this, args); }; }` });
     await send('Page.navigate', { url });
     await wait('window.gridbound && document.querySelector("canvas")');
     await evaluate(`indexedDB.deleteDatabase('gridbound.commanders.r1'); localStorage.clear(); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(qaProfile)}))`);
@@ -61,33 +65,68 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     await screenshot(`artifacts/dungeon-map-${viewport.tag}.png`);
 
     // Walk rooms until a fight has been won (resolving events, treasure and camps on the way).
+    const saveState = '(() => { const p = window.gridbound.profile(), run = p.journey.run; return { xp: p.loadouts[0].xp, wins: p.wins, pouch: run?.pouch.gold, materials: run?.pouch.materials, at: run?.at, status: run?.status, pending: Boolean(run?.pendingFight) }; })()';
+    const reloadToDungeon = async () => {
+      await send('Page.reload');
+      await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
+      await click('.town-spot[data-facility="dungeon"]');
+      await wait('Boolean(document.querySelector(".dungeon-scene"))');
+    };
+    // Resolve events, treasure and camps until a fight is pending; false when the run ends first.
+    const walkToFight = async () => {
+      for (let step = 0; step < 12; step++) {
+        if (await evaluate('window.gridbound.profile().journey.run?.status') !== 'active') return false;
+        if (await evaluate('Boolean(document.querySelector("[data-dungeon-fight]"))')) return true;
+        for (const sel of ['[data-dungeon-choice]', '[data-dungeon-open]', '[data-dungeon-camp="rest"]']) {
+          if (await evaluate(`Boolean(document.querySelector(${JSON.stringify(sel)}))`)) { await click(sel); await wait('Boolean(document.querySelector(".room-outcome")) || Boolean(document.querySelector("[data-dungeon-fight]"))', 5000).catch(() => {}); break; }
+        }
+        if (await evaluate('Boolean(document.querySelector("[data-dungeon-fight]"))')) return true;
+        const before = await evaluate('window.gridbound.profile().journey.run?.at');
+        if (await evaluate('Boolean(document.querySelector(".dungeon-map .room.open"))')) {
+          await click('.dungeon-map .room.open');
+          await wait(`window.gridbound.profile().journey.run?.at !== ${before}`);
+        }
+      }
+      return false;
+    };
+    const resultReady = 'Boolean(document.querySelector("#result-dungeon")) && !document.querySelector("#result-dungeon").disabled';
+    const fight = async (win, shot, failSave = false) => {
+      await click('[data-dungeon-fight]');
+      await wait('window.gridbound.battle.mode === "dungeon" && ["ready", "fighting"].includes(window.gridbound.battle.status)', 15000);
+      if (await evaluate('window.gridbound.battle.status === "ready"')) { await wait('Boolean(document.querySelector("#start:not([hidden]):not(:disabled)"))'); await click('#start'); }
+      await wait('window.gridbound.battle.status === "fighting"');
+      if (shot) await screenshot(`artifacts/dungeon-fight-${viewport.tag}.png`);
+      if (failSave) { await wait('document.querySelector("#storage-status").textContent.startsWith("Saved")'); await evaluate("localStorage.setItem('qa.failPut', '1')"); }
+      await evaluate(win ? 'for (const e of window.gridbound.battle.enemies ?? []) e.hp = 0; window.gridbound.battle.bossHp = 0; window.gridbound.step(.05)' : 'for (const h of window.gridbound.battle.heroes) h.hp = 0; window.gridbound.step(.05)');
+      await wait(failSave ? 'Boolean(document.querySelector("dialog[open] #retry-save"))' : resultReady, 15000);
+    };
     let fights = 0;
-    for (let step = 0; step < 12 && fights < 2; step++) {
-      const state = await evaluate('window.gridbound.profile().journey.run?.status');
-      if (state !== 'active') break;
-      if (await evaluate('Boolean(document.querySelector("[data-dungeon-fight]"))')) {
-        await click('[data-dungeon-fight]');
-        await wait('window.gridbound.battle.mode === "dungeon" && ["ready", "fighting"].includes(window.gridbound.battle.status)', 15000);
-        if (await evaluate('window.gridbound.battle.status === "ready"')) { await wait('Boolean(document.querySelector("#start:not([hidden]):not(:disabled)"))'); await click('#start'); }
-        await wait('window.gridbound.battle.status === "fighting"');
-        if (fights === 0) await screenshot(`artifacts/dungeon-fight-${viewport.tag}.png`);
-        await evaluate('for (const e of window.gridbound.battle.enemies ?? []) e.hp = 0; window.gridbound.battle.bossHp = 0; window.gridbound.step(.05)');
-        await wait('Boolean(document.querySelector("#result-dungeon")) && !document.querySelector("#result-dungeon").disabled', 15000);
-        if (fights === 0) await screenshot(`artifacts/dungeon-result-${viewport.tag}.png`);
+    const startXp = await evaluate('window.gridbound.profile().loadouts[0].xp');
+    while (fights < 2 && await walkToFight()) {
+      // On mobile the first result's save fails: retry/export is offered, and the retry saves the outcome without settling the fight twice.
+      const failSave = fights === 0 && viewport.mobile;
+      await fight(true, fights === 0, failSave);
+      if (failSave) {
+        const pending = await evaluate(saveState);
+        await screenshot(`artifacts/dungeon-unsaved-${viewport.tag}.png`);
+        assert.equal(await evaluate('Boolean(document.querySelector("dialog[open] #pending-export"))'), true, 'the unsaved result can be exported');
+        await evaluate("localStorage.removeItem('qa.failPut')");
+        await click('#retry-save');
+        await wait(resultReady, 15000);
+        assert.deepEqual(await evaluate(saveState), pending, 'a retry saves the same outcome once');
+      }
+      if (fights === 0) {
+        await screenshot(`artifacts/dungeon-result-${viewport.tag}.png`);
+        // The room's outcome is saved the moment its result appears: reloading on the result screen keeps the XP, pouch and win.
+        const won = await evaluate(saveState);
+        assert.ok(won.xp > startXp && won.wins === 4 && won.pouch > 0 && !won.pending, 'the win is settled');
+        await reloadToDungeon();
+        assert.deepEqual(await evaluate(saveState), won, 'a reload on the dungeon result keeps the XP, pouch and win');
+      } else {
         await click('#result-dungeon');
         await wait('Boolean(document.querySelector(".dungeon-scene"))');
-        fights++;
-        continue;
       }
-      for (const sel of ['[data-dungeon-choice]', '[data-dungeon-open]', '[data-dungeon-camp="rest"]']) {
-        if (await evaluate(`Boolean(document.querySelector(${JSON.stringify(sel)}))`)) { await click(sel); await wait('Boolean(document.querySelector(".room-outcome")) || Boolean(document.querySelector("[data-dungeon-fight]"))', 5000).catch(() => {}); break; }
-      }
-      if (await evaluate('Boolean(document.querySelector("[data-dungeon-fight]"))')) continue;
-      const before = await evaluate('window.gridbound.profile().journey.run?.at');
-      if (await evaluate('Boolean(document.querySelector(".dungeon-map .room.open"))')) {
-        await click('.dungeon-map .room.open');
-        await wait(`window.gridbound.profile().journey.run?.at !== ${before}`);
-      }
+      fights++;
     }
     assert.ok(fights >= 1, 'won at least one dungeon fight');
     const run = await evaluate('window.gridbound.profile().journey.run');
@@ -102,6 +141,19 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     await click('#dungeon-abandon');
     await wait('document.querySelectorAll(".depth-card").length === 8');
     assert.equal(await evaluate('window.gridbound.profile().gold'), gold, 'abandoning banks nothing');
+
+    // A wipe is saved with its result too: reloading cannot bring the run or the pouch back.
+    await click('[data-dungeon-start="1"]');
+    await wait('Boolean(document.querySelector(".dungeon-map .room.open"))');
+    assert.ok(await walkToFight(), 'the new run reaches a fight');
+    await fight(false, false);
+    const wiped = await evaluate(saveState);
+    assert.deepEqual({ status: wiped.status, pouch: wiped.pouch, pending: wiped.pending }, { status: 'wiped', pouch: 0, pending: false });
+    await reloadToDungeon();
+    assert.deepEqual(await evaluate(saveState), wiped, 'the run stays wiped after a reload');
+    assert.equal(await evaluate('Boolean(document.querySelector(".dungeon-result.wiped [data-dungeon-close]"))'), true, 'the Undercroft shows the wipe');
+    await click('[data-dungeon-close]');
+    await wait('document.querySelectorAll(".depth-card").length === 8');
 
     // Forge: refine the equipped weapon with Ember Shards.
     await click.nav('party');

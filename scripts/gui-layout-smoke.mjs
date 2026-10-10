@@ -12,6 +12,8 @@ for (const [width, height] of viewports) {
     const rows = [];
 
     const measure = async (name, actionSelector = '') => {
+      // Town navigation flushes the Commander save before rendering, so give the route a moment to appear.
+      if (actionSelector) await wait(`Boolean(document.querySelector(${JSON.stringify(actionSelector)}))`, 5000).catch(() => {});
       const result = await evaluate(`(() => {
         const selector = ${JSON.stringify(actionSelector)};
         const action = selector ? document.querySelector(selector) : null;
@@ -150,12 +152,15 @@ for (const [width, height] of viewports) {
     await click.nav('more');
     await measure('more-menu', '.more-card[data-facility="quests"]');
     await click('.more-card[data-facility="quests"]');
+    await wait('document.querySelector(".town-game-shell")?.dataset.townRoute === "quests"');
     await measure('quests');
     await click.nav('more');
     await click('.more-card[data-facility="bestiary"]');
+    await wait('document.querySelector(".town-game-shell")?.dataset.townRoute === "bestiary"');
     await measure('bestiary');
     await click.nav('more');
     await click('.more-card[data-facility="challenge-shop"]');
+    await wait('document.querySelector(".town-game-shell")?.dataset.townRoute === "challenge-shop"');
     await measure('challenge-shop');
 
     assert.deepEqual(errors, []);

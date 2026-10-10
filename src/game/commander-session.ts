@@ -4,9 +4,13 @@ export class CommanderSession {
   repository?: CommanderRepository;
   document?: CommanderDocument;
   mode: CommanderMode = 'story';
+  /** A save operation is running right now. */
   busy = false;
   stale = false;
+  /** Changes not yet committed: a save is queued or in flight, or the last one failed. */
   dirty = false;
+  /** The last save failed (or the tab went stale): the changes exist only in this tab until a save succeeds. In-flight saves are dirty but not failed. */
+  failed = false;
   error = '';
   private queue: Promise<unknown> = Promise.resolve();
   private openPromise?: Promise<CommanderDocument[]>;
@@ -20,6 +24,7 @@ export class CommanderSession {
       this.repository.subscribe(event => {
         if (this.document?.commanderId === event.commanderId && event.revision > this.document.revision) {
           this.stale = true;
+          this.failed = true;
           this.error = 'Another tab changed this Commander. Export unsaved work, then refresh. This tab is read-only.';
           this.onStatus();
         }
@@ -34,6 +39,7 @@ export class CommanderSession {
     this.mode = mode;
     this.stale = false;
     this.dirty = false;
+    this.failed = false;
     this.error = '';
     return materializeProfile(this.document, mode, 'auto');
   }
@@ -48,6 +54,7 @@ export class CommanderSession {
     const committed = await this.repository.commit(candidate, this.document.revision);
     this.document = committed;
     this.dirty = false;
+    this.failed = false;
     this.error = '';
     return committed;
   }
@@ -70,6 +77,7 @@ export class CommanderSession {
         this.error = error instanceof Error ? error.message : String(error);
         this.stale ||= error instanceof StaleCommanderError;
         this.dirty = true;
+        this.failed = true;
         return false;
       } finally {
         this.busy = false;

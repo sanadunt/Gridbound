@@ -21,7 +21,8 @@ try{
   else{await click.nav('more');await wait('Boolean(document.querySelector(".more-scene"))');await click('.more-scene [data-open-action="profiles"]');}
   await wait('Boolean(document.querySelector("#new-commander"))');
   await evaluate('document.querySelector("#commander-name").value="Production smoke"');
-  await click('#new-commander');await wait('!document.querySelector("dialog[open]") && document.querySelector("#storage-status")?.textContent.startsWith("Saved")');
+  // A Commander already exists (the first visit migrates the starting profile), so wait until the new one is active before navigating.
+  await click('#new-commander');await wait('document.querySelector("#title-commander-name")?.textContent.startsWith("Production smoke") && !document.querySelector("dialog[open]") && document.querySelector("#storage-status")?.textContent.startsWith("Saved")',15000);
   await click.nav('party');
   await wait('Boolean(document.querySelector("[data-facility=party-advanced]"))');
   await click.nav('party-advanced');

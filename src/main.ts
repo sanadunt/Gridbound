@@ -27,10 +27,10 @@ import { playDialogue, paginate } from './ui/dialogue';
 import { BattleScene, ARENA, cell } from './render/BattleScene';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
-import { loadSave, saveProfile } from './game/save';
-import { createProfile } from './game/profile';
+import { loadSave, saveProfile, backupLegacy, legacyBackup, commanderFromBackup, isCompleteV3, SAVE_KEY } from './game/save';
+import { createProfile, type Profile } from './game/profile';
 import { CommanderSession } from './game/commander-session';
-import { copyLegacyToCommander, createCommanderDocument, createRunCheckpoint, terminalRun, storedStateFor, type CommanderDocument, type CommanderMode, type SlotId } from './game/commander';
+import { copyLegacyToCommander, createCommanderDocument, createRunCheckpoint, terminalRun, storedStateFor, materializeProfile, type CommanderDocument, type CommanderMode, type SlotId } from './game/commander';
 import { storyBattleOptions, setStoryParty, normalizeStoryParty } from './game/story-party';
 import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-build';
 import { JOBS } from './game/jobs';
@@ -131,21 +131,46 @@ function storageStatus() {
   $('wallet').innerHTML = currencyAmount('gold', wallet.gold);
   $('bank-wallet').innerHTML = currencyAmount('crystal', wallet.crystal);
   const status = $('storage-status');
-  const warning = saved.readOnly ? gameText(saved.warning) : commander.error ? gameText(commander.error) : commander.dirty ? t('storage.dirty') : '';
-  status.textContent = warning || (!commander.document ? t('storage.none') : commander.busy ? t('storage.saving') : commander.repository?.persistent ? t('storage.saved', { n: commander.document.revision }) : t('storage.session'));
-  status.dataset.level = warning || (commander.document && !commander.repository?.persistent) ? 'warn' : commander.busy ? 'busy' : 'ok';
+  // Warn only after a failed, stale or blocked save; a save in flight is the quiet 'busy' level.
+  const warning = saved.readOnly ? gameText(saved.warning) : commander.error ? gameText(commander.error) : commander.failed || (!commander.document && storageFailed) ? t('storage.dirty') : '';
+  status.textContent = warning || (!commander.document ? t('storage.none') : commander.dirty ? t('storage.saving') : commander.repository?.persistent ? t('storage.saved', { n: commander.document.revision }) : legacyMirrored() ? t('storage.session.kept') : t('storage.session'));
+  status.dataset.level = warning || (commander.document && !commander.repository?.persistent) ? 'warn' : commander.dirty ? 'busy' : 'ok';
   updateTitleStatus();
 }
 function context(slotId: SlotId = 'auto') {
   return { mode: commander.mode, slotId, profile, rogueBuild: townState.rogueSetup, raidBuild: townState.raidBuild, raidContract: getRaidContractForEnemy(townState.raid,townState.raidTier,townState.raidModifiers), raidSandbox: townState.raidSandbox };
 }
+/** Session-only Commander whose Story progress and bank reached gridbound.v3 (mirrorLegacy), so a reload keeps them. */
+const legacyMirrored = () => !saved.readOnly && !storageFailed;
+function writeLegacy(source: Profile) {
+  try { saveProfile(store, source, saved.readOnly); storageFailed = false; } catch { storageFailed = true; }
+}
+/** Session-only Commander (no IndexedDB): keep its Story progress and bank in gridbound.v3, so progress never lives only in RAM and the next visit migrates it again. Challenge profiles (0 gold) never reach the key. */
+function mirrorLegacy() {
+  const doc = commander.document;
+  if (!doc || saved.readOnly || commander.repository?.persistent) return;
+  const story = materializeProfile(doc, 'story');
+  story.economy.commanderCrystal = doc.shared.bankCrystal; story.challengeUnlocks = [...doc.shared.challengeUnlocks];
+  writeLegacy(story);
+}
+/** Commander lookup/migration at boot has finished; until then gridbound.v3 is not rewritten. */
+let commanderChecked = false;
+/** Revision and context of the last successful save: re-rendering an unchanged town does not commit a new revision. */
+let savedSignature = '';
 function persist(slotId: SlotId = 'auto', edit?: (document: CommanderDocument) => void) {
-  if (saved.readOnly) { storageStatus(); return Promise.resolve(false); }
   if (pendingSettlement && !edit) return Promise.resolve(false);
+  if (saved.readOnly && !commander.document) { storageStatus(); return Promise.resolve(false); }
   syncProfileEconomy(profile);
-  try { saveProfile(store, profile, saved.readOnly); storageFailed = false; } catch { storageFailed = true; }
-  if (!commander.document) { storageStatus(); return Promise.resolve(false); }
-  return commander.save(context(slotId), edit).then(ok => { storageFailed = !ok; return ok; });
+  const doc = commander.document;
+  // A browser-persistent Commander holds the progress: gridbound.v3 stays the untouched migration source.
+  if (!doc) { if (commanderChecked) writeLegacy(profile); storageStatus(); return Promise.resolve(false); }
+  const runtime = context(slotId), json = JSON.stringify(runtime);
+  if (!edit && !commander.dirty && !commander.stale && savedSignature === `${doc.commanderId}:${doc.revision}:${json}`) { storageStatus(); return Promise.resolve(true); }
+  return commander.save(runtime, edit).then(ok => {
+    storageFailed = !ok;
+    if (ok && commander.document) { savedSignature = `${commander.document.commanderId}:${commander.document.revision}:${json}`; mirrorLegacy(); }
+    return ok;
+  });
 }
 const sound = new Sound();
 sound.enabled = profile.sound;
@@ -611,22 +636,60 @@ function celebrate(selector: string) {
 }
 
 let ensureCommanderPromise: Promise<CommanderDocument | undefined> | undefined;
+/** Activate the latest Commander, or move the live progress into a new one when there is none (first visit or a pre-Commander save). Concurrent callers share one attempt; a failed attempt is retried by the next caller. */
 async function ensureCommander() {
   if (commander.document) return commander.document;
   if (ensureCommanderPromise) return ensureCommanderPromise;
   ensureCommanderPromise = (async () => {
     try {
       const docs = (await commander.open()).sort((a, b) => b.lastPlayed - a.lastPlayed);
-      if (docs.length > 0) {
-        if (!commander.document) activateCommander(docs[0]);
-        return commander.document;
+      if (!commander.document) {
+        if (docs.length > 0) activateCommander(docs[0], undefined, true, true);
+        else await migrateLegacy();
       }
-    } catch { /* storage fallback */ } finally {
+      return commander.document;
+    } catch (error) { commander.error = error instanceof Error ? error.message : String(error); storageStatus(); } finally {
       ensureCommanderPromise = undefined;
     }
     return undefined;
   })();
   return ensureCommanderPromise;
+}
+const legacyRaw = () => { try { return store.getItem(SAVE_KEY) ?? store.getItem('gridbound.v2'); } catch { return null; } };
+/** Copy the raw gridbound.v3 to a timestamped backup key (newest 3 kept) before a Commander takes the progress over. */
+function backupLegacyNow() { try { return backupLegacy(localStorage, new Date().toISOString()); } catch { return undefined; } }
+let migration: Promise<CommanderDocument | undefined> | undefined;
+/** Migration: back up gridbound.v3, then create a Commander from the live profile (bank included: there is no other Commander to duplicate it into). At boot a corrupt or blocked legacy save stays read-only and untouched; `manual` (Continue my progress) keeps the live progress anyway, since creating a Commander never writes gridbound.v3. */
+function migrateLegacy(name = t('profiles.default.name'), manual = false) {
+  // One migration at a time: a Continue click during the boot migration waits for it instead of creating a second copy (and a second bank).
+  return migration ??= (async () => {
+    if (commander.document || (saved.readOnly && !manual)) return commander.document;
+    const run = async () => {
+      // Tabs that boot together migrate one at a time: a tab that finds another tab's fresh Commander takes it over instead of creating a second copy and bank.
+      const docs = (await commander.open()).sort((a, b) => b.lastPlayed - a.lastPlayed);
+      if (commander.document) return;
+      if (docs.length > 0 && !manual) { activateCommander(docs[0], undefined, true, true); return; }
+      backupLegacyNow();
+      syncProfileEconomy(profile);
+      const candidate = createCommanderDocument(structuredClone(profile), name);
+      if (docs.length > 0) { candidate.shared.bankCrystal = 0; candidate.shared.challengeUnlocks = []; }
+      const raw = legacyRaw();
+      if (raw) candidate.legacySource = raw;
+      const created = await commander.create(candidate.name, candidate);
+      if (!commander.document) await adoptCommander(created);
+    };
+    const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+    if (locks) await locks.request('gridbound.commander-migration', run); else await run();
+    return commander.document;
+  })().finally(() => { migration = undefined; });
+}
+/** Attach a Commander created from the live profile without dropping anything done meanwhile: save the live state into it first, then re-materialize when the player is idle in town. */
+async function adoptCommander(document: CommanderDocument) {
+  commander.select(document, commander.mode);
+  savedSignature = '';
+  const ok = await persist('auto', () => {});
+  if (ok && inTown && !pendingSettlement && !presentingResult && commander.document) { activateCommander(commander.document, commander.mode, false, true); showTown(townState.tab); }
+  else storageStatus();
 }
 
 let playingScene = false;
@@ -660,7 +723,7 @@ function depart(mode: Mode) {
   if (commander.document) commander.document.activeMode = commander.mode;
   if (mode === 'adventure' && !canEnterZone(profile, townState.zone)) return;
   const existing = commander.document?.encounters?.[commander.mode];
-  if (existing && !existing.settled) { restoreEncounter(existing); return; }
+  if (existing && !existing.settled) { void restoreEncounter(existing); return; }
   const firstVisit = mode === 'adventure' && !profile.cleared.includes(townState.zone) && !introSeen(townState.zone);
   if (firstVisit && typeof navigator !== 'undefined' && !navigator.webdriver) { sound.unlock(); void chapterIntro(townState.zone).then(() => startDeparture(mode)); return; }
   startDeparture(mode);
@@ -783,6 +846,8 @@ function showReady() {
     gsap.fromTo('#start-overlay .start-window', { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
   }
 }
+/** The battle-start checkpoint save; leaving the battle waits for it, so an abandoned run is never written back afterwards. */
+let startCheckpoint: Promise<unknown> = Promise.resolve();
 async function begin() {
   if (inTown) return;
   if (commander.stale || pendingSettlement) return;
@@ -791,9 +856,9 @@ async function begin() {
   sound.unlock();
   battle.start();
   $('start-overlay').hidden = true;
-  scene.encounterStart();
+  if (initialized) scene.encounterStart();
   addLog(t('log.begin'));
-  void ensureCommander().then(() => commander.flush()).then(() => checkpoint(true));
+  startCheckpoint = ensureCommander().then(() => commander.flush()).then(() => checkpoint(true));
 }
 
 function renderPartyHealthTray() {
@@ -1232,7 +1297,8 @@ async function navigateTown(tab: TownTab = 'camp') {
   };
   if (inTown) {
     if (commander.document) {
-      if (!(await commander.flush())) { storageStatus(); return; }
+      // A failed save gets the retry/export prompt instead of a dead button.
+      if (!(await commander.flush())) { if (!commander.stale) unsavedTownModal(() => navigateTown(tab), 'storage.unsaved.leave'); else storageStatus(); return; }
       activateTargetMode();
     }
     showTown(tab, '', true);
@@ -1448,6 +1514,12 @@ function result() {
     else show();
   } else show();
 }
+/** The outcome could not be saved: navigation stays locked until a retry succeeds; the outcome can be exported meanwhile. */
+function unsavedResultModal() {
+  openModal(`<h2 id="modal-title">${t('result.unsaved.title')}</h2><p>${t('result.unsaved.copy')}</p><button id="retry-save" class="btn primary">${t('result.unsaved.retry')}</button><button id="pending-export" class="btn">${t('result.unsaved.export')}</button>`);
+  $('retry-save').onclick = () => { presentingResult = false; result(); };
+  $('pending-export').onclick = exportCommander;
+}
 async function presentResult() {
   if (battle.mode === 'dungeon') return presentDungeonResult();
   const won = battle.status === 'victory';
@@ -1490,12 +1562,7 @@ async function presentResult() {
       encounter = makeEncounter(false);
     } else if (!encounter?.settled) encounter = makeEncounter(true);
     const ok = await checkpoint(true);
-    if (!ok && commander.document) {
-      openModal(`<h2 id="modal-title">${t('result.unsaved.title')}</h2><p>${t('result.unsaved.copy')}</p><button id="retry-save" class="btn primary">${t('result.unsaved.retry')}</button><button id="pending-export" class="btn">${t('result.unsaved.export')}</button>`);
-      $('retry-save').onclick = () => { presentingResult = false; result(); };
-      $('pending-export').onclick = exportCommander;
-      return false;
-    }
+    if (!ok && commander.document) { unsavedResultModal(); return false; }
     pendingSettlement = false;
     recorded = true;
   }
@@ -1585,7 +1652,7 @@ async function presentResult() {
     if (battle.nextWave()) {
       lastStatus = 'ready';
       recorded = false;
-      scene.replace(battle);
+      if (initialized) scene.replace(battle);
       makeUnits();
       updateExpedition();
       showReady();
@@ -1632,16 +1699,21 @@ async function presentDungeonResult() {
   let loot: { gold: number; materials: Record<string, number> } | undefined;
   if (!recorded) {
     pendingSettlement = true;
-    const candidate = structuredClone(profile), run = candidate.journey.run;
-    const rewards = won ? settleProgress(candidate, battle) ?? [] : [];
-    if (run) {
-      const hp = Object.fromEntries(battle.heroes.map(h => [h.id, h.maxHp > 0 ? h.hp / h.maxHp : 0]));
-      loot = resolveFight(run, won, hp, battle.potions);
-      if (run.status === 'cleared') { bankPouch(candidate, run.pouch); candidate.journey.depth = Math.max(candidate.journey.depth, run.depth); }
+    // Settle once per fight: a retry after a failed save only saves again.
+    if (dungeonSettled !== battle) {
+      const candidate = structuredClone(profile), run = candidate.journey.run;
+      const rewards = won ? settleProgress(candidate, battle) ?? [] : [];
+      if (run) {
+        const hp = Object.fromEntries(battle.heroes.map(h => [h.id, h.maxHp > 0 ? h.hp / h.maxHp : 0]));
+        loot = resolveFight(run, won, hp, battle.potions);
+        if (run.status === 'cleared') { bankPouch(candidate, run.pouch); candidate.journey.depth = Math.max(candidate.journey.depth, run.depth); }
+      }
+      if (won) candidate.wins++;
+      profile = candidate; experienceRewards = rewards; dungeonLoot = loot; dungeonSettled = battle;
     }
-    if (won) candidate.wins++;
-    profile = candidate; experienceRewards = rewards; dungeonLoot = loot;
-    await persist();
+    // Saved the moment the result appears (the no-op edit passes the pendingSettlement guard), so a reload keeps the XP and pouch and cannot undo a wipe.
+    const ok = await persist('auto', () => {});
+    if (!ok && commander.document) { unsavedResultModal(); return false; }
     pendingSettlement = false; recorded = true;
   }
   loot = dungeonLoot;
@@ -1662,11 +1734,12 @@ async function presentDungeonResult() {
   return true;
 }
 let dungeonLoot: { gold: number; materials: Record<string, number> } | undefined;
+let dungeonSettled: Battle | undefined;
 function makeEncounter(settled = false): NonNullable<typeof encounter> {
   return { runId: encounter?.runId ?? crypto.randomUUID(), seq: (encounter?.seq ?? 0) + 1, battle: battle.checkpoint(), purse: runWallet.crystal, boons: [...runBoons], seed: runSeed, settled };
 }
 async function checkpoint(terminal = false, slotId: SlotId = 'auto') {
-  if (battle.mode === 'dungeon') return persist(slotId);
+  if (battle.mode === 'dungeon') return persist(slotId, () => {});
   if (!terminal && battle.status === 'ready') encounter = makeEncounter();
   if (!encounter) return false;
   const frozen = structuredClone(encounter);
@@ -1693,8 +1766,11 @@ async function checkpoint(terminal = false, slotId: SlotId = 'auto') {
     }
   });
 }
-function restoreEncounter(savedEncounter: NonNullable<typeof encounter>) {
-  if (!inTown || commander.stale || pendingSettlement || commander.busy || commander.dirty) return;
+async function restoreEncounter(savedEncounter: NonNullable<typeof encounter>) {
+  if (!inTown || commander.stale || pendingSettlement) return;
+  // Wait for a save in flight; a failed one gets a retry/export prompt instead of a dead Depart button.
+  if (!(await commander.flush())) { unsavedTownModal(() => restoreEncounter(savedEncounter)); return; }
+  if (!inTown || pendingSettlement) return;
   const frozen = structuredClone(savedEncounter);
   boot(frozen.battle.mode, frozen.battle.floor);
   battle.restoreCheckpoint(frozen.battle);
@@ -1703,9 +1779,17 @@ function restoreEncounter(savedEncounter: NonNullable<typeof encounter>) {
   runBoons = [...frozen.boons]; runSeed = frozen.seed;
   recorded = frozen.settled;
   townState.rogueSetup = battle.rogueBuild ? structuredClone(battle.rogueBuild) : townState.rogueSetup;
-  scene.replace(battle); makeUnits(); updateExpedition(); showReady();
+  if (initialized) scene.replace(battle);
+  makeUnits(); updateExpedition(); showReady();
   $('ready-copy').textContent = t('ready.resume');
   if (frozen.settled) result();
+}
+/** Town changes could not be saved: retry (then continue with `next`) or export them. */
+function unsavedTownModal(next: () => unknown, copy: 'storage.unsaved.copy' | 'storage.unsaved.leave' = 'storage.unsaved.copy') {
+  storageStatus();
+  openModal(`<h2 id="modal-title">${t('result.unsaved.title')}</h2><p>${t(copy)}</p><p class="hint">${escapeUI(gameText(commander.error))}</p><button id="retry-save" class="btn primary">${t('result.unsaved.retry')}</button><button id="pending-export" class="btn">${t('result.unsaved.export')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
+  $('retry-save').onclick = () => { void persist().then(ok => { if (ok) { closeWithoutResume(); void next(); } else unsavedTownModal(next, copy); }); };
+  $('pending-export').onclick = exportCommander;
 }
 async function clearEncounter() {
   const ok = await persist('auto', document => {
@@ -1745,7 +1829,8 @@ async function nextFloor() {
   townState.rogueSetup = build;
   await checkpoint();
 }
-function activateCommander(document: CommanderDocument, mode = document.activeMode, renderTownAfterActivation = true) {
+/** `resumed`: the document is exactly what storage holds (just loaded or just saved), so the next unchanged town render does not commit another revision. */
+function activateCommander(document: CommanderDocument, mode = document.activeMode, renderTownAfterActivation = true, resumed = false) {
   profile = commander.select(document, mode);
   encounter = undefined; runBoons = []; runWallet = createRunWallet(); recorded = false; pendingSettlement = false;
   const rogue = storedStateFor(document, 'roguelike', 'auto');
@@ -1758,6 +1843,7 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
   townState.pendingGear = undefined; townState.hero = profile.roster[0]; townState.zone = Math.min(profile.cleared.length,CAMPAIGN.length-1);
   sound.enabled = profile.sound; scene.reducedMotion = !profile.motion;
   $('sound').setAttribute('aria-pressed', String(profile.sound)); window.document.body.classList.toggle('reduced-motion', !profile.motion);
+  if (resumed && mode === document.activeMode) { syncProfileEconomy(profile); savedSignature = `${document.commanderId}:${commander.document!.revision}:${JSON.stringify(context())}`; } else savedSignature = '';
   updateTitleStatus();
   if (inTown && renderTownAfterActivation) showTown(mode === 'story' ? 'camp' : mode === 'raid' ? 'raid' : 'endless');
 }
@@ -1769,29 +1855,49 @@ async function leaveSafely(action: () => void | Promise<void>) {
   openModal(hasCommander
     ? `<h2 id="modal-title">${t('leave.title')}</h2><p>${t('leave.copy')}</p><nav class="menu-list"><button id="suspend-run" class="menu-item">${t('leave.suspend')}</button><button id="abandon-run" class="menu-item">${t('leave.abandon')}</button><button data-close class="menu-item">${t('common.cancel')}</button></nav>`
     : `<h2 id="modal-title">${t('leave.title')}</h2><p>${t('leave.copy.none')}</p><nav class="menu-list"><button id="abandon-run" class="menu-item">${t('leave.abandon')}</button><button data-close class="menu-item">${t('common.cancel')}</button></nav>`);
+  // A save already in flight (the battle-start checkpoint) is queued behind, not a reason to drop the click; `leaving` only stops a double tap.
+  let leaving = false;
   $('suspend-run')?.addEventListener('click', async () => {
-    if (!commander.document || commander.busy) return;
-    if (await persist('auto', doc => { if (commander.mode !== 'story') { const state=commander.mode==='raid'?doc.raid:doc.rogue; if (state.activeRun) state.activeRun.status='suspended'; } })) { closeWithoutResume(); inTown = true; await action(); }
+    if (!commander.document || leaving) return;
+    leaving = true;
+    try { await startCheckpoint; if (await persist('auto', doc => { if (commander.mode !== 'story') { const state=commander.mode==='raid'?doc.raid:doc.rogue; if (state.activeRun) state.activeRun.status='suspended'; } })) { closeWithoutResume(); inTown = true; await action(); } } finally { leaving = false; }
   });
   $('abandon-run').addEventListener('click', async () => {
-    if (commander.busy) return;
-    let cleared = true;
-    if (commander.document) cleared = await clearEncounter();
-    else {
-      encounter = undefined;
-      runBoons = [];
-      offeredBoons = [];
-      resetRunWallet(runWallet);
-    }
-    if (cleared) { closeWithoutResume(); inTown = true; await action(); }
+    if (leaving) return;
+    leaving = true;
+    try {
+      // Without a Commander (a stalled lookup) the checkpoint may never come; clearing `encounter` below already stops a late one.
+      if (commander.document) await startCheckpoint;
+      let cleared = true;
+      if (commander.document) cleared = await clearEncounter();
+      else {
+        encounter = undefined;
+        runBoons = [];
+        offeredBoons = [];
+        resetRunWallet(runWallet);
+      }
+      if (cleared) { closeWithoutResume(); inTown = true; await action(); }
+    } finally { leaving = false; }
   });
 }
 function download(data: unknown, filename: string) {
-  const url = URL.createObjectURL(new Blob([typeof data === 'string' ? data : JSON.stringify(data,null,2)], { type: 'application/json' }));
+  const text = typeof data === 'string' ? data : data === undefined || data === null ? undefined : JSON.stringify(data, null, 2);
+  // Never hand the player an empty or 'undefined' file that looks like a backup.
+  if (!text) { openModal(`<h2 id="modal-title">${t('export.empty.title')}</h2><p>${t('export.empty.copy')}</p><button data-close class="btn primary">${t('common.close')}</button>`, false); return false; }
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url),1000);
+  return true;
 }
+/** gridbound.v3 as written, when it is a complete save that holds the latest progress; the live profile otherwise (corrupt or blocked key, a failed write, or a boot that has not written it yet). */
+function legacyProfile() {
+  if (!storageFailed && commanderChecked) try { const parsed: unknown = JSON.parse(store.getItem(SAVE_KEY) ?? 'null'); if (isCompleteV3(parsed)) return parsed; } catch { /* corrupt or blocked: export the live profile */ }
+  syncProfileEconomy(profile);
+  return structuredClone(profile);
+}
+/** Every backup is importable from the Save dialog: the Commander document, a recovery file while a save is pending, or the legacy profile when no Commander exists yet. */
 function exportCommander() {
-  download(commander.dirty || pendingSettlement ? { kind:'gridbound-recovery', document:commander.document, pendingProfile:profile, pendingEncounter:encounter } : commander.document, 'Gridbound-Commander.json');
+  if (!commander.document) { download(legacyBackup(legacyProfile() as Profile), 'Gridbound-Save.json'); return; }
+  download(commander.dirty || pendingSettlement ? { kind:'gridbound-recovery', mode:commander.mode, document:commander.document, pendingProfile:profile, pendingEncounter:encounter } : commander.document, 'Gridbound-Commander.json');
 }
 import { STORY_CHOICES, narrativeChoice, epilogue } from './game/narrative';
 function chapterChronicle() {
@@ -1811,10 +1917,26 @@ async function storyJournal() {
  openModal(`<h2 id="modal-title">${t('journal.title')}</h2><p class="hint">${t('journal.intro')}</p>${scenes.length?'':`<p>${t('journal.locked')}</p>`}${scenes.map(s=>`<section class="journal-scene"><h3>${s.title}</h3><p>${s.text}</p>${state[s.id]?`<p class="journal-outcome">${s.options.find(o=>o.id===state[s.id])?.outcome}</p>`:`<nav class="menu-list">${s.options.map(o=>`<button class="menu-item" data-story-choice="${s.id}" data-story-option="${o.id}">${o.label}</button>`).join('')}<button class="menu-item" data-story-choice="${s.id}" data-story-option="${s.options[0].id}">${t('journal.skip', { label: s.options[0].label })}</button></nav>`}</section>`).join('')}${chapterChronicle()}${ending.map(text=>`<p>${text}</p>`).join('')}<button class="btn primary" data-close>${t('common.back')}</button>`);
  modal.querySelectorAll<HTMLElement>('[data-replay-chapter]').forEach(button=>button.onclick=()=>{ closeWithoutResume(); void chapterIntro(Number(button.dataset.replayChapter)); });
  modal.querySelectorAll<HTMLElement>('[data-story-choice]').forEach(button=>button.onclick=async()=>{
-  if(commander.busy||commander.stale)return;
+  if(commander.stale)return;
   profile.narrative??={};
-  if(narrativeChoice(profile.narrative,button.dataset.storyChoice!,button.dataset.storyOption!,profile.cleared)&&await persist())await storyJournal();
+  if(narrativeChoice(profile.narrative,button.dataset.storyChoice!,button.dataset.storyOption!,profile.cleared)){ await persist(); await storyJournal(); }
  });
+}
+const hasProgress = (p: Profile) => p.cleared.length > 0 || p.roster.length > 3 || p.gold !== createProfile().gold;
+const progressSummary = (p: Profile) => ({ ch: p.cleared.length, gold: p.gold.toLocaleString('en-US'), heroes: p.roster.length });
+/** Import a downloaded backup as a new Commander (fresh id, three-file limit). It keeps its Crystal bank only when that cannot duplicate one: no Commander here came from the same file (a legacy backup: no Commander at all). */
+async function importSave(file: File, documents: CommanderDocument[]) {
+  if (documents.length >= 3) throw new Error(t('profiles.import.full'));
+  const imported = commanderFromBackup(await file.text().catch(() => ''), { id: globalThis.crypto?.randomUUID?.() ?? `commander-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, name: t('profiles.legacy.name'), timestamp: Date.now() });
+  if (!imported) throw new Error(t('profiles.import.invalid'));
+  if (imported.sourceId ? documents.some(doc => doc.commanderId === imported.sourceId) : documents.length > 0) { imported.document.shared.bankCrystal = 0; imported.document.shared.challengeUnlocks = []; }
+  await leaveSafely(() => creatingCommander(async () => { activateCommander(await commander.create(imported.document.name, imported.document)); }));
+}
+/** Creating a Commander file: a 'Saving…' dialog stays up until the new file is active (so a late activation never pulls the player off another screen) and shows the error if creation fails. */
+async function creatingCommander(task: () => Promise<void>) {
+  openModal(`<h2 id="modal-title">${t('profiles.title')}</h2><p id="creating-status">${t('storage.saving')}</p><p id="profile-error" role="status"></p><button data-close class="btn">${t('common.close')}</button>`);
+  try { await task(); closeWithoutResume(); }
+  catch (error) { const message = error instanceof Error ? error.message : String(error); if (modal.open && document.getElementById('profile-error')) { $('creating-status').textContent = t('result.unsaved.title'); $('profile-error').textContent = gameText(message); } else { commander.error = message; storageStatus(); } }
 }
 async function profilesMenu() {
   openModal(`<h2 id="modal-title">${t('profiles.title')}</h2><p>${t('profiles.loading')}</p>`);
@@ -1822,32 +1944,49 @@ async function profilesMenu() {
     const documents = await commander.open();
     if (!commander.document && documents.length > 0) {
       const latest = [...documents].sort((a, b) => b.lastPlayed - a.lastPlayed)[0];
-      activateCommander(latest);
+      activateCommander(latest, undefined, true, true);
     }
     const current = commander.document;
+    // No Commander holds the live progress (migration pending or failed, or a protected legacy save): keeping it is the primary action.
+    const unheld = !current, full = documents.length >= 3;
     const slots = current ? (commander.mode === 'story' ? current.story : commander.mode === 'raid' ? current.raid : current.rogue).slots : [];
     openModal(`<h2 id="modal-title">${t('profiles.title')}</h2><p class="hint">${t('profiles.intro')}</p>
-      <div class="save-files">${documents.map((doc,index) => `<div class="save-file ${current?.commanderId === doc.commanderId ? 'current' : ''}"><div><b>${escapeUI(doc.name)}</b><small>${t('profiles.file', { ch: doc.story.slots[3].state?.cleared.length ?? 0, crystal: doc.shared.bankCrystal, rev: doc.revision })}</small></div><button data-commander="${index}" class="btn">${current?.commanderId === doc.commanderId ? t('profiles.current') : t('profiles.switch')}</button></div>`).join('') || `<p>${t('profiles.empty')}</p>`}</div>
-      <label class="name-field">${t('profiles.name')} <input id="commander-name" maxlength="32" value="${escapeUI(current?.name ?? 'Commander')}"></label>
-      <div class="departure-actions"><button id="new-commander" class="btn primary" ${documents.length >= 3 ? 'disabled' : ''}>${t('profiles.new')}</button>${current ? `<button id="rename-commander" class="btn">${t('profiles.rename')}</button><button id="export-commander" class="btn">${t('profiles.export')}</button><button id="delete-commander" class="btn danger">${t('profiles.delete')}</button><button id="save-retry" class="btn">${t('result.unsaved.retry')}</button>` : ''}<button id="legacy-preview" class="btn">${t('profiles.legacy')}</button></div>
+      <div class="save-files">${documents.map((doc,index) => `<div class="save-file ${current?.commanderId === doc.commanderId ? 'current' : ''}"><div><b>${escapeUI(doc.name)}</b><small>${t('profiles.file', { ch: doc.story.slots[3].state?.cleared.length ?? 0, crystal: doc.shared.bankCrystal, rev: doc.revision })}</small></div><button data-commander="${index}" class="btn">${current?.commanderId === doc.commanderId ? t('profiles.current') : t('profiles.switch')}</button></div>`).join('') || (unheld ? '' : `<p>${t('profiles.empty')}</p>`)}</div>
+      <label class="name-field">${t('profiles.name')} <input id="commander-name" maxlength="32" value="${escapeUI(current?.name ?? t('profiles.default.name'))}"></label>
+      ${unheld ? `<p class="hint" id="continue-summary">${t('profiles.continue.summary', progressSummary(profile))}</p>` : ''}
+      <div class="departure-actions">${unheld ? `<button id="continue-mine" class="btn primary" ${full ? 'disabled' : ''}>${t('profiles.continue.mine')}</button>` : ''}<button id="new-commander" class="btn" ${full ? 'disabled' : ''}>${t('profiles.new')}</button>${current ? `<button id="rename-commander" class="btn">${t('profiles.rename')}</button><button id="export-commander" class="btn">${t('profiles.export')}</button><button id="delete-commander" class="btn danger">${t('profiles.delete')}</button><button id="save-retry" class="btn">${t('result.unsaved.retry')}</button>` : ''}<button id="legacy-preview" class="btn">${t('profiles.legacy')}</button><button id="import-save-button" class="btn" ${full ? 'disabled' : ''}>${t('profiles.import')}</button><input id="import-save" type="file" accept="application/json,.json" hidden></div>
       ${current ? `<h3 class="subheading">${t('profiles.slots', { mode: modeName(commander.mode) })}</h3><p class="hint">${t('profiles.slots.hint')}</p><div class="save-files">${slots.map(slot => `<div class="save-file"><div><b>${slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) })}</b><small>${t(`profiles.status.${slot.status}` as never)} · ${slot.savedAt ? new Date(slot.savedAt).toLocaleString() : t('profiles.emptyslot')}</small></div><span>${slot.slotId !== 'auto' ? `<button data-save-slot="${slot.slotId}" class="btn">${t('profiles.save')}</button>` : ''}<button data-load-slot="${slot.slotId}" class="btn" ${!slot.state ? 'disabled' : ''}>${t('profiles.load')}</button></span></div>`).join('')}</div><button id="continue-latest" class="btn primary">${t('profiles.continue')}</button>` : ''}
       <p id="profile-error" role="status">${escapeUI(gameText(commander.error || commander.repository?.warning || ''))}</p><button data-close class="btn">${t('common.close')}</button>`);
     const attempt = async (task: () => Promise<void>) => { try { await task(); } catch(error) { $('profile-error').textContent = error instanceof Error ? error.message : String(error); } };
     modal.querySelectorAll<HTMLElement>('[data-commander]').forEach(button => button.onclick = () => { const target = documents[Number(button.dataset.commander)]; if (target.commanderId !== current?.commanderId) void leaveSafely(() => { activateCommander(target); closeWithoutResume(); }); else closeWithoutResume(); });
-    $('new-commander').onclick = () => { const name = $<HTMLInputElement>('commander-name').value; void leaveSafely(() => attempt(async () => { activateCommander(await commander.create(name)); closeWithoutResume(); })); };
+    const typedName = () => $<HTMLInputElement>('commander-name').value.trim().slice(0, 32) || t('profiles.default.name');
+    $('continue-mine')?.addEventListener('click', () => { const name = typedName(); void leaveSafely(() => creatingCommander(async () => { await migrateLegacy(name, true); if (!commander.document) throw new Error(commander.error || t('storage.dirty')); })); });
+    // A fresh Commander starts at zero; with real progress on screen the player confirms first (the current file is kept either way).
+    $('new-commander').onclick = () => {
+      const name = typedName(), create = () => void leaveSafely(() => creatingCommander(async () => { activateCommander(await commander.create(name)); }));
+      if (!hasProgress(profile)) { create(); return; }
+      openModal(`<h2 id="modal-title">${t('profiles.new.confirm.title')}</h2><p>${t('profiles.new.confirm.copy')}</p><p class="hint">${current ? t('profiles.new.confirm.kept', { name: escapeUI(current.name) }) : t('profiles.new.confirm.unheld')}</p><button id="new-confirm" class="btn danger">${t('profiles.new.confirm')}</button><button id="new-cancel" class="btn primary">${t('common.cancel')}</button><p id="profile-error" role="status"></p>`);
+      $('new-confirm').onclick = create;
+      $('new-cancel').onclick = () => { void profilesMenu(); };
+    };
+    $('import-save-button').onclick = () => $<HTMLInputElement>('import-save').click();
+    $('import-save').onchange = () => { const file = $<HTMLInputElement>('import-save').files?.[0]; if (file) void attempt(() => importSave(file, documents)); };
     $('rename-commander')?.addEventListener('click', () => { const name = $<HTMLInputElement>('commander-name').value.trim().slice(0,32); void attempt(async () => { if (!name) throw new Error(t('profiles.name.required')); if (await persist('auto', doc => { doc.name=name; })) await profilesMenu(); }); });
     $('export-commander')?.addEventListener('click',exportCommander);
     $('save-retry')?.addEventListener('click', () => { if (pendingSettlement) { presentingResult=false; result(); } else void persist().then(() => profilesMenu()); });
     $('delete-commander')?.addEventListener('click', () => {
       openModal(`<h2 id="modal-title">${t('profiles.delete.title', { name: escapeUI(current!.name) })}</h2><p>${t('profiles.delete.copy', { crystal: current!.shared.bankCrystal, receipts: current!.shared.settlementReceipts.length })}</p><input id="delete-word" aria-label="DELETE"><button id="delete-confirm" class="btn danger" disabled>${t('profiles.delete.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
       $('delete-word').oninput = () => { $<HTMLButtonElement>('delete-confirm').disabled = $<HTMLInputElement>('delete-word').value !== 'DELETE'; };
-      $('delete-confirm').onclick = async () => { if (!inTown || pendingSettlement || commander.stale) return; try { await commander.flush(); await commander.repository!.remove(current!.commanderId,commander.document!.revision); commander.document=undefined; profile=createProfile(); showTown(); await profilesMenu(); } catch(error) { commander.error=String(error); storageStatus(); } };
+      // Always-on Commander: the next file takes over, or a fresh one when the last is deleted (gridbound.v3 is never overwritten with a fresh profile).
+      $('delete-confirm').onclick = async () => { if (!inTown || pendingSettlement || commander.stale) return; try { await commander.flush(); await commander.repository!.remove(current!.commanderId,commander.document!.revision); commander.document=undefined; profile=createProfile(); const rest=(await commander.open()).sort((a,b)=>b.lastPlayed-a.lastPlayed); activateCommander(rest[0] ?? await commander.create(t('profiles.default.name'), createCommanderDocument(createProfile(), t('profiles.default.name')))); await profilesMenu(); } catch(error) { commander.error=String(error); storageStatus(); } };
     });
+    // The old save is read when the preview opens and again on confirm, never from the page-load snapshot.
+    const rawV3 = () => { try { return store.getItem(SAVE_KEY); } catch { return null; } };
     $('legacy-preview').onclick = () => {
-      let raw: string | null = null; try { raw=store.getItem('gridbound.v3'); } catch { /* source remains protected */ }
-      openModal(`<h2 id="modal-title">${t('profiles.legacy.title')}</h2><p>${t('profiles.legacy.copy', { gold: saved.profile.gold, roster: saved.profile.roster.length })}</p><p>${escapeUI(gameText(saved.warning))}</p><button id="legacy-export" class="btn">${t('profiles.legacy.export')}</button><button id="legacy-confirm" class="btn primary" ${!raw || saved.readOnly || documents.length>=3 ? 'disabled' : ''}>${t('profiles.legacy.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
-      $('legacy-export').onclick = () => download(raw ?? '', 'Gridbound-original-v3.json');
-      $('legacy-confirm').onclick = () => { void leaveSafely(async () => { const candidate=copyLegacyToCommander(saved.profile,'Legacy copy'); candidate.legacySource=raw!; try { activateCommander(await commander.create('Legacy copy',candidate)); closeWithoutResume(); } catch(error) { commander.error=String(error); storageStatus(); } }); };
+      const old = loadSave(store), raw = rawV3();
+      openModal(`<h2 id="modal-title">${t('profiles.legacy.title')}</h2><p>${t('profiles.legacy.copy', { ch: old.profile.cleared.length, gold: old.profile.gold, roster: old.profile.roster.length })}</p><p>${escapeUI(gameText(old.warning))}</p><button id="legacy-export" class="btn" ${raw ? '' : 'disabled'}>${t('profiles.legacy.export')}</button><button id="legacy-confirm" class="btn primary" ${!raw || old.readOnly || full ? 'disabled' : ''}>${t('profiles.legacy.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
+      $('legacy-export').onclick = () => download(rawV3() ?? '', 'Gridbound-original-v3.json');
+      $('legacy-confirm').onclick = () => { void leaveSafely(() => creatingCommander(async () => { const source=loadSave(store), raw=rawV3(); if (!raw || source.readOnly) return; backupLegacyNow(); const name=t('profiles.legacy.name'), candidate=copyLegacyToCommander(source.profile,name); candidate.legacySource=raw; activateCommander(await commander.create(name,candidate)); })); };
     };
     modal.querySelectorAll<HTMLElement>('[data-save-slot]').forEach(button => button.onclick = () => { void attempt(async () => { if (!inTown && encounter && !pendingSettlement) { const frozen=structuredClone(encounter); await persist(button.dataset.saveSlot as SlotId, doc => { const state=commander.mode==='story'?doc.story:commander.mode==='raid'?doc.raid:doc.rogue; const auto=state.slots[3]; const index=state.slots.findIndex(slot=>slot.slotId===button.dataset.saveSlot); state.slots[index]=structuredClone({...auto,slotId:button.dataset.saveSlot as SlotId}); doc.encounters ??={}; doc.encounters[commander.mode]=frozen; }); } else await persist(button.dataset.saveSlot as SlotId); sound.play('save'); await profilesMenu(); }); });
     modal.querySelectorAll<HTMLElement>('[data-load-slot]').forEach(button => button.onclick = () => {
@@ -1855,7 +1994,7 @@ async function profilesMenu() {
       openModal(`<h2 id="modal-title">${t('profiles.preview', { slot: slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) }) })}</h2><pre class="slot-preview">${escapeUI(JSON.stringify(slot.state,null,2))}</pre><p class="hint">${t('profiles.preview.hint')}</p><button id="load-confirm" class="btn primary">${t('profiles.load.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button><p id="load-error" role="status"></p>`);
       $('load-confirm').onclick = async () => { if (!inTown || pendingSettlement) { $('load-error').textContent=t('profiles.load.blocked'); return; } try { profile=await commander.loadSlot(slot.slotId); activateCommander(commander.document!,commander.mode); closeWithoutResume(); } catch(error) { $('load-error').textContent=String(error); } };
     });
-    $('continue-latest')?.addEventListener('click', () => { const savedEncounter=commander.document?.encounters?.[commander.mode]; if (!savedEncounter) { $('profile-error').textContent=t('profiles.nocheckpoint'); return; } closeWithoutResume(); restoreEncounter(savedEncounter); });
+    $('continue-latest')?.addEventListener('click', () => { const savedEncounter=commander.document?.encounters?.[commander.mode]; if (!savedEncounter) { $('profile-error').textContent=t('profiles.nocheckpoint'); return; } closeWithoutResume(); void restoreEncounter(savedEncounter); });
   } catch(error) { console.error('PROFILES_MENU_ERROR:', error); openModal(`<h2 id="modal-title">${t('profiles.protected')}</h2><p>${escapeUI(String(error))}</p><p>${t('profiles.protected.copy')}</p>`); }
 }
 commander.onStatus = () => { storageStatus(); if (commander.stale && battle.status === 'fighting') battle.pause(); };
@@ -1877,13 +2016,15 @@ $('menu-button').addEventListener('click', () => { sound.play('confirm'); void n
 document.addEventListener('click', event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-lang]');
   if (!button || button.dataset.lang === lang()) return;
-  if (!inTown || pendingSettlement || commander.busy) { storageStatus(); return; }
+  // A save in flight is waited for (flush below), not a reason to drop the click.
+  if (!inTown || pendingSettlement) { storageStatus(); return; }
   const next = button.dataset.lang as Lang;
   void commander.flush().then(saved => {
     if (!saved) { storageStatus(); return; }
     const apply = () => { setLang(next); location.reload(); };
     if (commander.document && !commander.repository?.persistent) {
-      openModal(`<h2 id="modal-title">${t('lang.session.title')}</h2><p>${t('lang.session.copy')}</p><button id="lang-export" class="btn">${t('profiles.export')}</button><button id="lang-anyway" class="btn danger">${t('lang.session.confirm')}</button><button data-close class="btn primary">${t('common.cancel')}</button>`, false);
+      const kept = legacyMirrored();
+      openModal(`<h2 id="modal-title">${t('lang.session.title')}</h2><p>${t(kept ? 'lang.session.kept' : 'lang.session.copy')}</p><button id="lang-export" class="btn">${t('profiles.export')}</button><button id="lang-anyway" class="btn danger">${t(kept ? 'lang.session.anyway' : 'lang.session.confirm')}</button><button data-close class="btn primary">${t('common.cancel')}</button>`, false);
       $('lang-export').addEventListener('click', exportCommander);
       $('lang-anyway').addEventListener('click', apply);
       return;
@@ -1965,19 +2106,29 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && !in
 scene = new BattleScene(battle, sound, frame);
 scene.reducedMotion = !profile.motion;
 document.body.classList.toggle('reduced-motion', !profile.motion);
-new Phaser.Game({ type: Phaser.AUTO, parent: 'game-canvas', width: ARENA.width, height: ARENA.height, backgroundColor: '#0e1e19', pixelArt: true, roundPixels: true, antialias: false, scene: [scene], scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, input: { activePointers: 3 }, audio: { noAudio: true }, render: { preserveDrawingBuffer: true }, banner: false });
-initialized = true;
+/** The engine's first frame builds every procedural texture in one long task; it starts once the save layer has settled (or after 6 s, for a lookup that never answers) so the Commander is active before the player can act. A battle booted before that renders once the engine starts (scene calls are guarded by `initialized`). */
+function startEngine() {
+  if (initialized) return;
+  scene.battle = battle;
+  new Phaser.Game({ type: Phaser.AUTO, parent: 'game-canvas', width: ARENA.width, height: ARENA.height, backgroundColor: '#0e1e19', pixelArt: true, roundPixels: true, antialias: false, scene: [scene], scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, input: { activePointers: 3 }, audio: { noAudio: true }, render: { preserveDrawingBuffer: true }, banner: false });
+  initialized = true;
+}
+// A stalled Commander lookup (IndexedDB that never answers) must not leave progress only in RAM: after 1.5 s the raw legacy save is backed up and the live profile is written to gridbound.v3 until a Commander activates.
+const saveFallback = window.setTimeout(() => { if (!commander.document && !commanderChecked) { backupLegacyNow(); commanderChecked = true; storageStatus(); } }, 1500);
+// The engine waits longer: started early, its long first frame would hold back a lookup that is merely slow (a busy device).
+const engineFallback = window.setTimeout(startEngine, 6000);
 showTown();
 if (typeof navigator !== 'undefined' && !navigator.webdriver) {
   titleScreenEl.classList.add('press-phase');
   showTitleScreen();
 }
-void commander.open().then(documents => { if (documents.length > 0) { const latest = [...documents].sort((a, b) => b.lastPlayed - a.lastPlayed)[0]; activateCommander(latest); } }).catch(error => { commander.error=String(error); storageStatus(); });
-if (import.meta.env.DEV) Object.assign(window, { gridbound: {
+const exposeQaHook = () => { if (import.meta.env.DEV) Object.assign(window, { gridbound: {
   snapshot: () => battle.snapshot(), profile: () => structuredClone(profile),
   get battle() { return battle; }, get inTown() { return inTown; },
   get runBoons() { return runBoons; },
   setRunBoons: (b: string[]) => { runBoons = [...b]; battle.boons = [...b]; updateExpedition(); },
   step: (seconds: number) => { for (let t = 0; t < Math.min(600, Math.max(0, seconds)); t += 1 / 60) battle.tick(1 / 60); frame(1); },
   boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro, recruitScene: (id: number) => recruitScene(id, true),
-} });
+} }); };
+// Every player gets a Commander: the latest one, or one migrated from the legacy save (backed up first). The dev QA hook appears once that has settled, so tests never race the migration.
+void ensureCommander().finally(() => { commanderChecked = true; storageStatus(); window.clearTimeout(saveFallback); window.clearTimeout(engineFallback); startEngine(); exposeQaHook(); });

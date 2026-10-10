@@ -30,7 +30,8 @@ try {
   await wait('document.querySelector("[data-load-slot=manual-1]")?.disabled===false');
   await click('[data-load-slot="manual-1"]');await wait('Boolean(document.querySelector("#load-confirm"))');
   await click('#load-confirm');await wait('!document.querySelector("dialog[open]")');
-  for(const n of ['Smoke Beta','Smoke Gamma']) { await openProfiles(); await name(n); await click('#new-commander'); await wait('!document.querySelector("dialog[open]")'); }
+  // The first visit already migrated the starting profile into a Commander, so Alpha and Beta fill the three files.
+  for(const n of ['Smoke Beta']) { await openProfiles(); await name(n); await click('#new-commander'); await wait('!document.querySelector("dialog[open]")'); }
   await openProfiles();await wait('document.querySelectorAll("[data-commander]").length===3');
   assert.equal(await evaluate('document.querySelector("#new-commander").disabled'),true);
   await screenshot('artifacts/d6-profiles.png');

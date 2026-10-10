@@ -34,7 +34,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("canvas")');
   
-  await evaluate(`localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(qaProfile)}))`);
+  // The first visit already created a Commander from the starting profile; drop it so the seeded save is migrated instead.
+  await evaluate(`indexedDB.deleteDatabase('gridbound.commanders.r1'); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(qaProfile)}))`);
   await send('Page.reload');
   await wait('window.gridbound && document.querySelector("canvas")');
   await wait('Boolean(document.querySelector("#town-screen:not([hidden])"))');
@@ -121,7 +122,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("canvas")');
   
-  await evaluate(`localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(qaProfile)}))`);
+  // The first visit already created a Commander from the starting profile; drop it so the seeded save is migrated instead.
+  await evaluate(`indexedDB.deleteDatabase('gridbound.commanders.r1'); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(qaProfile)}))`);
   await send('Page.reload');
   await wait('window.gridbound && document.querySelector("canvas")');
   await wait('Boolean(document.querySelector("#town-screen:not([hidden])"))');

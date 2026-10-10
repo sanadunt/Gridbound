@@ -1,4 +1,5 @@
 import { normalizeProfile, type Profile } from './profile';
+import { applyRuntimeToDocument, createCommanderDocument, normalizeCommanderDocument, type CommanderDocument } from './commander';
 export const SAVE_KEY='gridbound.v3';
 export type SaveStore={getItem(key:string):string|null;setItem(key:string,value:string):void};
 type SaveRecord=Record<string,unknown>;
@@ -37,4 +38,42 @@ export function loadSave(store:SaveStore) {
 export function saveProfile(store:SaveStore,p:Profile,readOnly=false) {
   if(readOnly)throw new Error('Save is protected');
   store.setItem(SAVE_KEY,JSON.stringify(p));
+}
+
+/** Backups of the raw legacy save, newest last when sorted: `gridbound.v3.backup-<ISO timestamp>`. */
+export const BACKUP_PREFIX=`${SAVE_KEY}.backup-`;
+export type BackupStore=SaveStore&{removeItem(key:string):void;key(index:number):string|null;readonly length:number};
+/** Copy the raw gridbound.v3 string aside before a Commander takes it over. Keeps the newest `keep` backups, skips a copy identical to the newest one, and never throws. */
+export function backupLegacy(store:BackupStore,stamp:string,keep=3):string|undefined {
+  try{
+    const raw=store.getItem(SAVE_KEY);
+    if(raw===null)return undefined;
+    const backups=()=>Array.from({length:store.length},(_,i)=>store.key(i)).filter((key):key is string=>Boolean(key?.startsWith(BACKUP_PREFIX))).sort();
+    const newest=backups().at(-1);
+    if(newest!==undefined&&store.getItem(newest)===raw)return newest;
+    const key=`${BACKUP_PREFIX}${stamp}`;
+    store.setItem(key,raw);
+    for(const old of backups().slice(0,-keep))store.removeItem(old);
+    return key;
+  }catch{return undefined;}
+}
+
+/** The file 'Download save backup' writes when no Commander holds the progress yet. */
+export const legacyBackup=(profile:Profile)=>({kind:'gridbound-legacy',version:3,profile});
+export type BackupFile={document:CommanderDocument;sourceId?:string};
+/** Turn a downloaded backup into a new Commander candidate with a fresh id: a Commander export, a recovery export (its document plus a pending Story profile) or a gridbound-legacy envelope. Undefined when the file is not a Gridbound save. */
+export function commanderFromBackup(text:string,options:{id:string;name:string;timestamp:number}):BackupFile|undefined {
+  let data:unknown;
+  try{data=JSON.parse(text);}catch{return undefined;}
+  if(!isRecord(data))return undefined;
+  if(data.kind==='gridbound-legacy'){
+    if(!isCompleteV3(data.profile))return undefined;
+    const document=createCommanderDocument(normalizeProfile(data.profile),options.name);
+    return {document:{...document,commanderId:options.id,legacySource:JSON.stringify(data.profile)}};
+  }
+  const recovery=data.kind==='gridbound-recovery';
+  const document=normalizeCommanderDocument(recovery?data.document:data);
+  if(!document)return undefined;
+  if(recovery&&data.mode==='story'&&isCompleteV3(data.pendingProfile))applyRuntimeToDocument(document,{mode:'story',slotId:'auto',profile:normalizeProfile(data.pendingProfile)},options.timestamp);
+  return {document:{...document,commanderId:options.id,revision:0},sourceId:document.commanderId};
 }
