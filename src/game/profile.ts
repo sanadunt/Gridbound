@@ -6,7 +6,7 @@ export { TALENTS } from './talents';
 import { heroProgress, normalizedXP, xpForLevel } from './levels';
 import { QUESTS, questProgress } from './quests';
 import type { Battle } from './simulation';
-import { normalizeStoryParty, benchExperience } from './story-party';
+import { normalizeStoryParty, benchExperience, storyPartyCap, roleTiles, placeParty } from './story-party';
 import { createCurrencyState, creditCurrency, type CurrencyState } from '../economy/currency';
 import { bankRaidReward, bankRoguelikeReward, buyBankItem, normalizeChallengeUnlocks, raidReward, roguelikeBankReward, creditRunRoom, type RunWallet } from '../economy/challenge';
 import { normalizeNarrative } from './narrative';
@@ -54,24 +54,34 @@ export function equipGear(p:Profile,id:number,gearId:string) {
 }
 export function moveFormation(p:Profile,heroId:number,slot:number) {
   const h=loadout(p,heroId);if(!h||!Number.isInteger(slot)||slot<0||slot>8||slot===h.slot)return false;
-  // Only the deployed party shares the 3x3 grid; benched heroes keep a preferred tile.
-  const party=p.storyActive.includes(heroId)?p.storyActive:p.roster;
-  const other=party.find(id=>id!==heroId&&p.loadouts[id].slot===slot);
+  // Only the deployed party shares the 3x3 grid (a deployed hero swaps tiles); a benched hero's preferred tile may be shared and never displaces anyone.
+  const other=p.storyActive.includes(heroId)?p.storyActive.find(id=>id!==heroId&&p.loadouts[id].slot===slot):undefined;
   if(other!==undefined)p.loadouts[other].slot=h.slot;
   h.slot=slot;return true;
 }
 export function canEnterZone(p:Profile,index:number) { return Number.isInteger(index)&&index>=0&&index<CAMPAIGN.length&&(index===0||p.cleared.includes(index-1)); }
+const medianLevel=(p:Profile,ids:readonly number[])=>{const levels=ids.map(i=>heroProgress(p.loadouts[i].xp).level).sort((a,b)=>a-b);return levels[Math.floor(levels.length/2)]??1;};
+/** Clear a chapter: recruits join at the roster's median level and, like benched heroes, fill any free party slot (the cap may just have grown). */
 export function completeZone(p:Profile,index:number) {
   if(!canEnterZone(p,index)||p.cleared.includes(index))return false;
   p.cleared.push(index);
+  const cap=storyPartyCap(p.cleared);
   for(const id of CAMPAIGN[index].recruit)if(!p.roster.includes(id)){
-    const occupied=new Set(p.roster.map(id=>p.loadouts[id].slot));
-    const slot=Array.from({length:9},(_,i)=>i).find(i=>!occupied.has(i))??ROSTER[id].slot;
-    const levels=p.roster.map(i=>heroProgress(p.loadouts[i].xp).level).sort((a,b)=>a-b);
-    p.loadouts[id]={skills:[0,1],talents:[],slot,xp:xpForLevel(levels[Math.floor(levels.length/2)]??1)};p.roster.push(id);
+    const deployed=new Set(p.storyActive.map(other=>p.loadouts[other].slot));
+    const slot=roleTiles(ROSTER[id].classId).find(i=>!deployed.has(i))??ROSTER[id].slot;
+    p.loadouts[id]={skills:[0,1],talents:[],slot,xp:xpForLevel(medianLevel(p,p.roster))};p.roster.push(id);
+    if(p.storyActive.length<cap)p.storyActive.push(id);
   }
+  for(const id of p.roster)if(p.storyActive.length<cap&&!p.storyActive.includes(id))p.storyActive.push(id);
+  placeParty(p.loadouts,p.storyActive);
   return true;
 }
+/** Normal replays pay this share of a chapter's gold reward; the full reward comes only with the first clear. */
+export const REPLAY_GOLD=.3;
+/** Replay EXP: full up to the latest cleared chapter, then 15% less per chapter further behind, never below 25%. */
+export function replayFactor(p:Profile,chapter:number) { return Math.max(.25,1-.15*Math.max(0,p.cleared.length-chapter-1)); }
+/** Chapter gold on top of the battle gold, read before the clear is recorded: full on the first clear, REPLAY_GOLD on a Normal replay, none on Heroic (its first clear pays heroicReward instead). */
+export function chapterReward(p:Profile,chapter:number,heroic=false) { const zone=CAMPAIGN[chapter];return !zone||heroic?0:p.cleared.includes(chapter)?Math.round(zone.reward*REPLAY_GOLD):zone.reward; }
 // Story progress no longer multiplies the party: growth comes from hero levels, gear, talents and jobs.
 export function profileModifiers(_p:Profile) { return {power:1,vitality:1,tempo:1}; }
 
@@ -113,7 +123,7 @@ export function normalizeProfile(raw:unknown,legacy?:unknown):Profile {
   const cleared=Array.isArray(data.cleared)?data.cleared:[];
   for(let index=0;index<CAMPAIGN.length&&cleared.includes(index);index++)completeZone(p,index);
   p.storyActive=normalizeStoryParty(data.storyActive,p.roster,p.cleared);
-  const loads=record(data.loadouts),occupied=new Set<number>();
+  const loads=record(data.loadouts),saved=p.roster.filter(id=>Object.keys(record(loads[String(id)])).length>0);
   for(const id of p.roster){
     const source=record(loads[String(id)]),h=p.loadouts[id];
     const claimed=Array.isArray(source.talents)?source.talents:[];
@@ -128,11 +138,12 @@ export function normalizeProfile(raw:unknown,legacy?:unknown):Profile {
     const skills=Array.isArray(source.skills)?source.skills:[];
     const valid=[...new Set(skills)].filter((index):index is number=>typeof index==='number'&&legalSkill(index,h.talents,h.job));
     h.skills=valid.length===2?valid:[0,1];
-    const slot=source.slot;
-    if(typeof slot==='number'&&Number.isInteger(slot)&&slot>=0&&slot<=8&&!occupied.has(slot))h.slot=slot;
-    else if(occupied.has(h.slot))h.slot=Array.from({length:9},(_,i)=>i).find(i=>!occupied.has(i))??ROSTER[id].slot;
-    occupied.add(h.slot);
+    // Any valid saved tile is kept for now (benched heroes may share one); placeParty below makes deployed tiles unique.
+    if(typeof source.slot==='number'&&Number.isInteger(source.slot)&&source.slot>=0&&source.slot<=8)h.slot=source.slot;
   }
+  // A recruit the save predates (content added later) joins at the saved heroes' median level, as a live recruit would.
+  if(data.version===3&&saved.length)for(const id of p.roster)if(!saved.includes(id))p.loadouts[id].xp=xpForLevel(medianLevel(p,saved));
+  placeParty(p.loadouts,p.storyActive);
   const ledger=record(data.ledger),enemies=record(ledger.enemies);
   p.ledger.raids=bounded(ledger.raids,0,1000000);p.ledger.victories=bounded(ledger.victories,0,1000000);
   for(const e of Object.values(ENEMIES))if(e.archetype===e.id&&enemies[e.id]!==undefined)p.ledger.enemies[e.id]=bounded(enemies[e.id],0,1000000);
@@ -204,7 +215,7 @@ export function settleProgress(p:Profile,b:Battle,runWallet?:RunWallet) {
   // Calculate every delta before mutating the profile.  The operations below
   // are bounded integer updates, so a settlement either commits as a whole or
   // returns without changing the profile.
-  const xp=b.mode==='adventure'?Math.round((180+b.floor*75+b.stageCount*45)*(b.heroic?1.3:1)):b.mode==='dungeon'?b.dungeon?.xp??0:b.mode==='endless'?100+b.floor*35:180+b.floor*45;
+  const xp=b.mode==='adventure'?Math.round((180+b.floor*75+b.stageCount*45)*(b.heroic?1.3:1)*replayFactor(p,b.floor-1)):b.mode==='dungeon'?b.dungeon?.xp??0:b.mode==='endless'?100+b.floor*35:180+b.floor*45;
   const rewards=(b.mode==='endless'?[]:b.heroes).map(h=>{const amount=Math.floor(xp*(h.hp>0?1:.6));const before=heroProgress(p.loadouts[h.id]?.xp).level;return {id:h.id,kind:'active' as 'active'|'bench',bonus:0,xp:amount,before,after:heroProgress((p.loadouts[h.id]?.xp??0)+amount).level};});
   if(b.mode==='adventure') {
     const activeXP=b.heroes.map(h=>normalizedXP(p.loadouts[h.id]?.xp)).sort((a,b)=>a-b);

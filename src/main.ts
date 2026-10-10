@@ -18,7 +18,7 @@ import { Battle, type BattleEvent, type BattleOptions } from './game/simulation'
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
 import { CAMPAIGN, BOONS, boonChoices } from './game/world';
-import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, ownsChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult } from './game/profile';
+import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, ownsChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult, chapterReward } from './game/profile';
 import { startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fightScale, dungeonXP, type Outcome } from './game/dungeon';
 import { chapterStars } from './game/journey';
 import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
@@ -31,7 +31,7 @@ import { loadSave, saveProfile, backupLegacy, legacyBackup, commanderFromBackup,
 import { createProfile, type Profile } from './game/profile';
 import { CommanderSession } from './game/commander-session';
 import { copyLegacyToCommander, createCommanderDocument, createRunCheckpoint, terminalRun, storedStateFor, materializeProfile, type CommanderDocument, type CommanderMode, type SlotId } from './game/commander';
-import { storyBattleOptions, setStoryParty, normalizeStoryParty } from './game/story-party';
+import { storyBattleOptions, setStoryParty, normalizeStoryParty, storyPartyCap } from './game/story-party';
 import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-build';
 import { JOBS } from './game/jobs';
 import { defaultRaidBuild, setRaidJob, setRaidHero, setRaidPartySize, normalizeRaidBuild, openRaidQuarry, raidQuarryUnlocked } from './game/raid-build';
@@ -179,6 +179,11 @@ let scene: BattleScene;
 let inTown = true;
 let initialized = false;
 let recorded = false;
+let chapterResult: { stars: number; improved: boolean; heroic?: { gold: number; materials: Record<string, number> } } | undefined;
+/** What the last settled result credited (gold for Story, bank Crystal otherwise) and the party cap it unlocked (0 = unchanged). */
+let resultReward: { gold: number; crystal: number; partyCap: number } | undefined;
+/** The current adventure battle's start checkpoint ('Retry this battle'); cleared whenever a new battle is booted. */
+let stageStart: NonNullable<typeof encounter> | undefined;
 let experienceRewards:NonNullable<ReturnType<typeof settleProgress>>=[];
 let lastStatus = battle.status;
 let drawIn = 0;
@@ -202,6 +207,8 @@ const townState: TownState = {
   tab: 'camp', hero: 0, zone: Math.min(profile.cleared.length, CAMPAIGN.length - 1), raid: 'golem', raidTier: 'bronze', raidModifiers: [], raidBuild: defaultRaidBuild(profile), notice: '',
   trainingTab: 'formation', campaignPage: 0, questPage: 0, bestiaryPage: 0,
 };
+/** Selecting another chapter drops the Heroic toggle: Heroic is chosen per chapter, never carried over. */
+function selectZone(zone: number) { if (zone !== townState.zone) townState.heroic = false; townState.zone = zone; }
 
 $('app').innerHTML = `
 <section id="title-screen" class="title-screen" hidden>${titleMarkup()}</section>
@@ -413,6 +420,7 @@ $('town-screen').addEventListener('click', event => {
   }
   if (button.dataset.facility) {
     townState.pendingGear = undefined;
+    if (button.dataset.trainingTab) townState.trainingTab = button.dataset.trainingTab as TownState['trainingTab'];
     void navigateTown(button.dataset.facility as TownTab);
     return;
   }
@@ -441,7 +449,7 @@ $('town-screen').addEventListener('click', event => {
   }
   if (button.dataset.equipSkill !== undefined) {
     const ok = equipSkill(profile, townState.hero, Number(button.dataset.skillSlot), Number(button.dataset.equipSkill));
-    showTown('party', ok ? t('notice.loadout') : '', true);
+    showTown('party', ok ? t('notice.loadout') : t('notice.loadout.fail'), true);
     if (ok) celebrate(`[data-loadout-slot="${button.dataset.skillSlot}"]`);
     return;
   }
@@ -458,7 +466,7 @@ $('town-screen').addEventListener('click', event => {
   }
   if (button.dataset.campaignPage) {
     const delta = Number(button.dataset.campaignPage);
-    townState.zone = Math.max(0, Math.min(CAMPAIGN.length - 1, townState.zone + delta));
+    selectZone(Math.max(0, Math.min(CAMPAIGN.length - 1, townState.zone + delta)));
     townState.campaignPage = townState.zone;
     sound.clink();
     showTown('campaign', '', true);
@@ -488,14 +496,14 @@ $('town-screen').addEventListener('click', event => {
     const startZone = actId * 4;
     const actZones = [startZone, startZone + 1, startZone + 2, startZone + 3];
     const target = actZones.find(z => !profile.cleared.includes(z)) ?? startZone;
-    townState.zone = target;
+    selectZone(target);
     townState.campaignPage = target;
     sound.clink();
     showTown('campaign', '', true);
     return;
   }
   if (button.dataset.zone || button.dataset.mission) {
-    townState.zone = Number(button.dataset.zone ?? button.dataset.mission);
+    selectZone(Number(button.dataset.zone ?? button.dataset.mission));
     townState.campaignPage = townState.zone;
     sound.clink();
     showTown('mission', '', true);
@@ -792,6 +800,7 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   $('battle-detail-pause-note').hidden = true;
   battle = next;
   recorded = false;
+  chapterResult = undefined; resultReward = undefined; stageStart = undefined;
   experienceRewards=[];
   offeredBoons = [];
   lastStatus = 'ready';
@@ -876,6 +885,7 @@ async function begin() {
   if (commander.stale || pendingSettlement) return;
   if (['victory', 'defeat'].includes(battle.status)) { result(); return; }
   encounter = makeEncounter();
+  stageStart = battle.mode === 'adventure' ? structuredClone(encounter) : undefined;
   sound.unlock();
   battle.start();
   $('start-overlay').hidden = true;
@@ -1548,10 +1558,8 @@ async function presentResult() {
   const won = battle.status === 'victory';
   const moreWaves = won && battle.mode === 'adventure' && battle.stage + 1 < battle.stageCount;
   const zone = CAMPAIGN[battle.floor - 1];
-  let recruited: string[] = [];
   recruitedIds = [];
   let reward = 0;
-  if (!recorded) chapterResult = undefined;
   if (!recorded) {
     pendingSettlement = true;
     if (won && !moreWaves && !encounter?.settled) {
@@ -1564,16 +1572,16 @@ async function presentResult() {
         openModal(`<h2 id="modal-title">${t('result.blocked.title')}</h2><p>${t('result.blocked.copy')}</p>`);
         return false;
       }
-      reward = battle.gold + (battle.mode === 'adventure' ? zone.reward : 0);
+      // The credited amounts are computed once here and the ceremony shows exactly these.
       if (battle.mode === 'adventure') {
-        if (battle.heroic) reward = battle.gold;
+        reward = battle.gold + chapterReward(candidate, battle.floor - 1, battle.heroic);
         candidate.gold += reward;
-        const before = new Set(candidate.roster);
+        const before = new Set(candidate.roster), cap = storyPartyCap(candidate.cleared);
         completeZone(candidate, battle.floor - 1);
         recruitedIds = candidate.roster.filter(id => !before.has(id));
-        recruited = recruitedIds.map(id => ROSTER[id].name);
         chapterResult = { stars: chapterStars(battle.living().length === battle.heroes.length, battle.stageTime), ...recordChapterResult(candidate, battle.floor - 1, chapterStars(battle.living().length === battle.heroes.length, battle.stageTime), battle.heroic) };
-      }
+        resultReward = { gold: reward + (chapterResult.heroic?.gold ?? 0), crystal: 0, partyCap: storyPartyCap(candidate.cleared) > cap ? storyPartyCap(candidate.cleared) : 0 };
+      } else resultReward = { gold: 0, crystal: Math.max(0, candidate.economy.commanderCrystal - profile.economy.commanderCrystal), partyCap: 0 };
       candidate.wins++;
       if (battle.mode === 'endless') candidate.bestFloor = Math.max(candidate.bestFloor, battle.floor);
       profile = candidate;
@@ -1613,6 +1621,7 @@ async function presentResult() {
         <h2 id="result-title" class="boon-modal-title">${t('boon.choose')}</h2>
         <p class="boon-modal-subtitle">${t('boon.choose.sub')}</p>
         <p class="boon-run-wallet">${t('boons.purse', { n: runWallet.crystal })} · ${t('battle.standing', { n: battle.living().length, total: battle.heroes.length })} · ${formatTime(battle.time)}</p>
+        ${resultReward?.crystal ? `<p class="boon-run-wallet boon-bank-gain" data-result-reward>${t('boons.bank', { n: resultReward.crystal })}</p>` : ''}
       </header>
       <section class="win rogue-promote" id="rogue-promote" aria-live="polite"></section>
       ${!offeredBoons.length ? `<button id="next-floor" class="btn primary">${t('boon.allcollected')}</button>` : ''}
@@ -1625,7 +1634,10 @@ async function presentResult() {
     const outcomeClass = won ? (moreWaves ? 'wave-clear' : 'victory') : 'defeat';
     const banner = moreWaves ? t('result.banner.wave', { n: battle.stage + 1, total: battle.stageCount }) : won ? t('result.banner.win') : t('result.banner.lose');
     const titleText = won ? (moreWaves ? t('result.title.wave') : t('result.title.win')) : t('result.title.lose');
-    const goldDisplay = won ? (moreWaves ? battle.gold : battle.gold + (battle.mode === 'adventure' ? zone.reward : 0)) : 0;
+    // Gold or bank Crystal actually credited ('—' when the result is shown again after a reload and the amount is no longer known).
+    const credited = !won ? 0 : resultReward ? (battle.mode === 'adventure' ? resultReward.gold : resultReward.crystal) : undefined;
+    const rewardPlaque = moreWaves ? [t('result.carried'), `${battle.gold}G`] : battle.mode === 'adventure' ? [t('result.gold'), credited === undefined ? '—' : `${credited}G`] : [t('currency.crystal'), credited === undefined ? '—' : `+${credited}`];
+    const retryBattle = !won && battle.mode === 'adventure' && battle.stage > 0 && stageStart?.battle.stage === battle.stage && stageStart.battle.floor === battle.floor;
     const xpRows = experienceRewards.map(r => {
       const isLevelUp = r.after > r.before;
       const hero = ROSTER[r.id];
@@ -1637,22 +1649,25 @@ async function presentResult() {
       <header class="win ceremony-header">
         <h2 id="result-title" class="ceremony-title">${titleText}</h2>
         <p class="ceremony-desc">${escapeUI(description).replace(/\n/g, '<br>')}</p>
-        ${recruited.length ? `<p class="recruit-notice">${t('result.recruited', { names: recruited.join(' & ') })}</p>` : ''}
-        ${chapterResult && won && !moreWaves ? `<p class="result-stars"><span>${t('result.stars')}</span> <b class="star-row">${'★'.repeat(chapterResult.stars)}${'☆'.repeat(3 - chapterResult.stars)}</b>${chapterResult.improved ? ` <em>${t('result.stars.new')}</em>` : ''}</p>` : ''}
+        ${([['result.recruited', true], ['result.recruited.bench', false]] as const).map(([key, deployed]) => { const names = recruitedIds.filter(id => profile.storyActive.includes(id) === deployed).map(id => ROSTER[id].name); return names.length ? `<p class="recruit-notice">${t(key, { names: names.join(' & ') })}</p>` : ''; }).join('')}
+        ${resultReward?.partyCap && won && !moreWaves ? `<p class="recruit-notice party-grew">${t('notice.party.grew', { n: resultReward.partyCap })}</p>` : ''}
+        ${won && !moreWaves && battle.heroic ? `<p class="result-stars heroic-stars">${t('stars.heroic')}</p>` : chapterResult && won && !moreWaves ? `<p class="result-stars"><span>${t('result.stars')}</span> <b class="star-row">${'★'.repeat(chapterResult.stars)}${'☆'.repeat(3 - chapterResult.stars)}</b>${chapterResult.improved ? ` <em>${t('result.stars.new')}</em>` : ''}</p>` : ''}
         ${chapterResult?.heroic ? `<p class="recruit-notice">${t('result.heroic', { gold: chapterResult.heroic.gold, mat: materialList(chapterResult.heroic.materials) })}</p>` : ''}
       </header>
       <section class="win result-summary" aria-label="${t('result.summary')}">
-        <dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque gold"><dt>${moreWaves ? t('result.carried') : t('result.gold')}</dt><dd>${goldDisplay}G</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>
+        <dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque gold"><dt>${rewardPlaque[0]}</dt><dd data-result-reward>${rewardPlaque[1]}</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>
         ${xpRows ? `<div class="xp-results">${xpRows}</div>` : ''}
         ${readyQuests && !moreWaves && won ? `<p class="hint">${t('result.quests', { n: readyQuests })}</p>` : ''}
+        ${retryBattle ? `<p class="hint retry-battle-hint">${t('result.retry.battle.hint')}</p>` : ''}
       </section>
       <section class="win result-details" id="result-details" aria-label="${t('result.details')}" hidden>
         <p class="hint">${t('result.xp.note')}</p>
         <dl class="stat-table"><div><dt>${t('battle.stat.damage')}</dt><dd>${Math.round(battle.damage).toLocaleString()}</dd></div><div><dt>${t('battle.stat.blocked')}</dt><dd>${Math.round(battle.blocked).toLocaleString()}</dd></div></dl>
       </section>
       <div class="ceremony-actions">
-        ${moreWaves ? `<button id="next-wave" class="btn primary">${t('result.next')} ▶</button>` : `<button id="retry" class="btn">${t('result.retry')}</button>`}
-        <button id="result-town" class="btn ${moreWaves ? '' : 'primary'}">${moreWaves ? t('result.abandon') : t('result.town')}</button>
+        ${retryBattle ? `<button id="retry-battle" class="btn primary" title="${escapeUI(t('result.retry.battle.hint'))}">${t('result.retry.battle')}</button>` : ''}
+        ${moreWaves ? `<button id="next-wave" class="btn primary">${t('result.next')} ▶</button>` : `<button id="retry" class="btn">${!won && battle.stage > 0 ? t('result.restart') : t('result.retry')}</button>`}
+        <button id="result-town" class="btn ${moreWaves || retryBattle ? '' : 'primary'}">${moreWaves ? t('result.abandon') : t('result.town')}</button>
         <button id="result-details-toggle" class="btn result-details-toggle" type="button" aria-controls="result-details" aria-expanded="false">${t('result.details')}</button>
       </div>
     </div>`);
@@ -1694,11 +1709,20 @@ async function presentResult() {
   }));
   $('next-floor')?.addEventListener('click',()=>{closeWithoutResume();void nextFloor();});
   $('retry')?.addEventListener('click', () => {
-    const mode = battle.mode, floor = battle.mode === 'endless' ? 1 : battle.floor;
+    // Read before boot replaces `battle`: a Heroic retry stays Heroic.
+    const mode = battle.mode, floor = battle.mode === 'endless' ? 1 : battle.floor, heroic = battle.heroic;
     runBoons = [];
     closeWithoutResume();
-    boot(mode, floor);
+    boot(mode, floor, mode === 'adventure' && heroic ? { heroic: true } : {});
     void clearEncounter();
+  });
+  // Retry only the lost battle from its start checkpoint: HP and potions as they were then, no refill.
+  $('retry-battle')?.addEventListener('click', () => {
+    if (!stageStart) return;
+    const saved = { ...structuredClone(stageStart), seq: Math.max(stageStart.seq, encounter?.seq ?? 0) };
+    closeWithoutResume();
+    resumeEncounter(saved);
+    void checkpoint();
   });
   $('result-town').addEventListener('click', () => {
     if (moreWaves || won && battle.mode === 'endless') {
@@ -1715,7 +1739,6 @@ async function presentResult() {
   });
 }
 
-let chapterResult: { stars: number; improved: boolean; heroic?: { gold: number; materials: Record<string, number> } } | undefined;
 /** Result of one Undercroft room: XP, carried HP and the pouch update, then back to the map. */
 async function presentDungeonResult() {
   const won = battle.status === 'victory';
@@ -1794,6 +1817,10 @@ async function restoreEncounter(savedEncounter: NonNullable<typeof encounter>) {
   // Wait for a save in flight; a failed one gets a retry/export prompt instead of a dead Depart button.
   if (!(await commander.flush())) { unsavedTownModal(() => restoreEncounter(savedEncounter)); return; }
   if (!inTown || pendingSettlement) return;
+  resumeEncounter(savedEncounter);
+}
+/** Rebuild the battle from an encounter checkpoint (a resumed save, or 'Retry this battle'). */
+function resumeEncounter(savedEncounter: NonNullable<typeof encounter>) {
   const frozen = structuredClone(savedEncounter);
   boot(frozen.battle.mode, frozen.battle.floor);
   battle.restoreCheckpoint(frozen.battle);
@@ -1863,7 +1890,7 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
   const contract = raid && 'contract' in raid ? raid.contract : undefined;
   townState.raid = huntTarget ?? contract?.bossId ?? 'golem'; townState.raidTier = contract?.tier ?? 'bronze'; townState.raidModifiers = (contract?.modifiers ?? []).filter(raidModifierAvailable);
   townState.raidSandbox = raid && 'sandbox' in raid ? raid.sandbox : undefined;
-  townState.pendingGear = undefined; townState.hero = profile.roster[0]; townState.zone = Math.min(profile.cleared.length,CAMPAIGN.length-1);
+  townState.pendingGear = undefined; townState.hero = profile.roster[0]; selectZone(Math.min(profile.cleared.length,CAMPAIGN.length-1));
   sound.enabled = profile.sound; scene.reducedMotion = !profile.motion;
   $('sound').setAttribute('aria-pressed', String(profile.sound)); window.document.body.classList.toggle('reduced-motion', !profile.motion);
   if (resumed && mode === document.activeMode) { syncProfileEconomy(profile); savedSignature = `${document.commanderId}:${commander.document!.revision}:${JSON.stringify(context())}`; } else savedSignature = '';

@@ -53,6 +53,26 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   const boons = await evaluate('window.gridbound.battle.boons');
   assert.ok(boons.includes(boonId), `Drafted boon ${boonId} must be active in run`);
 
+  // Floors 1-2 are plain rooms (no bank line); clearing floor 3 completes Act I and the draft shows the bank Crystal it credited.
+  assert.equal(await evaluate('Boolean(document.querySelector(".boon-bank-gain"))'), false, 'no bank line before an act clear');
+  for (const floor of [2, 3]) {
+    await wait(`window.gridbound.battle.floor === ${floor} && window.gridbound.battle.status === "ready" && !document.querySelector("#start-overlay").hidden`);
+    await click('#start');
+    await wait('window.gridbound.battle.status === "fighting"');
+    const crystal = await evaluate('window.gridbound.profile().economy.commanderCrystal');
+    await evaluate('window.gridbound.battle.bossHp = 0; window.gridbound.step(.1)');
+    await wait('document.querySelector("[data-boon]") && !document.querySelector("[data-boon]").disabled', 15000);
+    if (floor === 3) {
+      const gained = await evaluate('window.gridbound.profile().economy.commanderCrystal') - crystal;
+      assert.equal(gained, 6, 'Act I clear banks 6 Crystal');
+      assert.equal(await evaluate('document.querySelector(".boon-bank-gain")?.textContent'), `Act clear: +${gained} ◆ banked`, 'the draft names the banked Crystal');
+      await screenshot('artifacts/boon-draft-act-clear.png');
+    } else {
+      assert.equal(await evaluate('Boolean(document.querySelector(".boon-bank-gain"))'), false, `floor ${floor} banks nothing`);
+      await click('[data-boon]');
+    }
+  }
+
   console.log('✓ Desktop 3-Card Draft test passed');
 }, { width: 1440, height: 900 });
 

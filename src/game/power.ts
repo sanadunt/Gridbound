@@ -32,6 +32,12 @@ export function recommendedPower(chapter: number): number {
   return RECOMMENDED_POWER[Math.max(0, Math.min(RECOMMENDED_POWER.length - 1, chapter))];
 }
 
+/** Heroic replays (HEROIC_HP/DMG, one potion) need about this much more power than the Normal chapter; WP8 refits it from data. */
+export const HEROIC_POWER_FACTOR = 1.25;
+export function recommendedHeroicPower(chapter: number): number {
+  return Math.round(recommendedPower(chapter) * HEROIC_POWER_FACTOR / 10) * 10;
+}
+
 /** 'ready' at or above the recommendation, 'close' within 15% below it, otherwise 'under'. */
 export function powerVerdict(power: number, recommended: number): 'ready' | 'close' | 'under' {
   return power >= recommended * .97 ? 'ready' : power >= recommended * .85 ? 'close' : 'under';

@@ -46,6 +46,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key }) => {
   assert.equal(await evaluate('document.querySelector("#result-details").hidden && document.querySelector("#result-screen").dataset.detailsOpen !== "true"'), true, 'Escape returns to the result summary');
   assert.equal(await evaluate('document.querySelector("#battle-screen").inert && Number(getComputedStyle(document.querySelector("#result-screen")).zIndex) > Number(getComputedStyle(document.querySelector("#battle-screen")).zIndex)'), true, 'Result screen must cover inert combat');
   assert.equal(await evaluate('Boolean(document.querySelector(".recruit-notice"))'), true, 'Recruit notice for Sable must appear');
+  assert.equal(await evaluate('document.querySelector(".recruit-notice").textContent'), 'Sable joined the roster and waits on the bench.', 'the party cap is still 3, so the notice says Sable is benched');
 
   assert.equal(await evaluate('document.querySelectorAll(".stat-plaque").length'), 3, 'Summary and details retain survivors, rewards, and elapsed time');
   assert.equal(await evaluate('Boolean(document.querySelector("#result-town"))'), true, '#result-town CTA must exist');
@@ -156,6 +157,69 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await click('#retry');
   assert.equal(await evaluate('window.gridbound.battle.floor'), 1, 'Retry restarts at floor 1');
   console.log('✓ Defeat ceremony flow passed');
+}, { width: 1440, height: 900 });
+
+// 4. Heroic defeat mid-chapter: 'Retry this battle' resumes the lost battle from its start (HP and potions as
+// they were, no refill) and 'Restart chapter (battle 1)' starts over; both stay Heroic.
+await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
+  const loadout = slot => ({ skills: [0, 1], talents: [], xp: 600, slot });
+  const seeded = { version: 3, gold: 500, economy: { gold: 500, commanderCrystal: 0, materials: {} }, challengeUnlocks: [], claimedQuests: [], ledger: { raids: 0, victories: 0, enemies: {} }, roster: [0, 4, 3, 2, 7], cleared: [0, 1], storyActive: [0, 4, 3, 7], loadouts: { 0: loadout(1), 4: loadout(7), 3: loadout(6), 2: loadout(8), 7: loadout(8) }, journey: { stars: { 0: 2, 1: 2 }, chests: 0, heroic: [], depth: 0 }, bestFloor: 0, wins: 2, sound: false, motion: false };
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: `if (!sessionStorage.getItem('qa.seeded')) { sessionStorage.setItem('qa.seeded', '1'); localStorage.clear(); localStorage.setItem('gridbound.v3', ${JSON.stringify(JSON.stringify(seeded))}); }` });
+  await send('Page.navigate', { url });
+  await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")');
+  await click.nav('campaign');
+  await click('.map-node-pin[data-zone="1"]');
+  await wait('Boolean(document.querySelector(".heroic-toggle"))');
+  await click('[data-heroic="1"]');
+  await wait('Boolean(document.querySelector(".heroic-depart"))');
+  await click('[data-depart="adventure"]');
+  await wait('window.gridbound.battle.mode === "adventure" && window.gridbound.battle.status === "ready"');
+  assert.equal(await evaluate('window.gridbound.battle.heroic && window.gridbound.battle.potions'), 1, 'Heroic departs with one potion');
+  // Battle 1: take damage and drink the only potion, then win; battle 2 starts with that HP and no potion.
+  await click('#start');
+  await wait('window.gridbound.battle.status === "fighting"');
+  await evaluate('(() => { const b = window.gridbound.battle; b.heroes[0].hp = Math.round(b.heroes[0].maxHp * .3); b.potion(); b.heroes[1].hp = Math.round(b.heroes[1].maxHp * .4); b.bossHp = 0; window.gridbound.step(.05); })()');
+  await wait('Boolean(document.querySelector("#next-wave")) && !document.querySelector("#next-wave").disabled');
+  await click('#next-wave');
+  await wait('window.gridbound.battle.status === "ready" && document.querySelector("#result-screen").hidden');
+  await click('#start');
+  await wait('window.gridbound.battle.status === "fighting" && window.gridbound.battle.stage === 1');
+  const atStart = await evaluate('JSON.stringify(window.gridbound.battle.heroes.map(h => Math.round(h.hp)))');
+  await evaluate('window.gridbound.battle.heroes.forEach(h => { h.hp = 0; }); window.gridbound.step(.1)');
+  await wait('document.querySelector("#result-screen:not([hidden]) .result-ceremony-modal.defeat") && document.querySelector("#retry") && !document.querySelector("#retry").disabled');
+  assert.equal(await evaluate('document.querySelector("#retry").textContent'), 'Restart chapter (battle 1)', 'a mid-chapter defeat names what Retry restarts');
+  assert.equal(await evaluate('document.querySelector("#retry-battle")?.textContent'), 'Retry this battle');
+  assert.equal(await evaluate('document.querySelector("[data-result-reward]").textContent'), '0G', 'a defeat credits nothing');
+  const actions = JSON.parse(await evaluate('JSON.stringify([...document.querySelectorAll("#result-screen .ceremony-actions button")].map(button => { const box = button.getBoundingClientRect(); return { top: box.top, bottom: box.bottom, height: box.height }; }))'));
+  const height = await evaluate('innerHeight');
+  assert.ok(actions.length === 4 && actions.every(box => box.top >= 0 && box.bottom <= height && box.height >= 44), 'all four defeat actions are visible 44px targets');
+  await screenshot('artifacts/defeat-retry-battle-desktop.png');
+  await send('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
+  const mobile = JSON.parse(await evaluate('JSON.stringify([...document.querySelectorAll("#result-screen .ceremony-actions button")].map(button => { const box = button.getBoundingClientRect(); return { top: box.top, bottom: box.bottom, height: box.height }; }))'));
+  assert.ok(mobile.every(box => box.top >= 0 && box.bottom <= 640 && box.height >= 44) && await evaluate('document.documentElement.scrollHeight <= innerHeight + 1'), 'the four defeat actions fit 360×640 without document scrolling');
+  await screenshot('artifacts/defeat-retry-battle-mobile-360x640.png');
+  await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await click('#retry-battle');
+  await wait('window.gridbound.battle.status === "ready" && document.querySelector("#result-screen").hidden');
+  assert.deepEqual(JSON.parse(await evaluate('JSON.stringify({ stage: window.gridbound.battle.stage, heroic: window.gridbound.battle.heroic, potions: window.gridbound.battle.potions, hp: window.gridbound.battle.heroes.map(h => Math.round(h.hp)) })')), { stage: 1, heroic: true, potions: 0, hp: JSON.parse(atStart) }, 'Retry this battle: same battle, Heroic, the HP and potions it began with (no refill)');
+  assert.ok((await evaluate('document.querySelector("#mode-label").textContent')).includes('HEROIC'), 'the HUD keeps the Heroic badge');
+  // Lose again and restart the chapter: still Heroic, battle 1, one potion.
+  await click('#start');
+  await wait('window.gridbound.battle.status === "fighting"');
+  await evaluate('window.gridbound.battle.heroes.forEach(h => { h.hp = 0; }); window.gridbound.step(.1)');
+  await wait('document.querySelector("#result-screen:not([hidden]) .result-ceremony-modal.defeat") && document.querySelector("#retry") && !document.querySelector("#retry").disabled');
+  await click('#retry');
+  await wait('window.gridbound.battle.status === "ready" && document.querySelector("#result-screen").hidden');
+  assert.deepEqual(JSON.parse(await evaluate('JSON.stringify({ stage: window.gridbound.battle.stage, heroic: window.gridbound.battle.heroic, potions: window.gridbound.battle.potions })')), { stage: 0, heroic: true, potions: 1 }, 'Restart chapter keeps Heroic: battle 1 with one potion');
+  assert.ok((await evaluate('document.querySelector("#mode-label").textContent')).includes('HEROIC'));
+  // A defeat in battle 1 has nothing to resume: only Retry, with its plain label.
+  await click('#start');
+  await wait('window.gridbound.battle.status === "fighting"');
+  await evaluate('window.gridbound.battle.heroes.forEach(h => { h.hp = 0; }); window.gridbound.step(.1)');
+  await wait('document.querySelector("#result-screen:not([hidden]) .result-ceremony-modal.defeat") && document.querySelector("#retry") && !document.querySelector("#retry").disabled');
+  assert.equal(await evaluate('document.querySelector("#retry").textContent'), 'Retry');
+  assert.equal(await evaluate('Boolean(document.querySelector("#retry-battle"))'), false);
+  console.log('✓ Heroic retry flow passed');
 }, { width: 1440, height: 900 });
 
 console.log('ALL CEREMONY BROWSER TESTS PASSED!');

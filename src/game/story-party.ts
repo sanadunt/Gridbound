@@ -16,12 +16,25 @@ export function normalizeStoryParty(value: unknown, roster: readonly number[], c
   return ids.length ? ids : roster.slice(0, cap);
 }
 
+/** Tile order for a hero who needs a tile: warriors and monks hold the front row, everyone else starts at the back, then the middle. */
+export function roleTiles(classId: string): number[] { return classId === 'warrior' || classId === 'monk' ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [6, 7, 8, 3, 4, 5, 0, 1, 2]; }
+const validTile = (slot: unknown): slot is number => typeof slot === 'number' && Number.isInteger(slot) && slot >= 0 && slot <= 8;
+/** Deployed heroes get unique tiles: earlier heroes keep theirs; a hero whose tile is missing or taken gets its role's first tile that no other deployed hero holds. Benched heroes may share a preferred tile. */
+export function placeParty(loadouts: Profile['loadouts'], ids: readonly number[]): void {
+  const used = new Set<number>();
+  for (const id of ids) {
+    const l = loadouts[id], order = roleTiles(ROSTER[id].classId);
+    if (!validTile(l.slot) || used.has(l.slot)) l.slot = order.find(i => !used.has(i) && !ids.some(other => other !== id && loadouts[other].slot === i)) ?? order.find(i => !used.has(i)) ?? l.slot;
+    used.add(l.slot);
+  }
+}
+
 export function setStoryParty(p: Profile, ids: number[]): boolean {
   if (!Array.isArray(ids) || !ids.length || ids.length > storyPartyCap(p.cleared) || new Set(ids).size !== ids.length || ids.some(id => !Number.isInteger(id) || !p.roster.includes(id) || !p.loadouts[id])) return false;
+  // Heroes who were already deployed keep their tiles; newly deployed heroes take what is left.
+  const before = p.storyActive;
   p.storyActive = [...ids];
-  // Benched heroes may share a preferred tile; give a newly deployed hero the first free one.
-  const used = new Set<number>();
-  for (const id of ids) { const l = p.loadouts[id]; if (used.has(l.slot)) l.slot = Array.from({ length: 9 }, (_, i) => i).find(i => !used.has(i) && !ids.some(other => other !== id && p.loadouts[other].slot === i)) ?? l.slot; used.add(l.slot); }
+  placeParty(p.loadouts, [...ids.filter(id => before.includes(id)), ...ids.filter(id => !before.includes(id))]);
   return true;
 }
 

@@ -99,8 +99,9 @@ try {
     const after=await evaluate('window.gridbound.profile()');
     const deltas=after.roster.map(id=>({id,kind:selected.includes(id)?'active':'bench',xp:after.loadouts[id].xp-before.loadouts[id].xp}));
     assert.ok(deltas.every(row=>row.xp>0));
-    assert.ok(deltas.filter(row=>row.kind==='active').every(row=>row.xp===435));
-    assert.deepEqual(deltas.filter(row=>row.kind==='bench').map(row=>row.xp),[217,434,434]);
+    // Chapter 1 replayed with four chapters cleared is three behind the frontier: 55% of the 435 EXP (replayFactor).
+    assert.ok(deltas.filter(row=>row.kind==='active').every(row=>row.xp===239));
+    assert.deepEqual(deltas.filter(row=>row.kind==='bench').map(row=>row.xp),[119,238,238]);
     const duplicate=await evaluate(`(async()=>{const {settleProgress}=await import('/src/game/profile.ts');return settleProgress(window.gridbound.profile(),window.gridbound.battle);})()`);
     assert.equal(duplicate,null);
     await screenshot('artifacts/d3-results.png');

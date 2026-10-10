@@ -121,7 +121,7 @@ Campaign berjalan dalam urutan linear empat act. Setiap empat chapter membentuk 
 | III | 9. Winter Ledger; 10. The Unborn Orchard; 11. Nine Funerals; 12. The Last Rehearsal | Menemukan masa depan Elian di dalam mesin, menolak pengorbanan berulang, memperoleh benih untuk masa depan baru, lalu memutus time repeater. |
 | IV | 13. A City Without Bells; 14. The Borrowed Crown; 15. A Name for Tomorrow; 16. The Unwritten Dawn | Membangun perlindungan melalui kerja komunitas, menghadapi sejarah Bellkeeper pertama, memberi Elian ruang memilih nama Eda, dan menghentikan mesin sambil membebaskan Vharok. |
 
-Chapter 1 merekrut Sable, chapter 2 merekrut Orin, chapter 3 merekrut Bran dan Kestrel, chapter 4 merekrut Nyx dan Mira. Pemain memulai dengan Aldric, Lyra, dan Rowan. Recruitment tidak memindahkan hero baru secara diam-diam ke party aktif.
+Chapter 1 merekrut Sable, chapter 2 merekrut Orin, chapter 3 merekrut Bran dan Kestrel, chapter 4 merekrut Nyx dan Mira. Pemain memulai dengan Aldric, Lyra, dan Rowan. Recruitment tidak pernah mengganti hero yang sedang aktif: setelah first clear, recruit baru mengisi slot party yang masih kosong (cap dihitung setelah chapter tercatat), lalu sisa slot kosong diisi hero bench sesuai urutan roster. Hero yang perlu tile baru ditempatkan menurut perannya: warrior dan monk di tile depan terendah yang kosong (0–2), class lain di baris belakang (6–8) lalu tengah (3–5).
 
 ### Chapter-by-chapter story beats
 
@@ -196,13 +196,13 @@ Title screen memuat empat aksi: **Enter Emberhollow**, **Commander Profiles**, *
 
 ### Expedition map dan dossier
 
-World Map menampilkan empat act dengan route pins, status chapter terkunci/tersedia/selesai, dan seleksi chapter. Memilih route membuka mission dossier dengan informasi speaker, chapter, stage, reward, recruit, boss, intent, counter, dan cerita yang relevan. Pemain harus menekan aksi deploy; memilih node saja tidak memulai pertarungan.
+World Map menampilkan empat act dengan route pins, status chapter terkunci/tersedia/selesai, dan seleksi chapter. Memilih route membuka mission dossier dengan informasi speaker, chapter, stage, reward, recruit, boss, intent, counter, dan cerita yang relevan. Baris reward menunjukkan bayaran yang sebenarnya: reward penuh untuk first clear, **Hadiah ulang** (30% Gold dan persentase EXP replay) untuk chapter yang sudah selesai, atau bayaran Heroic (Gold + material clear Heroic pertama, atau "hanya gold pertempuran" bila sudah pernah; EXP Heroic ×1,3 ikut dikalikan `replayFactor`, sehingga persentase EXP juga ditulis bila di bawah 100%). Baris recruit disembunyikan pada replay, dan saat Heroic dipilih target bintang diganti catatan bahwa bintang hanya berasal dari clear Normal. Toggle Heroic berlaku per chapter: memilih chapter lain mengembalikannya ke Normal. Pemain harus menekan aksi deploy; memilih node saja tidak memulai pertarungan.
 
 ### Progres yang terlihat
 
-- **Party power** merangkum level, gear, refine, talent, dan job menjadi satu angka. World Map, dossier, dan daftar depth Undercroft membandingkannya dengan **recommended power** per chapter (power pemain casual hasil simulasi balance di awal chapter tersebut) dengan status Ready / Close / Under.
-- **Chapter stars:** ★ untuk clear, ★ jika semua hero masih berdiri, ★ jika boss kalah dalam 80 detik atau kurang. Setiap 8 bintang membuka **star chest** (Gold + material).
-- **Next step** di Camp selalu menunjuk satu tujuan berikutnya (dungeon yang sedang berjalan, chest, point yang belum dipakai, chapter berikutnya, Undercroft saat party under-power, atau Heroic setelah campaign tamat) dengan tombol Go.
+- **Party power** merangkum level, gear, refine, talent, dan job menjadi satu angka. World Map, dossier, dan daftar depth Undercroft membandingkannya dengan **recommended power** per chapter (power pemain casual hasil simulasi balance di awal chapter tersebut) dengan status Ready / Close / Under. Saat Heroic dipilih, dossier memakai rekomendasi Heroic tersendiri (`recommendedHeroicPower` = recommended power × `HEROIC_POWER_FACTOR` 1,25) beserta status-nya.
+- **Chapter stars:** ★ untuk clear, ★ jika semua hero masih berdiri, ★ jika boss kalah dalam 80 detik atau kurang. Setiap 8 bintang membuka **star chest** (Gold + material); setelah peti keenam (48/48 bintang) bar bintang menulis "Semua peti bintang sudah dibuka".
+- **Next step** di Camp selalu menunjuk satu tujuan berikutnya (dungeon yang sedang berjalan, slot party kosong yang bisa diisi hero bench, chest, point yang belum dipakai, chapter berikutnya, Undercroft saat party under-power, atau Heroic setelah campaign tamat) dengan tombol Go. Untuk slot kosong, Go membuka tab Formation dengan panel party Story sudah terbuka.
 
 ### Core loop Story
 
@@ -221,7 +221,7 @@ Chapter → XP, Gold, recruit, bintang → bila power kurang: Undercroft untuk X
 
 ### Story
 
-Chapter dibuka berurutan. First clear memberikan chapter progression dan membuka recruit yang ditetapkan. Pemain dapat memilih party yang lebih kecil dari cap aktif. Hero yang berada di bench dapat menerima XP catch-up terbatas pada mode Story. Replaying chapter dapat menghasilkan XP dan Gold, tetapi tidak memberi recruit atau bonus first clear untuk kedua kalinya.
+Chapter dibuka berurutan. First clear memberikan chapter progression, membuka recruit yang ditetapkan, dan mengisi slot party yang kosong (layar hasil menulis "Party bertambah menjadi n!" saat cap naik). Recruit yang tidak kebagian slot (misalnya Sable setelah chapter 1, saat cap masih 3) masuk cadangan dan layar hasil menyebutnya "menunggu sebagai cadangan". Pemain tetap dapat memilih party yang lebih kecil dari cap aktif; first clear berikutnya mengisinya kembali (replay tidak mengubah party). Hero yang berada di bench dapat menerima XP catch-up terbatas pada mode Story. Replay chapter Normal membayar Gold pertempuran ditambah 30% reward chapter (`REPLAY_GOLD`; reward penuh hanya untuk first clear) dan XP dikalikan `replayFactor` = max(0,25; 1 − 0,15 × max(0, chapter selesai − chapter − 1)): penuh sampai chapter terakhir yang selesai, lalu berkurang 15% per chapter di belakangnya. Replay tidak memberi recruit atau bonus first clear untuk kedua kalinya. Layar hasil menampilkan Gold yang benar-benar dikreditkan (Raid menampilkan bank Crystal yang diterima; draft boon Roguelike setelah act tuntas menampilkan bank Crystal milestone yang masuk). Setelah kalah di pertempuran kedua atau lebih dari sebuah chapter, **Ulangi pertempuran ini** memulai lagi pertempuran itu dari checkpoint awalnya (HP dan potion seperti saat pertempuran dimulai, tanpa isi ulang), dan **Ulang chapter (pertempuran 1)** memulai chapter dari awal; keduanya mempertahankan Heroic.
 
 ### Undercroft (dungeon)
 
@@ -229,7 +229,7 @@ Dibuka dari Bell Tower di Emberhollow. Delapan depth; depth 1 terbuka setelah Ch
 
 ### Heroic
 
-Chapter yang sudah selesai dapat diulang dalam mode Heroic: musuh +60% HP, +45% damage, serangan lebih cepat, hanya satu potion, dan boss menambah aftershock setelah phase 2. Clear Heroic pertama per chapter memberi Gold dan material; replay berikutnya tidak memberi reward chapter. Simulasi balance: pemain expert dengan level satu–dua chapter di atas syarat dapat menyelesaikan Heroic chapter 1–12; Heroic chapter 13–16 adalah konten post-game yang memerlukan level tambahan dari Undercroft.
+Chapter yang sudah selesai dapat diulang dalam mode Heroic: musuh +60% HP, +45% damage, serangan lebih cepat, hanya satu potion, dan boss menambah aftershock setelah phase 2. Clear Heroic pertama per chapter memberi Gold dan material; replay berikutnya hanya memberi Gold pertempuran. Heroic tidak memberi bintang chapter; XP Heroic (×1,3) juga memakai `replayFactor`. Simulasi balance: pemain expert dengan level satu–dua chapter di atas syarat dapat menyelesaikan Heroic chapter 1–12; Heroic chapter 13–16 adalah konten post-game yang memerlukan level tambahan dari Undercroft.
 
 ### Raid
 
@@ -393,7 +393,7 @@ Setiap job tier-3 mempertahankan efek parent-nya dan membawa satu perk unik. Per
 
 - XP dan level disimpan per hero. Level maksimum 40.
 - Setiap level di atas level 1 menambah power 5% dan HP 6% (`LEVEL_POWER`/`LEVEL_HP`); level adalah sumber utama pertumbuhan hero, ditambah gear (dan refine), talent, serta job.
-- Hero yang direkrut mengejar median level roster pada saat recruitment.
+- Hero yang direkrut mengejar median level roster pada saat recruitment. Recruit yang belum ada di save lama (konten ditambahkan belakangan) bergabung pada median level hero yang tersimpan.
 - Story party dimulai dengan tiga hero aktif. Cap menjadi empat setelah dua chapter berurutan selesai, lima setelah tiga, enam setelah empat, tujuh setelah enam, delapan setelah sembilan, dan sembilan setelah dua belas.
 - Dalam Story, hero bench menerima setidaknya 50% dari victory XP dan catch-up tambahan yang dibatasi oleh selisih terhadap median XP party aktif. Formula ini tidak berlaku untuk Raid atau Roguelike.
 - Katalog talent memiliki 50 definisi; 34 berlaku untuk setiap hero: 15 foundational, 15 node shared Assault/Guard/Tempo, dan empat node khusus class. Talent dapat memerlukan level hero, Gold, skill point, node parent, atau dua prerequisite. Hanya satu keystone dari tiga pilihan dapat dipakai pada satu hero.
@@ -401,7 +401,7 @@ Setiap job tier-3 mempertahankan efek parent-nya dan membawa satu perk unik. Per
 
 ### Skill dan gear
 
-Loadout setiap hero menyimpan dua skill aktif, talent, job, XP, inventori, dan slot formasi. Gear memiliki tiga slot: weapon, armor, dan charm. Katalog memiliki 42 item termasuk universal item, enam three-piece sets, class weapon, dan item quest. Item memiliki gate class/level/source; set memberi efek pada dua dan tiga item yang sesuai. Gear dibeli sekali per hero lalu dapat dipasang ulang tanpa pembelian ulang.
+Loadout setiap hero menyimpan dua skill aktif, talent, job, XP, inventori, dan slot formasi. Tile hero aktif unik; hero bench boleh berbagi tile pilihan. Di tab Formation, memindahkan hero aktif ke tile hero aktif lain menukar keduanya, sedangkan memilih tile untuk hero bench tidak pernah menggeser hero lain. Saat party Story diubah, hero yang sudah aktif mempertahankan tile-nya dan hero yang baru diturunkan mengambil tile sisa. Normalisasi save (reload dan setiap aktivasi Commander) mempertahankan tile tersimpan: hero aktif dalam urutan party menyimpan tile-nya bila belum dipakai hero aktif sebelumnya (jika bentrok, mengambil tile kosong sesuai perannya), sedangkan hero bench menyimpan tile valid apa pun. Skill book hanya menawarkan skill yang bisa dipasang (`legalSkill`): skill job lain menulis job yang dibutuhkan. Inspector gear menulis **Pakai** tanpa harga untuk item yang sudah dimiliki, membandingkan stat setelah refine, dan menerjemahkan rarity. Gear memiliki tiga slot: weapon, armor, dan charm. Katalog memiliki 42 item termasuk universal item, enam three-piece sets, class weapon, dan item quest. Item memiliki gate class/level/source; set memberi efek pada dua dan tiga item yang sesuai. Gear dibeli sekali per hero lalu dapat dipasang ulang tanpa pembelian ulang.
 
 Skill, talent, equipment, job, XP curve, koefisien damage, dan deskripsi lengkap berada di definisi runtime berikut. Jangan menyalin tabel angka ke dokumen ini lalu menganggap salinan tetap segar ketika source berubah:
 

@@ -36,3 +36,21 @@ test('fresh RPG profile starts in town with warrior healer and archer', async ()
   assert.deepEqual(p.cleared, []);
   assert.deepEqual(p.loadouts[0].skills, [0, 1]);
 });
+
+test('WP5 replays pay the full chapter gold only once and less EXP the further behind the frontier', async () => {
+  const { CAMPAIGN } = await import('../src/game/world');
+  const { Battle } = await import('../src/game/simulation');
+  const { storyBattleOptions } = await import('../src/game/story-party');
+  const p=profiles.createProfile();
+  assert.equal(profiles.chapterReward(p,0),CAMPAIGN[0].reward,'first clear pays in full');
+  assert.equal(profiles.chapterReward(p,0,true),0,'Heroic pays battle gold only (its first clear banks heroicReward)');
+  for(let i=0;i<8;i++)profiles.completeZone(p,i);
+  assert.equal(profiles.chapterReward(p,0),Math.round(CAMPAIGN[0].reward*profiles.REPLAY_GOLD));
+  assert.equal(profiles.chapterReward(p,8),CAMPAIGN[8].reward);
+  assert.deepEqual([8,7,6,5,0].map(ch=>profiles.replayFactor(p,ch)),[1,1,.85,.7,.25]);
+  const win=(q:typeof p,floor:number)=>{const b=new Battle('adventure',floor,undefined,{...storyBattleOptions(q),settlementId:`replay-${floor}`});do{b.start();b.bossHp=0;b.tick(.05);}while(b.nextWave());return profiles.settleProgress(q,b)!;};
+  const front=win(structuredClone(p),8)[0].xp,old=win(structuredClone(p),1)[0].xp;
+  assert.equal(old,Math.floor(Math.round((180+75+CAMPAIGN[0].stages.length*45)*.25)),'chapter 1 replay at chapter 8 pays a quarter');
+  assert.equal(front,Math.round(180+8*75+CAMPAIGN[7].stages.length*45),'replaying the latest cleared chapter pays in full');
+  const fresh=profiles.createProfile();assert.equal(win(fresh,1)[0].xp,180+75+CAMPAIGN[0].stages.length*45,'a first clear pays in full');
+});

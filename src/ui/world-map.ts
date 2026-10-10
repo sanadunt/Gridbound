@@ -1,7 +1,7 @@
-import { partyPower, powerVerdict, recommendedPower } from '../game/power';
+import { partyPower, powerVerdict, recommendedHeroicPower, recommendedPower } from '../game/power';
 import { MAX_STARS, STARS_PER_CHEST, STAR_PAR_SECONDS, claimableChests, heroicReward, totalStars } from '../game/journey';
 import { CAMPAIGN, ENEMIES } from '../game/world';
-import { canEnterZone, type Profile } from '../game/profile';
+import { canEnterZone, chapterReward, replayFactor, type Profile } from '../game/profile';
 import { ROSTER } from '../game/content';
 import { monsterCanvas } from '../art/monsters';
 import { overworldCanvas } from '../art/overworld';
@@ -25,10 +25,17 @@ const starRow = (n: number) => `<span class="star-row" aria-label="${t('stars.to
 const matLabel = (pouch: { materials: Record<string, number> }) => Object.entries(pouch.materials).map(([id, n]) => `${t(`material.${id}` as StringKey)} ×${n}`).join(', ');
 
 export function renderWorldMap(p: Profile, state: TownState): string {
-  const power = partyPower(p), rec = recommendedPower(state.zone), verdict = powerVerdict(power, rec);
   const stars = p.journey.stars[state.zone] ?? 0, chests = claimableChests(p.journey), total = totalStars(p.journey);
   const heroicOpen = p.cleared.includes(state.zone), heroic = heroicOpen && state.heroic === true, heroicDone = p.journey.heroic.includes(state.zone);
-  const powerLine = `<p class="power-line power-${verdict}"><b>${t('power.party', { n: power })}</b> · ${t('power.rec', { n: rec })} <em>${t(`power.verdict.${verdict}` as StringKey)}</em></p>`;
+  // Heroic has its own recommendation (and verdict): its enemies hit harder and the party gets one potion.
+  const power = partyPower(p), rec = heroic ? recommendedHeroicPower(state.zone) : recommendedPower(state.zone), verdict = powerVerdict(power, rec);
+  const powerLine = `<p class="power-line power-${verdict}"><b>${t('power.party', { n: power })}</b> · ${t(heroic ? 'power.rec.heroic' : 'power.rec', { n: rec })} <em>${t(`power.verdict.${verdict}` as StringKey)}</em></p>`;
+  // The reward row shows what this run would really pay: first clear, Normal replay (part gold, less EXP far behind the frontier) or Heroic.
+  // Heroic EXP (x1.3) shrinks with the same replay factor, so both replay rows name the EXP share when it is below 100%.
+  const replay = p.cleared.includes(state.zone), xpShare = Math.round(replayFactor(p, state.zone) * 100), xpNote = xpShare < 100 ? ` · ${t('map.reward.xp', { n: xpShare })}` : '';
+  const rewardRow = heroic ? heroicDone ? [t('map.reward'), `${t('map.reward.heroic.replay')}${xpNote}`] : [t('map.reward.heroic'), `${heroicReward(state.zone).gold}G + ${matLabel(heroicReward(state.zone))}${xpNote}`]
+    : replay ? [t('map.reward.replay'), `${chapterReward(p, state.zone)}G${xpNote}`] : [t('map.reward'), `${chapterReward(p, state.zone)}G`];
+  const allChests = p.journey.chests >= Math.floor(MAX_STARS / STARS_PER_CHEST);
   const actId = Math.min(3, Math.max(0, Math.floor(state.zone / 4))) as ActId;
   const act = ACTS[actId];
   const zone = CAMPAIGN[state.zone];
@@ -58,10 +65,10 @@ export function renderWorldMap(p: Profile, state: TownState): string {
       <div class="boss-intel"><small>${t('map.boss')}</small><h4>${escape(boss.name)}</h4><small class="dossier-boss-title">${escape(boss.title)}</small>
         <div class="intent-row">${boss.patterns.map((intent, i) => `<span class="intent-chip intent-${intent}">${i + 1}. ${t(`intent.${intent}` as StringKey)}</span>`).join('')}</div></div></div>
     ${heroicOpen ? `<nav class="tabs heroic-toggle" aria-label="${t('heroic.heroic')}"><button data-heroic="0" aria-pressed="${!heroic}">${t('heroic.normal')}</button><button data-heroic="1" aria-pressed="${heroic}">${t('heroic.heroic')}${heroicDone ? ' ✓' : ''}</button></nav>` : ''}
-    ${heroic ? `<p class="heroic-note"><b>${t('heroic.badge')}</b> ${t('heroic.desc')} ${heroicDone ? t('heroic.cleared') : t('heroic.reward', { gold: heroicReward(state.zone).gold, mat: matLabel(heroicReward(state.zone)) })}</p>` : ''}
+    ${heroic ? `<p class="heroic-note"><b>${t('heroic.badge')}</b> ${t('heroic.desc')} ${heroicDone ? t('heroic.cleared') : ''}</p>` : ''}
     ${powerLine}
-    <div class="star-goals">${starRow(stars)}<ul><li class="${stars >= 1 ? 'met' : ''}">${t('stars.goal.clear')}</li><li class="${stars >= 2 ? 'met' : ''}">${t('stars.goal.standing')}</li><li class="${stars >= 3 ? 'met' : ''}">${t('stars.goal.par', { s: STAR_PAR_SECONDS })}</li></ul></div>
-    <dl class="stat-table mission-facts"><div><dt>${t('map.waves')}</dt><dd>${zone.stages.length}</dd></div><div><dt>${t('map.reward')}</dt><dd>${zone.reward}G</dd></div><div><dt>${t('map.potions')}</dt><dd>${heroic ? 1 : 2}</dd></div>${zone.recruit.length ? `<div><dt>${t('map.recruit')}</dt><dd>${zone.recruit.map(id => ROSTER[id].name).join(', ')}</dd></div>` : ''}</dl>
+    ${heroic ? `<p class="star-goals heroic-stars">${t('stars.heroic')}</p>` : `<div class="star-goals">${starRow(stars)}<ul><li class="${stars >= 1 ? 'met' : ''}">${t('stars.goal.clear')}</li><li class="${stars >= 2 ? 'met' : ''}">${t('stars.goal.standing')}</li><li class="${stars >= 3 ? 'met' : ''}">${t('stars.goal.par', { s: STAR_PAR_SECONDS })}</li></ul></div>`}
+    <dl class="stat-table mission-facts"><div><dt>${t('map.waves')}</dt><dd>${zone.stages.length}</dd></div><div class="reward-row"><dt>${rewardRow[0]}</dt><dd>${escape(rewardRow[1])}</dd></div><div><dt>${t('map.potions')}</dt><dd>${heroic ? 1 : 2}</dd></div>${zone.recruit.length && !replay ? `<div><dt>${t('map.recruit')}</dt><dd>${zone.recruit.map(id => ROSTER[id].name).join(', ')}</dd></div>` : ''}</dl>
     <p class="counter-strategy"><b>${t('bestiary.counter')}</b> ${escape(boss.counter)}</p>
     <details class="dossier-lore-accordion"><summary>${t('map.story')}</summary><p class="zone-narrative-intro">${escape(zone.intro).replace(/\n/g, '<br>')}</p>
       <ol class="stage-route">${zone.stages.map((s, idx) => `<li><small>${idx === zone.stages.length - 1 ? t('map.finalboss') : t('map.wave', { n: idx + 1 })}</small> <b>${escape(s.name)}</b></li>`).join('')}</ol>
@@ -73,7 +80,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
     ${mission ? `<button class="btn mission-map-return" data-facility="campaign">◀ ${t('map.back')}</button>` : `
     <div class="win map-top-bar"><div class="map-title-block"><small>${t('map.act', { n: act.roman })} · ${t(`act.${actId}.territory` as StringKey)}</small><h2>${t(`act.${actId}.title` as StringKey)}</h2></div>
       <div class="map-stepper-wrap"><button class="btn map-stepper-btn" data-campaign-page="-1" ${state.zone <= 0 ? 'disabled' : ''} aria-label="${t('map.prevch')}">◀</button><span class="chapter-counter">CH ${state.zone + 1}/${CAMPAIGN.length}</span><button class="btn map-stepper-btn" data-campaign-page="1" ${state.zone >= CAMPAIGN.length - 1 ? 'disabled' : ''} aria-label="${t('map.nextch')}">▶</button></div></div>
-    <div class="win star-bar"><span>${t('stars.total', { n: total, max: MAX_STARS })}</span>${chests ? `<button class="btn primary" data-star-chest>${t('stars.chest.open')}</button>` : `<small>${t('stars.next', { n: STARS_PER_CHEST - total % STARS_PER_CHEST })}</small>`}</div>
+    <div class="win star-bar"><span>${t('stars.total', { n: total, max: MAX_STARS })}</span>${chests ? `<button class="btn primary" data-star-chest>${t('stars.chest.open')}</button>` : allChests ? `<small>${t('stars.allchests')}</small>` : `<small>${t('stars.next', { n: STARS_PER_CHEST - total % STARS_PER_CHEST })}</small>`}</div>
     <nav class="map-act-nav" aria-label="${t('map.acts')}">${acts}</nav>
     <section class="world-map-canvas-card" aria-label="${t('map.title')}"><div class="map-chart-viewport"><img class="overworld-art" src="${art}" alt=""/><div class="map-nodes-layer">${nodes}</div></div></section>
     <article class="msg-window mission-brief map-selected"><small>CH ${state.zone + 1} · ${escape(zone.subtitle)}</small><h3>${escape(zone.name)}</h3>${powerLine}<p class="map-hint">${t('map.hint')}</p>${canEnter ? `<button class="btn primary" data-mission="${state.zone}">${t('map.view')} ▶</button>` : ''}</article>`}

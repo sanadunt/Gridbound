@@ -19,6 +19,7 @@
 .star-goals li::before { content: '☆ '; color: var(--faint); }
 .star-goals li.met { color: var(--ink); }
 .star-goals li.met::before { content: '★ '; color: var(--gold); }
+.star-goals.heroic-stars { font-size: 12px; color: var(--ink-dim); }
 .star-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 8px 12px; font-family: var(--pixel); font-size: 10px; color: var(--gold); }
 .star-bar small { font-family: var(--text); font-size: 12px; color: var(--ink-dim); }
 
