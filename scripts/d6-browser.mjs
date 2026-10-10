@@ -105,6 +105,8 @@ try {
   const paid=await evaluate('window.gridbound.profile()');
   assert.ok(paid.economy.commanderCrystal>initialBank,'certified Raid must actually bank reward');
   await click('#result-town');await wait('window.gridbound.inTown===true');
+  // Camp is Story; the Raid checkpoint is continued from the Raid gate.
+  await click.nav('raid');
   await openProfiles();await wait('Boolean(document.querySelector("#continue-latest"))');await click('#continue-latest');
   await wait('Boolean(document.querySelector("#result-town")) && !document.querySelector("#result-town").disabled',15000);
   assert.equal(await evaluate('window.gridbound.profile().economy.commanderCrystal'),paid.economy.commanderCrystal,'terminal replay never recredits');

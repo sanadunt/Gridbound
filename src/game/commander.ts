@@ -2,6 +2,7 @@ import { getRaidContractForEnemy, normalizeRaidSandbox, normalizeRaidModifiers, 
 import { createProfile, normalizeProfile, type Loadout, type Profile } from './profile';
 import { createRaidBuild, normalizeRaidBuild, validRaidBuild, type RaidBuild } from './raid-build';
 import { createRogueBuild, normalizeRogueBuild, validRogueBuild, type RogueBuild } from './roguelike-build';
+import { ENEMIES } from './world';
 
 import type { Battle } from './simulation';
 export const COMMANDER_SCHEMA = 4;
@@ -81,6 +82,8 @@ export type SharedCommanderState = {
   settlementReceipts: string[];
   ledger: Profile['ledger'];
   wins: number;
+  /** Deepest Roguelike floor ever reached; kept here once so loading an older rogue preset cannot lower it. */
+  bestFloor: number;
 };
 
 export type StoryModeState = {
@@ -226,6 +229,7 @@ function profileFromStoryState(raw: StoredStoryState | undefined): Profile {
   return normalized;
 }
 
+const floorOf = (floor: number) => Math.max(0, Math.min(100, Math.floor(floor) || 0));
 function sharedFromProfile(profile: Profile): SharedCommanderState {
   return {
     bankCrystal: Math.max(0, Math.min(1_000_000_000, Math.floor(profile.economy.commanderCrystal))),
@@ -233,15 +237,30 @@ function sharedFromProfile(profile: Profile): SharedCommanderState {
     settlementReceipts: [...new Set(profile.settlementReceipts)],
     ledger: clone(profile.ledger),
     wins: Math.max(0, Math.min(1_000_000, Math.floor(profile.wins))),
+    bestFloor: floorOf(profile.bestFloor),
   };
+}
+
+export type AccountStats = Pick<SharedCommanderState, 'ledger' | 'wins' | 'settlementReceipts'>;
+/** Account-wide stats only ever grow: per-key max for kill counts, max for wins, union for settlement receipts. */
+export function mergeLedger(a: AccountStats, b: AccountStats): AccountStats {
+  const enemies: Record<string, number> = { ...a.ledger.enemies };
+  for (const [id, n] of Object.entries(b.ledger.enemies)) enemies[id] = Math.max(enemies[id] ?? 0, n);
+  return { ledger: { raids: Math.max(a.ledger.raids, b.ledger.raids), victories: Math.max(a.ledger.victories, b.ledger.victories), enemies }, wins: Math.max(a.wins, b.wins), settlementReceipts: [...new Set([...a.settlementReceipts, ...b.settlementReceipts])] };
+}
+const statsOf = (profile: Profile): AccountStats => ({ ledger: profile.ledger, wins: profile.wins, settlementReceipts: profile.settlementReceipts });
+/** Deepest Roguelike floor of the account: document.shared plus every rogue slot (older documents kept it only per slot). Read by every mode; descent quests run in Story. */
+export const bestFloorOf = (document: Pick<CommanderDocument, 'shared' | 'rogue'>) => Math.max(document.shared.bestFloor ?? 0, ...document.rogue.slots.map(slot => slot.state?.bestFloor ?? 0));
+/** A Raid or Roguelike run only grants hero XP to the Story party: raise the live Story slot's XP, never touch gear, jobs, talents or manual slots. */
+export function mergeChallengeXp(document: CommanderDocument, loadouts: Profile['loadouts'], timestamp = now()): void {
+  const auto = slotRecord(document.story.slots, 'auto');
+  if (!slotHasState(auto)) return;
+  for (const [id, loadout] of Object.entries(loadouts)) { const stored = auto.state.loadouts[Number(id)]; if (stored && (loadout.xp ?? 0) > (stored.xp ?? 0)) { stored.xp = loadout.xp; auto.savedAt = timestamp; } }
 }
 
 function applyShared(profile: Profile, shared: SharedCommanderState): void {
   profile.economy.commanderCrystal = shared.bankCrystal;
   profile.challengeUnlocks = [...shared.challengeUnlocks];
-  profile.settlementReceipts = [...shared.settlementReceipts];
-  profile.ledger = clone(shared.ledger);
-  profile.wins = shared.wins;
 }
 
 function defaultRaidBuild(profile: Profile): RaidBuild | undefined {
@@ -297,6 +316,8 @@ function normalizeStoryState(raw: unknown): StoredStoryState | undefined {
     loadouts: isRecord(raw.loadouts) ? raw.loadouts : {},
     sound: raw.sound,
     motion: raw.motion,
+    journey: raw.journey,
+    narrative: isRecord(raw.narrative) ? raw.narrative : {},
   };
   const normalized = profileFromStoryState(source as StoredStoryState);
   return { ...storyStateFromProfile(normalized), ...(isRecord(raw.encounter) ? { encounter: clone(raw.encounter) as StoredStoryState['encounter'] } : {}) };
@@ -354,7 +375,8 @@ function normalizeShared(raw: unknown): SharedCommanderState {
   const ledgerData = isRecord(data.ledger) ? data.ledger : {};
   const enemyData = isRecord(ledgerData.enemies) ? ledgerData.enemies : {};
   const enemies: Record<string, number> = {};
-  for (const [id, amount] of Object.entries(enemyData)) if (typeof amount === 'number' && Number.isSafeInteger(amount) && amount >= 0) enemies[id] = Math.min(1_000_000, amount);
+  // Same filter as normalizeProfile: only known enemy archetypes are counted, so a hand-edited id never reaches a merged profile ledger.
+  for (const [id, amount] of Object.entries(enemyData)) if (ENEMIES[id]?.archetype === id && typeof amount === 'number' && Number.isSafeInteger(amount) && amount >= 0) enemies[id] = Math.min(1_000_000, amount);
   return {
     bankCrystal: safeInt(data.bankCrystal, 0, 1_000_000_000),
     challengeUnlocks: Array.isArray(data.challengeUnlocks) ? [...new Set(data.challengeUnlocks.filter((id): id is string => typeof id === 'string' && id.length <= 100))] : [],
@@ -365,6 +387,7 @@ function normalizeShared(raw: unknown): SharedCommanderState {
       enemies,
     },
     wins: safeInt(data.wins, 0, 1_000_000),
+    bestFloor: safeInt(data.bestFloor, 0, 100),
   };
 }
 
@@ -455,6 +478,8 @@ export function normalizeCommanderDocument(raw: unknown): CommanderDocument | un
   const story = normalizeStorySlots(raw.story);
   const rogue = normalizeRogueSlots(raw.rogue);
   const raid = normalizeRaidSlots(raw.raid);
+  const shared = normalizeShared(raw.shared);
+  shared.bestFloor = bestFloorOf({ shared, rogue });
   return {
     schema: COMMANDER_SCHEMA,
     rulesetId: COMMANDER_RULESET,
@@ -466,7 +491,7 @@ export function normalizeCommanderDocument(raw: unknown): CommanderDocument | un
     lastPlayed: safeInt(raw.lastPlayed, now(), Number.MAX_SAFE_INTEGER),
     activeMode: raw.activeMode,
     revision: safeInt(raw.revision, 0, 1_000_000_000),
-    shared: normalizeShared(raw.shared),
+    shared,
     ...(isRecord(raw.encounters) ? { encounters: clone(raw.encounters) as CommanderDocument['encounters'] } : {}),
     ...(typeof raw.legacySource === 'string' ? { legacySource: raw.legacySource } : {}),
     story,
@@ -498,20 +523,17 @@ export function lastRunFor(document: CommanderDocument, mode: ChallengeMode): Ru
 }
 
 export function materializeProfile(document: CommanderDocument, mode: CommanderMode, slotId?: SlotId): Profile {
-  const selectedSlot = slotId ?? (mode === 'story' ? document.story.activeSlot : mode === 'roguelike' ? document.rogue.activeSlot : document.raid.activeSlot);
-  const storySlot = slotRecord(document.story.slots, mode === 'story' ? selectedSlot : document.story.activeSlot);
+  // Challenge modes always build on the live Story slot ('auto'): that is the only Story slot a challenge run writes back to.
+  const storySlot = slotRecord(document.story.slots, mode === 'story' ? slotId ?? document.story.activeSlot : 'auto');
   const story = slotHasState(storySlot) ? storySlot.state : slotHasState(slotRecord(document.story.slots, 'auto')) ? slotRecord(document.story.slots, 'auto')!.state : undefined;
   const profile = profileFromStoryState(story);
+  Object.assign(profile, mergeLedger(statsOf(profile), document.shared));
+  profile.bestFloor = bestFloorOf(document);
   if (mode === 'story') return profile;
   applyShared(profile, document.shared);
   profile.narrative = {};
   profile.gold = 0;
   profile.economy.gold = 0;
-  if (mode === 'roguelike') {
-    const slot = slotRecord(document.rogue.slots, selectedSlot);
-    const state = slotHasState(slot) ? slot.state : slotHasState(slotRecord(document.rogue.slots, 'auto')) ? slotRecord(document.rogue.slots, 'auto')!.state : undefined;
-    profile.bestFloor = state?.bestFloor ?? 0;
-  }
   return profile;
 }
 
@@ -525,7 +547,9 @@ export function storedStateFor(document: CommanderDocument, mode: CommanderMode,
 export function applyRuntimeToDocument(document: CommanderDocument, context: RuntimeCommanderContext, timestamp = now()): void {
   document.activeMode = context.mode;
   document.lastPlayed = timestamp;
-  if (context.mode !== 'story') document.shared = sharedFromProfile(context.profile);
+  // Ledger, wins, receipts and the best floor are account-wide and merged from every mode; Crystal and challenge unlocks belong to the challenge modes.
+  document.shared = { ...(context.mode === 'story' ? document.shared : sharedFromProfile(context.profile)), ...mergeLedger(document.shared, statsOf(context.profile)), bestFloor: Math.max(bestFloorOf(document), floorOf(context.profile.bestFloor)) };
+  if (context.mode !== 'story') mergeChallengeXp(document, context.profile.loadouts, timestamp);
   if (context.mode === 'story') {
     const state = storyStateFromProfile(context.profile);
     if (document.encounters?.story) state.encounter = clone(document.encounters.story);
@@ -537,7 +561,7 @@ export function applyRuntimeToDocument(document: CommanderDocument, context: Run
   if (context.mode === 'roguelike') {
     const state: StoredRogueState = {
       build: context.rogueBuild && validRogueBuild(context.rogueBuild) ? normalizeRogueBuild(context.rogueBuild) : createRogueBuild(),
-      bestFloor: Math.max(0, Math.min(100, Math.floor(context.profile.bestFloor))),
+      bestFloor: floorOf(context.profile.bestFloor),
       ...((context.runState?.activeRun ?? document.rogue.activeRun ?? document.rogue.lastRun) ? { runBookmark: clone((context.runState?.activeRun ?? document.rogue.activeRun ?? document.rogue.lastRun)!) } : {}),
     };
     writeSlot(document.rogue.slots, 'auto', state, timestamp, Boolean(context.runState?.activeRun), Boolean(context.runState?.lastRun));

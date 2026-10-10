@@ -275,7 +275,7 @@ Dua belas boon:
 
 ### Batas antar-mode
 
-Story Gold, hero XP, recruitment, gear, dan story flags tetap berada di Story state. Raid dan Roguelike memakai build mode masing-masing. Bank Commander Crystal dan challenge unlocks dirancang untuk digunakan lintas Challenge mode; run Crystal hanya berlaku di dalam run. Tidak ada pertukaran Story Gold menjadi run currency.
+Story Gold, hero XP, recruitment, gear, dan story flags tetap berada di Story state. Raid dan Roguelike memakai build mode masing-masing. Bank Commander Crystal dan challenge unlocks dirancang untuk digunakan lintas Challenge mode; run Crystal hanya berlaku di dalam run. Tidak ada pertukaran Story Gold menjadi run currency. Satu-satunya hasil Challenge yang masuk ke party Story adalah XP hero dari kemenangan Raid: XP itu menaikkan slot Story `auto` (nilai terbesar yang dipakai), sedangkan gear, job, talent, gold, dan slot manual Story tidak disentuh. Ledger (jumlah kill per musuh, victory, raid), total kemenangan, settlement receipt, dan floor Roguelike terdalam adalah statistik akun yang dibaca semua mode, sehingga hunt quest, Bestiary, dan descent quest di Story ikut menghitung progres dari Raid dan Roguelike. HUD selalu menampilkan Story Gold dan bank Crystal; Gold hanya bisa dibelanjakan di Story dan Crystal hanya di Challenge.
 
 ## 7. Aturan combat
 
@@ -491,6 +491,8 @@ Runtime memisahkan dua lapisan penyimpanan:
 2. Commander Documents di IndexedDB. Satu browser dapat menyimpan maksimum tiga Commander. Setiap Commander menyimpan mode Story, Raid, Roguelike, shared Challenge state, empat slot per mode (`manual-1`, `manual-2`, `manual-3`, `auto`), dan encounter/run checkpoint.
 
 A legacy Profile dapat disalin ke Commander melalui aksi migration yang eksplisit; migrasi itu tidak dilakukan otomatis saat launch.
+
+Slot Story menyimpan seluruh state Story, termasuk journey (bintang chapter, star chest yang sudah dibuka, Heroic clear, kedalaman Undercroft, run dungeon aktif) dan pilihan Story Journal; semua field itu bertahan saat dokumen dibaca ulang dan dinormalisasi. Slot manual (`manual-1..3`) adalah snapshot beku: hanya aksi save ke slot itu yang menulisnya. Raid dan Roguelike selalu dibangun dari slot Story `auto` dan hanya menulis kembali XP hero ke slot itu. Shared state menyimpan bank Crystal, challenge unlock, serta ledger, total kemenangan, receipt, dan floor Roguelike terdalam akun; setiap mode menggabungkan nilainya ke sana (maksimum per kunci, receipt digabung tanpa duplikat), sehingga statistik itu tidak pernah turun, juga setelah memuat slot manual lama. Camp selalu berjalan dalam mode Story, jadi Commander Profiles di camp menampilkan slot Story; run Raid atau Roguelike yang tertunda dilanjutkan dari gerbang mode itu (Continue latest atau Depart di tab Raid/Endless).
 
 Run checkpoint menyimpan awal encounter beserta status yang dibutuhkan untuk melanjutkan. Checkpoint bukan save setiap frame dan manual save Challenge tidak boleh digunakan untuk memutar ulang payout lama. `CommanderSession` mengantrekan save, menandai revision stale saat tab lain menulis, dan melindungi slot dari overwrite/rewind yang tidak sah. Jika IndexedDB tidak tersedia, repository menyediakan memory-only session; progress tersebut hilang ketika tab ditutup. UI menyediakan export backup/recovery, tetapi import backup umum belum dibuktikan sebagai flow yang tersedia.
 

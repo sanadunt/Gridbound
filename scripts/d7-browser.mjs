@@ -13,6 +13,8 @@ await withBrowser(async ({ wait, evaluate, click, errors, screenshot }) => {
   await evaluate(`document.querySelector('#commander-name').value='D7 QA'`);
   await click('#new-commander');
   await wait('document.querySelectorAll("dialog[open]").length===0');
+  // The profiles dialog closes before the Commander is committed; wait for it so its activation cannot close the Journal.
+  await wait('document.querySelector("#storage-status")?.textContent.startsWith("Saved")', 15000);
   await click.nav('more');
   await click('.more-scene [data-open-action="journal"]');
   await wait('Boolean(document.querySelector("dialog[open]"))');

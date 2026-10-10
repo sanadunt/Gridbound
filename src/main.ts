@@ -121,9 +121,15 @@ function enterEmberhollow() {
     }, 250);
   }
 }
+/** HUD wallet: Story gold and challenge Crystal in every mode. Each mode's profile zeroes the currency it cannot spend, so the other one comes from the Commander document. */
+function walletAmounts() {
+  const doc = commander.document;
+  return { gold: doc && commander.mode !== 'story' ? doc.story.slots.find(slot => slot.slotId === 'auto')?.state?.gold ?? 0 : profile.gold, crystal: doc && commander.mode === 'story' ? doc.shared.bankCrystal : profile.economy.commanderCrystal };
+}
 function storageStatus() {
-  $('wallet').innerHTML = currencyAmount('gold', profile.gold);
-  $('bank-wallet').innerHTML = currencyAmount('crystal', profile.economy.commanderCrystal);
+  const wallet = walletAmounts();
+  $('wallet').innerHTML = currencyAmount('gold', wallet.gold);
+  $('bank-wallet').innerHTML = currencyAmount('crystal', wallet.crystal);
   const status = $('storage-status');
   const warning = saved.readOnly ? gameText(saved.warning) : commander.error ? gameText(commander.error) : commander.dirty ? t('storage.dirty') : '';
   status.textContent = warning || (!commander.document ? t('storage.none') : commander.busy ? t('storage.saving') : commander.repository?.persistent ? t('storage.saved', { n: commander.document.revision }) : t('storage.session'));
@@ -175,7 +181,7 @@ $('app').innerHTML = `
 <section id="title-screen" class="title-screen" hidden>${titleMarkup()}</section>
 <header class="site-header hud-bar">
   <button class="brand" id="home" aria-label="${t('hud.home')}"><span class="brand-back" aria-hidden="true">◀</span><span id="hud-title">${t('town.name')}</span></button>
-  <div class="header-tools"><b id="wallet" class="wallet">${currencyAmount('gold', profile.gold)}</b><b id="bank-wallet" class="wallet bank-wallet">${currencyAmount('crystal', profile.economy.commanderCrystal)}</b><button id="sound" class="icon-button" aria-label="${t('hud.sound')}" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="${t('hud.settings')}">⚙</button><button id="menu-button" class="icon-button menu-button" data-facility="more" aria-label="${t('route.menu')}">${t('hud.menu')}</button></div>
+  <div class="header-tools"><b id="wallet" class="wallet">${currencyAmount('gold', walletAmounts().gold)}</b><b id="bank-wallet" class="wallet bank-wallet">${currencyAmount('crystal', walletAmounts().crystal)}</b><button id="sound" class="icon-button" aria-label="${t('hud.sound')}" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="${t('hud.settings')}">⚙</button><button id="menu-button" class="icon-button menu-button" data-facility="more" aria-label="${t('route.menu')}">${t('hud.menu')}</button></div>
 </header>
   <main id="town-screen" class="town-screen"></main>
   <main id="battle-screen" class="game-layout" data-battle-view="arena" hidden>
@@ -255,20 +261,18 @@ const resultScreen = $<HTMLElement>('result-screen');
 function modeForTownTab(tab: TownTab, fallback = commander.mode): CommanderMode {
   if (tab === 'raid') return 'raid';
   if (tab === 'endless') return 'roguelike';
-  if (tab === 'quests' || tab === 'dungeon') return 'story';
+  if (tab === 'camp' || tab === 'quests' || tab === 'dungeon') return 'story';
   if (tab === 'challenge-shop') return fallback === 'story' ? 'raid' : fallback;
-  if (tab === 'camp' || tab === 'more' || tab === 'bestiary') return fallback;
+  if (tab === 'more' || tab === 'bestiary') return fallback;
   return 'story';
 }
 
 function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   const routeChanged = tab !== townState.tab;
   const nextMode = modeForTownTab(tab);
-  if (commander.document && nextMode !== commander.mode) {
-    commander.mode = nextMode;
-    commander.document.activeMode = nextMode;
-    void persist();
-  }
+  // Re-materialize the target mode's profile; persisting the previous mode's profile under the new mode would write challenge zeros into Story (or Story's 0 Crystal into the bank).
+  // With an unsaved, in-flight or stale save the current mode stays (navigateTown flushes first), so a failed write is retried rather than dropped.
+  if (commander.document && nextMode !== commander.mode && !commander.dirty && !commander.busy && !commander.stale) activateCommander(commander.document, nextMode, false);
   inTown = true;
   pauseForDetails = false;
   if (battle.status === 'fighting') battle.pause();
@@ -1676,12 +1680,7 @@ async function checkpoint(terminal = false, slotId: SlotId = 'auto') {
       }
     }
     if (commander.mode !== 'story') {
-      for (const slot of document.story.slots) if (slot.state) {
-        slot.state.loadouts = structuredClone(profile.loadouts);
-        slot.state.ledger = structuredClone(profile.ledger);
-        slot.state.wins = profile.wins;
-        slot.state.receipts = [...profile.settlementReceipts];
-      }
+      // Story slots are left alone here: applyRuntimeToDocument raises only the live Story slot's hero XP and merges the ledger into document.shared.
       const state = commander.mode === 'raid' ? document.raid : document.rogue;
       const run = createRunCheckpoint(commander.mode, { runId: frozen.runId, floor: battle.floor, seed: frozen.seed, purse: frozen.purse, boons: frozen.boons, checkpointSeq: frozen.seq, rogueBuild: battle.rogueBuild, raidBuild: battle.raidBuild, raidContract: battle.raidContract, raidSandbox: battle.raidSandbox });
       const finished = battle.status === 'defeat' || terminal && (battle.mode === 'raid' || battle.runFinalClear);
@@ -1868,8 +1867,7 @@ if (typeof navigator !== 'undefined' && !navigator.webdriver) {
 }
  $('home').addEventListener('click', () => {
   if (inTown && townState.tab === 'camp') showTitleScreen();
-  else if (inTown) showTown('camp');
-  else navigateTown('camp');
+  else void navigateTown('camp');
 });
 $('title-enter').addEventListener('click', enterEmberhollow);
 $('title-profiles').addEventListener('click', () => { void profilesMenu(); });

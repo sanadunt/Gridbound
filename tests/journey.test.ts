@@ -7,7 +7,7 @@ import { Battle, HEROIC_HP, HEROIC_DMG } from '../src/game/simulation';
 import { storyBattleOptions } from '../src/game/story-party';
 import { heroPower, partyPower, powerVerdict, recommendedPower, RECOMMENDED_POWER } from '../src/game/power';
 import { startRun, fightScale, dungeonXP, enterNode, reachable } from '../src/game/dungeon';
-import { storyStateFromProfile, createCommanderDocument, materializeProfile } from '../src/game/commander';
+import { storyStateFromProfile, createCommanderDocument, materializeProfile, normalizeCommanderDocument } from '../src/game/commander';
 
 test('chapter stars: clear, everyone standing, boss under par; only improvements count', () => {
   assert.equal(chapterStars(false, STAR_PAR_SECONDS + 1), 1);
@@ -125,10 +125,12 @@ test('the journey and an active dungeon run survive the Commander story slot', (
   p.journey.run = startRun(1, 11, [0, 4, 3]);
   const state = storyStateFromProfile(p);
   const doc = createCommanderDocument(p, 'QA');
-  const back = materializeProfile(doc, 'story');
-  assert.deepEqual(state.journey?.stars, { 0: 3, 1: 2 });
-  assert.deepEqual(back.journey.stars, { 0: 3, 1: 2 });
-  assert.deepEqual(back.journey.heroic, [0]);
-  assert.equal(back.journey.run?.depth, 1);
-  assert.equal(back.journey.run?.nodes.length, p.journey.run.nodes.length);
+  // A reload reads the document back through normalizeCommanderDocument (CommanderRepository.list()).
+  for (const back of [materializeProfile(doc, 'story'), materializeProfile(normalizeCommanderDocument(JSON.parse(JSON.stringify(doc)))!, 'story')]) {
+    assert.deepEqual(state.journey?.stars, { 0: 3, 1: 2 });
+    assert.deepEqual(back.journey.stars, { 0: 3, 1: 2 });
+    assert.deepEqual(back.journey.heroic, [0]);
+    assert.equal(back.journey.depth, 1);
+    assert.deepEqual(back.journey.run, p.journey.run);
+  }
 });
