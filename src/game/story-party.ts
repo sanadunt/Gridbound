@@ -29,8 +29,11 @@ export function placeParty(loadouts: Profile['loadouts'], ids: readonly number[]
   }
 }
 
+/** True while an Undercroft run is under way: its party is locked until the run ends. */
+export const storyPartyLocked = (p: Profile) => p.journey?.run?.status === 'active';
+
 export function setStoryParty(p: Profile, ids: number[]): boolean {
-  if (!Array.isArray(ids) || !ids.length || ids.length > storyPartyCap(p.cleared) || new Set(ids).size !== ids.length || ids.some(id => !Number.isInteger(id) || !p.roster.includes(id) || !p.loadouts[id])) return false;
+  if (storyPartyLocked(p) || !Array.isArray(ids) || !ids.length || ids.length > storyPartyCap(p.cleared) || new Set(ids).size !== ids.length || ids.some(id => !Number.isInteger(id) || !p.roster.includes(id) || !p.loadouts[id])) return false;
   // Heroes who were already deployed keep their tiles; newly deployed heroes take what is left.
   const before = p.storyActive;
   p.storyActive = [...ids];

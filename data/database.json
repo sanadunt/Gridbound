@@ -5284,7 +5284,8 @@
           "spider"
         ],
         "elite": [
-          "shaman"
+          "shaman",
+          "golem"
         ],
         "guardian": "treant",
         "material": "ember-shard",
@@ -5299,7 +5300,9 @@
           "goblin"
         ],
         "elite": [
-          "golem"
+          "golem",
+          "treant",
+          "wolf-ash"
         ],
         "guardian": "wraith",
         "material": "ember-shard",
@@ -5314,7 +5317,9 @@
           "spider-ash"
         ],
         "elite": [
-          "revenant"
+          "revenant",
+          "golem-ash",
+          "wraith"
         ],
         "guardian": "hydra",
         "material": "bell-bronze",
@@ -5329,7 +5334,9 @@
           "moth-ash"
         ],
         "elite": [
-          "lich"
+          "lich",
+          "wolf-ash",
+          "spider-ash"
         ],
         "guardian": "knight",
         "material": "bell-bronze",
@@ -5344,7 +5351,9 @@
           "basilisk-frost"
         ],
         "elite": [
-          "knight-frost"
+          "knight-frost",
+          "golem-ash",
+          "hydra-frost"
         ],
         "guardian": "colossus",
         "material": "frost-glass",
@@ -5359,7 +5368,9 @@
           "crab-frost"
         ],
         "elite": [
-          "lich-frost"
+          "lich-frost",
+          "revenant-frost",
+          "colossus-frost"
         ],
         "guardian": "hydra-frost",
         "material": "frost-glass",
@@ -5374,7 +5385,9 @@
           "harpy-auric"
         ],
         "elite": [
-          "lich-auric"
+          "lich-auric",
+          "golem-auric",
+          "colossus-frost"
         ],
         "guardian": "choir-auric",
         "material": "frost-glass",
@@ -5389,7 +5402,9 @@
           "colossus-auric"
         ],
         "elite": [
-          "hydra-auric"
+          "hydra-auric",
+          "wraith-auric",
+          "choir-frost"
         ],
         "guardian": "dragon-auric",
         "material": "frost-glass",

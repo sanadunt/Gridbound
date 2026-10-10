@@ -19,7 +19,7 @@ import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
 import { CAMPAIGN, BOONS, boonChoices } from './game/world';
 import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, ownsChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult, chapterReward } from './game/profile';
-import { startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fightScale, dungeonXP, type Outcome } from './game/dungeon';
+import { startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fleeFight, interruptFight, noteFight, dungeonBattleOptions, type Outcome, type Pouch } from './game/dungeon';
 import { chapterStars } from './game/journey';
 import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
 import { actArt } from './ui/world-map';
@@ -31,7 +31,7 @@ import { loadSave, saveProfile, backupLegacy, legacyBackup, commanderFromBackup,
 import { createProfile, type Profile } from './game/profile';
 import { CommanderSession } from './game/commander-session';
 import { copyLegacyToCommander, createCommanderDocument, createRunCheckpoint, terminalRun, storedStateFor, materializeProfile, type CommanderDocument, type CommanderMode, type SlotId } from './game/commander';
-import { storyBattleOptions, setStoryParty, normalizeStoryParty, storyPartyCap } from './game/story-party';
+import { storyBattleOptions, setStoryParty, normalizeStoryParty, storyPartyCap, storyPartyLocked } from './game/story-party';
 import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-build';
 import { JOBS } from './game/jobs';
 import { defaultRaidBuild, setRaidJob, setRaidHero, setRaidPartySize, normalizeRaidBuild, openRaidQuarry, raidQuarryUnlocked } from './game/raid-build';
@@ -306,6 +306,8 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   // Re-materialize the target mode's profile; persisting the previous mode's profile under the new mode would write challenge zeros into Story (or Story's 0 Crystal into the bank).
   // With an unsaved, in-flight or stale save the current mode stays (navigateTown flushes first), so a failed write is retried rather than dropped.
   if (commander.document && nextMode !== commander.mode && !commander.dirty && !commander.busy && !commander.stale) activateCommander(commander.document, nextMode, false);
+  // An Undercroft fight a reload cut short resolves as a flee when the Undercroft opens (saved by the persist below).
+  if (tab === 'dungeon') settleInterruptedFight();
   inTown = true;
   pauseForDetails = false;
   if (battle.status === 'fighting') battle.pause();
@@ -331,6 +333,8 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
       heading.tabIndex = -1;
       heading.focus({ preventScroll: true });
     }
+    // Back in the Undercroft with news (a fled or interrupted fight): open on the room panel that explains it.
+    if (tab === 'dungeon' && townState.dungeonOutcome) scene?.querySelector('.room-panel')?.scrollIntoView({ block: 'end' });
   }
   persist();
   if (animate && profile.motion) {
@@ -360,6 +364,8 @@ $('town-screen').addEventListener('click', event => {
     return;
   }
   if (button.dataset.storyToggle !== undefined) {
+    // The Undercroft run fights with the party it set out with; it is locked until the run ends.
+    if (storyPartyLocked(profile)) { showTown('party', t('dungeon.party.locked')); return; }
     const id=Number(button.dataset.storyToggle);
     const ids=profile.storyActive.includes(id)?profile.storyActive.filter(hero=>hero!==id):[...profile.storyActive,id];
     const ok=setStoryParty(profile,ids);
@@ -370,32 +376,32 @@ $('town-screen').addEventListener('click', event => {
     const depth = Number(button.dataset.dungeonStart);
     if (profile.journey.run?.status === 'active') return;
     profile.journey.run = startRun(depth, Math.floor(Math.random() * 1e9), normalizeStoryParty(profile.storyActive, profile.roster, profile.cleared));
-    townState.dungeonOutcome = undefined; sound.play('confirm');
+    townState.dungeonOutcome = townState.dungeonLetter = undefined; sound.play('confirm');
     showTown('dungeon', '', true);
     return;
   }
   if (button.dataset.dungeonNode && profile.journey.run) {
-    if (enterNode(profile.journey.run, Number(button.dataset.dungeonNode))) { townState.dungeonOutcome = undefined; sound.play('cursor'); showTown('dungeon'); }
+    if (enterNode(profile.journey.run, Number(button.dataset.dungeonNode))) { townState.dungeonOutcome = townState.dungeonLetter = undefined; sound.play('cursor'); showDungeonRoom(); }
     return;
   }
   if (button.hasAttribute('data-dungeon-fight')) { startDungeonFight(); return; }
   if (button.dataset.dungeonChoice && profile.journey.run) {
     const out = chooseEvent(profile.journey.run, button.dataset.dungeonChoice);
-    if (out) { townState.dungeonOutcome = describeOutcome(out); sound.play(out.fight ? 'threat' : out.hurt ? 'hurt' : 'buff'); showTown('dungeon'); }
+    if (out) { townState.dungeonOutcome = describeOutcome(out); townState.dungeonLetter = out.lore; sound.play(out.fight ? 'threat' : out.hurt ? 'hurt' : 'buff'); showDungeonRoom(); }
     return;
   }
   if (button.hasAttribute('data-dungeon-open') && profile.journey.run) {
     const out = openTreasure(profile.journey.run);
-    if (out) { townState.dungeonOutcome = describeOutcome(out); sound.play('coin'); showTown('dungeon'); }
+    if (out) { townState.dungeonOutcome = describeOutcome(out); townState.dungeonLetter = undefined; sound.play('coin'); showDungeonRoom(); }
     return;
   }
   if (button.dataset.dungeonCamp && profile.journey.run) {
     const run = profile.journey.run, choice = button.dataset.dungeonCamp as 'rest' | 'extract';
     if (campChoice(run, choice)) {
       if (choice === 'extract') bankPouch(profile, run.pouch);
-      townState.dungeonOutcome = choice === 'rest' ? t('dungeon.out.rest') : undefined;
+      townState.dungeonOutcome = choice === 'rest' ? t('dungeon.out.rest') : undefined; townState.dungeonLetter = undefined;
       sound.play(choice === 'rest' ? 'heal' : 'fanfare');
-      showTown('dungeon');
+      showDungeonRoom();
     }
     return;
   }
@@ -404,7 +410,7 @@ $('town-screen').addEventListener('click', event => {
     $('dungeon-abandon').addEventListener('click', () => { modal.close(); delete profile.journey.run; showTown('dungeon'); });
     return;
   }
-  if (button.hasAttribute('data-dungeon-close')) { delete profile.journey.run; townState.dungeonOutcome = undefined; showTown('dungeon'); return; }
+  if (button.hasAttribute('data-dungeon-close')) { delete profile.journey.run; townState.dungeonOutcome = townState.dungeonLetter = undefined; showTown('dungeon'); return; }
   if (button.hasAttribute('data-star-chest')) {
     const reward = claimStarChest(profile);
     if (reward) { sound.play('fanfare'); showTown(townState.tab, t('stars.chest.got', { gold: reward.gold, mat: materialList(reward.materials) })); }
@@ -624,6 +630,8 @@ $('town-screen').addEventListener('change', event => {
     showTown('raid',t('notice.raid.sandbox'));return;
   }
 });
+/** Re-render the Undercroft with the current room's panel (outcome and actions) on screen: on a phone it sits below the map. */
+function showDungeonRoom() { showTown('dungeon'); $('town-screen').querySelector('.room-panel')?.scrollIntoView({ block: 'end' }); }
 function materialList(materials: Record<string, number>) {
   return Object.entries(materials).filter(([, n]) => n > 0).map(([id, n]) => `${t(`material.${id}` as never)} ×${n}`).join(', ');
 }
@@ -641,14 +649,52 @@ function describeOutcome(out: Outcome): string {
   if (out.potion) parts.push(t('dungeon.out.potion'));
   return parts.join(' ') || t('dungeon.out.nothing');
 }
-/** Fight the pending dungeon room with the party's carried HP, potions and blessings. */
+/** What a flee or a wipe left behind, for notices and the result card. */
+function lostText(lost: Pouch) {
+  return [lost.gold > 0 ? `${lost.gold}G` : '', materialList(lost.materials)].filter(Boolean).join(', ') || t('dungeon.lost.none');
+}
+/** A dungeon battle is on screen and has no result yet (a flee is still possible). */
+const dungeonFightLive = () => !inTown && battle.mode === 'dungeon' && ['ready', 'fighting', 'paused'].includes(battle.status);
+/** Each hero's HP ratio in the current battle. */
+const heroRatios = () => Object.fromEntries(battle.heroes.map(h => [h.id, h.maxHp > 0 ? h.hp / h.maxHp : 0]));
+/** Last noted state of the dungeon fight in progress: standing heroes, potions and 10 s of battle time. */
+let fightNote = '';
+const fightNoteKey = () => `${battle.living().length}:${battle.potions}:${Math.floor(battle.time / 10)}`;
+/** A dungeon fight in progress saves its state on every fall, potion and every 10 s, so a reload costs at least as much as fleeing then. */
+function noteDungeonFight() {
+  const run = profile.journey.run, key = fightNoteKey();
+  if (key === fightNote || !run) return;
+  fightNote = key;
+  if (!pendingSettlement && !commander.stale && noteFight(run, heroRatios(), battle.potions)) persist();
+}
+/** A fight still marked in progress outside a live battle was cut short (reload, closed tab): it resolves as a flee
+ *  once, when the Undercroft is opened (not at boot, so a second tab does not flee the first tab's fight). */
+function settleInterruptedFight() {
+  const run = profile.journey.run, lost = run && commander.mode === 'story' && !dungeonFightLive() ? interruptFight(run) : undefined;
+  if (lost) { townState.dungeonOutcome = t('dungeon.interrupted', { lost: lostText(lost) }); townState.dungeonLetter = undefined; }
+  return lost;
+}
+/** Fight the pending dungeon room with the run's own party, its carried HP, potions and blessings. */
 function startDungeonFight() {
-  const run = profile.journey.run, fight = run?.pendingFight;
-  if (!run || !fight || run.status !== 'active') return;
-  const scale = fightScale(run, fight.kind);
+  const run = profile.journey.run;
+  if (!run?.pendingFight || run.status !== 'active') return;
+  if (settleInterruptedFight()) { showTown('dungeon'); return; }
+  const options = dungeonBattleOptions(profile, run)!;
   commander.mode = 'story';
   runBoons = [];
-  boot('dungeon', scale.chapter, { enemyId: fight.enemy, dungeon: { chapter: scale.chapter, hp: scale.hp, damage: scale.damage, xp: dungeonXP(run, fight.kind), startHp: { ...run.hp }, potions: run.potions, power: run.blessing.power, vitality: run.blessing.vitality } });
+  boot('dungeon', options.dungeon!.chapter, options);
+}
+/** Flee a dungeon fight in progress: wounds and potions used carry over, the room's fight waits and half the pouch is lost. */
+function fleeDungeonModal() {
+  openModal(`<h2 id="modal-title">${t('dungeon.flee.title')}</h2><p>${t('dungeon.flee.copy')}</p><button id="dungeon-flee" class="btn danger">${t('dungeon.flee.yes')}</button><button class="btn" data-close>${t('common.cancel')}</button>`);
+  $('dungeon-flee').addEventListener('click', () => {
+    const run = profile.journey.run;
+    if (!dungeonFightLive() || !run || pendingSettlement || commander.stale) { modal.close(); return; }
+    const lost = fleeFight(run, heroRatios(), battle.potions);
+    closeWithoutResume(); inTown = true; townState.dungeonOutcome = townState.dungeonLetter = undefined;
+    sound.play('hurt');
+    showTown('dungeon', lost ? t('dungeon.fled', { lost: lostText(lost) }) : '', true);
+  });
 }
 // Upgrade feedback: the changed element pops and the level-up jingle plays.
 function celebrate(selector: string) {
@@ -787,8 +833,10 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
       raidBuild: structuredClone(townState.raidBuild),
       raidSandbox: townState.raidSandbox ? structuredClone(townState.raidSandbox) : undefined,
     } : {}),
-    ...(mode === 'endless' && milestone ? { runWallet, runAct: milestone.act, runActClear: milestone.actClear, runFinalClear: milestone.finalClear, relics: RELIC_IDS.filter(id => ownsChallengeUnlock(profile, id)) } : {}), ...options,
-    ...(mode === 'adventure' || mode === 'dungeon' ? storyBattleOptions(profile) : {}),
+    ...(mode === 'endless' && milestone ? { runWallet, runAct: milestone.act, runActClear: milestone.actClear, runFinalClear: milestone.finalClear, relics: RELIC_IDS.filter(id => ownsChallengeUnlock(profile, id)) } : {}),
+    // A dungeon fight brings its own roster (the run's party), so the story options go first and the passed options win.
+    ...(mode === 'dungeon' ? storyBattleOptions(profile) : {}), ...options,
+    ...(mode === 'adventure' ? storyBattleOptions(profile) : {}),
   });
   inTown = false;
   resultRequest++;
@@ -855,6 +903,7 @@ function updateExpedition() {
   $('encounter-label').textContent = stageLabel();
   $('boss-name').textContent = battle.enemyName;
   $('boss-title').textContent = battle.enemyTitle;
+  $('retreat').textContent = battle.mode === 'dungeon' ? t('dungeon.flee.label') : t('battle.retreat');
   $('expedition-label').textContent = battle.mode === 'adventure' ? t('mode.campaign') : battle.mode === 'endless' ? t('route.endless') : battle.mode === 'dungeon' ? t('route.dungeon') : t('mode.raid');
   $('journey-title').textContent = battle.mode === 'adventure' ? c.name : battle.mode === 'endless' ? t('route.endless') : battle.enemyName;
   $('journey-copy').textContent = battle.mode === 'adventure' ? c.subtitle : t('battle.journey.copy');
@@ -886,6 +935,8 @@ async function begin() {
   if (['victory', 'defeat'].includes(battle.status)) { result(); return; }
   encounter = makeEncounter();
   stageStart = battle.mode === 'adventure' ? structuredClone(encounter) : undefined;
+  // From here a dungeon fight counts: leaving is a flee, and the saved flag makes a reload one too.
+  if (battle.mode === 'dungeon' && profile.journey.run?.pendingFight) { profile.journey.run.pendingFight.started = true; fightNote = fightNoteKey(); }
   sound.unlock();
   battle.start();
   $('start-overlay').hidden = true;
@@ -1184,6 +1235,7 @@ function frame(dt: number) {
   if (drawIn > 0) return;
   drawIn = .06;
   if (battle.status !== lastStatus) { lastStatus = battle.status; renderInspector(); if (['victory', 'defeat'].includes(battle.status)) result(); }
+  if (battle.mode === 'dungeon' && battle.status === 'fighting') noteDungeonFight();
   $('boss-health').textContent = `${Math.ceil(battle.bossHp).toLocaleString()} / ${battle.bossMax.toLocaleString()}`;
   const hpPercent = `${battle.bossHp / battle.bossMax * 100}%`;
   $('boss-hp').style.width = hpPercent;
@@ -1303,10 +1355,10 @@ function pauseMenu() {
   if (inTown) return;
   if (['victory', 'defeat'].includes(battle.status)) { result(); return; }
   if (modal.open) { modal.close(); return; }
-  openModal(`<h2 id="modal-title">${t('pause.title')}</h2><p class="hint">${t('pause.copy')}</p><nav class="menu-list"><button class="menu-item" data-close>${t('pause.resume')}</button><button id="pause-help" class="menu-item">${t('pause.controls')}</button><button id="pause-settings" class="menu-item">${t('pause.settings')}</button><button id="pause-retreat" class="menu-item">${t('pause.retreat')}</button></nav>`);
+  openModal(`<h2 id="modal-title">${t('pause.title')}</h2><p class="hint">${t('pause.copy')}</p><nav class="menu-list"><button class="menu-item" data-close>${t('pause.resume')}</button><button id="pause-help" class="menu-item">${t('pause.controls')}</button><button id="pause-settings" class="menu-item">${t('pause.settings')}</button><button id="pause-retreat" class="menu-item">${battle.mode === 'dungeon' ? t('dungeon.flee.label') : t('pause.retreat')}</button></nav>`);
   $('pause-help').addEventListener('click', help);
   $('pause-settings').addEventListener('click', settings);
-  $('pause-retreat').addEventListener('click', () => navigateTown());
+  $('pause-retreat').addEventListener('click', () => navigateTown(battle.mode === 'dungeon' ? 'dungeon' : 'camp'));
 }
 const escapeUI = (value: string) => value.replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]!));
 function showBoonTray() {
@@ -1749,9 +1801,10 @@ async function presentDungeonResult() {
     if (dungeonSettled !== battle) {
       const candidate = structuredClone(profile), run = candidate.journey.run;
       const rewards = won ? settleProgress(candidate, battle) ?? [] : [];
+      // The pouch and HP before the fight: a wipe shows what it cost, every result shows each hero's HP before → after.
+      dungeonBefore = run ? { hp: { ...run.hp }, pouch: structuredClone(run.pouch) } : undefined;
       if (run) {
-        const hp = Object.fromEntries(battle.heroes.map(h => [h.id, h.maxHp > 0 ? h.hp / h.maxHp : 0]));
-        loot = resolveFight(run, won, hp, battle.potions);
+        loot = resolveFight(run, won, heroRatios(), battle.potions);
         if (run.status === 'cleared') { bankPouch(candidate, run.pouch); candidate.journey.depth = Math.max(candidate.journey.depth, run.depth); }
       }
       if (won) candidate.wins++;
@@ -1766,20 +1819,25 @@ async function presentDungeonResult() {
   const run = profile.journey.run, cleared = run?.status === 'cleared';
   const xpRows = experienceRewards.map(r => { const hero = ROSTER[r.id], up = r.after > r.before; return `<p class="xp-card ${up ? 'leveled-up' : ''}"><img src="${portrait(hero.classId)}" alt=""/><span class="xp-hero-info"><b class="xp-hero-name">${hero.name}</b></span><span class="xp-points">+${r.xp} EXP</span><span class="xp-level-badge">${up ? t('result.levelup', { from: r.before, to: r.after }) : `LV ${r.after}`}</span></p>`; }).join('');
   const desc = !won ? t('dungeon.end.wiped') : cleared ? t('dungeon.end.cleared') : loot ? `${t('dungeon.out.gold', { n: loot.gold })} ${Object.entries(loot.materials).map(([id, n]) => t('dungeon.out.material', { n, name: t(`material.${id}` as never) })).join(' ')}` : '';
+  // A wipe names what the pouch held; with an empty pouch there is nothing to lose and nothing to say.
+  const before = dungeonBefore, lost = !won && before && (before.pouch.gold > 0 || Object.values(before.pouch.materials).some(n => n > 0)) ? before.pouch : undefined;
+  const pct = (ratio: number) => `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
+  const hpRows = run && before ? run.party.filter(id => ROSTER[id]).map(id => { const from = before.hp[id] ?? 0, to = run.hp[id] ?? 0; return `<li class="${to <= 0 ? 'down' : to < .35 ? 'low' : ''}"><img src="${portrait(ROSTER[id].classId)}" alt=""/><b>${ROSTER[id].name}</b><span class="gauge" aria-hidden="true"><i style="width:${pct(to)}"></i></span><small>${pct(from)} <span class="hp-arrow">→</span> ${pct(to)}</small></li>`; }).join('') : '';
   $('start-overlay').hidden = false;
   showResultScreen(`<div class="result-ceremony-modal ${won ? 'victory' : 'defeat'}">
     <p class="result-banner" aria-hidden="true">${won ? cleared ? t('dungeon.end.cleared.banner') : t('result.banner.win') : t('dungeon.end.wiped.banner')}</p>
     <header class="win ceremony-header"><h2 id="result-title" class="ceremony-title">${t('route.dungeon')} · ${t('dungeon.depth.label', { n: run?.depth ?? 1 })}</h2><p class="ceremony-desc">${escapeUI(desc)}</p></header>
-    <section class="win result-summary"><dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque"><dt>${t('dungeon.pouch')}</dt><dd>${run?.pouch.gold ?? 0}G</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>${xpRows ? `<div class="xp-results">${xpRows}</div>` : ''}</section>
+    <section class="win result-summary"><dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque"><dt>${t('dungeon.pouch')}</dt><dd>${lost ? `−${lost.gold}G` : `${run?.pouch.gold ?? 0}G`}</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>${lost ? `<p class="dungeon-lost">${escapeUI(t('dungeon.lost', { lost: lostText(lost) }))}</p>` : ''}${hpRows ? `<h3 class="subheading">${t('dungeon.result.hp')}</h3><ul class="dungeon-hp-list">${hpRows}</ul>` : ''}${xpRows ? `<div class="xp-results">${xpRows}</div>` : ''}</section>
     <div class="ceremony-actions"><button id="result-dungeon" class="btn primary">${t('dungeon.result.back')} ▶</button></div>
   </div>`);
   sound.play(won ? 'fanfare' : 'defeat');
   if (experienceRewards.some(r => r.after > r.before)) window.setTimeout(() => sound.play('levelup'), 1300);
   animateCeremony();
-  $('result-dungeon').addEventListener('click', () => { closeWithoutResume(); inTown = true; townState.dungeonOutcome = undefined; showTown('dungeon', '', true); });
+  $('result-dungeon').addEventListener('click', () => { closeWithoutResume(); inTown = true; townState.dungeonOutcome = townState.dungeonLetter = undefined; showTown('dungeon', '', true); });
   return true;
 }
 let dungeonLoot: { gold: number; materials: Record<string, number> } | undefined;
+let dungeonBefore: { hp: Record<number, number>; pouch: Pouch } | undefined;
 let dungeonSettled: Battle | undefined;
 function makeEncounter(settled = false): NonNullable<typeof encounter> {
   return { runId: encounter?.runId ?? crypto.randomUUID(), seq: (encounter?.seq ?? 0) + 1, battle: battle.checkpoint(), purse: runWallet.crystal, boons: [...runBoons], seed: runSeed, settled };
@@ -1900,6 +1958,8 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
 async function leaveSafely(action: () => void | Promise<void>) {
   if (pendingSettlement || presentingResult || commander.stale) { storageStatus(); return; }
   if (!(await commander.flush())) { storageStatus(); return; }
+  // A dungeon fight under way can only be left by fleeing (wounds kept, half the pouch lost); before Begin or after the result it just closes.
+  if (dungeonFightLive() && battle.status !== 'ready') { fleeDungeonModal(); return; }
   if (inTown || battle.mode === 'dungeon') { closeWithoutResume(); inTown = true; await action(); return; }
   const hasCommander = Boolean(commander.document);
   openModal(hasCommander
@@ -2089,7 +2149,7 @@ document.addEventListener('pointerdown', event => {
 const titleScreenEl = $('title-screen');
 const leavePressPhase = () => { if (!titleScreenEl.classList.contains('press-phase')) return false; titleScreenEl.classList.remove('press-phase'); sound.unlock(); sound.play('confirm'); requestAnimationFrame(() => $('title-enter').focus({ preventScroll: true })); return true; };
 titleScreenEl.addEventListener('pointerdown', event => { if (titleScreenEl.classList.contains('press-phase')) { event.preventDefault(); leavePressPhase(); } });
-$('retreat').addEventListener('click', () => navigateTown());
+$('retreat').addEventListener('click', () => navigateTown(battle.mode === 'dungeon' ? 'dungeon' : 'camp'));
 $('battle-screen').addEventListener('click', event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-run-buy]');
   if (button && !button.disabled && !inTown) buyForRun(button.dataset.runBuy!);

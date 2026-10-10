@@ -3,7 +3,7 @@ import { CAMPAIGN, ENEMIES } from '../game/world';
 import { TALENTS, canEnterZone, talentReason, availablePoints, gearReason, profileModifiers, type Profile } from '../game/profile';
 import { JOBS, GEAR, GEAR_SETS, gearStats, legalSkill } from '../game/jobs';
 import { heroProgress, LEVEL_HP, LEVEL_POWER } from '../game/levels';
-import { storyPartyCap, normalizeStoryParty } from '../game/story-party';
+import { storyPartyCap, normalizeStoryParty, storyPartyLocked } from '../game/story-party';
 import { BASIC_JOBS, createRogueBuild, type RogueBuild } from '../game/roguelike-build';
 import { Battle } from '../game/simulation';
 import { BANK_SHOP, BELL_TONIC, CHALLENGE_SHOP, RAID_MODIFIERS, RELIC_IDS, bankShopItem, getRaidContractForEnemy, raidModifierAvailable, raidReward, type RaidModifierId, type RaidSandbox, type RaidTier } from '../economy/challenge';
@@ -47,6 +47,8 @@ export type TownState = {
   pendingGear?: PendingGear;
   heroic?: boolean;
   dungeonOutcome?: string;
+  /** Letter id a lore choice just found (shown under the outcome). */
+  dungeonLetter?: string;
   gearSlot?: ItemSlot;
   rogueSetup?: RogueBuild;
   /** Bell Tonic ticked for the next Raid/Roguelike departure (paid with bank Crystal when the run starts). */
@@ -183,7 +185,7 @@ export function expeditionModes(active: 'campaign' | 'dungeon' | 'raid' | 'endle
 }
 
 export function renderTown(root: HTMLElement, p: Profile, state: TownState) {
-  const content = state.tab === 'camp' ? campScene(p) : state.tab === 'dungeon' ? dungeonScene(p, state.dungeonOutcome, expeditionModes('dungeon')) : state.tab === 'campaign' || state.tab === 'mission' ? renderWorldMap(p, state) : state.tab === 'party' || state.tab === 'party-advanced' ? training(p, state, state.tab === 'party-advanced') : state.tab === 'more' ? moreScene(p) : secondaryScene(p, state);
+  const content = state.tab === 'camp' ? campScene(p) : state.tab === 'dungeon' ? dungeonScene(p, state.dungeonOutcome, expeditionModes('dungeon'), state.dungeonLetter) : state.tab === 'campaign' || state.tab === 'mission' ? renderWorldMap(p, state) : state.tab === 'party' || state.tab === 'party-advanced' ? training(p, state, state.tab === 'party-advanced') : state.tab === 'more' ? moreScene(p) : secondaryScene(p, state);
   root.innerHTML = `<div class="town-game-shell" data-town-route="${state.tab}"><section class="town-scene" aria-label="${escape(routeTitle(state.tab))}"><p id="town-notice" class="town-notice" role="status" ${state.notice ? '' : 'hidden'}>${escape(gameText(state.notice))}</p>${content}</section></div>`;
 }
 
@@ -227,7 +229,9 @@ function heroSheet(p: Profile, id: number, preview: ReturnType<Battle['hero']> &
 
 function storyPartyPanel(p: Profile) {
   const cap = storyPartyCap(p.cleared);
-  return `<details class="story-party" ${emptySlots(p) ? 'open' : ''}><summary>${t('party.story', { n: p.storyActive.length, cap, total: p.roster.length })}</summary><p class="hint">${t('party.story.hint')}</p><div class="departure-actions">${p.roster.map(id => { const active = p.storyActive.includes(id); return `<button class="btn ${active ? 'on' : ''}" data-story-toggle="${id}" aria-pressed="${active}" ${active ? p.storyActive.length === 1 ? 'disabled' : '' : p.storyActive.length >= cap ? 'disabled' : ''}>${ROSTER[id].name}: ${active ? t('party.story.active') : t('party.story.bench')}</button>`; }).join('')}</div></details>`;
+  // During an Undercroft run the party is locked: its heroes are marked, and a click explains why instead of toggling.
+  const locked = storyPartyLocked(p), below = p.journey.run?.party ?? [];
+  return `<details class="story-party ${locked ? 'locked' : ''}" ${emptySlots(p) || locked ? 'open' : ''}><summary>${t('party.story', { n: p.storyActive.length, cap, total: p.roster.length })}</summary><p class="hint">${locked ? t('dungeon.party.locked') : t('party.story.hint')}</p><div class="departure-actions">${p.roster.map(id => { const active = p.storyActive.includes(id); return `<button class="btn ${active ? 'on' : ''}" data-story-toggle="${id}" aria-pressed="${active}" ${locked ? 'aria-disabled="true"' : active ? p.storyActive.length === 1 ? 'disabled' : '' : p.storyActive.length >= cap ? 'disabled' : ''}>${ROSTER[id].name}: ${locked && below.includes(id) ? t('party.story.undercroft') : active ? t('party.story.active') : t('party.story.bench')}</button>`; }).join('')}</div></details>`;
 }
 
 function trainingOverview(p: Profile, state: TownState, preview: ReturnType<Battle['hero']> & {}, progress: ReturnType<typeof heroProgress>) {

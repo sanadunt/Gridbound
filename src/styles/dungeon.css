@@ -44,8 +44,10 @@
 .refine-row .btn { flex: none; }
 .refine-tag { margin-left: 4px; font-family: var(--pixel); font-size: 8px; color: var(--hp); }
 
-/* Undercroft: depth picker */
-.dungeon-scene { display: grid; gap: 10px; padding: 10px 12px 18px; }
+/* Undercroft: depth picker. The scene is its route's scroll panel: rows keep their content height (no stretching when
+   short, no squashing when long), so the mode tabs never collapse under the intro. */
+.dungeon-scene { display: grid; align-content: start; grid-auto-rows: max-content; gap: 10px; padding: 10px 12px 18px; }
+.dungeon-scene > .tabs { min-height: max-content; flex-shrink: 0; }
 .dungeon-intro small, .dungeon-hud small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
 .dungeon-intro h2, .dungeon-hud h2, .dungeon-result h2 { margin: 6px 0; font-family: var(--pixel); font-size: 14px; line-height: 1.5; color: var(--gold); }
 .dungeon-intro p { margin: 6px 0; color: var(--ink-soft); }
@@ -63,8 +65,18 @@
 .depth-meta { display: flex; align-items: center; gap: 6px; }
 .depth-meta em { padding: 1px 5px; border-radius: var(--radius); font-style: normal; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .depth-meta i { font-style: normal; color: var(--hp); }
+.dungeon-rules { padding: 8px 12px; }
+.dungeon-rules summary { min-height: 32px; display: flex; align-items: center; gap: 8px; font-family: var(--pixel); font-size: 10px; color: var(--gold); cursor: pointer; list-style: none; }
+.dungeon-rules summary::-webkit-details-marker { display: none; }
+/* The marker points right when closed; base.css turns it down when open. */
+.dungeon-rules summary::before { content: '▸'; font-family: var(--text); font-size: 14px; }
 .dungeon-rules p { margin: 4px 0; font-size: 13px; color: var(--ink-soft); }
 .dungeon-rules b { color: var(--gold); }
+/* Room key: one compact wrapping row of icons. */
+.dungeon-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 6px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--ink-dim); }
+.dungeon-legend li { display: inline-flex; align-items: center; gap: 4px; }
+.dungeon-legend img { width: 16px; height: 16px; image-rendering: pixelated; }
+.dungeon-scene > .dungeon-legend { margin: -4px 2px 0; }
 
 /* Undercroft: run HUD */
 .dungeon-hud { display: grid; gap: 6px; padding: 8px 12px; }
@@ -80,7 +92,7 @@
 .dungeon-hero.down img { filter: grayscale(1) brightness(.5); }
 
 /* Undercroft: room map (rows climb from the entrance at the bottom to the guardian at the top) */
-.dungeon-map { position: relative; height: min(64vh, 470px); min-height: 330px; border: 1px solid var(--win-edge); border-radius: var(--radius); background:
+.dungeon-map { position: relative; height: min(64vh, 470px); max-height: 55vh; min-height: 280px; border: 1px solid var(--win-edge); border-radius: var(--radius); background:
   radial-gradient(ellipse at 50% 100%, #2b1f17 0%, transparent 60%),
   repeating-linear-gradient(0deg, #0000 0 22px, #ffffff06 22px 23px),
   linear-gradient(180deg, #120d10, #1b1612 55%, #221a13); overflow: hidden; }
@@ -104,6 +116,12 @@
 .room-outcome { padding: 6px 8px; border-left: 3px solid var(--gold); background: var(--inset); color: var(--ink) !important; }
 .event-choices { display: grid; gap: 6px; margin-top: 8px; }
 .event-choices .btn { text-align: left; }
+.event-choices .btn:disabled { opacity: 1; filter: none; border-style: dashed; color: var(--ink-dim); cursor: not-allowed; }
+/* The reason stays readable on the dimmed choice. */
+.choice-need { margin-left: 4px; padding: 1px 6px; border: 1px solid #a8483c; border-radius: var(--radius); background: #4a1f1a; font-style: normal; font-size: 11px; font-weight: 700; color: #ffd9cf; white-space: nowrap; }
+.dungeon-letter { margin: 6px 0; padding: 6px 10px; border-left: 3px solid var(--gold-border); background: var(--inset); }
+.dungeon-letter small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
+.dungeon-letter p { margin: 4px 0 0 !important; font-style: italic; color: var(--ink) !important; }
 .dungeon-scene .departure-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .dungeon-scene .departure-actions small { flex: 1 1 180px; font-size: 12px; }
 
@@ -113,11 +131,29 @@
 .dungeon-result.wiped .result-banner { color: var(--danger); }
 .dungeon-result .dungeon-pouch { justify-content: center; margin: 10px 0; }
 
+/* Undercroft: per-hero HP on a room result, and what a wipe cost */
+.dungeon-hp-list { display: grid; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
+.dungeon-hp-list li { display: grid; grid-template-columns: 28px minmax(0, 1fr) 72px auto; align-items: center; gap: 8px; font-size: 13px; }
+.dungeon-hp-list img { width: 28px; height: 28px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); }
+.dungeon-hp-list b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dungeon-hp-list .gauge { height: 6px; }
+.dungeon-hp-list small { font-family: var(--pixel); font-size: 8px; color: var(--ink-soft); white-space: nowrap; }
+/* The pixel font has no arrow glyph: the body font draws it. */
+.dungeon-hp-list .hp-arrow { font-family: var(--text); font-size: 12px; line-height: 1; vertical-align: -1px; color: var(--gold); }
+.dungeon-hp-list li.low .gauge i { background: var(--hp-low); }
+.dungeon-hp-list li.down img { filter: grayscale(1) brightness(.5); }
+.dungeon-lost { margin: 8px 0 0; padding: 6px 8px; border-left: 3px solid var(--danger); background: #2a1512; color: #f3d3cc; font-size: 13px; }
+.story-party.locked .btn[aria-disabled="true"] { opacity: .7; }
+
 @media (max-width: 420px) {
   .room { width: 40px; height: 40px; }
   .room img { width: 24px; height: 24px; }
   .depth-card { grid-template-columns: 32px 1fr; }
   .depth-meta { grid-column: 2; }
+  /* The run HUD's party stays one row of smaller portraits. */
+  .dungeon-hud .dungeon-party { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .dungeon-hero { flex: none; width: 32px; }
+  .dungeon-hero img { width: 32px; height: 32px; }
 }
 
 /* Lore fragment on a guardian clear */

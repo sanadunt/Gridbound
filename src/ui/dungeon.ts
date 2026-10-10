@@ -1,7 +1,7 @@
 // The Undercroft screen: depth picker, the room map of a run in progress, and the current room's choices.
 import { KITS, ROSTER } from '../game/content';
 import { ENEMIES } from '../game/world';
-import { DEPTHS, DUNGEON_EVENTS, DUNGEON_ROWS, depthDef, reachable, unlockedDepth, type DungeonNode, type DungeonRun } from '../game/dungeon';
+import { DEPTHS, DUNGEON_EVENTS, DUNGEON_ROWS, choiceNeed, depthDef, reachable, unlockedDepth, type DungeonNode, type DungeonNodeKind, type DungeonRun } from '../game/dungeon';
 import type { Profile } from '../game/profile';
 import { normalizeStoryParty } from '../game/story-party';
 import { partyPower, powerVerdict, recommendedPower } from '../game/power';
@@ -15,9 +15,12 @@ const face = (classId: keyof typeof KITS) => { if (!faces.has(classId)) faces.se
 const materialName = (id: string) => t(`material.${id}` as StringKey);
 const pouchLine = (pouch: { gold: number; materials: Record<string, number> }) => [`<span class="pouch-gold">${pouch.gold}G</span>`, ...Object.entries(pouch.materials).filter(([, n]) => n > 0).map(([id, n]) => `<span class="pouch-mat"><img src="${dungeonIcon(id as 'ember-shard')}" alt=""/>${escape(materialName(id))} ×${n}</span>`)].join(' ');
 
-export function dungeonScene(p: Profile, outcome?: string, modes = ''): string {
+const KINDS: DungeonNodeKind[] = ['battle', 'elite', 'event', 'treasure', 'camp', 'guardian'];
+
+/** `outcome`: what the last choice did; `letter`: a letter id found by a lore choice (`dungeon.letter.<id>`). */
+export function dungeonScene(p: Profile, outcome?: string, modes = '', letter?: string): string {
   const run = p.journey.run;
-  return `<section class="dungeon-scene" aria-labelledby="dungeon-title"><h1 id="dungeon-title" class="sr-only">${t('route.dungeon')}</h1>${run?.status === 'active' ? '' : modes}${run ? run.status === 'active' ? activeRun(p, run, outcome) : finishedRun(run) : depthPicker(p)}</section>`;
+  return `<section class="dungeon-scene" aria-labelledby="dungeon-title"><h1 id="dungeon-title" class="sr-only">${t('route.dungeon')}</h1>${run?.status === 'active' ? '' : modes}${run ? run.status === 'active' ? activeRun(p, run, outcome, letter) : finishedRun(run) : depthPicker(p)}</section>`;
 }
 
 function depthPicker(p: Profile): string {
@@ -32,10 +35,15 @@ function depthPicker(p: Profile): string {
       <span class="depth-meta">${locked ? '' : `<em class="power-${verdict}">${t('power.rec.short', { n: rec })}</em>`}<img src="${dungeonIcon(d.material as 'ember-shard')}" alt="${escape(materialName(d.material))}"/>${beaten ? '<i>✓</i>' : ''}</span>
     </button>`;
   }).join('');
+  // The rules come before the depths (open until the first guardian falls), so nobody descends without knowing a wipe loses the pouch.
   return `<article class="win dungeon-intro"><small>${t('dungeon.kicker')}</small><h2>${t('route.dungeon')}</h2><p>${t('dungeon.intro')}</p>
     <div class="dungeon-party">${party.map(id => `<img src="${face(ROSTER[id].classId)}" alt="${escape(ROSTER[id].name)}" title="${escape(ROSTER[id].name)}"/>`).join('')}<span>${t('power.party', { n: power })}</span></div></article>
-    ${open ? `<div class="depth-list">${cards}</div>` : `<p class="win hint">${t('dungeon.locked')}</p>`}
-    <div class="win dungeon-rules"><p><b>${t('dungeon.rule.map.title')}</b> ${t('dungeon.rule.map')}</p><p><b>${t('dungeon.rule.hp.title')}</b> ${t('dungeon.rule.hp')}</p><p><b>${t('dungeon.rule.pouch.title')}</b> ${t('dungeon.rule.pouch')}</p></div>`;
+    <details class="win dungeon-rules" ${p.journey.depth ? '' : 'open'}><summary>${t('dungeon.howto')}</summary><p><b>${t('dungeon.rule.map.title')}</b> ${t('dungeon.rule.map')}</p><p><b>${t('dungeon.rule.hp.title')}</b> ${t('dungeon.rule.hp')}</p><p><b>${t('dungeon.rule.pouch.title')}</b> ${t('dungeon.rule.pouch')}</p>${legend()}</details>
+    ${open ? `<div class="depth-list">${cards}</div>` : `<p class="win hint">${t('dungeon.locked')}</p>`}`;
+}
+
+function legend(): string {
+  return `<ul class="dungeon-legend" aria-label="${t('dungeon.legend')}">${KINDS.map(kind => `<li><img src="${dungeonIcon(kind)}" alt=""/>${t(`dungeon.kind.${kind}` as StringKey)}</li>`).join('')}</ul>`;
 }
 
 function finishedRun(run: DungeonRun): string {
@@ -64,24 +72,27 @@ function mapView(run: DungeonRun): string {
   return `<div class="dungeon-map" style="--rows:${DUNGEON_ROWS}"><svg class="dungeon-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${nodes}</div>`;
 }
 
-function roomPanel(run: DungeonRun, outcome?: string): string {
+function roomPanel(run: DungeonRun, outcome?: string, letter?: string): string {
   const node = run.at >= 0 ? run.nodes[run.at] : undefined;
+  // What the last choice did stays readable, also when it ends in an ambush (or a fled fight still waits).
+  const done = `${outcome ? `<p class="room-outcome" role="status">${escape(outcome)}</p>` : ''}${letter ? `<blockquote class="dungeon-letter"><small>${t('dungeon.letter.title')}</small><p>${escape(t(`dungeon.letter.${letter}` as StringKey))}</p></blockquote>` : ''}`;
   if (run.pendingFight) {
     const enemy = ENEMIES[run.pendingFight.enemy];
-    return `<small>${t(`dungeon.kind.${run.pendingFight.kind}` as StringKey)}</small><h3>${escape(enemy.name)} <span>${escape(enemy.title)}</span></h3><p>${escape(enemy.counter)}</p><button class="btn primary" data-dungeon-fight>${t('dungeon.fight')}</button>`;
+    return `${done}<small>${t(`dungeon.kind.${run.pendingFight.kind}` as StringKey)}</small><h3>${escape(enemy?.name ?? run.pendingFight.enemy)} <span>${escape(enemy?.title ?? '')}</span></h3><p>${escape(enemy?.counter ?? '')}</p><button class="btn primary" data-dungeon-fight>${t('dungeon.fight')}</button>`;
   }
   if (!node) return `<h3>${t('dungeon.entrance')}</h3><p>${t('dungeon.pick')}</p>`;
-  const done = outcome ? `<p class="room-outcome" role="status">${escape(outcome)}</p>` : '';
   if (node.kind === 'event' && node.event) {
     const id = node.event;
-    return `<small>${t('dungeon.kind.event')}</small><h3>${t(`dungeon.event.${id}.title` as StringKey)}</h3><p>${t(`dungeon.event.${id}.body` as StringKey)}</p>${node.done ? done || `<p class="hint">${t('dungeon.pick')}</p>` : `<div class="event-choices">${DUNGEON_EVENTS[id].map(choice => `<button class="btn" data-dungeon-choice="${choice}">${t(`dungeon.event.${id}.${choice}` as StringKey)}</button>`).join('')}</div>`}`;
+    // A choice the pouch cannot pay for (or a full potion belt) is shown disabled with the reason.
+    const choices = DUNGEON_EVENTS[id].map(choice => { const need = choiceNeed(run, id, choice), why = need === undefined ? '' : need === 'potions' ? t('dungeon.need.potions') : t('dungeon.need.gold', { n: need }); return `<button class="btn" data-dungeon-choice="${choice}" ${why ? 'disabled' : ''}>${t(`dungeon.event.${id}.${choice}` as StringKey)}${why ? ` <em class="choice-need">${escape(why)}</em>` : ''}</button>`; }).join('');
+    return `<small>${t('dungeon.kind.event')}</small><h3>${t(`dungeon.event.${id}.title` as StringKey)}</h3><p>${t(`dungeon.event.${id}.body` as StringKey)}</p>${node.done ? done || `<p class="hint">${t('dungeon.pick')}</p>` : `<div class="event-choices">${choices}</div>`}`;
   }
   if (node.kind === 'treasure') return `<small>${t('dungeon.kind.treasure')}</small><h3>${t('dungeon.treasure.title')}</h3>${node.done ? done || `<p class="hint">${t('dungeon.pick')}</p>` : `<p>${t('dungeon.treasure.body')}</p><button class="btn primary" data-dungeon-open>${t('dungeon.treasure.open')}</button>`}`;
   if (node.kind === 'camp') return `<small>${t('dungeon.kind.camp')}</small><h3>${t('dungeon.camp.title')}</h3>${node.done ? done || `<p class="hint">${t('dungeon.pick')}</p>` : `<p>${t('dungeon.camp.body')}</p><div class="event-choices"><button class="btn primary" data-dungeon-camp="rest">${t('dungeon.camp.rest')}</button><button class="btn" data-dungeon-camp="extract">${t('dungeon.camp.extract')}</button></div>`}`;
   return `<small>${t(`dungeon.kind.${node.kind}` as StringKey)}</small><h3>${t('dungeon.cleared.room')}</h3>${done}<p class="hint">${t('dungeon.pick')}</p>`;
 }
 
-function activeRun(p: Profile, run: DungeonRun, outcome?: string): string {
+function activeRun(p: Profile, run: DungeonRun, outcome?: string, letter?: string): string {
   const def = depthDef(run.depth);
   const party = run.party.filter(id => ROSTER[id]).map(id => {
     const ratio = run.hp[id] ?? 0;
@@ -92,6 +103,7 @@ function activeRun(p: Profile, run: DungeonRun, outcome?: string): string {
       <div class="dungeon-pouch"><small>${t('dungeon.pouch')}</small> ${pouchLine(run.pouch)} <span class="pouch-potions">${t('dungeon.potions', { n: run.potions })}</span>${blessing}</div>
       <div class="dungeon-party">${party}</div></header>
     ${mapView(run)}
-    <section class="win room-panel" aria-live="polite">${roomPanel(run, outcome)}</section>
+    ${legend()}
+    <section class="win room-panel" aria-live="polite">${roomPanel(run, outcome, letter)}</section>
     <div class="departure-actions"><button class="btn danger" data-dungeon-leave>${t('dungeon.leave')}</button><small class="hint">${t('dungeon.material.hint', { name: materialName(def.material) })}</small></div>`;
 }
