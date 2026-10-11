@@ -10,7 +10,8 @@
  *
  * `eventText()` translates strings emitted at runtime by src/game/simulation.ts
  * (banners, floating texts, threat names and counters) plus a few other
- * runtime-composed strings (talent/gear lock reasons, epilogue choice cards).
+ * runtime-composed strings (stage names, epilogue choice cards). Talent/gear lock
+ * reasons and save errors are codes rendered by t() (lockText/errorText in ./index).
  */
 import { KITS, UPGRADES } from '../game/content';
 import { CHARACTERS } from '../game/characters';
@@ -146,7 +147,9 @@ export function localizedRaidModifier(modifier: RaidModifier, lang: ContentLang)
 // ---------------------------------------------------------------------------
 // Runtime event text (simulation.ts banners, floating texts, threats).
 
-const EVENT_TEXT: ContentText[] = [
+/** `source` is the text simulation.ts emits when it differs from `id` (the ID counters translate its English tags). */
+type EventEntry = ContentText & { source?: string };
+const EVENT_TEXT: EventEntry[] = [
   ...R2_EVENT_TEXT,
   // Threat names (Battle.telegraph). EMERALD CATACLYSM is Vharok's named attack and stays as is.
   { en: 'HUNT THE WOUNDED', id: 'BURU YANG TERLUKA' },
@@ -161,13 +164,13 @@ const EVENT_TEXT: ContentText[] = [
   { en: 'MENDING MIST', id: 'KABUT PEMULIH' },
   { en: 'NINEFOLD DAWN', id: 'FAJAR SEMBILAN' },
   { en: 'SYNC!', id: 'SINKRON!' },
-  // Threat counters.
-  { en: 'MARKED: follows the hero. Heal the target, ready a shield or Party Guard.', id: 'MARKED: mengikuti hero. Heal target, siapkan shield atau Party Guard.' },
-  { en: 'GROUND: leave the marked row once the telegraph appears.', id: 'GROUND: keluar dari row yang ditandai setelah telegraph muncul.' },
-  { en: 'GROUND: move to another lane. The impact zone does not follow heroes.', id: 'GROUND: pindah ke lane lain. Lokasi impact tidak mengikuti hero.' },
-  { en: "ALL GRID: Guard just before impact (G) or cast an interrupt skill. Changing tiles won't help.", id: 'ALL GRID: Guard menjelang impact (G) atau cast skill interrupt. Pindah tile tidak membantu.' },
-  { en: 'GROUND: move heroes to safe tiles. The markers stay on the ground.', id: 'GROUND: pindahkan hero ke tile aman. Tanda tetap di tanah.' },
-  { en: "GROUND: a delayed second blast. Don't rush back onto this tile.", id: 'GROUND: ledakan kedua tertunda. Jangan buru-buru kembali ke tile ini.' },
+  // Threat counters: the tag is the intent family the map and bestiary chips name (intent.kind.*): MARKED/DITANDAI, GROUND/TANAH, ALL GRID/SELURUH GRID, CHANNEL/RAPALAN.
+  { en: 'MARKED: follows the hero. Heal the target, ready a shield or Party Guard.', id: 'DITANDAI: mengikuti hero. Heal target, siapkan shield atau Party Guard.', source: 'MARKED: mengikuti hero. Heal target, siapkan shield atau Party Guard.' },
+  { en: 'GROUND: leave the marked row once the telegraph appears.', id: 'TANAH: keluar dari baris yang ditandai setelah telegraph muncul.', source: 'GROUND: keluar dari row yang ditandai setelah telegraph muncul.' },
+  { en: 'GROUND: move to another lane. The impact zone does not follow heroes.', id: 'TANAH: pindah ke lane lain. Lokasi impact tidak mengikuti hero.', source: 'GROUND: pindah ke lane lain. Lokasi impact tidak mengikuti hero.' },
+  { en: "ALL GRID: Guard just before impact (G) or cast an interrupt skill. Changing tiles won't help.", id: 'SELURUH GRID: Guard menjelang impact (G) atau cast skill interrupt. Pindah petak tidak membantu.', source: 'ALL GRID: Guard menjelang impact (G) atau cast skill interrupt. Pindah tile tidak membantu.' },
+  { en: 'GROUND: move heroes to safe tiles. The markers stay on the ground.', id: 'TANAH: pindahkan hero ke petak aman. Tanda tetap di tanah.', source: 'GROUND: pindahkan hero ke tile aman. Tanda tetap di tanah.' },
+  { en: "GROUND: a delayed second blast. Don't rush back onto this tile.", id: 'TANAH: ledakan kedua tertunda. Jangan buru-buru kembali ke petak ini.', source: 'GROUND: ledakan kedua tertunda. Jangan buru-buru kembali ke tile ini.' },
   // Banners and floating texts.
   { en: 'FORMATION', id: 'FORMASI' },
   { en: 'PARTY GUARD · 65% REDUCTION', id: 'PARTY GUARD · REDUKSI 65%' },
@@ -183,39 +186,24 @@ const EVENT_TEXT: ContentText[] = [
   { en: 'TURRET', id: 'MENARA' },
   { en: 'COUNTER', id: 'BALASAN' },
   { en: 'ENRAGED', id: 'MURKA' },
-  { en: 'GROUND: no safe tile. Swap a tank or shielded hero onto the mark, or Guard (G).', id: 'GROUND: tidak ada tile aman. Tukar tank atau hero ber-shield ke tanda, atau Guard (G).' },
+  { en: 'GROUND: no safe tile. Swap a tank or shielded hero onto the mark, or Guard (G).', id: 'TANAH: tidak ada petak aman. Tukar tank atau hero ber-shield ke tanda, atau Guard (G).', source: 'GROUND: tidak ada tile aman. Tukar tank atau hero ber-shield ke tanda, atau Guard (G).' },
   // Battle.stageName outside the campaign (shown raw and upper-cased as the start banner).
   { en: 'Practice arena · no Crystal', id: 'Arena latihan · tanpa Crystal' },
   { en: 'Raid contract', id: 'Kontrak raid' },
-  // profile.ts talentReason() / gearReason().
-  { en: 'Hero not yet recruited', id: 'Hero belum direkrut' },
-  { en: 'Already learned', id: 'Sudah dipelajari' },
-  { en: 'Restricted to another class', id: 'Khusus class lain' },
-  { en: 'Requires both previous branches', id: 'Perlu kedua cabang sebelumnya' },
-  { en: 'Another keystone is already chosen', id: 'Keystone lain dipilih' },
-  { en: 'Not enough skill points', id: 'Skill point belum cukup' },
-  { en: 'Not enough Gold', id: 'Gold belum cukup' },
-  { en: 'Item unavailable', id: 'Item tidak tersedia' },
-  { en: 'Quest reward', id: 'Hadiah quest' },
 ];
 
+const dot = (n: string) => n.replace(',', '.'), comma = (n: string) => n.replace('.', ',');
+/** The runtime text table, for tests (glossary and leak guards). */
+export const EVENT_TEXT_ENTRIES: readonly EventEntry[] = EVENT_TEXT;
 type EventPattern = { en: RegExp; id: RegExp; text: Record<ContentLang, (...groups: string[]) => string> };
 const EVENT_PATTERNS: EventPattern[] = [
   { en: /^(.+) · PHASE (\d+)$/i, id: /^(.+) · FASE (\d+)$/i, text: { en: (name, n) => `${name} · PHASE ${n}`, id: (name, n) => `${name} · FASE ${n}` } },
-  { en: /^DELAYED \+([\d.]+)s$/, id: /^TERTUNDA \+([\d.]+)d$/, text: { en: n => `DELAYED +${n}s`, id: n => `TERTUNDA +${n}d` } },
+  { en: /^DELAYED \+([\d.]+)s$/, id: /^TERTUNDA \+([\d,]+)d$/, text: { en: n => `DELAYED +${dot(n)}s`, id: n => `TERTUNDA +${comma(n)}d` } },
   { en: /^ENRAGE IN (\d+)s$/, id: /^MURKA DALAM (\d+)d$/, text: { en: n => `ENRAGE IN ${n}s`, id: n => `MURKA DALAM ${n}d` } },
   { en: /^Descent (\d+)$/i, id: /^Kedalaman (\d+)$/i, text: { en: n => `Descent ${n}`, id: n => `Kedalaman ${n}` } },
   { en: /^Recruit (\d+)$/i, id: /^Rekrutan (\d+)$/i, text: { en: n => `Recruit ${n}`, id: n => `Rekrutan ${n}` } },
-  { en: /^Requires hero Lv\.(\d+)$/, id: /^Perlu hero Lv\.(\d+)$/, text: { en: n => `Requires hero Lv.${n}`, id: n => `Perlu hero Lv.${n}` } },
-  { en: /^Requires (.+)$/, id: /^Perlu (.+)$/, text: { en: name => `Requires ${name}`, id: name => `Perlu ${name}` } },
-  {
-    en: /^Commander storage failed \((.*)\)\. Session-only mode is active; do not treat autosave as permanent\.$/,
-    id: /^Penyimpanan Commander gagal \((.*)\)\. Mode session-only aktif; jangan anggap autosave permanen\.$/,
-    text: {
-      en: detail => `Commander storage failed (${detail}). Session-only mode is active; do not treat autosave as permanent.`,
-      id: detail => `Penyimpanan Commander gagal (${detail}). Mode session-only aktif; jangan anggap autosave permanen.`,
-    },
-  },
+  // Floating seconds (tap −0.6s, move +0.9s): ID writes the decimal comma and 'd' (detik).
+  { en: /^([+−])([\d.]+)s$/, id: /^([+−])([\d,]+)d$/, text: { en: (sign, n) => `${sign}${dot(n)}s`, id: (sign, n) => `${sign}${comma(n)}d` } },
 ];
 
 // Content strings that also surface through the simulation (stage name banner,
@@ -230,7 +218,7 @@ function lookups() {
     upper = new Map();
     const pairs = [...EVENT_TEXT, ...Object.entries(CONTENT_TEXT).filter(([key]) => EVENT_CONTENT_KEY.test(key)).map(([, text]) => text)];
     for (const pair of pairs) {
-      for (const text of [pair.en, pair.id]) {
+      for (const text of [pair.en, pair.id, (pair as EventEntry).source ?? pair.id]) {
         if (!exact.has(text)) exact.set(text, pair);
         if (!upper.has(text.toUpperCase())) upper.set(text.toUpperCase(), pair);
       }

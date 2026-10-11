@@ -138,19 +138,41 @@ export type RuntimeCommanderContext = {
   };
 };
 
-export class StaleCommanderError extends Error {
-  constructor(message = 'Commander save is stale; refresh before writing.') {
+/** Stable codes for storage and save failures (and the few the save UI raises itself). The UI shows `t('error.<code>')` (en.ts/id.ts, checked by tests/i18n-ui.test.ts); the English message stays for console logs only. */
+export const ERROR_CODES = ['stale', 'incompatible', 'loading', 'unsaved', 'slot-empty', 'bookmark-rewind', 'run-active', 'profiles-full', 'storage-full', 'idb-read', 'idb-write', 'idb-delete', 'idb-unavailable', 'idb-blocked', 'idb-open', 'storage-blocked', 'save-corrupt', 'save-incomplete', 'save-migrated', 'save-protected', 'settlement', 'import-full', 'import-invalid', 'name-required'] as const;
+export type CommanderErrorCode = typeof ERROR_CODES[number];
+
+export class CommanderError extends Error {
+  readonly code: CommanderErrorCode;
+  constructor(code: CommanderErrorCode, message: string) {
     super(message);
+    this.code = code;
+    this.name = 'CommanderError';
+  }
+}
+
+export class StaleCommanderError extends CommanderError {
+  constructor(message = 'Commander save is stale; refresh before writing.') {
+    super('stale', message);
     this.name = 'StaleCommanderError';
   }
 }
 
-export class IncompatibleCommanderError extends Error {
+export class IncompatibleCommanderError extends CommanderError {
   constructor(message = 'Commander save format is not compatible with this build.') {
-    super(message);
+    super('incompatible', message);
     this.name = 'IncompatibleCommanderError';
   }
 }
+
+/** Wrap a storage failure in a CommanderError: CommanderErrors pass through, a full disk becomes 'storage-full', anything else gets `fallback`. */
+export function commanderError(error: unknown, fallback: CommanderErrorCode): CommanderError {
+  if (error instanceof CommanderError) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  return new CommanderError(error instanceof Error && error.name === 'QuotaExceededError' ? 'storage-full' : fallback, message);
+}
+/** The stable code of a caught error ('unknown' for anything that is not a CommanderError). */
+export const errorCode = (error: unknown): CommanderErrorCode | 'unknown' => error instanceof CommanderError ? error.code : 'unknown';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const own = (record: Record<string, unknown>, key: string) => Object.prototype.hasOwnProperty.call(record, key);
@@ -626,13 +648,14 @@ export type CommanderRepositoryListener = (event: { commanderId: string; revisio
 
 export class CommanderRepository {
   readonly persistent: boolean;
-  readonly warning: string;
+  /** Why this repository is session-only ('' when IndexedDB works): an error code shown with t('error.<code>'). */
+  readonly warning: CommanderErrorCode | '';
   private readonly database?: IDBDatabase;
   private readonly memory = new Map<string, CommanderDocument>();
   private readonly listeners = new Set<CommanderRepositoryListener>();
   private readonly channel?: BroadcastChannel;
 
-  constructor(database?: IDBDatabase, warning = '') {
+  constructor(database?: IDBDatabase, warning: CommanderErrorCode | '' = '') {
     this.database = database;
     this.persistent = Boolean(database);
     this.warning = warning;
@@ -670,7 +693,7 @@ export class CommanderRepository {
       return committed;
     }
     const existing = this.memory.get(proposed.commanderId);
-    if (!existing && this.memory.size >= MAX_COMMANDERS) throw new Error('All three Commander profiles are occupied.');
+    if (!existing && this.memory.size >= MAX_COMMANDERS) throw new CommanderError('profiles-full', 'All three Commander profiles are occupied.');
     if (existing && expectedRevision !== existing.revision) throw new StaleCommanderError();
     if (!existing && expectedRevision !== undefined) throw new StaleCommanderError();
     const committed = { ...proposed, revision: (existing?.revision ?? 0) + 1 };
@@ -706,8 +729,8 @@ export class CommanderRepository {
       const transaction = this.database!.transaction('documents', 'readonly');
       const request = transaction.objectStore('documents').getAll();
       request.onsuccess = () => resolve(request.result as unknown[]);
-      request.onerror = () => reject(request.error ?? new Error('Unable to read Commander saves.'));
-      transaction.onerror = () => reject(transaction.error ?? new Error('Unable to read Commander saves.'));
+      request.onerror = () => reject(commanderError(request.error ?? 'Unable to read Commander saves.', 'idb-read'));
+      transaction.onerror = () => reject(commanderError(transaction.error ?? 'Unable to read Commander saves.', 'idb-read'));
     });
   }
 
@@ -721,7 +744,7 @@ export class CommanderRepository {
         if (settled) return;
         settled = true;
         try { transaction.abort(); } catch { /* transaction may already be complete */ }
-        reject(error instanceof Error ? error : new Error(String(error)));
+        reject(commanderError(error, 'idb-write'));
       };
       const request = store.get(document.commanderId);
       request.onsuccess = () => {
@@ -733,18 +756,18 @@ export class CommanderRepository {
         committed = { ...document, revision: (existing?.revision ?? 0) + 1 };
         const count = store.count();
         count.onsuccess = () => {
-          if (!existing && count.result >= MAX_COMMANDERS) return fail(new Error('All three Commander profiles are occupied.'));
+          if (!existing && count.result >= MAX_COMMANDERS) return fail(new CommanderError('profiles-full', 'All three Commander profiles are occupied.'));
           try { store.put(committed!); } catch (error) { fail(error); }
         };
       };
-      request.onerror = () => fail(request.error ?? new Error('Unable to read Commander revision.'));
+      request.onerror = () => fail(request.error ?? 'Unable to read Commander revision.');
       transaction.oncomplete = () => {
         if (settled) return;
         settled = true;
         resolve(clone(committed!));
       };
-      transaction.onerror = () => fail(transaction.error ?? new Error('Commander transaction failed.'));
-      transaction.onabort = () => { if (!settled) fail(transaction.error ?? new Error('Commander transaction aborted.')); };
+      transaction.onerror = () => fail(transaction.error ?? 'Commander transaction failed.');
+      transaction.onabort = () => { if (!settled) fail(transaction.error ?? 'Commander transaction aborted.'); };
     });
   }
 
@@ -757,7 +780,7 @@ export class CommanderRepository {
         if (settled) return;
         settled = true;
         try { transaction.abort(); } catch { /* transaction may already be complete */ }
-        reject(error instanceof Error ? error : new Error(String(error)));
+        reject(commanderError(error, 'idb-delete'));
       };
       const request = store.get(commanderId);
       request.onsuccess = () => {
@@ -765,16 +788,16 @@ export class CommanderRepository {
         if (!existing || existing.revision !== expectedRevision) return fail(new StaleCommanderError());
         store.delete(commanderId);
       };
-      request.onerror = () => fail(request.error ?? new Error('Unable to read Commander revision.'));
+      request.onerror = () => fail(request.error ?? 'Unable to read Commander revision.');
       transaction.oncomplete = () => { if (!settled) { settled = true; resolve(); } };
-      transaction.onerror = () => fail(transaction.error ?? new Error('Commander delete failed.'));
-      transaction.onabort = () => { if (!settled) fail(transaction.error ?? new Error('Commander delete aborted.')); };
+      transaction.onerror = () => fail(transaction.error ?? 'Commander delete failed.');
+      transaction.onabort = () => { if (!settled) fail(transaction.error ?? 'Commander delete aborted.'); };
     });
   }
 }
 
 export async function openCommanderRepository(): Promise<CommanderRepository> {
-  if (typeof indexedDB === 'undefined') return new CommanderRepository(undefined, 'IndexedDB tidak tersedia. Mode session-only aktif; progress tidak bertahan setelah tab ditutup.');
+  if (typeof indexedDB === 'undefined') return new CommanderRepository(undefined, 'idb-unavailable');
   try {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(COMMANDER_DB_NAME, COMMANDER_DB_VERSION);
@@ -782,13 +805,14 @@ export async function openCommanderRepository(): Promise<CommanderRepository> {
         if (!request.result.objectStoreNames.contains('documents')) request.result.createObjectStore('documents', { keyPath: 'commanderId' });
       };
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error('IndexedDB open failed.'));
-      request.onblocked = () => reject(new Error('IndexedDB is blocked by another tab.'));
+      request.onerror = () => reject(commanderError(request.error ?? 'IndexedDB open failed.', 'idb-open'));
+      request.onblocked = () => reject(new CommanderError('idb-blocked', 'IndexedDB is blocked by another tab.'));
     });
     return new CommanderRepository(database);
   } catch (error) {
-    const detail = error instanceof Error ? error.message : 'storage error';
-    return new CommanderRepository(undefined, `Penyimpanan Commander gagal (${detail}). Mode session-only aktif; jangan anggap autosave permanen.`);
+    const failure = commanderError(error, 'idb-open');
+    console.warn('Commander storage is session-only:', failure.message);
+    return new CommanderRepository(undefined, failure.code === 'idb-blocked' ? 'idb-blocked' : 'idb-open');
   }
 }
 

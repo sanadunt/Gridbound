@@ -1,5 +1,6 @@
 import { EN } from './en';
 import { ID } from './id';
+import type { LockReason } from '../game/profile';
 
 export type Lang = 'en' | 'id';
 export type StringKey = keyof typeof EN;
@@ -23,37 +24,50 @@ export function setLang(next: Lang) {
 }
 export const onLangChange = (listener: (lang: Lang) => void) => { listeners.add(listener); return () => listeners.delete(listener); };
 
-/** Translate a UI string. `{name}` placeholders are replaced from `vars`. */
+// Numbers follow the chosen game language, never the browser locale: EN 3,000 · 4.2 — ID 3.000 · 4,2.
+const locale = () => current === 'id' ? 'id-ID' : 'en-US';
+const formats = new Map<string, Intl.NumberFormat>();
+const numberFormat = (min: number, max: number) => {
+  const key = `${locale()}:${min}:${max}`;
+  let format = formats.get(key);
+  if (!format) formats.set(key, format = new Intl.NumberFormat(locale(), { minimumFractionDigits: min, maximumFractionDigits: max }));
+  return format;
+};
+/** A whole number with the language's digit grouping (rounded). */
+export const fmtInt = (n: number) => numberFormat(0, 0).format(Math.round(n));
+/** A number with exactly `digits` decimals and the language's decimal mark. */
+export const fmtDec = (n: number, digits = 1) => numberFormat(digits, digits).format(n);
+/** Seconds with the language's unit: EN '4.2s', ID '4,2d'. */
+export const fmtSec = (n: number, digits = 1) => `${fmtDec(n, digits)}${TABLES[current]['unit.s']}`;
+/** A date and time in the language's style. */
+export const fmtDateTime = (ms: number) => new Date(ms).toLocaleString(locale());
+/** A number as t() prints it: grouped, up to two decimals. */
+const fmtNum = (n: number) => numberFormat(0, 2).format(n);
+
+const plurals = new Map<string, Intl.PluralRules>();
+const pluralRules = () => { let rules = plurals.get(locale()); if (!rules) plurals.set(locale(), rules = new Intl.PluralRules(locale())); return rules; };
+
+/**
+ * Translate a UI string. `{name}` placeholders are replaced from `vars` (numbers are formatted for the language).
+ * `{n|chapter|chapters}` picks the word form for the number in `n` (Intl.PluralRules: 'one' takes the first form);
+ * Indonesian has no plural forms, so id.ts simply writes the base word.
+ */
 export function t(key: StringKey, vars: Record<string, string | number> = {}) {
   const text = TABLES[current][key] ?? EN[key] ?? key;
-  return text.replace(/\{(\w+)\}/g, (_, name: string) => name in vars ? String(vars[name]) : `{${name}}`);
+  return text.replace(/\{(\w+)((?:\|[^|{}]*)+)?\}/g, (whole, name: string, forms?: string) => {
+    if (!(name in vars)) return whole;
+    const value = vars[name];
+    if (forms) { const [one, other = one] = forms.slice(1).split('|'); return pluralRules().select(Number(value)) === 'one' ? one : other; }
+    return typeof value === 'number' ? fmtNum(value) : value;
+  });
 }
 
-/** Strings produced by game modules (validation reasons, storage warnings) are authored in Indonesian; map them to the active language. */
-const GAME_TEXT: Record<string, string> = {
-  'Gold belum cukup': 'Not enough Gold',
-  'Hadiah quest': 'Quest reward',
-  'Hero belum direkrut': 'Hero not recruited',
-  'Item tidak tersedia': 'Item unavailable',
-  'Keystone lain dipilih': 'Another keystone chosen',
-  'Khusus class lain': 'Other class only',
-  'Perlu kedua cabang sebelumnya': 'Needs both previous branches',
-  'Skill point belum cukup': 'Not enough skill points',
-  'Sudah dipelajari': 'Already learned',
-  'Storage browser tidak tersedia. Progress hanya di tab ini.': 'Browser storage is unavailable. Progress lives only in this tab.',
-  'Save v3 rusak. File asli tidak ditimpa; gunakan backup sebelum melanjutkan.': 'The v3 save is corrupted. The original was not overwritten; use a backup before continuing.',
-  'Save v3 tidak lengkap atau tidak didukung. Save asli dilindungi dari penimpaan.': 'The v3 save is incomplete or unsupported. The original is protected from overwriting.',
-  'Save lama dimigrasikan. Salinan v2 tetap disimpan untuk rollback.': 'Old save migrated. The v2 copy is kept for rollback.',
-  'IndexedDB tidak tersedia. Mode session-only aktif; progress tidak bertahan setelah tab ditutup.': 'IndexedDB is unavailable. Session-only mode: progress is lost when the tab closes.',
-};
-export function gameText(text: string) {
-  if (!text || current === 'id') return text;
-  if (text in GAME_TEXT) return GAME_TEXT[text];
-  const level = /^Perlu hero Lv\.(\d+)$/.exec(text);
-  if (level) return `Needs hero LV ${level[1]}`;
-  const storage = /^Penyimpanan Commander gagal \((.*)\)\. Mode session-only aktif; jangan anggap autosave permanen\.$/.exec(text);
-  if (storage) return `Commander storage failed (${storage[1]}). Session-only mode is active; autosave is not permanent.`;
-  const needs = /^Perlu (.+)$/.exec(text);
-  if (needs) return `Requires ${needs[1]}`;
-  return text;
+/** Player-facing text for a failure from a game module: its stable code (an Error's `code`, or the code itself) maps to `error.<code>`; anything else is the generic `error.unknown`. Raw messages belong in console logs only. */
+export function errorText(error: unknown) {
+  const code = typeof error === 'string' ? error : error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : '';
+  const key = `error.${code}`;
+  return code && key in EN ? t(key as StringKey) : t('error.unknown');
 }
+
+/** Why a talent or gear piece is locked (profile.ts talentReason/gearReason). */
+export const lockText = (reason: LockReason) => t(`lock.${reason.code}` as StringKey, { n: reason.n ?? '', name: reason.name ?? '' });

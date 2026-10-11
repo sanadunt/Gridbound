@@ -38,7 +38,7 @@ test('WP2: a Commander export imports as a new Commander with a fresh id and eve
   assert.equal(imported.document.commanderId, 'fresh-id'); assert.equal(imported.document.name, 'Exported');
   assert.deepEqual(materializeProfile(imported.document, 'story'), materializeProfile(doc, 'story'));
   assert.equal(imported.document.shared.bankCrystal, 75);
-  const repository = new CommanderRepository(undefined, 'session only');
+  const repository = new CommanderRepository(undefined, 'idb-unavailable');
   await repository.commit(doc);
   const committed = await repository.commit(imported.document);
   assert.equal(committed.revision, 1, 'imported as a new file next to the original');
@@ -62,7 +62,7 @@ test('WP2: the legacy backup envelope and a recovery file import; anything else 
 });
 
 test('WP2: a save in flight is dirty but not failed; only a failed save is marked failed until one succeeds', async () => {
-  const session = new CommanderSession(); session.repository = new CommanderRepository(undefined, 'session only');
+  const session = new CommanderSession(); session.repository = new CommanderRepository(undefined, 'idb-unavailable');
   const profile = session.select(await session.create('flight', createCommanderDocument(createProfile(), 'flight')), 'story');
   const saving = session.save({ mode: 'story', slotId: 'auto', profile });
   assert.equal(session.dirty, true); assert.equal(session.failed, false, 'in flight is not a failure');

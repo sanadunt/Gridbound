@@ -1,7 +1,7 @@
 import { KITS, ROSTER } from '../game/content';
 import { CAMPAIGN, ENEMIES } from '../game/world';
 import { TALENTS, canEnterZone, talentReason, availablePoints, gearReason, profileModifiers, type Profile } from '../game/profile';
-import { JOBS, GEAR, GEAR_SETS, gearStats, legalSkill } from '../game/jobs';
+import { JOBS, GEAR, GEAR_SETS, MAX_REFINE, REFINE_STEP, gearStats, legalSkill } from '../game/jobs';
 import { heroProgress, LEVEL_HP, LEVEL_POWER } from '../game/levels';
 import { storyPartyCap, normalizeStoryParty, storyPartyLocked } from '../game/story-party';
 import { BASIC_JOBS, createRogueBuild, type RogueBuild } from '../game/roguelike-build';
@@ -24,7 +24,8 @@ import { DEPTHS, unlockedDepth } from '../game/dungeon';
 import { refineCost } from '../game/profile';
 import { UNLOCKS, featureOpen, isFeature, isNew, type Feature } from './unlocks';
 import { dungeonBadge, heroNeeds, trainingBadge } from './badges';
-import { t, gameText, lang, type StringKey } from '../i18n';
+import { t, lockText, lang, fmtInt, fmtDec, fmtSec, type StringKey } from '../i18n';
+import { intentChips } from './intent';
 import { localizedRaidModifier } from '../i18n/content';
 
 export type TownTab = 'camp' | 'campaign' | 'mission' | 'dungeon' | 'party' | 'party-advanced' | 'more' | 'bestiary' | 'quests' | 'raid' | 'endless' | 'challenge-shop';
@@ -104,7 +105,7 @@ function nextObjective(p: Profile): { text: string; facility?: string; tab?: Tra
   // A story choice left for later waits in the Journal (below chests and quests, so 'Decide later' never hides them).
   if (pendingChoices(p.narrative ?? {}, p.cleared).length) return { text: t('guide.choice'), action: 'journal' };
   const idle = normalizeStoryParty(p.storyActive, p.roster, p.cleared).find(id => availablePoints(p, id) >= 2);
-  if (idle !== undefined) return { text: t('guide.points', { name: ROSTER[idle].name, n: availablePoints(p, idle) }), facility: 'party-advanced' };
+  if (idle !== undefined) return { text: t('guide.points', { name: ROSTER[idle].name, n: availablePoints(p, idle), place: t('town.spot.hall') }), facility: 'party-advanced' };
   if (p.cleared.length >= CAMPAIGN.length) return { text: t('guide.heroic'), facility: 'campaign' };
   const next = Math.min(p.cleared.length, CAMPAIGN.length - 1), power = partyPower(p), rec = recommendedPower(next);
   if (powerVerdict(power, rec) === 'under') return { text: t('guide.underpowered', { n: power, rec, name: CAMPAIGN[next].name }), facility: unlockedDepth(p.cleared, p.journey.depth) ? 'dungeon' : 'party' };
@@ -137,8 +138,8 @@ function campScene(p: Profile) {
     const [flag, state] = locked ? ['', '']
       : feature && isNew(p, feature) ? [`<i class="spot-flag spot-new" aria-hidden="true">${t('unlock.new')}</i>`, t('town.spot.state.new')]
       : spot.id === 'gate' && p.cleared.length < CAMPAIGN.length ? ['<i class="spot-flag" aria-hidden="true">!</i>', t('town.spot.state.story')]
-      : spot.id === 'guild' && questsReady ? [`<i class="spot-flag" aria-hidden="true">${questsReady}</i>`, t(questsReady === 1 ? 'town.spot.state.quests.one' : 'town.spot.state.quests', { n: questsReady })]
-      : spot.id === 'hall' && training ? [`<i class="spot-flag" aria-hidden="true">${training}</i>`, t(training === 1 ? 'town.spot.state.training.one' : 'town.spot.state.training', { n: training })]
+      : spot.id === 'guild' && questsReady ? [`<i class="spot-flag" aria-hidden="true">${questsReady}</i>`, t('town.spot.state.quests', { n: questsReady })]
+      : spot.id === 'hall' && training ? [`<i class="spot-flag" aria-hidden="true">${training}</i>`, t('town.spot.state.training', { n: training })]
       : spot.id === 'chapel' && below ? ['<i class="spot-flag" aria-hidden="true">!</i>', t('town.spot.state.depth')] : ['', ''];
     return `<button class="town-spot ${locked ? 'locked' : ''}" data-spot="${spot.id}" ${target} style="left:${spot.x}%;top:${spot.y}%;width:${spot.w}%;height:${spot.h}%" aria-label="${escape([name, dest, locked ? role : state].filter(Boolean).join(' · '))}"><span class="town-sign" style="left:${(spot.signX - spot.x) / spot.w * 100}%;top:${(spot.signY - spot.y) / spot.h * 100}%;--anchor:-${Math.min(85, Math.max(15, spot.signX))}%"><b>${locked ? '<i class="spot-lock" aria-hidden="true"></i>' : ''}${escape(name)}${flag}</b><small>${escape(role)}</small></span></button>`;
   }).join('');
@@ -213,7 +214,7 @@ export function expeditionModes(active: 'campaign' | 'dungeon' | 'raid' | 'endle
 
 export function renderTown(root: HTMLElement, p: Profile, state: TownState) {
   const content = state.tab === 'camp' ? campScene(p) : state.tab === 'dungeon' ? dungeonScene(p, state.dungeonOutcome, expeditionModes('dungeon', p), state.dungeonLetter) : state.tab === 'campaign' || state.tab === 'mission' ? renderWorldMap(p, state) : state.tab === 'party' || state.tab === 'party-advanced' ? training(p, state, state.tab === 'party-advanced') : state.tab === 'more' ? moreScene(p) : secondaryScene(p, state);
-  root.innerHTML = `<div class="town-game-shell" data-town-route="${state.tab}"><section class="town-scene" aria-label="${escape(routeTitle(state.tab))}"><p id="town-notice" class="town-notice" role="status" ${state.notice ? '' : 'hidden'}>${escape(gameText(state.notice))}</p>${content}</section></div>`;
+  root.innerHTML = `<div class="town-game-shell" data-town-route="${state.tab}"><section class="town-scene" aria-label="${escape(routeTitle(state.tab))}"><p id="town-notice" class="town-notice" role="status" ${state.notice ? '' : 'hidden'}>${escape(state.notice)}</p>${content}</section></div>`;
 }
 
 function training(p: Profile, state: TownState, advanced: boolean) {
@@ -243,7 +244,7 @@ function heroSheet(p: Profile, id: number, preview: ReturnType<Battle['hero']> &
   const r = ROSTER[id], kit = KITS[r.classId], loadout = p.loadouts[id];
   const job = JOBS[loadout.job ?? ''];
   const exp = progress.needed ? progress.current / progress.needed * 100 : 100;
-  const stats: [string, string][] = [[t('power.hero'), String(heroPower(preview, normalizeStoryParty(p.storyActive, p.roster, p.cleared).length))], ['HP', String(preview.maxHp)], [t('party.cd'), `${preview.total.toFixed(2)}s`], ['SP', String(availablePoints(p, id))]];
+  const stats: [string, string][] = [[t('power.hero'), fmtInt(heroPower(preview, normalizeStoryParty(p.storyActive, p.roster, p.cleared).length))], ['HP', fmtInt(preview.maxHp)], [t('party.cd'), fmtSec(preview.total, 2)], ['SP', String(availablePoints(p, id))]];
   return `<div class="win hero-sheet training-identity" style="--class-color:${kit.color}">
     <div class="sheet-portrait"><img src="${portrait(r.classId, 0, id)}" alt=""/><span>LV ${progress.level}</span></div>
     <div class="sheet-body"><small>${escape(job?.name ?? kit.name)} · ${escape(kit.role)}</small><h2>${r.name}<span class="sheet-line" aria-hidden="true">LV ${progress.level} · ${stats[0][0]} ${stats[0][1]} · SP ${stats[3][1]}</span></h2>
@@ -263,24 +264,24 @@ function storyPartyPanel(p: Profile) {
 
 function trainingOverview(p: Profile, state: TownState, preview: ReturnType<Battle['hero']> & {}, progress: ReturnType<typeof heroProgress>) {
   const h = p.loadouts[state.hero], kit = KITS[ROSTER[state.hero].classId], e = preview.equipment;
-  const rows: [string, string][] = [[t('party.maxhp'), String(preview.maxHp)], [t('party.opening'), `${preview.total.toFixed(2)}s`], [`${t('gear.power')} (${t('party.tab.gear')})`, percent(e.power - 1)], [`HP (${t('party.tab.gear')})`, percent(e.hp - 1)], [`${t('gear.tempo')} (${t('party.tab.gear')})`, percent(e.tempo - 1)], [t('party.tab.talents'), String(h.talents.length)], [t('party.job'), escape(h.job ? JOBS[h.job]?.name ?? '' : t('party.basejob'))]];
+  const rows: [string, string][] = [[t('party.maxhp'), fmtInt(preview.maxHp)], [t('party.opening'), fmtSec(preview.total, 2)], [`${t('gear.power')} (${t('party.tab.gear')})`, percent(e.power - 1)], [`HP (${t('party.tab.gear')})`, percent(e.hp - 1)], [`${t('gear.tempo')} (${t('party.tab.gear')})`, percent(e.tempo - 1)], [t('party.tab.talents'), String(h.talents.length)], [t('party.job'), escape(h.job ? JOBS[h.job]?.name ?? '' : t('party.basejob'))]];
   return `<section class="hero-progression" data-hero-level="${progress.level}"><label>EXP <span>${progress.needed ? t('party.xp.next', { current: progress.current, needed: progress.needed, level: progress.level + 1 }) : t('party.xp.cap')}</span><span class="gauge xp" aria-hidden="true"><i style="width:${progress.needed ? progress.current / progress.needed * 100 : 100}%"></i></span></label>
     <div class="status-points"><span>${t('party.sp')}</span><b data-skill-points>${availablePoints(p, state.hero)}</b></div>
     <h4 class="subheading">${t('party.status.attributes')}</h4><dl class="stat-table">${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>
     <h4 class="subheading">${t('party.status.loadout')}</h4><div class="status-loadout">${SLOTS.map(slot => { const g = gearOf(h, slot); return `<div class="status-item ${g ? `rarity-${g.rarity ?? 'common'}` : 'empty'}"><img class="item-icon" src="${itemIcon(slot, g?.rarity ?? 'common', !g)}" alt=""/><span><small>${t(`gear.slot.${slot}` as StringKey)}</small><b>${escape(g?.name ?? t('gear.empty'))}</b></span></div>`; }).join('')}${[0, 1].map(slot => { const skill = kit.skills[h.skills[slot]]; return `<div class="status-item skill"><span class="skill-emblem" aria-hidden="true">${escape(skill.label.slice(0, 2))}</span><span><small>${t('party.skills.slot', { n: slot + 1 })}</small><b>${escape(skill.name)}</b></span></div>`; }).join('')}</div>
-    <p class="hint">${t('party.overview.hint', { hp: (Math.round(LEVEL_HP * 1000) / 10).toLocaleString(lang()), power: (Math.round(LEVEL_POWER * 1000) / 10).toLocaleString(lang()) })}</p></section>`;
+    <p class="hint">${t('party.overview.hint', { hp: Math.round(LEVEL_HP * 1000) / 10, power: Math.round(LEVEL_POWER * 1000) / 10 })}</p></section>`;
 }
 
 function skillsPanel(loadout: Profile['loadouts'][number], kit: typeof KITS[keyof typeof KITS], classId: keyof typeof KITS) {
   // Same rule as equipSkill: talent skills need their talent, job skills only the current job and its parent.
   const unlocked = (index: number) => legalSkill(index, loadout.talents, loadout.job);
   const lockReason = (index: number) => { const job = index >= 4 ? Object.values(JOBS).find(j => j.base === classId && j.index === index) : undefined; return job ? t('party.skills.lock.jobname', { job: escape(job.name) }) : index >= 4 ? t('party.skills.lock.job') : t('party.skills.lock.talent'); };
-  const slotCard = (slot: number) => { const skill = kit.skills[loadout.skills[slot]]; return `<div class="skill-slot" data-loadout-slot="${slot}"><small>${t('party.skills.slot', { n: slot + 1 })}${slot === 0 ? ` · ${t('party.skills.opening')}` : ''}</small><b>${escape(skill.name)}</b><span>${escape(skill.label)} · ${skill.cooldown.toFixed(1)}s</span></div>`; };
+  const slotCard = (slot: number) => { const skill = kit.skills[loadout.skills[slot]]; return `<div class="skill-slot" data-loadout-slot="${slot}"><small>${t('party.skills.slot', { n: slot + 1 })}${slot === 0 ? ` · ${t('party.skills.opening')}` : ''}</small><b>${escape(skill.name)}</b><span>${escape(skill.label)} · ${fmtSec(skill.cooldown)}</span></div>`; };
   const card = (skill: typeof kit.skills[number], index: number) => {
     const open = unlocked(index), slot = loadout.skills.indexOf(index);
     return `<article class="skill-card ${slot >= 0 ? 'equipped' : ''} ${open ? '' : 'locked'}" data-skill-card="${index}">
       <span class="skill-emblem" aria-hidden="true">${escape(skill.label.slice(0, 2))}</span>
-      <div class="skill-card-body"><b>${escape(skill.name)}</b><small>${escape(skill.label)} · ${skill.cooldown.toFixed(1)}s${slot >= 0 ? ` · ${t('party.skills.slot', { n: slot + 1 })}` : ''}</small><p>${escape(skill.description)}</p>${open ? '' : `<em class="skill-lock">${lockReason(index)}</em>`}</div>
+      <div class="skill-card-body"><b>${escape(skill.name)}</b><small>${escape(skill.label)} · ${fmtSec(skill.cooldown)}${slot >= 0 ? ` · ${t('party.skills.slot', { n: slot + 1 })}` : ''}</small><p>${escape(skill.description)}</p>${open ? '' : `<em class="skill-lock">${lockReason(index)}</em>`}</div>
       ${open ? `<div class="skill-card-actions">${[0, 1].map(s => `<button class="btn" data-equip-skill="${index}" data-skill-slot="${s}" aria-pressed="${loadout.skills[s] === index}" aria-label="${escape(t('party.skills.equip', { name: skill.name, n: s + 1 }))}" ${loadout.skills[s] === index ? 'disabled' : ''}>${['I', 'II'][s]}</button>`).join('')}</div>` : ''}
     </article>`;
   };
@@ -303,7 +304,7 @@ function talentsPanel(p: Profile, state: TownState, r: typeof ROSTER[number], ki
   const lanes = [0, 1, 2, 3].map(level => nodes.filter(node => depth(node) === level)).filter(lane => lane.length);
   return `<section class="talent-workspace" aria-label="${t('party.tab.talents')}"><div class="talent-workspace-heading"><h3>${t(`talent.branch.${branch}` as StringKey)}</h3><span class="talent-count">${t('talent.learned', { n: nodes.filter(node => loadout.talents.includes(node.id)).length, total: nodes.length })}</span></div><nav class="tabs branch-tabs" aria-label="${t('party.tab.talents')}">${branches.map(b => `<button data-branch="${b}" aria-pressed="${b === branch}">${t(`talent.branch.${b}` as StringKey)}</button>`).join('')}</nav><div class="talent-flow">${lanes.map((lane, index) => `<div class="talent-flow-lane"><div class="talent-flow-label">${t(tierLabels[index])}</div><div class="talent-flow-cards">${lane.map(node => {
     const isLearned = loadout.talents.includes(node.id), available = !isLearned && !talentReason(p, state.hero, node);
-    return `<button data-inspect-talent="${node.id}" class="talent-flow-node ${node.id === chosen?.id ? 'chosen' : ''} ${isLearned ? 'learned' : available ? 'available' : 'locked'} ${node.exclusive ? 'keystone' : ''}" aria-label="${escape(node.name)}"><i class="talent-gem" aria-hidden="true">${isLearned ? '✓' : node.exclusive ? '★' : '◆'}</i><b>${escape(node.name)}</b><span>${isLearned ? t('talent.learned.short') : `${node.cost}G${node.points ? ` · ${node.points} SP` : ''}`}</span></button>`;
+    return `<button data-inspect-talent="${node.id}" class="talent-flow-node ${node.id === chosen?.id ? 'chosen' : ''} ${isLearned ? 'learned' : available ? 'available' : 'locked'} ${node.exclusive ? 'keystone' : ''}" aria-label="${escape(node.name)}"><i class="talent-gem" aria-hidden="true">${isLearned ? '✓' : node.exclusive ? '★' : '◆'}</i><b>${escape(node.name)}</b><span>${isLearned ? t('talent.learned.short') : `${fmtInt(node.cost)}G${node.points ? ` · ${node.points} SP` : ''}`}</span></button>`;
   }).join('')}</div></div>`).join('')}</div><div class="talent-inspector-section">${chosen ? talentCard(p, state.hero, kit, loadout)(chosen) : ''}</div></section>`;
 }
 
@@ -315,7 +316,7 @@ function talentCard(p: Profile, hero: number, kit: typeof KITS[keyof typeof KITS
     const description = active ? kit.skills[index]?.description ?? talent.description : talent.description;
     const prereqs = [...new Set([...(talent.requires ? [talent.requires] : []), ...(talent.requiresAll ?? [])])];
     const arrows = prereqs.map(req => `<div class="talent-arrow" data-talent-arrow="${req}->${talent.id}" data-from="${req}" data-to="${talent.id}">${t('talent.requires', { name: escape(TALENTS.find(n => n.id === req)?.name ?? req) })}</div>`).join('');
-    return `<div class="talent-node-wrap">${arrows}<button class="talent-node ${owned ? 'learned' : ''}" data-talent="${talent.id}" ${reason ? 'disabled' : ''}><small>${talent.exclusive ? t('talent.keystone') : active ? t('talent.active') : t('talent.passive')}${talent.level ? ` · LV ${talent.level}` : ''}</small><b>${escape(name)}</b><span>${escape(description)}</span><strong>${owned ? t('talent.learned.short') : reason ? escape(gameText(reason)) : `${t('talent.learn')} · ${talent.cost}G${talent.points ? ` + ${talent.points} SP` : ''}`}</strong></button></div>`;
+    return `<div class="talent-node-wrap">${arrows}<button class="talent-node ${owned ? 'learned' : ''}" data-talent="${talent.id}" ${reason ? 'disabled' : ''}><small>${talent.exclusive ? t('talent.keystone') : active ? t('talent.active') : t('talent.passive')}${talent.level ? ` · LV ${talent.level}` : ''}</small><b>${escape(name)}</b><span>${escape(description)}</span><strong>${owned ? t('talent.learned.short') : reason ? escape(lockText(reason)) : `${t('talent.learn')} · ${fmtInt(talent.cost)}G${talent.points ? ` + ${talent.points} SP` : ''}`}</strong></button></div>`;
   };
 }
 
@@ -328,7 +329,7 @@ function advancement(p: Profile, id: number) {
       const owned = h.job === job.id || JOBS[h.job ?? '']?.parent === job.id;
       const eligible = job.tier === 2 ? !h.job : h.job === job.parent;
       const disabled = owned || !eligible || level < job.level || p.gold < job.cost;
-      const state = owned ? t('talent.learned.short') : !eligible ? t('job.otherpath') : level < job.level ? t('job.rank', { n: job.level }) : `${job.cost}G`;
+      const state = owned ? t('talent.learned.short') : !eligible ? t('job.otherpath') : level < job.level ? t('job.rank', { n: job.level }) : `${fmtInt(job.cost)}G`;
       return `<button data-promote="${job.id}" class="job-node ${owned ? 'learned' : ''}" ${disabled ? 'disabled' : ''}><small>${job.tier === 2 ? t('job.advanced') : t('job.third')} · ${t('job.rank', { n: job.level })}</small><b>${escape(job.name)}</b><span>${escape(job.description)}</span><em>${t('job.unlock', { name: escape(job.skill.name) })}</em><strong>${state}</strong></button>`;
     });
     return `<section>${cards.join('<span class="job-connector" aria-hidden="true">▼</span>')}</section>`;
@@ -354,13 +355,13 @@ function forge(p: Profile, id: number, state: TownState) {
   };
   const items = GEAR.filter(g => g.slot === activeSlot && (!g.classId || g.classId === ROSTER[id].classId)).map(g => {
     const owned = h.inventory?.includes(g.id), equipped = h.gear?.[activeSlot] === g.id, why = gearReason(p, id, g.id);
-    const tag = equipped ? t('gear.tag.equipped') : owned ? t('gear.owned') : g.source === 'quest' ? t('gear.quest') : `${g.cost}G`;
+    const tag = equipped ? t('gear.tag.equipped') : owned ? t('gear.owned') : g.source === 'quest' ? t('gear.quest') : `${fmtInt(g.cost)}G`;
     return `<button class="item-card rarity-${g.rarity ?? 'common'} ${equipped ? 'equipped' : ''} ${selected?.id === g.id ? 'chosen' : ''} ${why && !equipped ? 'unavailable' : ''}" data-gear-item="${g.id}" data-gear-slot-for="${activeSlot}" aria-pressed="${selected?.id === g.id}"><img class="item-icon" src="${itemIcon(activeSlot, g.rarity ?? 'common')}" alt=""/><span class="item-main"><b>${escape(g.name)}</b><small>LV ${g.minLevel ?? 1}${g.classId ? ` · ${className(g.classId as keyof typeof KITS)}` : ''} · ${gearStatsLine(g)}</small></span><em>${escape(tag)}</em></button>`;
   }).join('');
-  const preview = selected ? `<section class="gear-preview rarity-${selected.rarity ?? 'common'}" data-gear-preview="${selected.id}" aria-live="polite"><small>${t('gear.inspect')} · ${t(`rarity.${selected.rarity ?? 'common'}` as StringKey)}</small><h3>${escape(selected.name)}${plus(selected)}</h3><p>${escape(selected.description)}</p><p>${t('gear.req')}: ${selected.minLevel ? `LV ${selected.minLevel}` : t('gear.req.none')}${selected.classId ? ` · ${className(selected.classId as keyof typeof KITS)}` : ''}${owned ? ` · ${t('gear.owned')}` : selected.source === 'quest' ? ` · ${t('gear.quest')}` : ` · ${selected.cost}G`}</p>${comparison}<p class="gear-preview-status">${reason ? escape(gameText(reason)) : current?.id === selected.id ? t('gear.equipped') : t('gear.ready')}</p><div class="gear-preview-actions"><button class="btn primary" data-confirm-gear ${reason || current?.id === selected.id ? 'disabled' : ''}>${owned ? t('gear.equip') : t('gear.confirm')}</button><button class="btn" data-cancel-gear>${t('common.cancel')}</button></div></section>` : `<p class="hint gear-preview-empty">${t('gear.hint')}</p>`;
+  const preview = selected ? `<section class="gear-preview rarity-${selected.rarity ?? 'common'}" data-gear-preview="${selected.id}" aria-live="polite"><small>${t('gear.inspect')} · ${t(`rarity.${selected.rarity ?? 'common'}` as StringKey)}</small><h3>${escape(selected.name)}${plus(selected)}</h3><p>${escape(selected.description)}</p><p>${t('gear.req')}: ${selected.minLevel ? `LV ${selected.minLevel}` : t('gear.req.none')}${selected.classId ? ` · ${className(selected.classId as keyof typeof KITS)}` : ''}${owned ? ` · ${t('gear.owned')}` : selected.source === 'quest' ? ` · ${t('gear.quest')}` : ` · ${fmtInt(selected.cost)}G`}</p>${comparison}<p class="gear-preview-status">${reason ? escape(lockText(reason)) : current?.id === selected.id ? t('gear.equipped') : t('gear.ready')}</p><div class="gear-preview-actions"><button class="btn primary" data-confirm-gear ${reason || current?.id === selected.id ? 'disabled' : ''}>${owned ? t('gear.equip') : t('gear.confirm')}</button><button class="btn" data-cancel-gear>${t('common.cancel')}</button></div></section>` : `<p class="hint gear-preview-empty">${t('gear.hint')}</p>`;
   const equipped = gearOf(h, activeSlot), level = equipped ? h.refine?.[equipped.id] ?? 0 : 0, cost = equipped ? refineCost(equipped.id, level) : undefined;
   const materials = (['ember-shard', 'bell-bronze', 'frost-glass'] as const).map(id => `<span class="mat-chip"><img src="${dungeonIcon(id)}" alt=""/>${escape(t(`material.${id}` as StringKey))} ×${p.economy.materials[id] ?? 0}</span>`).join('');
-  const refine = equipped ? `<div class="refine-row"><div><b>${escape(equipped.name)}${level ? ` +${level}` : ''}</b><small>${t('gear.refine.hint')}</small></div>${cost ? `<button class="btn" data-refine="${equipped.id}" ${p.gold >= cost.gold && (p.economy.materials[cost.material] ?? 0) >= cost.amount ? '' : 'disabled'}><span>${t('gear.refine', { n: level + 1 })}</span><small>${t('gear.refine.cost', { gold: cost.gold, mat: t(`material.${cost.material}` as StringKey), n: cost.amount })}</small></button>` : `<em>${t('gear.refine.max')}</em>`}</div>` : '';
+  const refine = equipped ? `<div class="refine-row"><div><b>${escape(equipped.name)}${level ? ` +${level}` : ''}</b><small>${t('gear.refine.hint', { n: Math.round(REFINE_STEP * 100) })}</small></div>${cost ? `<button class="btn" data-refine="${equipped.id}" ${p.gold >= cost.gold && (p.economy.materials[cost.material] ?? 0) >= cost.amount ? '' : 'disabled'}><span>${t('gear.refine', { n: level + 1 })}</span><small>${t('gear.refine.cost', { gold: cost.gold, mat: t(`material.${cost.material}` as StringKey), n: cost.amount })}</small></button>` : `<em>${t('gear.refine.max', { n: MAX_REFINE })}</em>`}</div>` : '';
   return `<h3 class="subheading">${t('gear.title')} <span>${t('gear.sub')}</span></h3><div class="gear-slots equip-slots">${SLOTS.map(slotButton).join('')}</div><div class="mat-bar" aria-label="${t('gear.materials')}">${materials}</div>${refine}${preview}<h4 class="subheading">${t(`gear.slot.${activeSlot}` as StringKey)} <span>${t('gear.list.sub')}</span></h4><div class="item-list">${items}</div><details class="gear-set-status"><summary>${t('gear.sets')}</summary>${GEAR_SETS.map(set => { const count = Object.entries(h.gear ?? {}).filter(([slot, gearId]) => GEAR.some(g => g.id === gearId && g.slot === slot && g.setId === set.id)).length; return `<p><b>${escape(set.name)} · ${count}/3</b><br>${escape(set.description)} ${count >= 3 ? t('gear.set.all') : count >= 2 ? t('gear.set.two') : ''}</p>`; }).join('')}</details>`;
 }
 
@@ -391,7 +392,7 @@ function bestiary(p: Profile, pick?: string) {
   const chosen = ENEMIES[pick ?? ''] ?? fallback, family = chosen.archetype ?? chosen.id, seen = seenFamily(p, family);
   const variants = Object.values(ENEMIES).filter(e => (e.archetype ?? e.id) === family);
   const detail = seen
-    ? `<article class="win bestiary-detail" data-bestiary-entry="${chosen.id}"><div class="bestiary-art"><img src="${monsterDataURL(chosen.id)}" alt="${escape(chosen.name)}"/></div><div><small>${escape(chosen.title)} · ${t('bestiary.tier', { n: chosen.tier ?? 1 })}</small><h3>${escape(chosen.name)}</h3><div class="bestiary-variants" role="group" aria-label="${t('bestiary.variants')}">${variants.map(v => `<button class="raid-variant-chip ${v.id === chosen.id ? 'chosen' : ''}" data-bestiary-pick="${v.id}" aria-pressed="${v.id === chosen.id}">T${v.tier ?? 1}</button>`).join('')}</div><p>${escape(chosen.description)}</p><p class="intent-row">${chosen.patterns.map((intent, i) => `<span class="intent-chip intent-${intent}">${i + 1}. ${t(`intent.${intent}` as StringKey)}</span>`).join('')}</p><p class="counter-note"><b>${t('bestiary.counter')}</b> ${escape(chosen.counter)}</p></div></article>`
+    ? `<article class="win bestiary-detail" data-bestiary-entry="${chosen.id}"><div class="bestiary-art"><img src="${monsterDataURL(chosen.id)}" alt="${escape(chosen.name)}"/></div><div><small>${escape(chosen.title)} · ${t('bestiary.tier', { n: chosen.tier ?? 1 })}</small><h3>${escape(chosen.name)}</h3><div class="bestiary-variants" role="group" aria-label="${t('bestiary.variants')}">${variants.map(v => `<button class="raid-variant-chip ${v.id === chosen.id ? 'chosen' : ''}" data-bestiary-pick="${v.id}" aria-pressed="${v.id === chosen.id}">T${v.tier ?? 1}</button>`).join('')}</div><p>${escape(chosen.description)}</p><p class="intent-row">${intentChips(chosen.id, chosen.patterns)}</p><p class="counter-note"><b>${t('bestiary.counter')}</b> ${escape(chosen.counter)}</p></div></article>`
     : `<article class="win bestiary-detail unseen" data-bestiary-entry="${family}"><div class="bestiary-art"><img src="${silhouette(family)}" alt=""/></div><div><h3>???</h3><p class="hint">${t('bestiary.unseen')}</p></div></article>`;
   const grid = FAMILIES.map(e => { const known = seenFamily(p, e.id); return `<button class="bestiary-cell ${known ? '' : 'unseen'} ${family === e.id ? 'chosen' : ''}" data-bestiary-pick="${e.id}" aria-pressed="${family === e.id}" aria-label="${known ? escape(e.name) : t('bestiary.unknown')}"><img src="${known ? monsterDataURL(e.id) : silhouette(e.id)}" alt=""/><b>${known ? escape(e.name) : '???'}</b></button>`; }).join('');
   return `<div class="bestiary-list" data-seen="${FAMILIES.filter(e => seenFamily(p, e.id)).length}"><p class="bestiary-count">${t('bestiary.seen', { n: FAMILIES.filter(e => seenFamily(p, e.id)).length, total: FAMILIES.length })}</p>${detail}<div class="win bestiary-grid" role="group" aria-label="${t('bestiary.grid')}">${grid}</div><p class="hint">${t('bestiary.hint')}</p></div>`;
@@ -400,7 +401,7 @@ function bestiary(p: Profile, pick?: string) {
 /** The Bell Tonic toggle shared by the Raid and Roguelike setups. */
 function tonicToggle(p: Profile, state: TownState) {
   const item = bankShopItem(BELL_TONIC)!, affordable = p.economy.commanderCrystal >= item.cost;
-  return `<label class="raid-modifier bell-tonic"><input type="checkbox" data-bell-tonic ${state.tonic && affordable ? 'checked' : ''} ${affordable ? '' : 'disabled'}/><span><b>${escape(item.name)} · ${item.cost} ◆</b><small>${escape(item.description)}</small></span></label>`;
+  return `<label class="raid-modifier bell-tonic"><input type="checkbox" data-bell-tonic ${state.tonic && affordable ? 'checked' : ''} ${affordable ? '' : 'disabled'}/><span><b>${escape(item.name)} · ${fmtInt(item.cost)} ◆</b><small>${escape(item.description)}</small></span></label>`;
 }
 
 function raids(p: Profile, state: TownState) {
@@ -430,14 +431,14 @@ function raids(p: Profile, state: TownState) {
   <details class="win" open><summary>${t('raid.party', { n: build.slots.length })}</summary><label class="raid-party-size">${t('raid.size')}<select data-raid-party-size aria-label="${t('raid.size')}">${[1,2,3,4,5,6].map(size => `<option value="${size}" ${build.slots.length === size ? 'selected' : ''} ${size > p.roster.length ? 'disabled' : ''}>${size}</option>`).join('')}</select></label><div class="raid-party-grid">${party}</div><p class="hint">${t('raid.party.hint')}</p>${tonicToggle(p, state)}</details>
   <section class="win raid-modifiers-box"><h3 class="subheading">${t('raid.modifiers')}</h3><fieldset class="raid-modifiers"><legend class="sr-only">${t('raid.modifiers')}</legend>${modifiers}</fieldset><p class="hint">${t('raid.modifiers.hint')}</p></section>
   <details class="win raid-sandbox"><summary>${t('raid.practice')}</summary><p class="hint">${t('raid.practice.hint')}</p>
-    <label>${t('raid.slider.hp')} <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.hpScale ?? 1}" data-raid-sandbox="hpScale"/><output>${(sandbox?.hpScale ?? 1).toFixed(1)}×</output></label>
-    <label>${t('raid.slider.damage')} <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.damageScale ?? 1}" data-raid-sandbox="damageScale"/><output>${(sandbox?.damageScale ?? 1).toFixed(1)}×</output></label>
-    <label>${t('raid.slider.interval')} <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.intervalScale ?? 1}" data-raid-sandbox="intervalScale"/><output>${(sandbox?.intervalScale ?? 1).toFixed(1)}×</output></label>
+    <label>${t('raid.slider.hp')} <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.hpScale ?? 1}" data-raid-sandbox="hpScale"/><output>${fmtDec(sandbox?.hpScale ?? 1)}×</output></label>
+    <label>${t('raid.slider.damage')} <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.damageScale ?? 1}" data-raid-sandbox="damageScale"/><output>${fmtDec(sandbox?.damageScale ?? 1)}×</output></label>
+    <label>${t('raid.slider.interval')} <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.intervalScale ?? 1}" data-raid-sandbox="intervalScale"/><output>${fmtDec(sandbox?.intervalScale ?? 1)}×</output></label>
   </details>`;
 }
 
 function challengeShop(p: Profile) {
-  return `<div class="win shop-keeper"><p>${t('shop.greeting')}</p><span class="shop-purse">${t('shop.purse', { n: p.economy.commanderCrystal })}</span></div><section class="challenge-shop-grid"><article class="win"><h3 class="subheading">${t('shop.bank')}</h3>${BANK_SHOP.map(item => { const owned = p.challengeUnlocks.includes(item.id); return `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div>${item.consumable ? `<span class="shop-cost consumable" data-bank-consumable="${item.id}">${item.cost} ◆<small>${t('shop.atdeparture')}</small></span>` : `<button class="btn ${owned ? '' : 'primary'}" data-bank-buy="${item.id}" ${owned || p.economy.commanderCrystal < item.cost ? 'disabled' : ''}>${owned ? t('shop.owned') : `${item.cost} ◆`}</button>`}</div>`; }).join('')}</article><article class="win"><h3 class="subheading">${t('shop.journey')}</h3><p class="hint">${t('shop.journey.hint')}</p>${CHALLENGE_SHOP.map(item => `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div><span class="shop-cost">${item.cost} ◇</span></div>`).join('')}</article></section>`;
+  return `<div class="win shop-keeper"><p>${t('shop.greeting')}</p><span class="shop-purse">${t('shop.purse', { n: p.economy.commanderCrystal })}</span></div><section class="challenge-shop-grid"><article class="win"><h3 class="subheading">${t('shop.bank')}</h3>${BANK_SHOP.map(item => { const owned = p.challengeUnlocks.includes(item.id); return `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div>${item.consumable ? `<span class="shop-cost consumable" data-bank-consumable="${item.id}">${fmtInt(item.cost)} ◆<small>${t('shop.atdeparture')}</small></span>` : `<button class="btn ${owned ? '' : 'primary'}" data-bank-buy="${item.id}" ${owned || p.economy.commanderCrystal < item.cost ? 'disabled' : ''}>${owned ? t('shop.owned') : `${fmtInt(item.cost)} ◆`}</button>`}</div>`; }).join('')}</article><article class="win"><h3 class="subheading">${t('shop.journey')}</h3><p class="hint">${t('shop.journey.hint')}</p>${CHALLENGE_SHOP.map(item => `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div><span class="shop-cost">${fmtInt(item.cost)} ◇</span></div>`).join('')}</article></section>`;
 }
 
 function endless(p: Profile, state: TownState) {

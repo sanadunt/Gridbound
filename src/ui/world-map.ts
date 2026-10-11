@@ -6,8 +6,9 @@ import { ROSTER } from '../game/content';
 import { monsterDataURL } from '../art/monsters';
 import { overworldCanvas } from '../art/overworld';
 import { expeditionModes, type TownState } from './town';
-import { t, type StringKey } from '../i18n';
+import { t, fmtInt, type StringKey } from '../i18n';
 import { heroicScale } from '../game/simulation';
+import { intentChips } from './intent';
 
 export type ActId = 0 | 1 | 2 | 3;
 export const ACTS: { id: ActId; roman: string; biomeClass: string; zones: number[] }[] = [0, 1, 2, 3].map(id => ({ id: id as ActId, roman: ['I', 'II', 'III', 'IV'][id], biomeClass: `biome-act-${id + 1}`, zones: [id * 4, id * 4 + 1, id * 4 + 2, id * 4 + 3] }));
@@ -35,8 +36,8 @@ export function renderWorldMap(p: Profile, state: TownState): string {
   // The reward row shows what this run would really pay: first clear, Normal replay (part gold, less EXP far behind the frontier) or Heroic.
   // Heroic EXP (x1.3) shrinks with the same replay factor, so both replay rows name the EXP share when it is below 100%.
   const replay = p.cleared.includes(state.zone), xpShare = Math.round(replayFactor(p, state.zone) * 100), xpNote = xpShare < 100 ? ` · ${t('map.reward.xp', { n: xpShare })}` : '';
-  const rewardRow = heroic ? heroicDone ? [t('map.reward'), `${t('map.reward.heroic.replay')}${xpNote}`] : [t('map.reward.heroic'), `${heroicReward(state.zone).gold}G + ${matLabel(heroicReward(state.zone))}${xpNote}`]
-    : replay ? [t('map.reward.replay'), `${chapterReward(p, state.zone)}G${xpNote}`] : [t('map.reward'), `${chapterReward(p, state.zone)}G`];
+  const rewardRow = heroic ? heroicDone ? [t('map.reward'), `${t('map.reward.heroic.replay')}${xpNote}`] : [t('map.reward.heroic'), `${fmtInt(heroicReward(state.zone).gold)}G + ${matLabel(heroicReward(state.zone))}${xpNote}`]
+    : replay ? [t('map.reward.replay'), `${fmtInt(chapterReward(p, state.zone))}G${xpNote}`] : [t('map.reward'), `${fmtInt(chapterReward(p, state.zone))}G`];
   const allChests = p.journey.chests >= Math.floor(MAX_STARS / STARS_PER_CHEST);
   const actId = Math.min(3, Math.max(0, Math.floor(state.zone / 4))) as ActId;
   const act = ACTS[actId];
@@ -65,7 +66,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
     <header class="dossier-header"><small>${escape(zone.speaker)}</small><h3>${escape(zone.name)}</h3><p class="zone-subtitle">${escape(zone.subtitle)}</p></header>
     <div class="dossier-boss-card"><div class="boss-avatar-frame"><img src="${monsterDataURL(finalStage.enemy)}" alt="${escape(finalStage.enemyName ?? boss.name)}"/></div>
       <div class="boss-intel"><small>${t('map.boss')}</small><h4>${escape(finalStage.enemyName ?? boss.name)}</h4><small class="dossier-boss-title">${escape(finalStage.enemyTitle ?? boss.title)}</small>
-        <div class="intent-row">${boss.patterns.map((intent, i) => `<span class="intent-chip intent-${intent}">${i + 1}. ${t(`intent.${intent}` as StringKey)}</span>`).join('')}</div></div></div>
+        <div class="intent-row">${intentChips(finalStage.enemy, boss.patterns)}</div></div></div>
     ${heroicOpen ? `<nav class="tabs heroic-toggle" aria-label="${t('heroic.heroic')}"><button data-heroic="0" aria-pressed="${!heroic}">${t('heroic.normal')}</button><button data-heroic="1" aria-pressed="${heroic}">${t('heroic.heroic')}${heroicDone ? ' ✓' : ''}</button></nav>` : ''}
     ${heroic ? `<p class="heroic-note"><b>${t('heroic.badge')}</b> ${t('heroic.desc', { hp: Math.round((heroicScale(state.zone + 1).hp - 1) * 100), dmg: Math.round((heroicScale(state.zone + 1).dmg - 1) * 100) })} ${heroicDone ? t('heroic.cleared') : ''}</p>` : ''}
     ${powerLine}

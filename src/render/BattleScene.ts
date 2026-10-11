@@ -4,9 +4,11 @@ import { installArt, heroCanvas, heroKey } from '../art/pixels';
 import { monsterCanvas } from '../art/monsters';
 import { KITS, type ClassId } from '../game/content';
 import { Sound } from '../audio/sound';
-import { t, lang } from '../i18n';
+import { t, lang, fmtInt } from '../i18n';
 import { eventText } from '../i18n/content';
 import { HitStats, allowedShake, SHAKE_PER_SECOND, HIT_STOP_GAP } from './hit-feedback';
+/** Floating numbers follow the game language (3,000 / 3.000); seconds texts like '−0.6s' are localized by eventText(). */
+const num = (value: number | string) => typeof value === 'number' ? fmtInt(value) : value;
 
 export const ARENA={width:600,height:760,x:72,y:367,cw:144,ch:112,gap:12};
 export function cell(slot:number){return {x:ARENA.x+(slot%3)*(ARENA.cw+ARENA.gap),y:ARENA.y+Math.floor(slot/3)*(ARENA.ch+ARENA.gap)};}
@@ -184,18 +186,18 @@ export class BattleScene extends Phaser.Scene {
  }
  spawnDamageNumber(x: number, y: number, value: number | string, options: { isCrit?: boolean; isBreak?: boolean; isHeal?: boolean; isBlocked?: boolean } = {}) {
    if (options.isCrit) {
-     this.floating(x, y, String(value), '#ffe082', true, true);
+     this.floating(x, y, num(value), '#ffe082', true, true);
      this.ring(x, y, 0xffd54f, 14, 2.6);
      this.addShake(0.28);
    } else if (options.isBreak) {
-     this.floating(x, y, String(value), '#ff80ab', true, true);
+     this.floating(x, y, num(value), '#ff80ab', true, true);
      this.ring(x, y, 0xff4081, 14, 2.4);
    } else if (options.isHeal) {
-     this.floating(x, y, `+${value} HP`, '#69f0ae');
+     this.floating(x, y, `+${num(value)} HP`, '#69f0ae');
    } else if (options.isBlocked) {
      this.floating(x, y, t('battle.blocked'), '#80deea', true);
    } else {
-     this.floating(x, y, String(value), '#ffdfa0');
+     this.floating(x, y, num(value), '#ffdfa0');
    }
  }
  spawnSlashArc(x: number, y: number, rotation = 0) {
@@ -219,8 +221,8 @@ export class BattleScene extends Phaser.Scene {
    bolt.destroy();
    this.burst(to.x,to.y,color,isCrit?18:isBig?14:8);
    // Crits are relative to this encounter; shake and flash scale with the hit's share of the boss's HP, and only crits stop time.
-   if(isCrit){this.floating(to.x,to.y,String(amount),'#ffe082',true,true);this.addShake(.1+Math.min(.18,share*4));this.ring(to.x,to.y,0xffd54f,14,2.6);this.freeze(.07,true);this.screenFlash(0xffffff,Math.min(.22,.08+share*3));}
-   else this.floating(to.x,to.y,String(amount),e.kind==='nova'?'#b5dbff':'#f6dfab',isBig);
+   if(isCrit){this.floating(to.x,to.y,fmtInt(amount),'#ffe082',true,true);this.addShake(.1+Math.min(.18,share*4));this.ring(to.x,to.y,0xffd54f,14,2.6);this.freeze(.07,true);this.screenFlash(0xffffff,Math.min(.22,.08+share*3));}
+   else this.floating(to.x,to.y,fmtInt(amount),e.kind==='nova'?'#b5dbff':'#f6dfab',isBig);
    if(e.lane===-1){this.pulse=.08;this.bossKick=.14;this.ring(to.x,to.y,color,12,2.2);}
    if(isBig&&!isCrit)this.addShake(.06+Math.min(.1,share*3));
   };
@@ -252,13 +254,13 @@ export class BattleScene extends Phaser.Scene {
   }
   if(e.type==='hurt'&&e.text==='PACT'){
    // Hollow Pact's self-cost is a price, not an enemy hit: its own colour, no shake or screen flash.
-   this.floating(pos.x,pos.y-10,`${eventText('PACT',lang())} −${e.amount}`,'#d7a6ff');this.ring(pos.x,pos.y,0xb98ae6,11,1.8);this.burst(pos.x,pos.y,0xb98ae6,4);
+   this.floating(pos.x,pos.y-10,`${eventText('PACT',lang())} −${fmtInt(e.amount??0)}`,'#d7a6ff');this.ring(pos.x,pos.y,0xb98ae6,11,1.8);this.burst(pos.x,pos.y,0xb98ae6,4);
   }else if(e.type==='hurt'){
    const blocked=!e.amount,hero=this.battle.hero(e.source??-1),share=(e.amount??0)/Math.max(1,hero?.maxHp??1);this.flashes.set(e.source!,.16);
    // Shake and flash scale with the share of that hero's max HP the hit took.
    if(!blocked&&share>=.12)this.addShake(Math.min(.22,share*.6));if(!blocked&&share>=.2)this.screenFlash(0xff3030,Math.min(.2,share*.35));
    if(blocked){this.floating(pos.x,pos.y-10,t('battle.blocked'),'#80deea',true);this.ring(pos.x,pos.y,0x80deea,14,2.3);}
-   else{this.floating(pos.x,pos.y-10,`−${e.amount}`,'#ff8a80',share>=.3);this.ring(pos.x,pos.y,0xe99a8b,11,1.8);}
+   else{this.floating(pos.x,pos.y-10,`−${fmtInt(e.amount??0)}`,'#ff8a80',share>=.3);this.ring(pos.x,pos.y,0xe99a8b,11,1.8);}
    this.burst(pos.x,pos.y,blocked?0x9ed6ed:0xe99a8b,blocked?4:6);
   }
   if(e.type==='down'){
@@ -267,7 +269,7 @@ export class BattleScene extends Phaser.Scene {
    this.freeze(.12);this.addShake(.22,true);this.screenFlash(0x3a3a3a,.25);
   }
   if(e.type==='heal'){
-   this.floating(pos.x,pos.y-12,`+${Math.round(e.amount??0)} HP`,'#69f0ae');
+   this.floating(pos.x,pos.y-12,`+${fmtInt(e.amount??0)} HP`,'#69f0ae');
    this.ring(pos.x,pos.y,0x69f0ae,13,2.1);
    if(!this.reducedMotion)for(let i=0;i<4;i++)this.particle(pos.x+(i-1.5)*10,pos.y+20,0x69f0ae,3,.55,(i-1.5)*16,-42,-10);
   }
@@ -285,7 +287,7 @@ export class BattleScene extends Phaser.Scene {
   if(e.type==='interrupt'){this.setBossCue('break',0x7ee0c0,.5);this.ring(300,200,0x7ee0c0,18,2.6);this.burst(300,200,0x9ff0d6,14);} // the HUD banner carries the text
   if(e.type==='enrage'){this.setBossCue('phase',0xff6b5b,.6);this.ring(300,200,0xff6b5b,18,2.6);if(e.kind==='on'){this.addShake(.2,true);this.screenFlash(0xff3030,.22);}}
   if(e.type==='break'){this.setBossCue('break',0xffd54f,.52);this.freeze(.1);this.screenFlash(0xffe6a0,.4);this.floating(300,150,t('battle.break'),'#ffe082',true,true);this.burst(300,200,0xf5d378,20);this.ring(300,200,0x55e3c7,19,2.4);this.ring(300,200,0xffd54f,13,2.8);this.addShake(.3,true);}
-  if(e.type==='coin'){this.floating(pos.x,pos.y-20,`+${e.amount}g`);this.burst(pos.x,pos.y,0xe9c56d,5);}
+  if(e.type==='coin'){this.floating(pos.x,pos.y-20,`+${fmtInt(e.amount??0)}g`);this.burst(pos.x,pos.y,0xe9c56d,5);}
   if(e.type==='move')this.floating(pos.x,pos.y-25,e.text??t('battle.fx.move'),'#eed69a');
   if(e.type==='impact'){
    for(const slot of e.targets??[]){const p=center(slot),color=e.kind==='breath'?0x8ceeaa:0xf49b70;this.burst(p.x,p.y,color,12);this.ring(p.x,p.y,0xf4c07e,12,1.9);if(e.kind==='breath'&&!this.reducedMotion)for(let n=0;n<8;n++){const ratio=n/8;this.particle(305+(p.x-305)*ratio,215+(p.y-215)*ratio,0xa6e1a0,5,.38,15,70,10);}}

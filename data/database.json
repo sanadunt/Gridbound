@@ -318,7 +318,7 @@
           "cooldown": 4.8,
           "power": 96,
           "kind": "attack",
-          "description": "96 damage pada target pilihan. Klik salah satu lane musuh untuk mengarahkan."
+          "description": "96 damage pada target pilihan. Ketuk salah satu lane musuh untuk mengarahkan."
         },
         {
           "name": "Silence Arrow",
@@ -6391,7 +6391,7 @@
         "Benih membutuhkan waktu. Musuh mengejar sumber cahaya di tengah ruangan.",
         "Ingatan yang dibuang mencoba kembali ke mesin. Jangan biarkan mereka memakan benih.",
         "Frostward Colossus memakai suara Elian kecil untuk memanggil Aldric menjauh.",
-        "Bellshore Claw menyeret lonceng-lonceng tua untuk ritus terakhir. Semua tile terancam: waktunya Guard atau interrupt.",
+        "Bellshore Claw menyeret lonceng-lonceng tua untuk ritus terakhir. Semua petak terancam: waktunya Guard atau interrupt.",
         "Frostward Colossus terakhir membungkus benih dengan es agar hari esok tidak tumbuh. Lepaskan cengkeraman mesin dari benih itu."
       ],
       "recruit": [],
@@ -6426,7 +6426,7 @@
           "kind": "miniboss",
           "name": "The threshold · A Name for Tomorrow",
           "hp": 7220,
-          "beat": "Bellshore Claw menyeret lonceng-lonceng tua untuk ritus terakhir. Semua tile terancam: waktunya Guard atau interrupt.",
+          "beat": "Bellshore Claw menyeret lonceng-lonceng tua untuk ritus terakhir. Semua petak terancam: waktunya Guard atau interrupt.",
           "combatHp": 27219
         },
         {
@@ -6456,7 +6456,7 @@
         "dragon-auric"
       ],
       "beats": [
-        "Barisan mesin mengenali seluruh party. Balas dengan build yang telah kalian pilih sendiri.",
+        "Barisan mesin mengenali seluruh party. Balas dengan build yang telah kamu pilih sendiri.",
         "Echo tertua menawarkan satu rewind lagi. Jalan terus.",
         "Setiap ritual yang diputus memberi kota satu tarikan napas.",
         "Jaga yang terluka sebelum mengejar damage terakhir. Tidak ada kemenangan jika rumah kehilangan semua penghuninya.",
@@ -6470,7 +6470,7 @@
           "kind": "wave",
           "name": "Crossing · The Unwritten Dawn",
           "hp": 3888,
-          "beat": "Barisan mesin mengenali seluruh party. Balas dengan build yang telah kalian pilih sendiri.",
+          "beat": "Barisan mesin mengenali seluruh party. Balas dengan build yang telah kamu pilih sendiri.",
           "combatHp": 15513
         },
         {

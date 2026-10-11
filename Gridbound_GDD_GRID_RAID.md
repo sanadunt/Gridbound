@@ -96,7 +96,7 @@ Forty definitions: four foundational and four job-specific skills per basic job.
 | Index | Skill | Kind | Cooldown | Power | Effect |
 | --- | --- | --- | --- | --- | --- |
 | 0 | Split Arrow | aoe | 4.4 | 62 | 105 damage dibagi rata ke semua minion; jika tidak ada minion, 62 damage ke boss. |
-| 1 | Pinpoint | attack | 4.8 | 96 | 96 damage pada target pilihan. Klik salah satu lane musuh untuk mengarahkan. |
+| 1 | Pinpoint | attack | 4.8 | 96 | 96 damage pada target pilihan. Ketuk salah satu lane musuh untuk mengarahkan. |
 | 2 | Silence Arrow | interrupt | 6.8 | 61 | 61 damage ke boss dan putus ritual all-grid. Hanya tersedia jika dipasang sebelum berangkat. |
 | 3 | Ricochet | aoe | 5.8 | 105 | 179 damage dibagi rata ke semua minion; jika tidak ada minion, 105 damage ke boss. |
 | 4 | Deadeye | attack | 6 | 142 | 142 directed damage. Mengincar lane pilihan atau boss. |
@@ -766,7 +766,7 @@ Konsekuensinya jelas: semua kemungkinan Elian yang lain akan berhenti. Ia tidak 
 | Crossing · A Name for Tomorrow | wave | moth-auric | 13753 | Benih membutuhkan waktu. Musuh mengejar sumber cahaya di tengah ruangan. |
 | Pursuit · A Name for Tomorrow | wave | spider-auric | 16045 | Ingatan yang dibuang mencoba kembali ke mesin. Jangan biarkan mereka memakan benih. |
 | Pressure · A Name for Tomorrow | wave | colossus-frost | 18624 | Frostward Colossus memakai suara Elian kecil untuk memanggil Aldric menjauh. |
-| The threshold · A Name for Tomorrow | miniboss | crab-auric | 27219 | Bellshore Claw menyeret lonceng-lonceng tua untuk ritus terakhir. Semua tile terancam: waktunya Guard atau interrupt. |
+| The threshold · A Name for Tomorrow | miniboss | crab-auric | 27219 | Bellshore Claw menyeret lonceng-lonceng tua untuk ritus terakhir. Semua petak terancam: waktunya Guard atau interrupt. |
 | The reckoning · A Name for Tomorrow | boss | colossus-auric | 45843 | Frostward Colossus terakhir membungkus benih dengan es agar hari esok tidak tumbuh. Lepaskan cengkeraman mesin dari benih itu. |
 
 **Aftermath:** Anak yang keluar dari ruangan tidak mengingat putaran-putaran itu. Ia tidak berutang rasa terima kasih atas hidup yang baru dimulainya.
@@ -791,7 +791,7 @@ Di town, Eda mencoba bersiul. Nadanya sumbang. Itulah suara masa depan yang seda
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · The Unwritten Dawn | wave | choir-frost | 15513 | Barisan mesin mengenali seluruh party. Balas dengan build yang telah kalian pilih sendiri. |
+| Crossing · The Unwritten Dawn | wave | choir-frost | 15513 | Barisan mesin mengenali seluruh party. Balas dengan build yang telah kamu pilih sendiri. |
 | Pursuit · The Unwritten Dawn | wave | wraith-auric | 18099 | Echo tertua menawarkan satu rewind lagi. Jalan terus. |
 | Pressure · The Unwritten Dawn | wave | lich-auric | 21007 | Setiap ritual yang diputus memberi kota satu tarikan napas. |
 | The threshold · The Unwritten Dawn | miniboss | golem-auric | 30703 | Jaga yang terluka sebelum mengejar damage terakhir. Tidak ada kemenangan jika rumah kehilangan semua penghuninya. |

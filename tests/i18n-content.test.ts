@@ -12,6 +12,9 @@ import { STORY_CHOICES, epilogue } from '../src/game/narrative';
 import { D8_ADVANCED_PATHS, D8_THIRD_PATHS, D8_ULTRAS } from '../src/game/d8-content';
 import { CHALLENGE_SHOP, BANK_SHOP, RAID_MODIFIERS } from '../src/economy/challenge';
 import { Battle } from '../src/game/simulation';
+import { DEPTHS, DUNGEON_EVENTS } from '../src/game/dungeon';
+import { EN } from '../src/i18n/en';
+import { ID } from '../src/i18n/id';
 
 const keys = Object.keys(CONTENT_TEXT);
 const read = (key: string) => { const slot = resolveContentKey(key)!; return slot.owner[slot.prop] as string; };
@@ -104,7 +107,7 @@ test('Indonesian mode translates English-only fields while keeping names', () =>
   assert.equal(ENEMIES['wolf-ash'].title, 'ASHBOUND · SERIGALA BARA');
   assert.equal(CAMPAIGN[0].subtitle, 'Telusuri jejak para pengintai yang hilang');
   assert.equal(CAMPAIGN[0].name, 'Ashwood Trail');
-  assert.equal(CAMPAIGN[4].stages[0].name, 'Penyeberangan · The Empty Census');
+  assert.equal(CAMPAIGN[4].stages[0].name, 'Penyeberangan — «The Empty Census»', 'the English chapter name reads as a title');
   assert.equal(KITS.warrior.skills[0].name, 'Cleave');
   assert.equal(CHALLENGE_SHOP[0].description, 'Setiap hero memulai ruangan ini dengan barrier sebesar 30% HP maksimum.');
   assert.equal(CAMPAIGN[0].intro, SOURCE.get('campaign.ashwood.intro'), 'Indonesian source prose is kept verbatim');
@@ -130,14 +133,16 @@ test('eventText maps simulation strings in both directions', () => {
   assert.equal(eventText('ASHFANG · FASE 3', 'en'), 'ASHFANG · PHASE 3');
   assert.equal(eventText('THE SCENT OF CINDERS', 'id'), 'AROMA BARA');
   assert.equal(eventText('AROMA BARA', 'en'), 'THE SCENT OF CINDERS');
-  assert.equal(eventText('CROSSING · THE EMPTY CENSUS', 'id'), 'PENYEBERANGAN · THE EMPTY CENSUS');
+  assert.equal(eventText('CROSSING · THE EMPTY CENSUS', 'id'), 'PENYEBERANGAN — «THE EMPTY CENSUS»');
   assert.equal(eventText('DESCENT 4', 'id'), 'KEDALAMAN 4');
   assert.equal(eventText('Descent 4', 'id'), 'Kedalaman 4');
   assert.equal(eventText('PRACTICE ARENA · NO CRYSTAL', 'id'), 'ARENA LATIHAN · TANPA CRYSTAL');
-  assert.equal(eventText('Perlu hero Lv.10', 'en'), 'Requires hero Lv.10');
-  assert.equal(eventText('Perlu Mastery', 'en'), 'Requires Mastery');
-  assert.equal(eventText('Perlu kedua cabang sebelumnya', 'en'), 'Requires both previous branches');
-  assert.equal(eventText('−0.6s', 'id'), '−0.6s');
+  assert.equal(eventText('Perlu hero Lv.10', 'en'), 'Perlu hero Lv.10', 'lock reasons are codes rendered by t(), not runtime text');
+  assert.equal(eventText('−0.6s', 'id'), '−0,6d', 'floating seconds take the ID decimal comma and unit');
+  assert.equal(eventText('+0.9s', 'id'), '+0,9d');
+  assert.equal(eventText('−0,6d', 'en'), '−0.6s');
+  assert.equal(eventText('DELAYED +1.2s', 'id'), 'TERTUNDA +1,2d');
+  assert.equal(eventText('TERTUNDA +1,2d', 'en'), 'DELAYED +1.2s');
   assert.equal(eventText('Cleave', 'id'), 'Cleave');
   assert.equal(eventText('something unknown', 'en'), 'something unknown');
   assert.equal(eventText('', 'en'), '');
@@ -172,9 +177,11 @@ test('eventText translates every threat and banner the simulation emits', () => 
   }
   assert.ok(counters.size >= 4, 'simulation produced threat counters');
   for (const counter of counters) {
-    const en = eventText(counter, 'en');
+    const en = eventText(counter, 'en'), id = eventText(counter, 'id');
     assert.notEqual(en, counter, `untranslated counter: ${counter}`);
-    assert.equal(eventText(en, 'id'), counter);
+    assert.match(en, /^(MARKED|GROUND|ALL GRID|CHANNEL): /, `EN counter tag: ${en}`);
+    assert.match(id, /^(DITANDAI|TANAH|SELURUH GRID|RAPALAN): /, `ID counter tag: ${id}`);
+    assert.equal(eventText(en, 'id'), id); assert.equal(eventText(id, 'en'), en);
   }
   for (const text of seen) {
     if (text === 'EMERALD CATACLYSM') continue;
@@ -182,4 +189,34 @@ test('eventText translates every threat and banner the simulation emits', () => 
     assert.notEqual(id, text, `untranslated event text: ${text}`);
     assert.equal(eventText(id, 'en'), text);
   }
+});
+
+// WP12 leak guards: walk every live content object after localizeContent and look for the other language's function words.
+const INDONESIAN = /\b(yang|dan|untuk|dengan|tidak|setiap|pada|kita|ini)\b/i;
+const ENGLISH = /\b(the|and|with|your|every)\b/i;
+function contentStrings(lang: 'en' | 'id') {
+  localizeContent(lang);
+  const roots = { KITS, UPGRADES, CHARACTERS, JOBS, GEAR, GEAR_SETS, TALENTS, QUESTS, ENEMIES, CAMPAIGN, BOONS, STORY_CHOICES, D8_ADVANCED_PATHS, D8_THIRD_PATHS, D8_ULTRAS, CHALLENGE_SHOP, BANK_SHOP, DEPTHS, DUNGEON_EVENTS, RAID_MODIFIERS: RAID_MODIFIERS.map(modifier => localizedRaidModifier(modifier, lang)) };
+  const out: { path: string; prop: string; text: string }[] = [];
+  const walk = (node: unknown, path: string, prop: string) => { if (typeof node === 'string') out.push({ path, prop, text: node }); else if (node && typeof node === 'object') for (const [key, value] of Object.entries(node)) walk(value, `${path}.${key}`, key); };
+  for (const [key, value] of Object.entries(roots)) walk(value, key, key);
+  // Names (skills, jobs, gear, chapters, enemies, heroes…) stay English in both languages, so they are taken out before the scan.
+  const names = [...new Set(out.filter(item => item.prop === 'name' || item.prop === 'enemyName').map(item => item.text))].filter(name => name.length > 2).sort((a, b) => b.length - a.length);
+  const strip = (text: string) => names.reduce((rest, name) => rest.split(name).join(' ').split(name.toUpperCase()).join(' '), text);
+  return { out: out.filter(item => item.prop !== 'name'), strip };
+}
+
+test('WP12 leak guard: no Indonesian prose survives in English content, no English prose in Indonesian content', () => {
+  const en = contentStrings('en');
+  assert.ok(en.out.length > 2000, `walked ${en.out.length} strings`);
+  assert.deepEqual(en.out.filter(item => INDONESIAN.test(en.strip(item.text))).map(item => `${item.path}: ${item.text.slice(0, 80)}`), []);
+  assert.ok(en.out.some(item => item.path === 'CAMPAIGN.0.intro' && /Sable/.test(item.text)), 'chapter intros are walked');
+  const id = contentStrings('id');
+  assert.deepEqual(id.out.filter(item => ENGLISH.test(id.strip(item.text))).map(item => `${item.path}: ${item.text.slice(0, 80)}`), []);
+  // The UI tables follow the same rule.
+  assert.deepEqual(Object.entries(EN).filter(([, text]) => INDONESIAN.test(text)).map(([key]) => key), []);
+  assert.deepEqual(Object.entries(ID).filter(([, text]) => ENGLISH.test(text)).map(([key]) => key), []);
+  // The guard itself bites: a leaked line is caught.
+  assert.match('Hero belum direkrut dan tidak siap', INDONESIAN); assert.match('Leave the room with your party', ENGLISH);
+  restoreContent();
 });

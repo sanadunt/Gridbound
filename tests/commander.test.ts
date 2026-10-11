@@ -37,7 +37,7 @@ test('D7 narrative persists in Story slots and stays isolated from Challenge mod
 });
 
 test('memory repository enforces revision and three-profile limit', async () => {
-  const repository=new CommanderRepository(undefined,'session only');
+  const repository=new CommanderRepository(undefined,'idb-unavailable');
   const first=await repository.commit(createCommanderDocument(createProfile(),'one'));
   await repository.commit({...first,name:'renamed'},first.revision);
   await assert.rejects(repository.commit(first,first.revision),StaleCommanderError);
@@ -115,7 +115,7 @@ test('WP1: every key storyStateFromProfile writes survives normalizeStoryState',
 });
 
 test('WP1: journey and narrative survive the memory repository commit and list', async () => {
-  const p=richProfile(), repository=new CommanderRepository(undefined,'session only');
+  const p=richProfile(), repository=new CommanderRepository(undefined,'idb-unavailable');
   const committed=await repository.commit(createCommanderDocument(p,'QA'));
   const listed=(await repository.list())[0];
   for(const doc of [committed,listed]){const back=materializeProfile(doc,'story');assert.deepEqual(back.journey,p.journey);assert.deepEqual(back.narrative,{school:'memorial'});}
@@ -169,7 +169,7 @@ test('WP1: Raid XP reaches the Story party; gear, jobs and manual slots stay as 
 });
 
 test('WP1: a manual Story slot stays a frozen snapshot through a challenge checkpoint', async () => {
-  const session=new CommanderSession(); session.repository=new CommanderRepository(undefined,'session only');
+  const session=new CommanderSession(); session.repository=new CommanderRepository(undefined,'idb-unavailable');
   const p=createProfile(); p.gold=p.economy.gold=3000; for(let i=0;i<6;i++)completeZone(p,i); p.loadouts[0].xp=xpForLevel(12);
   let profile=session.select(await session.create('slots',createCommanderDocument(normalizeProfile(p),'slots')),'story');
   assert.ok(await session.save({mode:'story',slotId:'manual-1',profile}));
@@ -189,7 +189,7 @@ test('WP1: a manual Story slot stays a frozen snapshot through a challenge check
 });
 
 test('WP1: the deepest Roguelike floor is kept once, survives loading an older preset and completes descent quests in Story', async () => {
-  const session=new CommanderSession(); session.repository=new CommanderRepository(undefined,'session only');
+  const session=new CommanderSession(); session.repository=new CommanderRepository(undefined,'idb-unavailable');
   const p=createProfile(); for(let i=0;i<9;i++)completeZone(p,i);
   let rogue=session.select(await session.create('descent',createCommanderDocument(normalizeProfile(p),'descent')),'roguelike');
   assert.ok(await session.save({mode:'roguelike',slotId:'manual-1',profile:rogue}),'a preset saved before any run');

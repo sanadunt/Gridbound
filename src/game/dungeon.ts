@@ -63,6 +63,12 @@ export const DUNGEON_EVENTS: Record<string, string[]> = {
 };
 /** Gold an event choice takes from the pouch. An unaffordable choice is refused and leaves the room open. */
 export const EVENT_COST: Record<string, number> = { 'merchant:buy': 60, 'well:coin': 20 };
+/** The fixed effects of event choices (shares of max HP / run blessings). chooseEvent applies them and the choice texts
+ *  show them as {heal}/{hurt}/{power}/{vitality} (plus {gold} from EVENT_COST), so a text never claims a stale number. */
+export const EVENT_EFFECTS: Record<string, { heal?: number; hurt?: number; power?: number; vitality?: number }> = {
+  'shrine:pray': { heal: .3 }, 'shrine:offering': { hurt: .12 }, 'lantern:keep': { power: .08 }, 'bell:ring': { vitality: .08, hurt: .08 }, 'bell:muffle': { heal: .12 },
+  'well:drink': { heal: .35, hurt: .1 }, 'well:coin': { power: .05 }, 'letters:read': { heal: .1 }, 'forge:temper': { hurt: .1 }, 'echo:silence': { heal: .15 }, 'cradle:rock': { vitality: .05, hurt: .05 },
+};
 /** Letters from the cast found by lore choices: a seeded pick from the depth's pool (text: `dungeon.letter.<id>`). */
 export const DUNGEON_LETTERS: string[][] = DEPTHS.map(d => ['a', 'b', 'c'].map(x => `${d.id}${x}`));
 
@@ -250,24 +256,24 @@ export function chooseEvent(run: DungeonRun, choice: string): Outcome | undefine
   const node = run.nodes[run.at];
   if (!node || node.kind !== 'event' || node.done || run.status !== 'active' || !DUNGEON_EVENTS[node.event!]?.includes(choice) || choiceNeed(run, node.event!, choice) !== undefined) return undefined;
   const def = depthDef(run.depth), chapter = def.unlock, roll = next(run);
-  const out: Outcome = {};
-  switch (`${node.event}:${choice}`) {
-    case 'shrine:pray': out.heal = .3; break;
-    case 'shrine:offering': out.gold = 40 + chapter * 10; out.hurt = .12; break;
+  const out: Outcome = {}, key = `${node.event}:${choice}`, fx = EVENT_EFFECTS[key] ?? {};
+  switch (key) {
+    case 'shrine:pray': out.heal = fx.heal; break;
+    case 'shrine:offering': out.gold = 40 + chapter * 10; out.hurt = fx.hurt; break;
     case 'archive:search': if (roll < .6) out.materials = { [def.material]: 2 }; else { out.fight = true; } break;
     case 'lantern:guide': out.materials = { 'ember-shard': 1 }; out.lore = letter(run); break;
-    case 'lantern:keep': out.power = .08; break;
+    case 'lantern:keep': out.power = fx.power; break;
     case 'merchant:buy': out.gold = -EVENT_COST['merchant:buy']; out.potion = 1; break;
-    case 'bell:ring': out.vitality = .08; out.hurt = .08; break;
-    case 'bell:muffle': out.heal = .12; break;
-    case 'well:drink': if (roll < .5) out.heal = .35; else out.hurt = .1; break;
-    case 'well:coin': out.gold = -EVENT_COST['well:coin']; out.power = .05; break;
-    case 'letters:read': out.lore = letter(run); out.heal = .1; break;
+    case 'bell:ring': out.vitality = fx.vitality; out.hurt = fx.hurt; break;
+    case 'bell:muffle': out.heal = fx.heal; break;
+    case 'well:drink': if (roll < .5) out.heal = fx.heal; else out.hurt = fx.hurt; break;
+    case 'well:coin': out.gold = -EVENT_COST['well:coin']; out.power = fx.power; break;
+    case 'letters:read': out.lore = letter(run); out.heal = fx.heal; break;
     case 'letters:burn': out.gold = 30 + chapter * 8; break;
-    case 'forge:temper': out.materials = { [def.material]: 1 }; out.hurt = .1; break;
+    case 'forge:temper': out.materials = { [def.material]: 1 }; out.hurt = fx.hurt; break;
     case 'echo:answer': out.fight = true; out.materials = { [def.material]: 1 }; break;
-    case 'echo:silence': out.heal = .15; break;
-    case 'cradle:rock': out.lore = letter(run); out.vitality = .05; out.hurt = .05; break;
+    case 'echo:silence': out.heal = fx.heal; break;
+    case 'cradle:rock': out.lore = letter(run); out.vitality = fx.vitality; out.hurt = fx.hurt; break;
     default: if (choice === 'leave') out.heal = LEAVE_HEAL; break;
   }
   applyOutcome(run, out);

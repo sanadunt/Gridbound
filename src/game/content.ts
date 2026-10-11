@@ -13,7 +13,7 @@ export const KITS: Record<ClassId, Kit> = {
   {name:'Pilfer',label:'CURI',cooldown:4,power:21,kind:'steal',description:'21 damage dan curi 8 gold dari kantong encounter. Maksimal 120 gold.'}]},
  archer: {name:'Archer',color:'#b3cf80',hp:290,role:'Pemburu minion dan weak point',skills:[
   {name:'Split Arrow',label:'VOLLEY',cooldown:4.4,power:62,kind:'aoe',description:'105 damage dibagi rata ke semua minion; jika tidak ada minion, 62 damage ke boss.'},
-  {name:'Pinpoint',label:'TARGET',cooldown:4.8,power:96,kind:'attack',description:'96 damage pada target pilihan. Klik salah satu lane musuh untuk mengarahkan.'}]},
+  {name:'Pinpoint',label:'TARGET',cooldown:4.8,power:96,kind:'attack',description:'96 damage pada target pilihan. Ketuk salah satu lane musuh untuk mengarahkan.'}]},
  healer: {name:'Healer',color:'#73d8cc',hp:310,role:'Pemulihan dan tempo party',skills:[
   {name:'Mending Light',label:'HEAL',cooldown:5,power:78,kind:'heal',description:'Pulihkan 78 HP rekan paling terluka dan 20 HP pada seluruh party.'},
   {name:'Battle Hymn',label:'BUFF',cooldown:6,power:0,kind:'buff',description:'Seluruh party mendapat +30% damage dan +20% kecepatan cooldown selama 7 detik.'}]},

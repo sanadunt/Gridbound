@@ -12,12 +12,12 @@ export const R2_TEXT: Record<string, ContentText> = {
   'kit.bard.skills.0.description': t('Every other hero’s remaining cooldown drops by 1.7s. Party tempo becomes a weapon.', 'Cooldown tersisa setiap hero lain berkurang 1,7 detik. Tempo party jadi senjata.'),
   'kit.bard.skills.1.description': t('58 damage and weaken the enemy for 5s: all enemy damage −25%.', '58 damage dan lemahkan musuh 5 detik: semua damage musuh −25%.'),
   'kit.bard.skills.2.description': t('Delay the next enemy intent by 2.2s. Telegraphs already shown keep running. Stacked delays are capped per intent.', 'Tunda intent musuh berikutnya 2,2 detik. Telegraph yang sudah muncul tetap berjalan. Tunda bertumpuk dibatasi per intent.'),
-  'kit.bard.skills.3.description': t('Fill 14 Resolve. Ninefold Dawn arrives sooner.', 'Isi 14 Resolve. Ninefold Dawn datang lebih cepat.'),
+  'kit.bard.skills.3.description': t('Fill 14 Resolve. Ninefold Dawn arrives sooner.', 'Isi 14 Resolve. Fajar Sembilan datang lebih cepat.'),
   'kit.hexer.role': t('Curses and damage over time', 'Kutukan dan damage berkelanjutan'),
   'kit.hexer.skills.0.description': t('Curse the boss: 18 damage per second for 6s. Recasting refreshes the curse.', 'Kutuk boss: 18 damage per detik selama 6 detik. Recast memperbarui kutukan.'),
   'kit.hexer.skills.1.description': t('52 damage; the most wounded ally recovers 50% of that damage.', '52 damage; rekan paling terluka pulih sebesar 50% damage itu.'),
   'kit.hexer.skills.2.description': t('Sacrifice 8% of own HP for 170 damage to the boss.', 'Korbankan 8% HP sendiri untuk 170 damage ke boss.'),
-  'kit.hexer.skills.3.description': t('70 damage and break the running all-grid ritual.', '70 damage dan putus ritual all-grid yang sedang berjalan.'),
+  'kit.hexer.skills.3.description': t('70 damage and break the running all-grid ritual.', '70 damage dan putus ritual seluruh grid yang sedang berjalan.'),
   'kit.monk.role': t('Combo fighter and counter-striker', 'Petarung combo dan counter'),
   'kit.monk.skills.0.description': t('34 damage, +12% per consecutive cast (max 5 stacks). A telegraph hit resets the combo.', '34 damage, +12% per cast beruntun (maks 5 tumpukan). Hantaman telegraph mereset combo.'),
   'kit.monk.skills.1.description': t('For 3.5s this hero takes −50% damage and answers every hit with 60 damage.', 'Selama 3,5 detik damage ke hero ini −50% dan setiap pukulan dibalas 60 damage.'),
@@ -26,7 +26,7 @@ export const R2_TEXT: Record<string, ContentText> = {
   'kit.engineer.role': t('Turrets, traps and repairs', 'Turret, perangkap, dan perbaikan'),
   'kit.engineer.skills.0.description': t('Deploy a turret in own lane: 22 damage per second for 6s to the front target.', 'Pasang turret di lane sendiri: 22 damage per detik selama 6 detik ke target terdepan.'),
   'kit.engineer.skills.1.description': t('Delay the next enemy attack by 1.6s and fill 120 boss stagger. Stacked delays are capped per intent.', 'Tunda serangan musuh berikutnya 1,6 detik dan isi stagger boss 120. Tunda bertumpuk dibatasi per intent.'),
-  'kit.engineer.skills.2.description': t('Add 1 potion (max 3). Once per stage.', 'Tambah 1 potion (maks 3). Sekali per stage.'),
+  'kit.engineer.skills.2.description': t('Add 1 potion (max 3). Once per stage.', 'Tambah 1 ramuan (maks 3). Sekali per stage.'),
   'kit.engineer.skills.3.description': t('Every hero’s remaining cooldown drops by 1.8s.', 'Cooldown tersisa setiap hero berkurang 1,8 detik.'),
 
   'job.troubadour.description': t('Buffs last 3s longer. Every cast adds 2 Resolve.', 'Buff berlangsung 3 detik lebih lama. Setiap cast menambah 2 Resolve.'),
@@ -34,7 +34,7 @@ export const R2_TEXT: Record<string, ContentText> = {
   'job.skald.description': t('All of this hero’s cooldowns run 15% faster.', 'Semua cooldown milik hero ini 15% lebih cepat.'),
   'job.skald.skill.description': t('Every hero’s remaining cooldown drops by 2s.', 'Cooldown tersisa setiap hero berkurang 2 detik.'),
   'job.maestro.description': t('Hymn stays active. Start each expedition with a barrier of 25% HP.', 'Hymn tetap aktif. Mulai expedition dengan barrier 25% HP.'),
-  'job.maestro.skill.description': t('Fill 24 Resolve at once. Ninefold Dawn becomes the party’s rhythm.', 'Isi 24 Resolve sekaligus. Ninefold Dawn menjadi ritme party.'),
+  'job.maestro.skill.description': t('Fill 24 Resolve at once. Ninefold Dawn becomes the party’s rhythm.', 'Isi 24 Resolve sekaligus. Fajar Sembilan menjadi ritme party.'),
   'job.thunder-skald.description': t('Skald tempo stays active. Each cast delays the next intent by 0.25s. Stacked delays are capped per intent.', 'Tempo Skald tetap aktif. Setiap cast memperlambat intent berikutnya 0,25 detik. Tunda bertumpuk dibatasi per intent.'),
   'job.thunder-skald.skill.description': t('281 damage shared evenly among all minions; with no minions up, 165 damage hits the boss.', '281 damage dibagi rata ke semua minion; jika tidak ada minion, 165 damage ke boss.'),
   'job.witch.description': t('Power +35% when the main enemy is under 40% HP.', 'Power +35% ketika musuh utama di bawah 40% HP.'),
@@ -113,10 +113,10 @@ export const R2_TEXT: Record<string, ContentText> = {
   'enemy.hydra.description': t('Three glass heads breathe down the busiest lane, then grow new scales unless the rite is broken.', 'Tiga kepala kaca menyembur lane paling ramai, lalu menumbuhkan sisik baru kecuali diputus.'),
   'enemy.hydra.counter': t('Spread heroes across lanes so the breath loses its target. Interrupt the Mending Rite.', 'Sebar hero ke beberapa lane agar breath kehilangan target. Interrupt Ritus Pemulihan.'),
   'enemy.harpy.title': t('STORM HARPY', 'HARPY BADAI'),
-  'enemy.harpy.description': t('A fast hunter that drops storm feathers on crowded tiles and swoops on the weakest hero.', 'Pemburu cepat yang menjatuhkan bulu badai ke tile ramai dan menyambar hero paling lemah.'),
+  'enemy.harpy.description': t('A fast hunter that drops storm feathers on crowded tiles and swoops on the weakest hero.', 'Pemburu cepat yang menjatuhkan bulu badai ke petak ramai dan menyambar hero paling lemah.'),
   'enemy.harpy.counter': t('Short interval: move early and let the healer cover the weak target. Each hit lands softer.', 'Interval pendek: bergerak lebih awal dan biarkan healer menjaga target lemah. Damage per hantaman lebih kecil.'),
   'enemy.colossus.title': t('GLACIER COLOSSUS', 'RAKSASA GLETSER'),
-  'enemy.colossus.description': t('A slow ice giant that mends its own cracks. Its floor slam freezes every tile.', 'Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile.'),
+  'enemy.colossus.description': t('A slow ice giant that mends its own cracks. Its floor slam freezes every tile.', 'Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua petak.'),
   'enemy.colossus.counter': t('The long interval leaves time to reposition. Save an interrupt for the Mending Rite and Guard for the grid slam.', 'Interval panjang memberi waktu reposisi. Simpan interrupt untuk Ritus Pemulihan dan Guard untuk hantaman grid.'),
   'enemy.choir.title': t('BELL CHOIR', 'PADUAN LONCENG'),
   'enemy.choir.description': t('A faceless choir from the bell machine. Its note freezes cooldowns and sings its wounds closed again.', 'Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka.'),
@@ -124,11 +124,12 @@ export const R2_TEXT: Record<string, ContentText> = {
 };
 
 /** Runtime strings emitted by the new mechanics (Battle.telegraph / act). */
-export const R2_EVENT_TEXT: ContentText[] = [
+/** Runtime text; `source` is what simulation.ts emits when it differs from `id`. */
+export const R2_EVENT_TEXT: (ContentText & { source?: string })[] = [
   t('TOLLING SILENCE', 'LONCENG SENYAP'),
   t('MENDING RITE', 'RITUS PEMULIHAN'),
-  t('ALL GRID: Guard just before impact (G) or cast an interrupt skill. Without either, every hero’s cooldown slips back 1.5 seconds.', 'ALL GRID: Guard menjelang impact (G) atau cast skill interrupt. Tanpa itu, semua cooldown hero mundur 1,5 detik.'),
-  t('CHANNEL: break it with an interrupt before it finishes, or the boss recovers 5% HP.', 'CHANNEL: putus dengan skill interrupt sebelum selesai, atau boss pulih 5% HP.'),
+  { ...t('ALL GRID: Guard just before impact (G) or cast an interrupt skill. Without either, every hero’s cooldown slips back 1.5 seconds.', 'SELURUH GRID: Guard menjelang impact (G) atau cast skill interrupt. Tanpa itu, semua cooldown hero mundur 1,5 detik.'), source: 'ALL GRID: Guard menjelang impact (G) atau cast skill interrupt. Tanpa itu, semua cooldown hero mundur 1,5 detik.' },
+  { ...t('CHANNEL: break it with an interrupt before it finishes, or the boss recovers 5% HP.', 'RAPALAN: putus dengan skill interrupt sebelum selesai, atau boss pulih 5% HP.'), source: 'CHANNEL: putus dengan skill interrupt sebelum selesai, atau boss pulih 5% HP.' },
   t('THE WOUND CLOSES', 'LUKANYA MENUTUP'),
   t('RESISTED', 'DITEPIS'),
   t('+1 POTION', '+1 RAMUAN'),

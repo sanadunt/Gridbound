@@ -152,7 +152,7 @@ for (const [width, height] of [[390, 844], [1280, 900]]) {
     for (let i = 0; i < 120 && await evaluate('window.gridbound.battle.status') === 'fighting'; i++) await evaluate('window.gridbound.step(0.5)');
     await wait('document.querySelector("#result-screen:not([hidden]) .result-ceremony-modal.defeat") && !document.querySelector("#result-town").disabled', 15000);
     const help = await evaluate('document.querySelector(".defeat-help").innerText');
-    assert.match(help, /Party power \d+ · recommended \d+/);
+    assert.match(help, /Party power [\d,]+ · recommended \d{1,3}(,\d{3})*\b/, "numbers carry the language's digit grouping");
     assert.match(help, /fell first/);
     assert.match(help, /How to beat [^:]+:/);
     const fixes = await evaluate('[...document.querySelectorAll("[data-defeat-fix]")].map(b => b.dataset.defeatFix)');

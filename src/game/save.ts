@@ -1,5 +1,5 @@
 import { normalizeProfile, type Profile } from './profile';
-import { applyRuntimeToDocument, createCommanderDocument, normalizeCommanderDocument, type CommanderDocument } from './commander';
+import { applyRuntimeToDocument, CommanderError, createCommanderDocument, normalizeCommanderDocument, type CommanderDocument, type CommanderErrorCode } from './commander';
 export const SAVE_KEY='gridbound.v3';
 export type SaveStore={getItem(key:string):string|null;setItem(key:string,value:string):void};
 type SaveRecord=Record<string,unknown>;
@@ -22,21 +22,23 @@ export function isCompleteV3(value:unknown):boolean {
   });
 }
 
-export function loadSave(store:SaveStore) {
+/** `warning` is an error code ('' when the save loaded cleanly); the UI shows t('error.<code>'). */
+export type LoadedSave={profile:Profile;readOnly:boolean;warning:Extract<CommanderErrorCode,'storage-blocked'|'save-corrupt'|'save-incomplete'|'save-migrated'>|''};
+export function loadSave(store:SaveStore):LoadedSave {
   const parse=(key:string)=>{try{return JSON.parse(store.getItem(key)??'null');}catch{return null;}};
   let raw:string|null;
-  try{raw=store.getItem(SAVE_KEY);}catch{return {profile:normalizeProfile(null),readOnly:true,warning:'Storage browser tidak tersedia. Progress hanya di tab ini.'};}
+  try{raw=store.getItem(SAVE_KEY);}catch{return {profile:normalizeProfile(null),readOnly:true,warning:'storage-blocked'};}
   if(raw!==null){
     let data:unknown;
-    try{data=JSON.parse(raw);}catch{return {profile:normalizeProfile(parse('gridbound.v2'),parse('gridbound.v1')),readOnly:true,warning:'Save v3 rusak. File asli tidak ditimpa; gunakan backup sebelum melanjutkan.'};}
-    if(!isCompleteV3(data))return {profile:normalizeProfile(parse('gridbound.v2'),parse('gridbound.v1')),readOnly:true,warning:'Save v3 tidak lengkap atau tidak didukung. Save asli dilindungi dari penimpaan.'};
+    try{data=JSON.parse(raw);}catch{return {profile:normalizeProfile(parse('gridbound.v2'),parse('gridbound.v1')),readOnly:true,warning:'save-corrupt'};}
+    if(!isCompleteV3(data))return {profile:normalizeProfile(parse('gridbound.v2'),parse('gridbound.v1')),readOnly:true,warning:'save-incomplete'};
     return {profile:normalizeProfile(data),readOnly:false,warning:''};
   }
   const legacy=parse('gridbound.v2');
-  return {profile:normalizeProfile(legacy,parse('gridbound.v1')),readOnly:false,warning:legacy?'Save lama dimigrasikan. Salinan v2 tetap disimpan untuk rollback.':''};
+  return {profile:normalizeProfile(legacy,parse('gridbound.v1')),readOnly:false,warning:legacy?'save-migrated':''};
 }
 export function saveProfile(store:SaveStore,p:Profile,readOnly=false) {
-  if(readOnly)throw new Error('Save is protected');
+  if(readOnly)throw new CommanderError('save-protected','Save is protected');
   store.setItem(SAVE_KEY,JSON.stringify(p));
 }
 

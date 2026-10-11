@@ -14,7 +14,7 @@ import './styles/result.css';
 import './styles/dungeon.css';
 import { currencyAmount } from './ui/currency';
 import { townSceneDataURL } from './art/town-scene';
-import { Battle, GUARD_DURATION, ENRAGE_WARN, ENRAGE_AT, ENRAGE_DMG, BREAK_SECONDS, type BattleEvent, type BattleOptions } from './game/simulation';
+import { Battle, GUARD_DURATION, ENRAGE_WARN, ENRAGE_AT, ENRAGE_DMG, BREAK_SECONDS, MOVE_PENALTY, MARK_DAMAGE, WEAKEN_DAMAGE, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
 import { CAMPAIGN, BOONS, ENEMIES, boonChoices } from './game/world';
@@ -35,16 +35,16 @@ import { BattleScene, ARENA, cell } from './render/BattleScene';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
 import { loadSave, saveProfile, backupLegacy, legacyBackup, commanderFromBackup, isCompleteV3, SAVE_KEY } from './game/save';
-import { createProfile, type Profile } from './game/profile';
+import { createProfile, FALLEN_XP, type Profile } from './game/profile';
 import { CommanderSession } from './game/commander-session';
-import { copyLegacyToCommander, createCommanderDocument, createRunCheckpoint, terminalRun, storedStateFor, materializeProfile, type CommanderDocument, type CommanderMode, type SlotId } from './game/commander';
+import { CommanderError, copyLegacyToCommander, createCommanderDocument, createRunCheckpoint, errorCode, terminalRun, storedStateFor, materializeProfile, type CommanderDocument, type CommanderMode, type SlotId } from './game/commander';
 import { storyBattleOptions, setStoryParty, normalizeStoryParty, storyPartyCap, storyPartyLocked } from './game/story-party';
 import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-build';
 import { JOBS } from './game/jobs';
 import { defaultRaidBuild, setRaidJob, setRaidHero, setRaidPartySize, normalizeRaidBuild, openRaidQuarry, raidQuarryUnlocked } from './game/raid-build';
 import { QUESTS, questProgress } from './game/quests';
 import { BELL_TONIC, CHALLENGE_SHOP, RELIC_IDS, bankShopItem, createRunWallet, creditRun, resetRunWallet, getRaidContractForEnemy, sandboxRaidContract, roguelikeMilestoneForFloor, buyRunItem, buyBellTonic, boonDraftSize, raidModifierAvailable, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
-import { t, lang, setLang, gameText, type Lang } from './i18n';
+import { t, lang, setLang, errorText, fmtInt, fmtDec, fmtSec, fmtDateTime, type Lang } from './i18n';
 import { localizeContent, eventText } from './i18n/content';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -147,10 +147,16 @@ function storageStatus() {
   $('bank-wallet').innerHTML = currencyAmount('crystal', wallet.crystal);
   const status = $('storage-status');
   // Warn only after a failed, stale or blocked save; a save in flight is the quiet 'busy' level.
-  const warning = saved.readOnly ? gameText(saved.warning) : commander.error ? gameText(commander.error) : commander.failed || (!commander.document && storageFailed) ? t('storage.dirty') : '';
-  status.textContent = warning || (!commander.document ? t('storage.none') : commander.dirty ? t('storage.saving') : commander.repository?.persistent ? t('storage.saved', { n: commander.document.revision }) : legacyMirrored() ? t('storage.session.kept') : t('storage.session'));
+  const warning = saved.readOnly && saved.warning ? errorText(saved.warning) : commander.error ? errorText(commander.error) : commander.failed || (!commander.document && storageFailed) ? t('storage.dirty') : '';
+  status.textContent = warning || (!commander.document ? t('storage.none') : commander.dirty ? t('storage.saving') : commander.repository?.persistent ? t('storage.saved', { n: String(commander.document.revision) }) : legacyMirrored() ? t('storage.session.kept') : t('storage.session'));
   status.dataset.level = warning || (commander.document && !commander.repository?.persistent) ? 'warn' : commander.dirty ? 'busy' : 'ok';
   updateTitleStatus();
+}
+/** A storage failure the player must see: its code goes to the status bar (errorText), the raw message only to the console. */
+function storageError(error: unknown) {
+  commander.error = errorCode(error); commander.errorDetail = error instanceof Error ? error.message : String(error);
+  console.warn('Commander storage:', error);
+  storageStatus();
 }
 function context(slotId: SlotId = 'auto') {
   return { mode: commander.mode, slotId, profile, rogueBuild: townState.rogueSetup, raidBuild: townState.raidBuild, raidContract: getRaidContractForEnemy(townState.raid,townState.raidTier,townState.raidModifiers), raidSandbox: townState.raidSandbox };
@@ -245,7 +251,7 @@ function announceThreat(e: BattleEvent) {
   announce(() => {
     const threat = battle.threats.find(v => v.id === id);
     if (!threat || threat.left < 1) return '';
-    const name = eventText(threat.name, lang()), s = Math.floor(threat.left), time = t(s === 1 ? 'a11y.second' : 'a11y.seconds', { s });
+    const name = eventText(threat.name, lang()), s = Math.floor(threat.left), time = t('a11y.seconds', { s });
     if (threat.type === 'all') return t('a11y.threat.all', { name, time });
     const ids = threat.targetId !== undefined ? [threat.targetId] : battle.living().filter(h => threat.slots.includes(h.slot)).map(h => h.id);
     return ids.length ? t('a11y.threat', { name, time, targets: ids.map(id => heroLabel(id)).join(', ') }) : t('a11y.threat.none', { name, time });
@@ -775,7 +781,7 @@ function describeOutcome(out: Outcome): string {
 }
 /** What a flee or a wipe left behind, for notices and the result card. */
 function lostText(lost: Pouch) {
-  return [lost.gold > 0 ? `${lost.gold}G` : '', materialList(lost.materials)].filter(Boolean).join(', ') || t('dungeon.lost.none');
+  return [lost.gold > 0 ? `${fmtInt(lost.gold)}G` : '', materialList(lost.materials)].filter(Boolean).join(', ') || t('dungeon.lost.none');
 }
 /** A dungeon battle is on screen and has no result yet (a flee is still possible). */
 const dungeonFightLive = () => !inTown && battle.mode === 'dungeon' && ['ready', 'fighting', 'paused'].includes(battle.status);
@@ -839,7 +845,7 @@ async function ensureCommander() {
         else await migrateLegacy();
       }
       return commander.document;
-    } catch (error) { commander.error = error instanceof Error ? error.message : String(error); storageStatus(); } finally {
+    } catch (error) { storageError(error); } finally {
       ensureCommanderPromise = undefined;
     }
     return undefined;
@@ -1086,9 +1092,9 @@ function battleWipe() {
 }
 function updateExpedition() {
   const c = CAMPAIGN[battle.floor - 1];
-  $('loot').textContent = battle.mode === 'endless' ? `${runWallet.crystal} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${battle.gold}G`;
+  $('loot').textContent = battle.mode === 'endless' ? `${fmtInt(runWallet.crystal)} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${fmtInt(battle.gold)}G`;
   const runShopHost = document.getElementById('run-shop-host');
-  if (runShopHost) runShopHost.innerHTML = battle.mode === 'endless' && battle.status === 'ready' ? CHALLENGE_SHOP.map(item => `<button class="btn" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${item.cost} ◇</button>`).join('') : '';
+  if (runShopHost) runShopHost.innerHTML = battle.mode === 'endless' && battle.status === 'ready' ? CHALLENGE_SHOP.map(item => `<button class="btn" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${fmtInt(item.cost)} ◇</button>`).join('') : '';
   $('mode-label').textContent = battle.mode === 'adventure' ? `${battle.heroic ? `${t('heroic.badge')} · ` : ''}${t('battle.chapter', { n: battle.floor })}` : battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : battle.mode === 'dungeon' ? t('dungeon.depth.label', { n: profile.journey.run?.depth ?? 1 }) : t('mode.raid');
   $('encounter-label').textContent = stageLabel();
   $('boss-name').textContent = battle.enemyName;
@@ -1177,11 +1183,11 @@ function updatePartyHealthView(h: PartyHero) {
   const ratio = h.maxHp > 0 ? Math.min(1, Math.max(0, h.hp / h.maxHp)) : 0;
   const hp = Math.ceil(h.hp);
   const shield = Math.round(h.shield);
-  const cooldownSeconds = h.remaining > 0 ? Math.max(.1, h.remaining).toFixed(1) : '';
+  const cooldownSeconds = h.remaining > 0 ? fmtSec(Math.max(.1, h.remaining)) : '';
   const charge = h.total > 0 ? Math.min(1, Math.max(0, 1 - h.remaining / h.total)) : 1;
-  const status = h.hp <= 0 ? t('battle.down') : cooldownSeconds ? `${cooldownSeconds}s` : t('battle.ready');
+  const status = h.hp <= 0 ? t('battle.down') : cooldownSeconds || t('battle.ready');
   // The label counts whole seconds (the visible text keeps tenths), so it changes about once a second, not on every frame.
-  const label = t('battle.hero.aria', { name: heroName(h), hp, max: h.maxHp, shield, status: h.hp > 0 && h.remaining > 0 ? `${Math.ceil(h.remaining)}s` : status });
+  const label = t('battle.hero.aria', { name: heroName(h), hp, max: h.maxHp, shield, status: h.hp > 0 && h.remaining > 0 ? fmtSec(Math.ceil(h.remaining), 0) : status });
   for (const view of views) {
     view.hp.textContent = String(hp);
     view.shield.textContent = String(shield);
@@ -1273,7 +1279,7 @@ function openSkillPicker(id: number) {
   const active = document.activeElement;
   pickerReturn = active instanceof HTMLElement && active !== document.body && !picker.contains(active) ? active : document.querySelector<HTMLElement>(`[data-skill-switch="${id}"]`);
   picker.setAttribute('aria-label', t('battle.skill.choose', { name: heroName(h) }));
-  picker.innerHTML = `<h4>${t('battle.skill.choose', { name: heroName(h) })}</h4>${battle.availableSkills(id).map(i => { const s = kit.skills[i]; return `<button type="button" data-pick-skill="${i}" aria-pressed="${h.stance === i}"><span><b>${s.name}</b><small>${s.label}</small></span><em>${s.cooldown.toFixed(1)}s</em></button>`; }).join('')}`;
+  picker.innerHTML = `<h4>${t('battle.skill.choose', { name: heroName(h) })}</h4>${battle.availableSkills(id).map(i => { const s = kit.skills[i]; return `<button type="button" data-pick-skill="${i}" aria-pressed="${h.stance === i}"><span><b>${s.name}</b><small>${s.label}</small></span><em>${fmtSec(s.cooldown)}</em></button>`; }).join('')}`;
   const p = cell(h.slot);
   const width = Math.max(180, $('arena').clientWidth * .52) / $('arena').clientWidth * 100;
   picker.style.left = `${Math.min(98 - width, Math.max(2, (p.x + 72) / 6 - width / 2))}%`;
@@ -1311,7 +1317,7 @@ function updateFocusBar() {
   if (!h || !bar) return;
   const ratio = h.maxHp > 0 ? h.hp / h.maxHp : 0;
   const skill = KITS[h.classId].skills[h.stance];
-  const status = h.hp <= 0 ? t('battle.down') : h.remaining > 0 ? `${Math.max(.1, h.remaining).toFixed(1)}s` : t('battle.ready');
+  const status = h.hp <= 0 ? t('battle.down') : h.remaining > 0 ? fmtSec(Math.max(.1, h.remaining)) : t('battle.ready');
   const img = bar.querySelector<HTMLImageElement>('.focus-face')!;
   const src = face(h);
   if (img.getAttribute('src') !== src) img.setAttribute('src', src);
@@ -1436,7 +1442,7 @@ function renderInspector() {
   const key = `${h.id}-${h.stance}-${moveMode}-${battle.status}`;
   if (key === selectedKey) return;
   selectedKey = key;
-  $('inspector').innerHTML = `<div class="hero-identity"><div class="portrait-frame"><img src="${face(h)}" alt="${heroName(h)}"/><span>LV ${h.level}</span></div><div><small class="hero-class">${k.name}</small><h2>${heroName(h)}</h2><p>${k.role}</p></div></div><div class="hero-stats"><span>HP <b id="selected-hp"></b></span><span>SH <b id="selected-shield"></b></span></div><h4 class="subheading stance-label">${t('battle.skills')} <span>${t('battle.autocast')}</span></h4><div class="stance-options">${battle.availableSkills(h.id).map(i => { const s = k.skills[i]; return `<button data-select-stance="${i}" class="stance-option ${h.stance === i ? 'chosen' : ''}" aria-pressed="${h.stance === i}" ${!['ready', 'fighting'].includes(battle.status) || h.hp <= 0 ? 'disabled' : ''}><span><b>${s.name}</b><small>${s.label} · ${s.cooldown.toFixed(1)}s</small></span><i>${h.stance === i ? '●' : '○'}</i></button>`; }).join('')}</div><p class="skill-description">${k.skills[h.stance].description}</p><div class="focus-meter"><div><span>${t('battle.fatigue')}</span><span id="fatigue-label"></span></div><span class="gauge"><i id="fatigue-fill"></i></span></div><button id="move-selected" class="btn move-button">${moveMode ? t('battle.move.pick') : t('battle.move')}<small>+0.9s</small></button><div class="move-grid" ${moveMode ? '' : 'hidden'}>${Array.from({ length: 9 }, (_, i) => `<button data-move-slot="${i}" aria-label="${t('formation.tile', { n: i + 1 })}" ${i === h.slot ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>`;
+  $('inspector').innerHTML = `<div class="hero-identity"><div class="portrait-frame"><img src="${face(h)}" alt="${heroName(h)}"/><span>LV ${h.level}</span></div><div><small class="hero-class">${k.name}</small><h2>${heroName(h)}</h2><p>${k.role}</p></div></div><div class="hero-stats"><span>HP <b id="selected-hp"></b></span><span>SH <b id="selected-shield"></b></span></div><h4 class="subheading stance-label">${t('battle.skills')} <span>${t('battle.autocast')}</span></h4><div class="stance-options">${battle.availableSkills(h.id).map(i => { const s = k.skills[i]; return `<button data-select-stance="${i}" class="stance-option ${h.stance === i ? 'chosen' : ''}" aria-pressed="${h.stance === i}" ${!['ready', 'fighting'].includes(battle.status) || h.hp <= 0 ? 'disabled' : ''}><span><b>${s.name}</b><small>${s.label} · ${fmtSec(s.cooldown)}</small></span><i>${h.stance === i ? '●' : '○'}</i></button>`; }).join('')}</div><p class="skill-description">${k.skills[h.stance].description}</p><div class="focus-meter"><div><span>${t('battle.fatigue')}</span><span id="fatigue-label"></span></div><span class="gauge"><i id="fatigue-fill"></i></span></div><button id="move-selected" class="btn move-button">${moveMode ? t('battle.move.pick') : t('battle.move')}<small>+${fmtSec(MOVE_PENALTY)}</small></button><div class="move-grid" ${moveMode ? '' : 'hidden'}>${Array.from({ length: 9 }, (_, i) => `<button data-move-slot="${i}" aria-label="${t('formation.tile', { n: i + 1 })}" ${i === h.slot ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>`;
   $('inspector').querySelectorAll<HTMLButtonElement>('[data-select-stance]').forEach(el => {
     el.disabled = !canModify || h.hp <= 0;
     el.addEventListener('click', () => {
@@ -1465,7 +1471,7 @@ function frame(dt: number) {
   }
   for (const h of battle.heroes) { if (h.hp <= 0) downed.add(h.id); else if (downed.delete(h.id)) announce(t('a11y.revived', { name: heroName(h) })); }
   if (battle.mode === 'dungeon' && battle.status === 'fighting') noteDungeonFight();
-  $('boss-health').textContent = `${Math.ceil(battle.bossHp).toLocaleString()} / ${battle.bossMax.toLocaleString()}`;
+  $('boss-health').textContent = `${fmtInt(Math.ceil(battle.bossHp))} / ${fmtInt(battle.bossMax)}`;
   const hpPercent = `${battle.bossHp / battle.bossMax * 100}%`;
   $('boss-hp').style.width = hpPercent;
   const ghost = document.getElementById('boss-hp-ghost');
@@ -1485,12 +1491,12 @@ function frame(dt: number) {
   if (isDanger && !wasDanger && motionOn()) {
     gsap.fromTo('#intent', { scale: 1.08 }, { scale: 1, duration: 0.25, ease: 'back.out(2)', clearProps: 'transform' });
   }
-  setText(intent.querySelector('b')!, threat ? `${t('battle.intent.time', { name: eventText(threat.name, lang()), s: Math.max(0, threat.left).toFixed(1) })}${threat.targetId !== undefined ? ` → ${battle.hero(threat.targetId)?.name ?? '?'}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: battle.guardLeft.toFixed(1) }) : t('battle.watch'));
+  setText(intent.querySelector('b')!, threat ? `${t('battle.intent.time', { name: eventText(threat.name, lang()), s: fmtDec(Math.max(0, threat.left)) })}${threat.targetId !== undefined ? ` → ${battle.hero(threat.targetId)?.name ?? '?'}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: fmtDec(battle.guardLeft) }) : t('battle.watch'));
   setText(intent.querySelector('span')!, threat ? `${threat.counter ? touchText(eventText(threat.counter, lang())) : t('battle.counter.default')}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.hint'));
   placeBanner();
-  $('damage').textContent = Math.round(battle.damage).toLocaleString();
-  $('blocked').textContent = Math.round(battle.blocked).toLocaleString();
-  $('loot').textContent = battle.mode === 'endless' ? `${runWallet.crystal} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${battle.gold}G`;
+  $('damage').textContent = fmtInt(battle.damage);
+  $('blocked').textContent = fmtInt(battle.blocked);
+  $('loot').textContent = battle.mode === 'endless' ? `${fmtInt(runWallet.crystal)} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${fmtInt(battle.gold)}G`;
   $('standing').textContent = t('battle.standing', { n: battle.living().length, total: battle.heroes.length });
   $('move-tip').textContent = moveMode ? t('battle.move.pick') : t('battle.drag');
   $('resolve-fill').style.width = `${battle.resolve}%`;
@@ -1506,7 +1512,7 @@ function frame(dt: number) {
   // (minus a few frames, since guardLeft ticks down before the impact resolves).
   const guardWindow = battle.status === 'fighting' && battle.guardCooldown <= 0 && battle.guardLeft <= 0 && battle.threats.some(v => v.type === 'all' && v.left <= GUARD_DURATION - GUARD_MARGIN);
   $('guard').classList.toggle('ready-window', guardWindow);
-  $('guard-label').textContent = guardWindow ? t('battle.guard.now') : battle.guardLeft > 0 ? t('battle.guard.active', { s: battle.guardLeft.toFixed(1) }) : battle.guardCooldown > 0 ? t('battle.guard.cd', { s: battle.guardCooldown.toFixed(1) }) : t('battle.guard.ready');
+  $('guard-label').textContent = guardWindow ? t('battle.guard.now') : battle.guardLeft > 0 ? t('battle.guard.active', { s: fmtDec(battle.guardLeft) }) : battle.guardCooldown > 0 ? t('battle.guard.cd', { s: fmtDec(battle.guardCooldown) }) : t('battle.guard.ready');
   $('guard').classList.toggle('guarding', battle.guardLeft > 0);
   coachFrame(guardWindow);
   $('lane-targets-hint')?.remove();
@@ -1579,8 +1585,8 @@ const STUN_NOTE_S = 1.6;
 function renderBossStatus() {
   const curse = battle.curses.reduce((left, c) => Math.max(left, c.left), 0);
   const chips: [string, string, number][] = [];
-  if (battle.markLeft > 0) chips.push(['mark', t('battle.status.mark'), battle.markLeft / 4]);
-  if (battle.weakenLeft > 0) chips.push(['weaken', t('battle.status.weaken'), battle.weakenLeft / 5]);
+  if (battle.markLeft > 0) chips.push(['mark', t('battle.status.mark', { n: Math.round((MARK_DAMAGE - 1) * 100) }), battle.markLeft / 4]);
+  if (battle.weakenLeft > 0) chips.push(['weaken', t('battle.status.weaken', { n: Math.round((1 - WEAKEN_DAMAGE) * 100) }), battle.weakenLeft / 5]);
   if (curse > 0) chips.push(['curse', `${t('battle.status.curse')}${battle.curses.length > 1 ? ` ×${battle.curses.length}` : ''}`, curse / 6]);
   const stunLeft = stunNote?.battle === battle ? stunNote.until - battle.time : 0;
   if (stunNote && stunLeft > 0 && stunLeft <= STUN_NOTE_S) chips.push(['delay', stunNote.text, stunLeft / STUN_NOTE_S]);
@@ -1658,7 +1664,7 @@ window.addEventListener('battle-log', event => {
     return;
   }
   if (e.kind === 'channel') return;
-  addLog(e.hit?.length ? t('log.impact', { name, heroes: e.hit.map(id => heroLabel(id)).join(', '), n: Math.round(e.amount ?? 0).toLocaleString() }) : t('log.dodged', { name }));
+  addLog(e.hit?.length ? t('log.impact', { name, heroes: e.hit.map(id => heroLabel(id)).join(', '), n: Math.round(e.amount ?? 0) }) : t('log.dodged', { name }));
 });
 
 /** The control that opened the modal: focus returns to it on close when nothing else took the focus (a re-render, a route change). */
@@ -1689,7 +1695,7 @@ modal.addEventListener('close', () => {
 function closeWithoutResume() { resumeOnClose = false; clearResultState(); if (modal.open) modal.close(); }
 function help() {
   const rows: [string, string][] = [['help.tap.title', 'help.tap'], ['help.skill.title', 'help.skill'], ['help.drag.title', 'help.drag'], ['help.guard.title', 'help.guard'], ['help.items.title', 'help.items'], ['help.lanes.title', 'help.lanes'], ['help.enrage.title', 'help.enrage']];
-  const vars = { t: formatTime(ENRAGE_AT), pct: Math.round((ENRAGE_DMG - 1) * 100), s: ENRAGE_AT - ENRAGE_WARN };
+  const vars = { t: formatTime(ENRAGE_AT), pct: Math.round((ENRAGE_DMG - 1) * 100), s: ENRAGE_AT - ENRAGE_WARN, move: fmtSec(MOVE_PENALTY) };
   openModal(`<h2 id="modal-title">${t('help.title')}</h2><div class="help-rows">${rows.map(([title, body]) => `<p><b>${t(title as never, vars)}</b><br>${t(body as never, vars)}</p>`).join('')}</div><button class="btn primary" data-close>${t('help.close')}</button>`);
 }
 function settings() {
@@ -1942,7 +1948,7 @@ async function presentResult() {
       const wallet = structuredClone(runWallet);
       const rewards = settleProgress(candidate, battle, wallet);
       if (rewards === null) {
-        commander.error = t('result.blocked.error');
+        commander.error = 'settlement';
         storageStatus();
         openModal(`<h2 id="modal-title">${t('result.blocked.title')}</h2><p>${t('result.blocked.copy')}</p>`);
         return false;
@@ -2011,7 +2017,7 @@ async function presentResult() {
     const titleText = won ? (moreWaves ? t('result.title.wave') : t('result.title.win')) : t('result.title.lose');
     // Gold or bank Crystal actually credited ('—' when the result is shown again after a reload and the amount is no longer known).
     const credited = !won ? 0 : resultReward ? (battle.mode === 'adventure' ? resultReward.gold : resultReward.crystal) : undefined;
-    const rewardPlaque = moreWaves ? [t('result.carried'), `${battle.gold}G`] : battle.mode === 'adventure' ? [t('result.gold'), credited === undefined ? '—' : `${credited}G`] : [t('currency.crystal'), credited === undefined ? '—' : `+${credited}`];
+    const rewardPlaque = moreWaves ? [t('result.carried'), `${fmtInt(battle.gold)}G`] : battle.mode === 'adventure' ? [t('result.gold'), credited === undefined ? '—' : `${fmtInt(credited)}G`] : [t('currency.crystal'), credited === undefined ? '—' : `+${fmtInt(credited)}`];
     const retryBattle = !won && battle.mode === 'adventure' && battle.stage > 0 && stageStart?.battle.stage === battle.stage && stageStart.battle.floor === battle.floor;
     // A Raid hero keeps the class the slot fielded (its colours stay its own); everyone else shows their roster class.
     const xpRows = xpSummary(experienceRewards, id => { const h = battle.mode === 'raid' ? battle.hero(id) : undefined; return h ? face(h) : portrait(ROSTER[id].classId, 0, id); });
@@ -2050,9 +2056,9 @@ async function presentResult() {
       </section>
       ${defeatHelp}
       <section class="win result-details" id="result-details" aria-label="${t('result.details')}" hidden>
-        <dl class="stat-table"><div><dt>${t('battle.stat.damage')}</dt><dd>${Math.round(battle.damage).toLocaleString()}</dd></div><div><dt>${t('result.detail.healed')}</dt><dd>${Math.round(battle.healed).toLocaleString()}</dd></div><div><dt>${t('battle.stat.blocked')}</dt><dd>${Math.round(battle.blocked).toLocaleString()}</dd></div><div><dt>${t('result.detail.dodged')}</dt><dd>${battle.dodged}</dd></div><div><dt>${t('result.detail.taps')}</dt><dd>${battle.taps}</dd></div><div><dt>${t('result.detail.moves')}</dt><dd>${battle.relocations}</dd></div></dl>
+        <dl class="stat-table"><div><dt>${t('battle.stat.damage')}</dt><dd>${fmtInt(battle.damage)}</dd></div><div><dt>${t('result.detail.healed')}</dt><dd>${fmtInt(battle.healed)}</dd></div><div><dt>${t('battle.stat.blocked')}</dt><dd>${fmtInt(battle.blocked)}</dd></div><div><dt>${t('result.detail.dodged')}</dt><dd>${battle.dodged}</dd></div><div><dt>${t('result.detail.taps')}</dt><dd>${battle.taps}</dd></div><div><dt>${t('result.detail.moves')}</dt><dd>${battle.relocations}</dd></div></dl>
         ${starGoals.length ? `<h3 class="subheading">${t('result.detail.stars')}</h3><ul class="result-star-goals">${starGoals.map(([key, met]) => `<li class="${met ? 'met' : ''}">${t(key, { s: STAR_PAR_SECONDS })}</li>`).join('')}</ul>` : ''}
-        <p class="hint">${t('result.xp.note')}</p>
+        <p class="hint">${t('result.xp.note', { n: Math.round(FALLEN_XP * 100) })}</p>
       </section>
       <div class="ceremony-actions">
         ${retryBattle ? `<button id="retry-battle" class="btn primary" title="${escapeUI(t('result.retry.battle.hint'))}">${t('result.retry.battle')}</button>` : ''}
@@ -2177,7 +2183,7 @@ async function presentDungeonResult() {
   showResultScreen(`<div class="result-ceremony-modal ${won ? 'victory' : 'defeat'}">
     <p class="result-banner" aria-hidden="true">${won ? cleared ? t('dungeon.end.cleared.banner') : t('result.banner.win') : t('dungeon.end.wiped.banner')}</p>
     <header class="win ceremony-header"><h2 id="result-title" class="ceremony-title">${t('route.dungeon')} · ${t('dungeon.depth.label', { n: run?.depth ?? 1 })}</h2><p class="ceremony-desc">${escapeUI(desc)}</p></header>
-    <section class="win result-summary"><dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque"><dt>${t('dungeon.pouch')}</dt><dd>${lost ? `−${lost.gold}G` : `${run?.pouch.gold ?? 0}G`}</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>${lost ? `<p class="dungeon-lost">${escapeUI(t('dungeon.lost', { lost: lostText(lost) }))}</p>` : ''}${hpRows ? `<h3 class="subheading">${t('dungeon.result.hp')}</h3><ul class="dungeon-hp-list">${hpRows}</ul>` : ''}${xpRows}</section>
+    <section class="win result-summary"><dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque"><dt>${t('dungeon.pouch')}</dt><dd>${lost ? `−${fmtInt(lost.gold)}G` : `${fmtInt(run?.pouch.gold ?? 0)}G`}</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>${lost ? `<p class="dungeon-lost">${escapeUI(t('dungeon.lost', { lost: lostText(lost) }))}</p>` : ''}${hpRows ? `<h3 class="subheading">${t('dungeon.result.hp')}</h3><ul class="dungeon-hp-list">${hpRows}</ul>` : ''}${xpRows}</section>
     <div class="ceremony-actions"><button id="result-dungeon" class="btn primary">${t('dungeon.result.back')} ▶</button></div>
   </div>`);
   sound.play(won ? 'fanfare' : 'defeat');
@@ -2245,7 +2251,7 @@ function resumeEncounter(savedEncounter: NonNullable<typeof encounter>) {
 /** Town changes could not be saved: retry (then continue with `next`) or export them. */
 function unsavedTownModal(next: () => unknown, copy: 'storage.unsaved.copy' | 'storage.unsaved.leave' = 'storage.unsaved.copy') {
   storageStatus();
-  openModal(`<h2 id="modal-title">${t('result.unsaved.title')}</h2><p>${t(copy)}</p><p class="hint">${escapeUI(gameText(commander.error))}</p><button id="retry-save" class="btn primary">${t('result.unsaved.retry')}</button><button id="pending-export" class="btn">${t('result.unsaved.export')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
+  openModal(`<h2 id="modal-title">${t('result.unsaved.title')}</h2><p>${t(copy)}</p><p class="hint">${commander.error ? escapeUI(errorText(commander.error)) : ''}</p><button id="retry-save" class="btn primary">${t('result.unsaved.retry')}</button><button id="pending-export" class="btn">${t('result.unsaved.export')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
   $('retry-save').onclick = () => { void persist().then(ok => { if (ok) { closeWithoutResume(); void next(); } else unsavedTownModal(next, copy); }); };
   $('pending-export').onclick = exportCommander;
 }
@@ -2389,12 +2395,12 @@ async function storyJournal() {
  });
 }
 const hasProgress = (p: Profile) => p.cleared.length > 0 || p.roster.length > 3 || p.gold !== createProfile().gold;
-const progressSummary = (p: Profile) => ({ ch: p.cleared.length, gold: p.gold.toLocaleString('en-US'), heroes: p.roster.length });
+const progressSummary = (p: Profile) => ({ ch: p.cleared.length, gold: p.gold, heroes: p.roster.length });
 /** Import a downloaded backup as a new Commander (fresh id, three-file limit). It keeps its Crystal bank only when that cannot duplicate one: no Commander here came from the same file (a legacy backup: no Commander at all). */
 async function importSave(file: File, documents: CommanderDocument[]) {
-  if (documents.length >= 3) throw new Error(t('profiles.import.full'));
+  if (documents.length >= 3) throw new CommanderError('import-full', 'All three Commander files are in use.');
   const imported = commanderFromBackup(await file.text().catch(() => ''), { id: globalThis.crypto?.randomUUID?.() ?? `commander-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, name: t('profiles.legacy.name'), timestamp: Date.now() });
-  if (!imported) throw new Error(t('profiles.import.invalid'));
+  if (!imported) throw new CommanderError('import-invalid', 'This file is not a Gridbound save backup.');
   if (imported.sourceId ? documents.some(doc => doc.commanderId === imported.sourceId) : documents.length > 0) { imported.document.shared.bankCrystal = 0; imported.document.shared.challengeUnlocks = []; }
   await leaveSafely(() => creatingCommander(async () => { activateCommander(await commander.create(imported.document.name, imported.document)); }));
 }
@@ -2402,7 +2408,7 @@ async function importSave(file: File, documents: CommanderDocument[]) {
 async function creatingCommander(task: () => Promise<void>) {
   openModal(`<h2 id="modal-title">${t('profiles.title')}</h2><p id="creating-status">${t('storage.saving')}</p><p id="profile-error" role="status"></p><button data-close class="btn">${t('common.close')}</button>`);
   try { await task(); closeWithoutResume(); }
-  catch (error) { const message = error instanceof Error ? error.message : String(error); if (modal.open && document.getElementById('profile-error')) { $('creating-status').textContent = t('result.unsaved.title'); $('profile-error').textContent = gameText(message); } else { commander.error = message; storageStatus(); } }
+  catch (error) { if (modal.open && document.getElementById('profile-error')) { console.warn('Commander storage:', error); $('creating-status').textContent = t('result.unsaved.title'); $('profile-error').textContent = errorText(error); } else storageError(error); }
 }
 async function profilesMenu() {
   openModal(`<h2 id="modal-title">${t('profiles.title')}</h2><p>${t('profiles.loading')}</p>`);
@@ -2421,12 +2427,12 @@ async function profilesMenu() {
       <label class="name-field">${t('profiles.name')} <input id="commander-name" maxlength="32" value="${escapeUI(current?.name ?? t('profiles.default.name'))}"></label>
       ${unheld ? `<p class="hint" id="continue-summary">${t('profiles.continue.summary', progressSummary(profile))}</p>` : ''}
       <div class="departure-actions">${unheld ? `<button id="continue-mine" class="btn primary" ${full ? 'disabled' : ''}>${t('profiles.continue.mine')}</button>` : ''}<button id="new-commander" class="btn" ${full ? 'disabled' : ''}>${t('profiles.new')}</button>${current ? `<button id="rename-commander" class="btn">${t('profiles.rename')}</button><button id="export-commander" class="btn">${t('profiles.export')}</button><button id="delete-commander" class="btn danger">${t('profiles.delete')}</button><button id="save-retry" class="btn">${t('result.unsaved.retry')}</button>` : ''}<button id="legacy-preview" class="btn">${t('profiles.legacy')}</button><button id="import-save-button" class="btn" ${full ? 'disabled' : ''}>${t('profiles.import')}</button><input id="import-save" type="file" accept="application/json,.json" hidden></div>
-      ${current ? `<h3 class="subheading">${t('profiles.slots', { mode: modeName(commander.mode) })}</h3><p class="hint">${t('profiles.slots.hint')}</p><div class="save-files">${slots.map(slot => `<div class="save-file"><div><b>${slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) })}</b><small>${t(`profiles.status.${slot.status}` as never)} · ${slot.savedAt ? new Date(slot.savedAt).toLocaleString() : t('profiles.emptyslot')}</small></div><span>${slot.slotId !== 'auto' ? `<button data-save-slot="${slot.slotId}" class="btn">${t('profiles.save')}</button>` : ''}<button data-load-slot="${slot.slotId}" class="btn" ${!slot.state ? 'disabled' : ''}>${t('profiles.load')}</button></span></div>`).join('')}</div><button id="continue-latest" class="btn primary">${t('profiles.continue')}</button>` : ''}
-      <p id="profile-error" role="status">${escapeUI(gameText(commander.error || commander.repository?.warning || ''))}</p><button data-close class="btn">${t('common.close')}</button>`);
-    const attempt = async (task: () => Promise<void>) => { try { await task(); } catch(error) { $('profile-error').textContent = error instanceof Error ? error.message : String(error); } };
+      ${current ? `<h3 class="subheading">${t('profiles.slots', { mode: modeName(commander.mode) })}</h3><p class="hint">${t('profiles.slots.hint')}</p><div class="save-files">${slots.map(slot => `<div class="save-file"><div><b>${slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) })}</b><small>${t(`profiles.status.${slot.status}` as never)} · ${slot.savedAt ? fmtDateTime(slot.savedAt) : t('profiles.emptyslot')}</small></div><span>${slot.slotId !== 'auto' ? `<button data-save-slot="${slot.slotId}" class="btn">${t('profiles.save')}</button>` : ''}<button data-load-slot="${slot.slotId}" class="btn" ${!slot.state ? 'disabled' : ''}>${t('profiles.load')}</button></span></div>`).join('')}</div><button id="continue-latest" class="btn primary">${t('profiles.continue')}</button>` : ''}
+      <p id="profile-error" role="status">${commander.error || commander.repository?.warning ? escapeUI(errorText(commander.error || commander.repository?.warning)) : ''}</p><button data-close class="btn">${t('common.close')}</button>`);
+    const attempt = async (task: () => Promise<void>) => { try { await task(); } catch(error) { console.warn('Commander storage:', error); $('profile-error').textContent = errorText(error); } };
     modal.querySelectorAll<HTMLElement>('[data-commander]').forEach(button => button.onclick = () => { const target = documents[Number(button.dataset.commander)]; if (target.commanderId !== current?.commanderId) void leaveSafely(() => { activateCommander(target); closeWithoutResume(); }); else closeWithoutResume(); });
     const typedName = () => $<HTMLInputElement>('commander-name').value.trim().slice(0, 32) || t('profiles.default.name');
-    $('continue-mine')?.addEventListener('click', () => { const name = typedName(); void leaveSafely(() => creatingCommander(async () => { await migrateLegacy(name, true); if (!commander.document) throw new Error(commander.error || t('storage.dirty')); })); });
+    $('continue-mine')?.addEventListener('click', () => { const name = typedName(); void leaveSafely(() => creatingCommander(async () => { await migrateLegacy(name, true); if (!commander.document) throw new CommanderError(commander.error && commander.error !== 'unknown' ? commander.error : 'idb-write', commander.errorDetail || 'No Commander was activated.'); })); });
     // A fresh Commander starts at zero; with real progress on screen the player confirms first (the current file is kept either way).
     $('new-commander').onclick = () => {
       const name = typedName(), create = () => void leaveSafely(() => creatingCommander(async () => { activateCommander(await commander.create(name)); }));
@@ -2437,20 +2443,20 @@ async function profilesMenu() {
     };
     $('import-save-button').onclick = () => $<HTMLInputElement>('import-save').click();
     $('import-save').onchange = () => { const file = $<HTMLInputElement>('import-save').files?.[0]; if (file) void attempt(() => importSave(file, documents)); };
-    $('rename-commander')?.addEventListener('click', () => { const name = $<HTMLInputElement>('commander-name').value.trim().slice(0,32); void attempt(async () => { if (!name) throw new Error(t('profiles.name.required')); if (await persist('auto', doc => { doc.name=name; })) await profilesMenu(); }); });
+    $('rename-commander')?.addEventListener('click', () => { const name = $<HTMLInputElement>('commander-name').value.trim().slice(0,32); void attempt(async () => { if (!name) throw new CommanderError('name-required', 'Enter a name.'); if (await persist('auto', doc => { doc.name=name; })) await profilesMenu(); }); });
     $('export-commander')?.addEventListener('click',exportCommander);
     $('save-retry')?.addEventListener('click', () => { if (pendingSettlement) { presentingResult=false; result(); } else void persist().then(() => profilesMenu()); });
     $('delete-commander')?.addEventListener('click', () => {
       openModal(`<h2 id="modal-title">${t('profiles.delete.title', { name: escapeUI(current!.name) })}</h2><p>${t('profiles.delete.copy', { crystal: current!.shared.bankCrystal, receipts: current!.shared.settlementReceipts.length })}</p><input id="delete-word" aria-label="DELETE"><button id="delete-confirm" class="btn danger" disabled>${t('profiles.delete.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
       $('delete-word').oninput = () => { $<HTMLButtonElement>('delete-confirm').disabled = $<HTMLInputElement>('delete-word').value !== 'DELETE'; };
       // Always-on Commander: the next file takes over, or a fresh one when the last is deleted (gridbound.v3 is never overwritten with a fresh profile).
-      $('delete-confirm').onclick = async () => { if (!inTown || pendingSettlement || commander.stale) return; try { await commander.flush(); await commander.repository!.remove(current!.commanderId,commander.document!.revision); commander.document=undefined; profile=createProfile(); const rest=(await commander.open()).sort((a,b)=>b.lastPlayed-a.lastPlayed); activateCommander(rest[0] ?? await commander.create(t('profiles.default.name'), createCommanderDocument(createProfile(), t('profiles.default.name')))); await profilesMenu(); } catch(error) { commander.error=String(error); storageStatus(); } };
+      $('delete-confirm').onclick = async () => { if (!inTown || pendingSettlement || commander.stale) return; try { await commander.flush(); await commander.repository!.remove(current!.commanderId,commander.document!.revision); commander.document=undefined; profile=createProfile(); const rest=(await commander.open()).sort((a,b)=>b.lastPlayed-a.lastPlayed); activateCommander(rest[0] ?? await commander.create(t('profiles.default.name'), createCommanderDocument(createProfile(), t('profiles.default.name')))); await profilesMenu(); } catch(error) { storageError(error); } };
     });
     // The old save is read when the preview opens and again on confirm, never from the page-load snapshot.
     const rawV3 = () => { try { return store.getItem(SAVE_KEY); } catch { return null; } };
     $('legacy-preview').onclick = () => {
       const old = loadSave(store), raw = rawV3();
-      openModal(`<h2 id="modal-title">${t('profiles.legacy.title')}</h2><p>${t('profiles.legacy.copy', { ch: old.profile.cleared.length, gold: old.profile.gold, roster: old.profile.roster.length })}</p><p>${escapeUI(gameText(old.warning))}</p><button id="legacy-export" class="btn" ${raw ? '' : 'disabled'}>${t('profiles.legacy.export')}</button><button id="legacy-confirm" class="btn primary" ${!raw || old.readOnly || full ? 'disabled' : ''}>${t('profiles.legacy.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
+      openModal(`<h2 id="modal-title">${t('profiles.legacy.title')}</h2><p>${t('profiles.legacy.copy', { ch: old.profile.cleared.length, gold: old.profile.gold, roster: old.profile.roster.length })}</p><p>${old.warning ? escapeUI(errorText(old.warning)) : ''}</p><button id="legacy-export" class="btn" ${raw ? '' : 'disabled'}>${t('profiles.legacy.export')}</button><button id="legacy-confirm" class="btn primary" ${!raw || old.readOnly || full ? 'disabled' : ''}>${t('profiles.legacy.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
       $('legacy-export').onclick = () => download(rawV3() ?? '', 'Gridbound-original-v3.json');
       $('legacy-confirm').onclick = () => { void leaveSafely(() => creatingCommander(async () => { const source=loadSave(store), raw=rawV3(); if (!raw || source.readOnly) return; backupLegacyNow(); const name=t('profiles.legacy.name'), candidate=copyLegacyToCommander(source.profile,name); candidate.legacySource=raw; activateCommander(await commander.create(name,candidate)); })); };
     };
@@ -2458,10 +2464,10 @@ async function profilesMenu() {
     modal.querySelectorAll<HTMLElement>('[data-load-slot]').forEach(button => button.onclick = () => {
       const slot=slots.find(item=>item.slotId===button.dataset.loadSlot)!;
       openModal(`<h2 id="modal-title">${t('profiles.preview', { slot: slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) }) })}</h2><pre class="slot-preview">${escapeUI(JSON.stringify(slot.state,null,2))}</pre><p class="hint">${t('profiles.preview.hint')}</p><button id="load-confirm" class="btn primary">${t('profiles.load.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button><p id="load-error" role="status"></p>`);
-      $('load-confirm').onclick = async () => { if (!inTown || pendingSettlement) { $('load-error').textContent=t('profiles.load.blocked'); return; } try { profile=await commander.loadSlot(slot.slotId); activateCommander(commander.document!,commander.mode); closeWithoutResume(); } catch(error) { $('load-error').textContent=String(error); } };
+      $('load-confirm').onclick = async () => { if (!inTown || pendingSettlement) { $('load-error').textContent=t('profiles.load.blocked'); return; } try { profile=await commander.loadSlot(slot.slotId); activateCommander(commander.document!,commander.mode); closeWithoutResume(); } catch(error) { console.warn('Commander storage:', error); $('load-error').textContent=errorText(error); } };
     });
     $('continue-latest')?.addEventListener('click', () => { const savedEncounter=commander.document?.encounters?.[commander.mode]; if (!savedEncounter) { $('profile-error').textContent=t('profiles.nocheckpoint'); return; } closeWithoutResume(); void restoreEncounter(savedEncounter); });
-  } catch(error) { console.error('PROFILES_MENU_ERROR:', error); openModal(`<h2 id="modal-title">${t('profiles.protected')}</h2><p>${escapeUI(String(error))}</p><p>${t('profiles.protected.copy')}</p>`); }
+  } catch(error) { console.error('PROFILES_MENU_ERROR:', error); openModal(`<h2 id="modal-title">${t('profiles.protected')}</h2><p>${escapeUI(errorText(error))}</p><p>${t('profiles.protected.copy')}</p>`); }
 }
 commander.onStatus = () => { storageStatus(); if (commander.stale && battle.status === 'fighting') battle.pause(); };
 window.addEventListener('beforeunload', () => {

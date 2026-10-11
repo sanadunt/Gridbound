@@ -1,19 +1,22 @@
 // The Undercroft screen: depth picker, the room map of a run in progress, and the current room's choices.
 import { KITS, ROSTER } from '../game/content';
 import { ENEMIES } from '../game/world';
-import { DEPTHS, DUNGEON_EVENTS, DUNGEON_ROWS, choiceNeed, depthDef, reachable, unlockedDepth, type DungeonNode, type DungeonNodeKind, type DungeonRun } from '../game/dungeon';
+import { CAMP_REST, DEPTHS, DUNGEON_EVENTS, DUNGEON_ROWS, EVENT_COST, EVENT_EFFECTS, LEAVE_HEAL, choiceNeed, depthDef, reachable, unlockedDepth, type DungeonNode, type DungeonNodeKind, type DungeonRun } from '../game/dungeon';
 import type { Profile } from '../game/profile';
 import { normalizeStoryParty } from '../game/story-party';
 import { partyPower, powerVerdict, recommendedPower } from '../game/power';
 import { dungeonIcon } from '../art/dungeon-icons';
 import { heroCanvas, heroKey } from '../art/pixels';
-import { t, type StringKey } from '../i18n';
+import { t, fmtInt, type StringKey } from '../i18n';
 
 const escape = (text: string) => text.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
 const faces = new Map<string, string>();
 const face = (classId: keyof typeof KITS, hero?: number) => { const key = heroKey(classId, hero); if (!faces.has(key)) faces.set(key, heroCanvas(classId, 0, hero).toDataURL()); return faces.get(key)!; };
 const materialName = (id: string) => t(`material.${id}` as StringKey);
-const pouchLine = (pouch: { gold: number; materials: Record<string, number> }) => [`<span class="pouch-gold">${pouch.gold}G</span>`, ...Object.entries(pouch.materials).filter(([, n]) => n > 0).map(([id, n]) => `<span class="pouch-mat"><img src="${dungeonIcon(id as 'ember-shard')}" alt=""/>${escape(materialName(id))} ×${n}</span>`)].join(' ');
+const pct = (share = 0) => Math.round(share * 100);
+/** The numbers an event choice text shows, read from the table chooseEvent applies. */
+const eventVars = (id: string, choice: string) => { const fx = EVENT_EFFECTS[`${id}:${choice}`] ?? {}; return { heal: pct(fx.heal ?? (choice === 'leave' ? LEAVE_HEAL : 0)), hurt: pct(fx.hurt), power: pct(fx.power), vitality: pct(fx.vitality), gold: EVENT_COST[`${id}:${choice}`] ?? 0 }; };
+const pouchLine = (pouch: { gold: number; materials: Record<string, number> }) => [`<span class="pouch-gold">${fmtInt(pouch.gold)}G</span>`, ...Object.entries(pouch.materials).filter(([, n]) => n > 0).map(([id, n]) => `<span class="pouch-mat"><img src="${dungeonIcon(id as 'ember-shard')}" alt=""/>${escape(materialName(id))} ×${n}</span>`)].join(' ');
 
 const KINDS: DungeonNodeKind[] = ['battle', 'elite', 'event', 'treasure', 'camp', 'guardian'];
 
@@ -84,11 +87,11 @@ function roomPanel(run: DungeonRun, outcome?: string, letter?: string): string {
   if (node.kind === 'event' && node.event) {
     const id = node.event;
     // A choice the pouch cannot pay for (or a full potion belt) is shown disabled with the reason.
-    const choices = DUNGEON_EVENTS[id].map(choice => { const need = choiceNeed(run, id, choice), why = need === undefined ? '' : need === 'potions' ? t('dungeon.need.potions') : t('dungeon.need.gold', { n: need }); return `<button class="btn" data-dungeon-choice="${choice}" ${why ? 'disabled' : ''}>${t(`dungeon.event.${id}.${choice}` as StringKey)}${why ? ` <em class="choice-need">${escape(why)}</em>` : ''}</button>`; }).join('');
-    return `<small>${t('dungeon.kind.event')}</small><h3>${t(`dungeon.event.${id}.title` as StringKey)}</h3><p>${t(`dungeon.event.${id}.body` as StringKey)}</p>${node.done ? done || `<p class="hint">${t('dungeon.pick')}</p>` : `<div class="event-choices">${choices}</div>`}`;
+    const choices = DUNGEON_EVENTS[id].map(choice => { const need = choiceNeed(run, id, choice), why = need === undefined ? '' : need === 'potions' ? t('dungeon.need.potions') : t('dungeon.need.gold', { n: need }); return `<button class="btn" data-dungeon-choice="${choice}" ${why ? 'disabled' : ''}>${t(`dungeon.event.${id}.${choice}` as StringKey, eventVars(id, choice))}${why ? ` <em class="choice-need">${escape(why)}</em>` : ''}</button>`; }).join('');
+    return `<small>${t('dungeon.kind.event')}</small><h3>${t(`dungeon.event.${id}.title` as StringKey)}</h3><p>${t(`dungeon.event.${id}.body` as StringKey, { gold: EVENT_COST[`${id}:buy`] ?? 0 })}</p>${node.done ? done || `<p class="hint">${t('dungeon.pick')}</p>` : `<div class="event-choices">${choices}</div>`}`;
   }
   if (node.kind === 'treasure') return `<small>${t('dungeon.kind.treasure')}</small><h3>${t('dungeon.treasure.title')}</h3>${node.done ? done || `<p class="hint">${t('dungeon.pick')}</p>` : `<p>${t('dungeon.treasure.body')}</p><button class="btn primary" data-dungeon-open>${t('dungeon.treasure.open')}</button>`}`;
-  if (node.kind === 'camp') return `<small>${t('dungeon.kind.camp')}</small><h3>${t('dungeon.camp.title')}</h3>${node.done ? done || `<p class="hint">${t('dungeon.pick')}</p>` : `<p>${t('dungeon.camp.body')}</p><div class="event-choices"><button class="btn primary" data-dungeon-camp="rest">${t('dungeon.camp.rest')}</button><button class="btn" data-dungeon-camp="extract">${t('dungeon.camp.extract')}</button></div>`}`;
+  if (node.kind === 'camp') return `<small>${t('dungeon.kind.camp')}</small><h3>${t('dungeon.camp.title')}</h3>${node.done ? done || `<p class="hint">${t('dungeon.pick')}</p>` : `<p>${t('dungeon.camp.body', { n: pct(CAMP_REST) })}</p><div class="event-choices"><button class="btn primary" data-dungeon-camp="rest">${t('dungeon.camp.rest')}</button><button class="btn" data-dungeon-camp="extract">${t('dungeon.camp.extract')}</button></div>`}`;
   return `<small>${t(`dungeon.kind.${node.kind}` as StringKey)}</small><h3>${t('dungeon.cleared.room')}</h3>${done}<p class="hint">${t('dungeon.pick')}</p>`;
 }
 

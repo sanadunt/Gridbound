@@ -1,7 +1,7 @@
-import { t } from '../i18n';
+import { t, fmtInt } from '../i18n';
 
 export function currencyAmount(kind: 'gold' | 'crystal', amount: number): string {
-  const value = Math.floor(amount).toLocaleString('en-US');
+  const value = fmtInt(Math.floor(amount));
   const label = kind === 'gold' ? t('currency.gold') : t('currency.crystal');
   const shape = kind === 'gold'
     ? '<path d="M7 2h10l5 5v10l-5 5H7l-5-5V7Z" fill="#ffd75e"/><path d="M9 6h6v12H9z" fill="#a5741e"/>'

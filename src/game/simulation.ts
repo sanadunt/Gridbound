@@ -54,6 +54,14 @@ export const SUPPORT_KINDS:readonly string[]=['shield','partyshield','heal','reg
 export const CONTROL_MIN=3,CONTROL_SHARE=.4,CHORUS_BUFF=1,CHORUS_EVERY=4;
 // Party Guard lasts GUARD_DURATION seconds; the soft enrage multiplies enemy damage by ENRAGE_DMG after ENRAGE_AT seconds of a stage (warned at ENRAGE_WARN).
 export const GUARD_DURATION=2.8,ENRAGE_WARN=135,ENRAGE_AT=150,ENRAGE_DMG=1.7;
+/** The telegraph name an enemy gives an intent. The map and bestiary chips show it too, so a preview and the battle use one name. */
+export const threatName=(enemyId:string,intent:Intent)=>intent==='weakest'?'HUNT THE WOUNDED':intent==='strongest'?'BREAK THE STRONG':intent==='front'?'CRUSHING FRONT':intent==='breath'?'LANE ERUPTION':intent==='silence'?'TOLLING SILENCE':intent==='mend'?'MENDING RITE':intent==='all'?(enemyId.startsWith('dragon')?'EMERALD CATACLYSM':'WORLDLESS RITUAL'):enemyId==='spider'?'VENOM WEB':'FALLING SHARDS';
+/** The counter family of an intent, the tag its counter line starts with (MARKED / GROUND / ALL GRID / CHANNEL). */
+export const threatKind=(intent:Intent):'marked'|'ground'|'all'|'channel'=>intent==='weakest'||intent==='strongest'?'marked':intent==='all'||intent==='silence'?'all':intent==='mend'?'channel':'ground';
+/** Seconds a hero's gauge loses when moved mid-fight (the Fleet boon lowers it). */
+export const MOVE_PENALTY=.9,FLEET_MOVE_PENALTY=.2;
+/** Damage taken by a marked boss, dealt by a weakened boss, taken during an armour break, and the share Party Guard blocks. UI texts and status chips read these. */
+export const MARK_DAMAGE=1.2,WEAKEN_DAMAGE=.75,BREAK_DAMAGE=1.6,GUARD_REDUCTION=.65;
 /** Counter text for a ground telegraph when every unmarked tile already holds a living hero. */
 export const NO_SAFE_TILE='GROUND: tidak ada tile aman. Tukar tank atau hero ber-shield ke tanda, atau Guard (G).';
 const chapterHp=(floor:number)=>CHAPTER_HP[Math.min(CHAPTER_HP.length,floor)-1];
@@ -223,7 +231,7 @@ export class Battle {
     const h=this.hero(id);if(!h||h.hp<=0||!Number.isInteger(slot)||slot<0||slot>8||slot===h.slot||h.moveLock>0||!['ready','fighting'].includes(this.status))return false;
     const other=this.heroes.find(a=>a.slot===slot);if(other&&other.moveLock>0)return false;
     const previous=h.slot;h.slot=slot;if(other)other.slot=previous;
-    const penalty=this.boons.includes('fleet')?.2:.9;
+    const penalty=this.boons.includes('fleet')?FLEET_MOVE_PENALTY:MOVE_PENALTY;
     if(this.status==='fighting') for(const ally of [h,other])if(ally&&ally.hp>0){ally.remaining+=ally.talents.includes('evasive')?Math.min(.45,penalty):penalty;ally.moveLock=.65;if(this.boons.includes('fleet'))this.shield(ally,30);}
     this.relocations++;this.emit({type:'move',source:id,slot,targets:other?[other.id]:[],text:this.status==='fighting'?`+${penalty}s`:'FORMATION'});return true;
   }
@@ -303,19 +311,19 @@ export class Battle {
     const alive=this.living();if(!alive.length)return;
     if(intent==='weakest'||intent==='strongest'){
       const candidates=[...alive].sort((a,b)=>intent==='weakest'?a.hp-b.hp||a.id-b.id:this.threatPower(b)-this.threatPower(a)||a.id-b.id);
-      const target=candidates[0];targetId=target.id;slots=[target.slot];type='target';name=intent==='weakest'?'HUNT THE WOUNDED':'BREAK THE STRONG';counter='MARKED: mengikuti hero. Heal target, siapkan shield atau Party Guard.';
+      const target=candidates[0];targetId=target.id;slots=[target.slot];type='target';name=threatName(this.enemyId,intent);counter='MARKED: mengikuti hero. Heal target, siapkan shield atau Party Guard.';
     }else if(intent==='front'){
-      const row=Math.min(...alive.map(h=>Math.floor(h.slot/3)));slots=[row*3,row*3+1,row*3+2];type='front';name='CRUSHING FRONT';counter='GROUND: keluar dari row yang ditandai setelah telegraph muncul.';
+      const row=Math.min(...alive.map(h=>Math.floor(h.slot/3)));slots=[row*3,row*3+1,row*3+2];type='front';name=threatName(this.enemyId,intent);counter='GROUND: keluar dari row yang ditandai setelah telegraph muncul.';
     }else if(intent==='breath'){
-      const counts=[0,1,2].map(lane=>alive.filter(h=>h.slot%3===lane).length);const lane=counts.indexOf(Math.max(...counts));slots=[lane,lane+3,lane+6];type='breath';name='LANE ERUPTION';counter='GROUND: pindah ke lane lain. Lokasi impact tidak mengikuti hero.';
+      const counts=[0,1,2].map(lane=>alive.filter(h=>h.slot%3===lane).length);const lane=counts.indexOf(Math.max(...counts));slots=[lane,lane+3,lane+6];type='breath';name=threatName(this.enemyId,intent);counter='GROUND: pindah ke lane lain. Lokasi impact tidak mengikuti hero.';
     }else if(intent==='silence'){
-      slots=Array.from({length:9},(_,i)=>i);type='all';effect='silence';name='TOLLING SILENCE';counter='ALL GRID: Guard menjelang impact (G) atau cast skill interrupt. Tanpa itu, semua cooldown hero mundur 1,5 detik.';
+      slots=Array.from({length:9},(_,i)=>i);type='all';effect='silence';name=threatName(this.enemyId,intent);counter='ALL GRID: Guard menjelang impact (G) atau cast skill interrupt. Tanpa itu, semua cooldown hero mundur 1,5 detik.';
     }else if(intent==='mend'){
-      slots=[];type='channel';effect='mend';name='MENDING RITE';counter='CHANNEL: putus dengan skill interrupt sebelum selesai, atau boss pulih 5% HP.';
+      slots=[];type='channel';effect='mend';name=threatName(this.enemyId,intent);counter='CHANNEL: putus dengan skill interrupt sebelum selesai, atau boss pulih 5% HP.';
     }else if(intent==='all'){
-      slots=Array.from({length:9},(_,i)=>i);type='all';name=this.enemyId.startsWith('dragon')?'EMERALD CATACLYSM':'WORLDLESS RITUAL';counter='ALL GRID: Guard menjelang impact (G) atau cast skill interrupt. Pindah tile tidak membantu.';
+      slots=Array.from({length:9},(_,i)=>i);type='all';name=threatName(this.enemyId,intent);counter='ALL GRID: Guard menjelang impact (G) atau cast skill interrupt. Pindah tile tidak membantu.';
     }else{
-      const candidates=[...alive];while(slots.length<Math.min(3,alive.length)){const i=Math.floor(this.random()*candidates.length);slots.push(candidates.splice(i,1)[0].slot);}type='meteor';name=this.enemyId==='spider'?'VENOM WEB':'FALLING SHARDS';counter='GROUND: pindahkan hero ke tile aman. Tanda tetap di tanah.';
+      const candidates=[...alive];while(slots.length<Math.min(3,alive.length)){const i=Math.floor(this.random()*candidates.length);slots.push(candidates.splice(i,1)[0].slot);}type='meteor';name=threatName(this.enemyId,intent);counter='GROUND: pindahkan hero ke tile aman. Tanda tetap di tanah.';
     }
     // Story parties stop at eight, so a tile is always free, but a marked row or lane can still cover it: point at the counters that still work.
     if((type==='front'||type==='breath'||type==='meteor')&&Array.from({length:9},(_,i)=>i).every(i=>slots.includes(i)||alive.some(h=>h.slot===i)))counter=NO_SAFE_TILE;
@@ -432,7 +440,7 @@ export class Battle {
     if(m.hp<=0||!Number.isFinite(amount)||amount<=0)return;
     const killer=this.hero(source),minionHeal=JOBS[killer?.job??'']?.perk?.minionHeal;
     if(JOBS[killer?.job??'']?.effect==='hunter')amount*=1.45;
-    amount*=(1+(killer?.perks.minionDamage??0))*(this.markLeft>0?1.2:1);
+    amount*=(1+(killer?.perks.minionDamage??0))*(this.markLeft>0?MARK_DAMAGE:1);
     const actual=Math.min(m.hp,amount);m.hp=Math.max(0,m.hp-amount);this.damage+=actual;this.gainResolve(actual/this.resolveRef()*RESOLVE_MINION);this.emit({type:'projectile',source,lane:m.lane,amount:actual,kind});
     if(m.hp===0&&minionHeal)this.living().forEach(h=>this.heal(h,minionHeal,killer));
     if(m.hp===0){this.emit({type:'minionDown',lane:m.lane});if(this.boons.includes('feast'))this.living().forEach(h=>this.heal(h,24));}
@@ -445,7 +453,7 @@ export class Battle {
   hitBoss(amount:number,source:number,kind:string) {
     if(!Number.isFinite(amount)||amount<=0||this.bossHp<=0)return;
     const execute=this.boons.includes('execution')&&this.bossHp/this.bossMax<.3;
-    const dmg=Math.min(this.bossHp,Math.round(amount*(this.breakLeft>0?1.6:1)*(this.markLeft>0?1.2:1)*(execute?1.4:1)));
+    const dmg=Math.min(this.bossHp,Math.round(amount*(this.breakLeft>0?BREAK_DAMAGE:1)*(this.markLeft>0?MARK_DAMAGE:1)*(execute?1.4:1)));
     this.bossHp=Math.max(0,this.bossHp-dmg);this.damage+=dmg;this.gainResolve(dmg/this.resolveRef()*RESOLVE_DEALT);
     this.addStagger(amount);
     this.emit({type:'projectile',source,lane:-1,amount:dmg,kind});
@@ -465,10 +473,10 @@ export class Battle {
   hurt(h:Hero,amount:number,cause?:{kind:string;name?:string}) {
     if(h.hp<=0||!Number.isFinite(amount)||amount<=0)return 0;
     if(h.talents.includes('fortitude'))amount*=.9;
-    if(this.weakenLeft>0)amount*=.75;
+    if(this.weakenLeft>0)amount*=WEAKEN_DAMAGE;
     if(h.counterLeft>0){amount*=.5;this.hitBoss(h.counterPower,h.id,'slash');}
     amount*=1-Math.min(.45,h.perks.reduction+(h.equipment.reduction??0));
-    const guard=this.guardLeft>0?amount*.65:0;amount-=guard;
+    const guard=this.guardLeft>0?amount*GUARD_REDUCTION:0;amount-=guard;
     const absorbed=Math.min(h.shield,amount);h.shield-=absorbed;this.blocked+=absorbed+guard;
     const dmg=Math.round(amount-absorbed),lost=Math.min(h.hp,dmg);h.hp=Math.max(0,h.hp-dmg);this.gainResolve(amount/Math.max(1,this.heroes.reduce((s,a)=>s+a.maxHp,0))*RESOLVE_TAKEN);
     if(this.boons.includes('thorn'))this.hitBoss((absorbed+guard)*.35,h.id,'thorn');

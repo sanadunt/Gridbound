@@ -169,27 +169,31 @@ export function availablePoints(p:Profile,id:number) {
   const h=loadout(p,id);if(!h)return 0;
   return Math.max(0,heroProgress(h.xp).level-1-TALENTS.filter(t=>h.talents.includes(t.id)).reduce((sum,t)=>sum+(t.points??0),0));
 }
-export function talentReason(p:Profile,id:number,t:Talent,ignoreGold=false):string {
-  const h=loadout(p,id);if(!h)return 'Hero belum direkrut';
-  if(h.talents.includes(t.id))return 'Sudah dipelajari';
-  if(t.classId&&t.classId!==ROSTER[id].classId)return 'Khusus class lain';
-  if(t.requires&&!h.talents.includes(t.requires))return `Perlu ${TALENTS.find(n=>n.id===t.requires)?.name??t.requires}`;
-  if(t.requiresAll?.some(key=>!h.talents.includes(key)))return 'Perlu kedua cabang sebelumnya';
-  if(t.level&&heroProgress(h.xp).level<t.level)return `Perlu hero Lv.${t.level}`;
-  if(t.exclusive&&TALENTS.some(n=>n.exclusive===t.exclusive&&h.talents.includes(n.id)))return 'Keystone lain dipilih';
-  if(availablePoints(p,id)<(t.points??0))return 'Skill point belum cukup';
-  if(!ignoreGold&&p.gold<t.cost)return 'Gold belum cukup';
-  return '';
+/** Share of the expedition EXP a hero who ended the fight down still receives. */
+export const FALLEN_XP=.6;
+/** Why a talent or gear piece cannot be taken: a code the UI renders with t('lock.<code>', {n, name}); undefined when it can. */
+export type LockReason={code:'unrecruited'|'learned'|'class'|'requires'|'branches'|'level'|'keystone'|'points'|'gold'|'unavailable'|'quest';n?:number;name?:string};
+export function talentReason(p:Profile,id:number,t:Talent,ignoreGold=false):LockReason|undefined {
+  const h=loadout(p,id);if(!h)return {code:'unrecruited'};
+  if(h.talents.includes(t.id))return {code:'learned'};
+  if(t.classId&&t.classId!==ROSTER[id].classId)return {code:'class'};
+  if(t.requires&&!h.talents.includes(t.requires))return {code:'requires',name:TALENTS.find(n=>n.id===t.requires)?.name??t.requires};
+  if(t.requiresAll?.some(key=>!h.talents.includes(key)))return {code:'branches'};
+  if(t.level&&heroProgress(h.xp).level<t.level)return {code:'level',n:t.level};
+  if(t.exclusive&&TALENTS.some(n=>n.exclusive===t.exclusive&&h.talents.includes(n.id)))return {code:'keystone'};
+  if(availablePoints(p,id)<(t.points??0))return {code:'points'};
+  if(!ignoreGold&&p.gold<t.cost)return {code:'gold'};
+  return undefined;
 }
-export function gearReason(p:Profile,id:number,gearId:string,ignoreGold=false):string {
-  const h=loadout(p,id),g=GEAR.find(g=>g.id===gearId);if(!h||!g)return 'Item tidak tersedia';
-  if(g.classId&&g.classId!==ROSTER[id].classId)return 'Khusus class lain';
-  if(heroProgress(h.xp).level<(g.minLevel??1))return `Perlu hero Lv.${g.minLevel}`;
+export function gearReason(p:Profile,id:number,gearId:string,ignoreGold=false):LockReason|undefined {
+  const h=loadout(p,id),g=GEAR.find(g=>g.id===gearId);if(!h||!g)return {code:'unavailable'};
+  if(g.classId&&g.classId!==ROSTER[id].classId)return {code:'class'};
+  if(heroProgress(h.xp).level<(g.minLevel??1))return {code:'level',n:g.minLevel};
   if(!h.inventory?.includes(g.id)){
-    if(g.source==='quest')return 'Hadiah quest';
-    if(!ignoreGold&&p.gold<g.cost)return 'Gold belum cukup';
+    if(g.source==='quest')return {code:'quest'};
+    if(!ignoreGold&&p.gold<g.cost)return {code:'gold'};
   }
-  return '';
+  return undefined;
 }
 export function claimQuest(p:Profile,id:string,recipient:number) {
   const q=QUESTS.find(q=>q.id===id);if(!q||!questProgress(p,q).ready)return false;
@@ -219,7 +223,7 @@ export function settleProgress(p:Profile,b:Battle,runWallet?:RunWallet) {
   // are bounded integer updates, so a settlement either commits as a whole or
   // returns without changing the profile.
   const xp=b.mode==='adventure'?Math.round((180+b.floor*75+b.stageCount*45)*(b.heroic?1.3:1)*replayFactor(p,b.floor-1)):b.mode==='dungeon'?b.dungeon?.xp??0:b.mode==='endless'?100+b.floor*35:180+b.floor*45;
-  const rewards=(b.mode==='endless'?[]:b.heroes).map(h=>{const amount=Math.floor(xp*(h.hp>0?1:.6));const before=heroProgress(p.loadouts[h.id]?.xp).level;return {id:h.id,kind:'active' as 'active'|'bench',bonus:0,xp:amount,before,after:heroProgress((p.loadouts[h.id]?.xp??0)+amount).level};});
+  const rewards=(b.mode==='endless'?[]:b.heroes).map(h=>{const amount=Math.floor(xp*(h.hp>0?1:FALLEN_XP));const before=heroProgress(p.loadouts[h.id]?.xp).level;return {id:h.id,kind:'active' as 'active'|'bench',bonus:0,xp:amount,before,after:heroProgress((p.loadouts[h.id]?.xp??0)+amount).level};});
   if(b.mode==='adventure') {
     const activeXP=b.heroes.map(h=>normalizedXP(p.loadouts[h.id]?.xp)).sort((a,b)=>a-b);
     const mid=Math.floor(activeXP.length/2);
