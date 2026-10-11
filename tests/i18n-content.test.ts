@@ -78,7 +78,7 @@ test('Indonesian prose becomes English under "en"', () => {
   assert.match(JOBS.paladin.skill.description, /^75 shield for the whole party/);
   assert.match(CAMPAIGN[0].intro, /^Sable should have been home before the dusk bell\./);
   assert.match(CAMPAIGN[4].intro, /^The morning after Vharok awoke/);
-  assert.equal(CAMPAIGN[4].intro.split('\n\n').length, 3, 'paragraph breaks survive');
+  assert.equal(CAMPAIGN[4].intro.split('\n\n').length, SOURCE.get('campaign.empty-names.intro')!.split('\n\n').length, 'paragraph breaks survive');
   assert.equal(CAMPAIGN[4].stages[0].beat, (CAMPAIGN[4] as unknown as { beats: string[] }).beats[0]);
   assert.match(ENEMIES.wolf.description, /^A hunter of wounds\./);
   assert.match(ENEMIES['wolf-ash'].description, /Ashbound variant: same intent order, more HP and damage\.$/);
@@ -148,8 +148,9 @@ test('eventText covers epilogue cards built from either language', () => {
   const cleared = Array.from({ length: 16 }, (_, i) => i);
   const cards = epilogue({ school: 'restore', archive: 'public', cooperative: 'clinic' }, cleared);
   const english = cards.map(card => eventText(card, 'en'));
-  assert.match(english[0], /^The machine stops\. Vharok is free\./);
-  assert.equal(english[1], 'A bell for the school: The children use the little bell to call everyone to mealtime.');
+  // The lead line is the UI string journal.epilogue.lead; epilogue() returns only the choice outcomes.
+  assert.equal(cards.length, 3);
+  assert.equal(english[0], 'A bell for the school: It hangs in the empty schoolhouse; no one remembers why the chairs are so small.');
   assert.deepEqual(english.map(card => eventText(card, 'id')), cards);
 });
 

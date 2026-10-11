@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { withBrowser } from './browser-harness.mjs';
 await withBrowser(async ({ wait, evaluate, click, errors, screenshot }) => {
-  await evaluate("location.href='http://127.0.0.1:5187/'");
+  await evaluate(`location.href=${JSON.stringify(process.env.GRIDBOUND_URL || 'http://127.0.0.1:5187/')}`);
   await wait('Boolean(window.gridbound && (document.querySelector(".town-game-shell") || document.querySelector("#title-screen:not([hidden])")))', 15000);
   if (await evaluate('Boolean(document.querySelector("#title-screen:not([hidden])"))')) await click('#title-profiles');
   else {
@@ -19,7 +19,8 @@ await withBrowser(async ({ wait, evaluate, click, errors, screenshot }) => {
   await click('.more-scene [data-open-action="journal"]');
   await wait('Boolean(document.querySelector("dialog[open]"))');
   const locked = await evaluate(`({text:document.querySelector('dialog[open]')?.textContent||'', choices:document.querySelectorAll('[data-story-choice]').length})`);
-  assert.match(locked.text, /Chapter 3/);
+  // The first story choice (the archive) opens after Chapter 6; the school bell waits for Chapter 13.
+  assert.match(locked.text, /Chapter 6/);
   assert.equal(locked.choices, 0);
   await screenshot('artifacts/d7-journal-locked.png');
   assert.equal(errors.length, 0);

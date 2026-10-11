@@ -79,8 +79,17 @@
 .dialogue-box .msg-caret { display: none; }
 .dialogue-box.ready .msg-caret { display: block; }
 .dialogue-count { position: absolute; left: 14px; bottom: 4px; font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); }
+.dialogue-choices { margin: 10px 0 2px; cursor: default; }
+.dialogue-choices .menu-item { min-height: 44px; padding-left: 26px; text-align: left; border: 1px solid var(--line); background: #0f201acc; }
+.dialogue-choices .menu-item:focus::before { opacity: 1; }
+.dialogue-box.choosing .msg-caret { display: none; }
+.dialogue-end { top: 30%; animation: scene-in 0.6s ease-out; }
 .start-window p.story-beat { font-style: italic; color: #fff; }
+.start-window p.ready-tip { margin-top: -4px; font-size: 12px; color: var(--ink-dim); }
 .journal-replay { display: block; margin: 6px 0; min-height: 40px; }
+.journal-companions { display: flex; flex-wrap: wrap; gap: 6px; }
+.journal-companions .btn { min-height: 40px; }
+.journal-epilogue p { margin: 6px 0; }
 
 /* Roguelike promotion between floors */
 .rogue-promote { margin: 0 0 12px; padding: 10px 12px; text-align: left; }

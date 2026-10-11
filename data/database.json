@@ -9,6 +9,7 @@
       "slot": 0,
       "bio": "Aldric mengingat semua cara melindungi orang lain, tetapi tidak ingat siapa yang pertama ia lindungi. Perisainya memiliki goresan yang tidak sesuai dengan usianya. Ia belajar bahwa menjaga seseorang tidak berarti memiliki masa depannya.",
       "joinLine": "Aku tidak ingat siapa yang pertama kulindungi. Biarlah kalian yang berikutnya.",
+      "fateLine": "Aldric belajar menunggu di depan pintu sekolah tanpa memilihkan apa pun untuk siapa pun.",
       "recruitChapter": 0
     },
     {
@@ -18,6 +19,7 @@
       "slot": 1,
       "bio": "Bran selalu datang membawa perisai cadangan. Ia pernah terlambat satu kali dan tidak bisa menjelaskan mengapa rasa bersalah itu terasa lebih tua dari dirinya. Ia ingin sebuah kemenangan yang tidak meninggalkan siapa pun.",
       "joinLine": "Aku terlambat sekali, dulu. Kali ini aku datang lebih awal dan membawa perisai cadangan.",
+      "fateLine": "Bran tidak lagi membawa perisai cadangan. Ia datang tepat waktu, dan itu cukup.",
       "recruitChapter": 3
     },
     {
@@ -27,6 +29,7 @@
       "slot": 2,
       "bio": "Sable mencuri benda yang pemiliknya mengaku tidak pernah punya. Ia menyimpan kuitansi, bukan trofi. Di kota yang bisa melupakan kontrak, seorang pencuri mungkin menjadi satu-satunya saksi yang menyimpan bukti.",
       "joinLine": "Kuitansi ini menyebut kalian berutang padaku. Tenang, aku menagihnya dengan bertarung di sisimu.",
+      "fateLine": "Sable masih menyimpan kuitansi. Kini ia mengembalikannya kepada pemiliknya.",
       "recruitChapter": 1
     },
     {
@@ -36,6 +39,7 @@
       "slot": 3,
       "bio": "Rowan mengenali setiap burung dari nadanya. Ketika harga sebuah penyeberangan adalah lagu ibunya, ia harus memilih antara mendapatkan masa lalunya kembali atau memberi orang lain jalan pulang.",
       "joinLine": "Burung-burung di jalan setapak terdiam. Aku ikut, sampai mereka bernyanyi lagi.",
+      "fateLine": "Burung-burung di jalan setapak bernyanyi lagi, dan Rowan menjawab dengan nada yang belum pernah ia dengar.",
       "recruitChapter": 0
     },
     {
@@ -45,6 +49,7 @@
       "slot": 4,
       "bio": "Lyra selalu tahu obat untuk luka yang belum pernah ia lihat. Ia takut kebaikannya hanya perintah yang ditanamkan. Kisahnya bukan mencari bukti bahwa ia pernah manusia, tetapi memilih apa yang akan ia lakukan hari ini.",
       "joinLine": "Aku tahu obat untuk luka yang belum kalian dapat. Mari pastikan aku tidak perlu memakainya.",
+      "fateLine": "Lyra tidak lagi bertanya apakah ia pernah manusia. Ia bertanya siapa yang belum makan.",
       "recruitChapter": 0
     },
     {
@@ -54,6 +59,7 @@
       "slot": 5,
       "bio": "Kestrel membawa lonceng kecil yang tak terhubung ke menara. Ia mengajari warga bahwa tanda bahaya dapat menjadi ajakan saling menjaga, bukan perintah untuk menyerahkan pilihan.",
       "joinLine": "Lonceng kecilku tidak memerintah siapa pun. Ia hanya memanggil, dan aku menjawab.",
+      "fateLine": "Lonceng kecil Kestrel kini berbunyi untuk rapat warga.",
       "recruitChapter": 3
     },
     {
@@ -63,6 +69,7 @@
       "slot": 6,
       "bio": "Nyx adalah pengukir yang mengingat bengkel sebelum bangunannya ada. Ia menulis nama-nama di bahan yang sulit dihapus. Keahliannya memberi bentuk pada hal-hal yang baru berani memilih untuk ada.",
       "joinLine": "Kuukir nama kalian di batu yang sulit dihapus. Sekarang aku harus memastikan nama itu tetap hidup.",
+      "fateLine": "Nyx mengukir papan nama Eda dari kayu yang mudah diganti.",
       "recruitChapter": 4
     },
     {
@@ -72,6 +79,7 @@
       "slot": 7,
       "bio": "Orin menulis prediksi di buku yang terus mengoreksi dirinya sendiri. Ia terpaksa memilih antara peta yang selalu benar dan masa depan yang belum ditentukan. Hal paling berani yang ia lakukan adalah menutup bukunya.",
       "joinLine": "Buku ini sudah menulis akhir cerita kita. Aku ikut untuk membuktikannya salah.",
+      "fateLine": "Orin membiarkan halaman terakhir bukunya kosong. Untuk pertama kalinya, ia tidak takut.",
       "recruitChapter": 2
     },
     {
@@ -81,6 +89,7 @@
       "slot": 8,
       "bio": "Mira merawat hal-hal kecil: obat, jalur evakuasi, kursi sekolah yang kosong. Ketika para pahlawan sibuk memecahkan rahasia, ia membangun cara hidup yang tidak perlu mengorbankan seseorang agar terasa aman.",
       "joinLine": "Kursi sekolah masih kosong. Aku ikut supaya ada yang pulang untuk mengisinya.",
+      "fateLine": "Mira masih menghitung ember, dan kota masih hidup.",
       "recruitChapter": 4
     },
     {
@@ -90,6 +99,7 @@
       "slot": 4,
       "bio": "Tamsin menyanyikan lagu yang tidak diingat siapa pun di Emberhollow, lengkap dengan bait tentang tujuh belas anak yang hilang. Ia bukan saksi; ia hanya tidak pernah membayar lonceng dengan ingatannya. Lagunya menjadi arsip yang bisa berjalan.",
       "joinLine": "Lagu ini punya tujuh belas bait, satu untuk setiap anak. Aku akan menyanyikannya sampai kalian ingat.",
+      "fateLine": "Tamsin mengajarkan tujuh belas bait itu di sekolah.",
       "recruitChapter": 5
     },
     {
@@ -99,6 +109,7 @@
       "slot": 7,
       "bio": "Vesper dulu memungut ongkos ingatan di Feri Kaca. Ia tahu rasa setiap kenangan yang pernah dijual penumpang, dan membenci dirinya karena menikmatinya. Kutukannya adalah cara mengembalikan beban kepada yang menciptakannya.",
       "joinLine": "Aku pernah menjual ongkos ingatan. Sekarang aku menagihnya kembali dari yang menetapkan harganya.",
+      "fateLine": "Vesper membuka kedai tempat orang menceritakan kenangan tanpa membayar.",
       "recruitChapter": 6
     },
     {
@@ -108,6 +119,7 @@
       "slot": 6,
       "bio": "Pell memperbaiki jam kota sejak umur sembilan dan diam-diam menulis catatan di setiap roda gigi. Di bangsal paduan suara, Pell menemukan bahwa mesin yang dirawatnya ikut menyimpan nyawa. Sekarang Pell membangun alat yang bisa dimatikan siapa saja.",
       "joinLine": "Setiap roda gigi yang kubuat punya tombol mati. Itu janjiku pada kalian.",
+      "fateLine": "Jam kota kembali berdetak, dengan tombol mati di depan.",
       "recruitChapter": 7
     },
     {
@@ -117,6 +129,7 @@
       "slot": 1,
       "bio": "Koa bertapa di Frostward, menghitung napas agar tidak menghitung hari. Ia menulis surat untuk party di putaran sebelumnya dan lupa pernah mengirimnya. Tinjunya pelan, tetapi tidak pernah ragu.",
       "joinLine": "Aku berhenti menghitung hari dan mulai menghitung napas. Napas berikutnya untuk perjalanan ini.",
+      "fateLine": "Koa berhenti menghitung napas. Ia mulai menghitung musim.",
       "recruitChapter": 9
     },
     {
@@ -126,6 +139,7 @@
       "slot": 5,
       "bio": "Ilse bernyanyi di pemakaman tanpa nama, untuk orang-orang yang belum meninggal. Ia percaya lagu duka bisa menjadi janji: kita akan berusaha agar lagu ini tidak pernah dibutuhkan.",
       "joinLine": "Aku menyanyi untuk orang yang belum meninggal. Bantu aku membuat lagu itu tidak pernah dibutuhkan.",
+      "fateLine": "Lagu duka Ilse tak dibutuhkan musim ini.",
       "recruitChapter": 11
     },
     {
@@ -135,6 +149,7 @@
       "slot": 8,
       "bio": "Hale memimpin bengkel Koperasi Hearth dan mengubah lonceng-lonceng kecil menjadi alarm, pompa, dan pemanas. Baginya keselamatan adalah pekerjaan bersama yang membosankan, dan justru karena itu ia mempercayainya.",
       "joinLine": "Kota tanpa lonceng tetap butuh tanda bahaya. Aku membangunnya, dan kali ini setiap orang bisa mematikannya.",
+      "fateLine": "Alarm Hale berbunyi sekali setahun, untuk latihan.",
       "recruitChapter": 13
     }
   ],
@@ -4290,7 +4305,7 @@
     },
     "wraith-ash": {
       "id": "wraith-ash",
-      "name": "Ashbound The Unburied",
+      "name": "Ashbound Unburied",
       "title": "ASHBOUND · OATHBOUND WRAITH",
       "description": "Memburu jiwa terlemah, lalu memukul seluruh party dengan ratapan. Mark tetap mengikuti target saat dipindah. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Heal menjelang mark, Guard saat ratapan. Bunuh spirit minion agar mereka tidak menghabisi target.",
@@ -4308,7 +4323,7 @@
     },
     "wraith-frost": {
       "id": "wraith-frost",
-      "name": "Frostbound The Unburied",
+      "name": "Frostbound Unburied",
       "title": "FROSTBOUND · OATHBOUND WRAITH",
       "description": "Memburu jiwa terlemah, lalu memukul seluruh party dengan ratapan. Mark tetap mengikuti target saat dipindah. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Heal menjelang mark, Guard saat ratapan. Bunuh spirit minion agar mereka tidak menghabisi target.",
@@ -4326,7 +4341,7 @@
     },
     "wraith-auric": {
       "id": "wraith-auric",
-      "name": "Gilded The Unburied",
+      "name": "Gilded Unburied",
       "title": "GILDED · OATHBOUND WRAITH",
       "description": "Memburu jiwa terlemah, lalu memukul seluruh party dengan ratapan. Mark tetap mengikuti target saat dipindah. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Heal menjelang mark, Guard saat ratapan. Bunuh spirit minion agar mereka tidak menghabisi target.",
@@ -4620,7 +4635,7 @@
     },
     "revenant-ash": {
       "id": "revenant-ash",
-      "name": "Ashbound The Last Watch",
+      "name": "Ashbound Last Watch",
       "title": "ASHBOUND · HOLLOW REVENANT",
       "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka.",
@@ -4639,7 +4654,7 @@
     },
     "revenant-frost": {
       "id": "revenant-frost",
-      "name": "Frostbound The Last Watch",
+      "name": "Frostbound Last Watch",
       "title": "FROSTBOUND · HOLLOW REVENANT",
       "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka.",
@@ -4658,7 +4673,7 @@
     },
     "revenant-auric": {
       "id": "revenant-auric",
-      "name": "Gilded The Last Watch",
+      "name": "Gilded Last Watch",
       "title": "GILDED · HOLLOW REVENANT",
       "description": "Penjaga tanpa jam pulang: menantang skill terkuat, menyapu depan, lalu membunyikan sumpah seluruh grid. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Tahan burst pada hero yang ditandai. Simpan Shield Bash atau Guard untuk sumpah all-grid; setelahnya ia memburu yang terluka.",
@@ -4927,7 +4942,7 @@
     },
     "colossus-frost": {
       "id": "colossus-frost",
-      "name": "Frostbound Frostward Colossus",
+      "name": "Frostward Colossus",
       "title": "FROSTBOUND · GLACIER COLOSSUS",
       "description": "Raksasa es yang lambat namun menambal retakannya sendiri. Hantaman lantainya membekukan semua tile. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Interval panjang memberi waktu reposisi. Simpan interrupt untuk Ritus Pemulihan dan Guard untuk hantaman grid.",
@@ -4965,7 +4980,7 @@
     },
     "choir-ash": {
       "id": "choir-ash",
-      "name": "Ashbound The Hollow Choir",
+      "name": "Ashbound Hollow Choir",
       "title": "ASHBOUND · BELL CHOIR",
       "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Ashbound: urutan intent sama, HP dan damage lebih tinggi.",
       "counter": "Idealnya dua interrupt: satu untuk Lonceng Senyap, satu untuk Ritus Pemulihan. Guard menahan ritual grid.",
@@ -4984,7 +4999,7 @@
     },
     "choir-frost": {
       "id": "choir-frost",
-      "name": "Frostbound The Hollow Choir",
+      "name": "Frostbound Hollow Choir",
       "title": "FROSTBOUND · BELL CHOIR",
       "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Frostbound: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Idealnya dua interrupt: satu untuk Lonceng Senyap, satu untuk Ritus Pemulihan. Guard menahan ritual grid.",
@@ -5003,7 +5018,7 @@
     },
     "choir-auric": {
       "id": "choir-auric",
-      "name": "Gilded The Hollow Choir",
+      "name": "Gilded Hollow Choir",
       "title": "GILDED · BELL CHOIR",
       "description": "Paduan suara tanpa wajah dari mesin lonceng. Nadanya membekukan cooldown dan menyanyikan ulang luka mereka. Varian Gilded: urutan intent bergeser, intent datang lebih cepat, HP dan damage lebih tinggi.",
       "counter": "Idealnya dua interrupt: satu untuk Lonceng Senyap, satu untuk Ritus Pemulihan. Guard menahan ritual grid.",
@@ -5485,6 +5500,7 @@
           "kind": "wave",
           "name": "The scent of cinders",
           "hp": 350,
+          "beat": "Jejak Sable berhenti di batang yang hangus. Serigala tidak memakan mangsanya; mereka menjaganya.",
           "combatHp": 770
         },
         {
@@ -5492,6 +5508,7 @@
           "kind": "wave",
           "name": "Scavenger barricade",
           "hp": 470,
+          "beat": "Pemulung menimbun barang curian di balik barikade. Salah satunya kuitansi bertuliskan nama Sable.",
           "combatHp": 1034
         },
         {
@@ -5499,6 +5516,7 @@
           "kind": "miniboss",
           "name": "Silk across the path",
           "hp": 700,
+          "beat": "Sutra Silk Widow masih hangat. Sesuatu di bawah hutan sedang ditenun menjadi kepompong.",
           "combatHp": 1540
         },
         {
@@ -5506,6 +5524,7 @@
           "kind": "boss",
           "name": "The root that remembers",
           "hp": 1150,
+          "beat": "Mournbark membelit Sable dengan akar yang mengingat. Potong akarnya, bukan pohonnya.",
           "combatHp": 2530
         }
       ],
@@ -5529,6 +5548,7 @@
           "kind": "wave",
           "name": "Stolen relics",
           "hp": 800,
+          "beat": "Pemulung menjual relik reruntuhan kepada siapa pun yang mau membeli. Rune Orin tergores di setiap peti.",
           "combatHp": 1560
         },
         {
@@ -5536,6 +5556,7 @@
           "kind": "wave",
           "name": "The false voice",
           "hp": 1000,
+          "beat": "Suara Orin memanggil dari dua arah sekaligus.",
           "combatHp": 1950
         },
         {
@@ -5543,6 +5564,7 @@
           "kind": "miniboss",
           "name": "Warden of the bridge",
           "hp": 1600,
+          "beat": "Ironroot menjaga jembatan seolah masih menunggu perintah para penjaga lama.",
           "combatHp": 3120
         },
         {
@@ -5550,6 +5572,7 @@
           "kind": "boss",
           "name": "The oath below",
           "hp": 2400,
+          "beat": "The Unburied mengucapkan sumpah para penjaga dengan suara Orin. Jangan jawab panggilannya.",
           "combatHp": 4680
         }
       ],
@@ -5574,6 +5597,7 @@
           "kind": "wave",
           "name": "Brood at the walls",
           "hp": 1300,
+          "beat": "Kawanan Silk Widow merayap di tembok luar. Bran menahan gerbang dengan perisai cadangannya.",
           "combatHp": 2288
         },
         {
@@ -5581,6 +5605,7 @@
           "kind": "wave",
           "name": "The hungry vanguard",
           "hp": 1450,
+          "beat": "Ashfang memimpin barisan depan yang lapar. Dari menara, Kestrel membunyikan lonceng kecilnya: bertahan.",
           "combatHp": 2552
         },
         {
@@ -5588,6 +5613,7 @@
           "kind": "miniboss",
           "name": "Cantor of the siege",
           "hp": 2300,
+          "beat": "Cantor mencoba merebut lonceng ketiga dengan nyanyiannya. Putuskan ritualnya sebelum menara runtuh.",
           "combatHp": 4048
         },
         {
@@ -5595,6 +5621,7 @@
           "kind": "boss",
           "name": "Ironroot awakens",
           "hp": 3800,
+          "beat": "Ironroot menggedor pintu menara. Kestrel menghitung dentangnya.",
           "combatHp": 6688
         }
       ],
@@ -5619,6 +5646,7 @@
           "kind": "wave",
           "name": "Echoes of the lost",
           "hp": 2000,
+          "beat": "Gema mereka yang hilang berjalan di samping kita. The Unburied mengenali nama yang belum kita ingat.",
           "combatHp": 4080
         },
         {
@@ -5626,6 +5654,7 @@
           "kind": "wave",
           "name": "The final chorus",
           "hp": 2350,
+          "beat": "Cantor terakhir menyanyikan mimpi yang bukan miliknya. Nyx dan Mira bertahan di balik segel; lindungi mereka dari nyanyiannya.",
           "combatHp": 4794
         },
         {
@@ -5633,6 +5662,7 @@
           "kind": "miniboss",
           "name": "Heart of the forest",
           "hp": 3500,
+          "beat": "Mournbark tumbuh dari jantung hutan yang sedang bermimpi. Akar-akarnya merindukan dunia tanpa manusia.",
           "combatHp": 7140
         },
         {
@@ -5640,6 +5670,7 @@
           "kind": "boss",
           "name": "A guardian dreaming",
           "hp": 6200,
+          "beat": "Vharok bermimpi. Jangan bangunkan rasa laparnya.",
           "combatHp": 12648
         }
       ],
@@ -5651,8 +5682,8 @@
       "name": "The Empty Census",
       "subtitle": "ACT II · A town that forgot its children",
       "speaker": "MIRA · THE SCHOOLHOUSE",
-      "intro": "Pagi setelah Vharok terbangun, lonceng berbunyi tujuh belas kali. Tidak ada yang tahu mengapa. Mira menemukan tujuh belas kursi kecil di sekolah; warga bersikeras Emberhollow tidak pernah punya anak.\n\nDi belakang papan tulis, sebuah garis tinggi badan ditulis dengan tangan Aldric. Namanya bukan nama anak. Namanya sendiri. Garis terakhir bertanggal besok.\n\nKita pergi mencari arsip sekolah di desa sebelah. Lyra membawa bekal untuk empat orang, lalu menatap tiga kantong yang tersisa. Ia tidak ingat siapa yang hilang.",
-      "outro": "Buku sensus tersimpan di rongga Ironroot. Setiap halaman memiliki cap lonceng. Tujuh belas nama telah dicoret, tetapi tinta di ujung jarinya masih basah.\n\nAldric membaca salah satunya: Elian. Ia tidak mengenali nama itu. Tubuhnya menangis lebih dulu. Di samping nama tersebut, tulisan tangannya berbunyi: SAYA SETUJU MENUKARNYA.",
+      "intro": "Pagi setelah Vharok terbangun, lonceng berbunyi tujuh belas kali. Tidak ada yang tahu mengapa. Mira menemukan tujuh belas kursi kecil di sekolah; warga bersikeras Emberhollow tidak pernah punya anak.\n\nDi belakang papan tulis, sebuah garis tinggi badan ditulis dengan tangan Aldric. Namanya bukan nama anak. Namanya sendiri. Garis terakhir bertanggal besok.\n\nKita pergi mencari arsip sekolah di desa sebelah. Lyra membawa bekal untuk empat orang, lalu menatap tiga kantong yang tersisa. Ia tidak ingat siapa yang hilang.\n\nDi gerbang desa sebelah, seorang penyanyi jalanan bernama Tamsin menyanyikan tujuh belas bait yang tak dikenal siapa pun. Ia berhenti di bait terakhir dan menatap Aldric.",
+      "outro": "Buku sensus tersimpan di rongga Ironroot. Setiap halaman memiliki cap lonceng. Tujuh belas nama telah dicoret, tetapi tinta di ujung jari Aldric masih basah.\n\nTamsin menyanyikan bait yang ia lewatkan. Namanya Elian. “Aku tak pernah membayar lonceng. Lagunya masih utuh.”\n\nAldric mencari nama itu di sensus. Ia tidak mengenalinya. Tubuhnya menangis lebih dulu. Di samping nama tersebut, tulisan tangannya berbunyi: SAYA SETUJU MENUKARNYA.",
       "enemies": [
         "wolf-ash",
         "moth",
@@ -5662,9 +5693,9 @@
       ],
       "beats": [
         "Mainan dari arang terserak di jalan. Jejak kecil berhenti tepat di tepi wilayah lonceng.",
+        "Di dalam kepompong Lantern Eater: daftar nama, dibungkus agar tidak dicuri angin.",
         "Pemulung memakai lencana murid. Mereka mempertahankan kotak makan kosong, bukan harta.",
-        "Di dalam kepompong: daftar nama, dibungkus agar tidak dicuri angin.",
-        "Cantor bernyanyi memakai suara anak yang tak seorang pun bisa ingat.",
+        "The Last Watch memanggil absen dengan suara anak yang tak seorang pun bisa ingat.",
         "Ironroot menutupi pintu arsip. Di pelat dadanya terukir: JANGAN BIARKAN MEREKA MEMBAYAR DUA KALI."
       ],
       "recruit": [
@@ -5685,7 +5716,7 @@
           "kind": "wave",
           "name": "Pursuit · The Empty Census",
           "hp": 1456,
-          "beat": "Pemulung memakai lencana murid. Mereka mempertahankan kotak makan kosong, bukan harta.",
+          "beat": "Di dalam kepompong Lantern Eater: daftar nama, dibungkus agar tidak dicuri angin.",
           "combatHp": 5125
         },
         {
@@ -5693,7 +5724,7 @@
           "kind": "wave",
           "name": "Pressure · The Empty Census",
           "hp": 1690,
-          "beat": "Di dalam kepompong: daftar nama, dibungkus agar tidak dicuri angin.",
+          "beat": "Pemulung memakai lencana murid. Mereka mempertahankan kotak makan kosong, bukan harta.",
           "combatHp": 5949
         },
         {
@@ -5701,7 +5732,7 @@
           "kind": "miniboss",
           "name": "The threshold · The Empty Census",
           "hp": 2470,
-          "beat": "Cantor bernyanyi memakai suara anak yang tak seorang pun bisa ingat.",
+          "beat": "The Last Watch memanggil absen dengan suara anak yang tak seorang pun bisa ingat.",
           "combatHp": 8694
         },
         {
@@ -5721,8 +5752,8 @@
       "name": "The Glass Ferry",
       "subtitle": "ACT II · Pay the river with a memory",
       "speaker": "NYX · AT THE WATERLINE",
-      "intro": "Sensus menyebut sebuah kapal yang menyeberang tanpa penumpang. Nyx mengenali lambang di tiket: bengkel tempat ia belajar mengukir. Bengkel itu belum dibangun.\n\nPenjaga feri menerima ingatan sebagai ongkos. Sable menawarkan ingatan tentang dompet yang pernah ia curi. Penjaga menolak: “Bukan sesuatu yang ingin kau lupakan.”\n\nRowan menyerahkan lagu yang diajarkan ibunya. Ia masih ingat wajahnya, tetapi saat mencoba bersenandung, tak ada suara. Kita naik sebelum harga tiket berubah.",
-      "outro": "Di seberang, lagu Rowan terdengar dari mulut makhluk yang kita kalahkan. Wraith menyerahkan tiket balik: penumpangnya tercatat sebagai bahan bakar, bukan warga.\n\nLonceng tidak mengusir monster. Lonceng memisahkan ingatan yang menyakitkan dari pemiliknya. Yang dibuang ke hutan belajar berjalan. Monster pertama yang kita bunuh mungkin pernah menjadi rasa takut kita sendiri.",
+      "intro": "Sensus menyebut sebuah kapal yang menyeberang tanpa penumpang. Nyx mengenali lambang di tiket: bengkel tempat ia belajar mengukir. Bengkel itu belum dibangun.\n\nVesper, penjaga feri, menerima ingatan sebagai ongkos. Sable menawarkan ingatan tentang dompet yang pernah ia curi. Vesper menolak: “Bukan sesuatu yang ingin kau lupakan.”\n\nRowan menyerahkan lagu yang diajarkan ibunya. Ia masih ingat wajahnya, tetapi saat mencoba bersenandung, tak ada suara. Kita naik sebelum harga tiket berubah.",
+      "outro": "Di seberang, lagu Rowan terdengar dari mulut makhluk yang kita kalahkan. Wraith menyerahkan tiket balik: penumpangnya tercatat sebagai bahan bakar, bukan warga.\n\nLonceng tidak mengusir monster. Lonceng memisahkan ingatan yang menyakitkan dari pemiliknya. Yang dibuang ke hutan belajar berjalan. Monster pertama yang kita bunuh mungkin pernah menjadi rasa takut kita sendiri.\n\nDi dermaga, Vesper merobek buku ongkosnya. “Aku mencicipi setiap kenangan yang dijual di sini. Biar kukembalikan beratnya kepada yang menetapkan harga.”",
       "enemies": [
         "spider-ash",
         "harpy",
@@ -5791,8 +5822,8 @@
       "name": "The Choir Ward",
       "subtitle": "ACT II · The healer who remembers too much",
       "speaker": "LYRA · OUTSIDE THE WHITE WARD",
-      "intro": "Lyra meminta kita tidak masuk rumah sakit lama. Ia mengenali setiap jendela meski bangunan itu ditinggalkan sebelum ia lahir.\n\nDi kamar paling ujung, ada sembilan tempat tidur. Buku perawat mencatat nama party kita, kecuali Lyra. Namanya ada di sampul sebagai kepala percobaan.\n\n“Kalau aku meminta kalian melupakan ini,” katanya, “jangan percaya aku.” Ia menyerahkan kunci ruangan kepada Sable dan berjalan paling depan.",
-      "outro": "Lyra bukan kepala percobaan. Ia adalah ingatan rasa bersalah milik kepala percobaan, diberi tubuh agar dapat merawat para korban. Tidak ada tanggal lahirnya; hanya tanggal keputusan untuk menyesal.\n\nAldric tidak mengangkat senjata. “Kau sudah menyelamatkanku berkali-kali. Itu cukup nyata.” Untuk pertama kalinya, Lyra memilih namanya sendiri alih-alih nama dalam arsip.",
+      "intro": "Lyra meminta kita tidak masuk rumah sakit lama. Ia mengenali setiap jendela meski bangunan itu ditinggalkan sebelum ia lahir.\n\nDi kamar paling ujung, ada satu ranjang untuk setiap anggota party. Buku perawat mencatat nama party kita, kecuali Lyra. Namanya ada di sampul sebagai kepala percobaan.\n\n“Kalau aku meminta kalian melupakan ini,” katanya, “jangan percaya aku.” Ia menyerahkan kunci ruangan kepada Sable dan berjalan paling depan.",
+      "outro": "Lyra bukan kepala percobaan. Ia adalah ingatan rasa bersalah milik kepala percobaan, diberi tubuh agar dapat merawat para korban. Tidak ada tanggal lahirnya; hanya tanggal keputusan untuk menyesal.\n\nAldric tidak mengangkat senjata. “Kau sudah menyelamatkanku berkali-kali. Itu cukup nyata.” Untuk pertama kalinya, Lyra memilih namanya sendiri alih-alih nama dalam arsip.\n\nPell memasang tombol mati pada mesin bangsal, lalu ikut berjalan keluar bersama kita.",
       "enemies": [
         "shaman-ash",
         "spider-ash",
@@ -5802,10 +5833,10 @@
       ],
       "beats": [
         "Botol obat berlabel kata-kata: amarah, rindu, malu. Semuanya kosong.",
-        "Catatan perawatan selalu berakhir pada hari yang sama, lalu dimulai kembali.",
+        "Pell, pembuat jam muda, memperbaiki mesin bangsal. Di setiap roda gigi ada catatan: siapa yang tidur di ranjang ini.",
         "Sebuah pesan ditulis di bawah ranjang: jika Lyra lupa, tolong ingatkan bahwa ia pernah baik.",
-        "Cantor menuntut Lyra pulang ke penciptanya. Party berdiri menghalangi pintu.",
-        "Choirmaster mengaku dapat membuat rasa bersalah Lyra hilang. Ia menolak dengan mengangkat tongkatnya."
+        "The Last Watch menuntut Lyra pulang ke penciptanya. Party berdiri menghalangi pintu.",
+        "Pale Archivist mengaku dapat menghapus rasa bersalah Lyra dari catatan. Ia menolak dengan mengangkat tongkatnya."
       ],
       "recruit": [
         11
@@ -5825,7 +5856,7 @@
           "kind": "wave",
           "name": "Pursuit · The Choir Ward",
           "hp": 2016,
-          "beat": "Catatan perawatan selalu berakhir pada hari yang sama, lalu dimulai kembali.",
+          "beat": "Pell, pembuat jam muda, memperbaiki mesin bangsal. Di setiap roda gigi ada catatan: siapa yang tidur di ranjang ini.",
           "combatHp": 7237
         },
         {
@@ -5841,7 +5872,7 @@
           "kind": "miniboss",
           "name": "The threshold · The Choir Ward",
           "hp": 3420,
-          "beat": "Cantor menuntut Lyra pulang ke penciptanya. Party berdiri menghalangi pintu.",
+          "beat": "The Last Watch menuntut Lyra pulang ke penciptanya. Party berdiri menghalangi pintu.",
           "combatHp": 12278
         },
         {
@@ -5849,7 +5880,7 @@
           "kind": "boss",
           "name": "The reckoning · The Choir Ward",
           "hp": 5760,
-          "beat": "Choirmaster mengaku dapat membuat rasa bersalah Lyra hilang. Ia menolak dengan mengangkat tongkatnya.",
+          "beat": "Pale Archivist mengaku dapat menghapus rasa bersalah Lyra dari catatan. Ia menolak dengan mengangkat tongkatnya.",
           "combatHp": 20678
         }
       ],
@@ -5862,7 +5893,7 @@
       "subtitle": "ACT II · Return to a sanctuary that hunts",
       "speaker": "SABLE · EMBERHOLLOW EAST WALL",
       "intro": "Pulang seharusnya aman. Namun jam kota berhenti pada pukul tiga belas dan pintu rumah tidak mengenali pemiliknya.\n\nWali kota menunjukkan kontrak: semua warga pernah memilih perlindungan lonceng. Bahkan Aldric. Yang tidak tertulis adalah bahwa persetujuan itu diperbarui setiap kali ingatan mereka dihapus.\n\nVharok mendarat tanpa menyerang. Ia menunggu jawaban kita. Mengembalikan segel telah memperbaiki mesin yang seharusnya kita hentikan.",
-      "outro": "Kita memutus pengulang di menara. Ingatan warga kembali sekaligus: cinta, kehilangan, dan semua janji yang mereka langgar. Tidak ada perayaan. Ada rumah yang pintunya dibuka kembali untuk orang asing yang ternyata keluarga.\n\nDari dalam lonceng, terdengar suara Elian: “Ayah, ini bukan putaran pertama.” Aldric menatap bekas luka yang selalu ia anggap tanda kemenangan. Ternyata itu tanda jumlah kegagalannya.",
+      "outro": "Simpul pecah. Vharok bangkit, terluka tapi bebas. Kita memutus pengulang di menara. Ingatan warga kembali sekaligus: cinta, kehilangan, dan semua janji yang mereka langgar. Tidak ada perayaan. Ada rumah yang pintunya dibuka kembali untuk orang asing yang ternyata keluarga.\n\nDari dalam lonceng, terdengar suara Elian: “Ayah, ini bukan putaran pertama.” Aldric menatap bekas luka yang selalu ia anggap tanda kemenangan. Ternyata itu tanda jumlah kegagalannya.",
       "enemies": [
         "goblin-ash",
         "knight",
@@ -5918,6 +5949,8 @@
           "name": "The reckoning · The Thirteenth Stroke",
           "hp": 6560,
           "beat": "Vharok menahan mesin dengan tubuhnya. Hancurkan simpul yang menguasainya, bukan sang penjaga.",
+          "enemyName": "Simpul Ketiga Belas",
+          "enemyTitle": "MENUNGGANGI VHAROK",
           "combatHp": 24141
         }
       ],
@@ -5929,8 +5962,8 @@
       "name": "Winter Ledger",
       "subtitle": "ACT III · A history written in future tense",
       "speaker": "ORIN · THE NORTHERN ARCHIVE",
-      "intro": "Mesin masih memiliki jantung jauh di utara. Orin membawa peta yang berubah setiap malam. Satu rute selalu kembali ke menara; rute lain belum pernah dicoba.\n\nArsip beku menyimpan surat-surat yang ditulis party pada putaran sebelumnya. Sebagian meminta kita menyerah. Satu surat dari Bran hanya berkata: “Aku selalu datang terlalu terlambat. Kali ini tunggu aku.”\n\nKita menunggu. Di atas salju, untuk pertama kalinya, ada sembilan pasang jejak yang berjalan bersama.",
-      "outro": "Catatan terakhir menjelaskan mengapa penjara itu berulang. Jantung mesin bernama Elian, tetapi ia bukan anak yang ditawan. Ia adalah masa depan Elian yang tidak jadi terjadi, dijahit dari semua kemungkinan yang ditukar demi menyelamatkan kota.\n\nAldric tidak memilih melupakan anaknya. Ia memilih menyerahkan hari esok anaknya agar semua orang punya hari ini. Mesin menghapus ingatannya supaya ia sanggup memilih hal yang sama lagi.",
+      "intro": "Mesin masih memiliki jantung jauh di utara. Orin membawa peta yang berubah setiap malam. Satu rute selalu kembali ke menara; rute lain belum pernah dicoba.\n\nArsip beku menyimpan surat-surat untuk party dari putaran sebelumnya, semuanya dalam satu tulisan tangan yang sama. Sebagian meminta kita menyerah. Satu surat menyalin pesan Bran: “Aku selalu datang terlalu terlambat. Kali ini tunggu aku.”\n\nKita menunggu. Di atas salju, untuk pertama kalinya, semua jejak kita berjalan bersama.",
+      "outro": "Catatan terakhir menjelaskan mengapa penjara itu berulang. Jantung mesin bernama Elian, tetapi ia bukan anak yang ditawan. Ia adalah masa depan Elian yang tidak jadi terjadi, dijahit dari semua kemungkinan yang ditukar demi menyelamatkan kota.\n\nAldric tidak memilih melupakan anaknya. Ia memilih menyerahkan hari esok anaknya agar semua orang punya hari ini. Mesin menghapus ingatannya supaya ia sanggup memilih hal yang sama lagi.\n\nKoa melipat surat terakhirnya dan, untuk pertama kalinya, mengantarnya sendiri.",
       "enemies": [
         "wolf-frost",
         "harpy-frost",
@@ -5941,9 +5974,9 @@
       "beats": [
         "Tulisan di salju muncul sebelum langkah kaki kita menyentuhnya.",
         "Sarang es menyimpan surat dari diri kita yang lebih tua.",
-        "Pemulung membakar halaman yang belum kita baca. Mereka takut pada isinya.",
-        "Penjaga arsip menghitung sembilan pengunjung, lalu memanggil sepuluh nama.",
-        "Wraith menawarkan satu masa depan tanpa kehilangan. Harganya adalah semua masa depan yang lain."
+        "Glassjaw memantulkan halaman yang belum kita baca. Jangan membacanya di cermin itu.",
+        "Penjaga arsip, Koa, memanggil satu nama lagi: namanya sendiri, dari surat yang ia tulis di putaran lalu.",
+        "Frostward Colossus menawarkan satu masa depan tanpa kehilangan, membeku selamanya. Harganya adalah semua masa depan yang lain."
       ],
       "recruit": [
         12
@@ -5971,7 +6004,7 @@
           "kind": "wave",
           "name": "Pressure · Winter Ledger",
           "hp": 2990,
-          "beat": "Pemulung membakar halaman yang belum kita baca. Mereka takut pada isinya.",
+          "beat": "Glassjaw memantulkan halaman yang belum kita baca. Jangan membacanya di cermin itu.",
           "combatHp": 11392
         },
         {
@@ -5979,7 +6012,7 @@
           "kind": "miniboss",
           "name": "The threshold · Winter Ledger",
           "hp": 4370,
-          "beat": "Penjaga arsip menghitung sembilan pengunjung, lalu memanggil sepuluh nama.",
+          "beat": "Penjaga arsip, Koa, memanggil satu nama lagi: namanya sendiri, dari surat yang ia tulis di putaran lalu.",
           "combatHp": 16650
         },
         {
@@ -5987,7 +6020,7 @@
           "kind": "boss",
           "name": "The reckoning · Winter Ledger",
           "hp": 7360,
-          "beat": "Wraith menawarkan satu masa depan tanpa kehilangan. Harganya adalah semua masa depan yang lain.",
+          "beat": "Frostward Colossus menawarkan satu masa depan tanpa kehilangan, membeku selamanya. Harganya adalah semua masa depan yang lain.",
           "combatHp": 28042
         }
       ],
@@ -5999,7 +6032,7 @@
       "name": "The Unborn Orchard",
       "subtitle": "ACT III · Harvest what never happened",
       "speaker": "ROWAN · BENEATH THE PALE TREES",
-      "intro": "Pohon utara tidak berbuah apel. Di setiap dahan tergantung sebuah kemungkinan: tangan yang sempat ditolong, surat yang sempat dikirim, seorang anak yang sempat dewasa.\n\nRowan menemukan lagunya. Jika dipetik, ia akan ingat kembali suara ibunya. Namun dahan itu juga menyangga jalur untuk para pengungsi. Ia membiarkannya tumbuh.\n\nKita mencari benih yang bisa menumbuhkan waktu tanpa memakannya. Para penjaga kebun mengenali Aldric sebagai pemilik pertama kapak itu.",
+      "intro": "Pohon utara tidak berbuah apel. Di setiap dahan tergantung sebuah kemungkinan: tangan yang sempat ditolong, surat yang sempat dikirim, seorang anak yang sempat dewasa.\n\nRowan menemukan lagunya. Jika dipetik, ia akan ingat kembali suara ibunya. Namun dahan itu juga menyangga jalur untuk para pengungsi. Ia membiarkannya tumbuh.\n\nKita mencari benih yang bisa menumbuhkan waktu tanpa memakannya. Para penjaga kebun mengenali Aldric sebagai pemilik pertama perisai itu.",
       "outro": "Benih yang kita dapat tidak memulihkan masa lalu. Ia membiarkan dua hal benar sekaligus: kota pernah diselamatkan, dan caranya salah.\n\nLyra berhenti mencoba membuktikan bahwa ia manusia. Ia mulai bertanya kehidupan seperti apa yang ingin ia jalani. Di belakang kita, kebun berbunga untuk sesuatu yang belum hilang.",
       "enemies": [
         "spider-frost",
@@ -6010,8 +6043,8 @@
       ],
       "beats": [
         "Setiap buah menampilkan wajah yang hampir kita kenal.",
-        "Mournbark melindungi dahan muda dengan tubuhnya yang retak.",
-        "Ashfang tidak memburu kita; ia memburu bayangan masa depan di belakang kita.",
+        "Lantern Eater mengerubungi dahan muda, memakan cahaya kemungkinan yang belum matang.",
+        "Glassmere Hydra tidak memburu kita; tiga kepalanya memburu bayangan masa depan di belakang kita.",
         "Cantor menukar suara-suara kemungkinan sampai tidak bisa menyebut namanya sendiri.",
         "Jangan bakar akar. Lepaskan parasit yang hidup dari janji tidak ditepati."
       ],
@@ -6031,7 +6064,7 @@
           "kind": "wave",
           "name": "Pursuit · The Unborn Orchard",
           "hp": 2856,
-          "beat": "Mournbark melindungi dahan muda dengan tubuhnya yang retak.",
+          "beat": "Lantern Eater mengerubungi dahan muda, memakan cahaya kemungkinan yang belum matang.",
           "combatHp": 10367
         },
         {
@@ -6039,7 +6072,7 @@
           "kind": "wave",
           "name": "Pressure · The Unborn Orchard",
           "hp": 3315,
-          "beat": "Ashfang tidak memburu kita; ia memburu bayangan masa depan di belakang kita.",
+          "beat": "Glassmere Hydra tidak memburu kita; tiga kepalanya memburu bayangan masa depan di belakang kita.",
           "combatHp": 12033
         },
         {
@@ -6067,8 +6100,8 @@
       "name": "Nine Funerals",
       "subtitle": "ACT III · Fight the party that took the easier road",
       "speaker": "BRAN · THE NAMELESS CEMETERY",
-      "intro": "Sembilan makam menunggu kita, lengkap dengan tanggal yang belum tiba. Bran mengenali batu nisannya: ia sendiri yang memahatnya pada putaran ketika seluruh party pulang kecuali dirinya.\n\nDi balik makam berdiri penjaga-penjaga putih. Mereka bukan kita yang telah mati. Mereka adalah keputusan-keputusan kita yang memilih berhenti mencoba.\n\nSable menghitung senjata mereka. “Mereka tahu semua trik lama kita.” Nyx tersenyum tipis. “Untung kita sudah ganti build.”",
-      "outro": "Makam kosong tidak runtuh saat kita menang. Kita hanya mencabut tanggalnya. Kematian tetap mungkin; kepastian bukan takdir.\n\nBran meninggalkan surat di atas nisannya: kali ini kami menunggu. Kestrel mencatat semua nama agar kemenangan berikutnya tidak perlu dibayar dengan lupa.",
+      "intro": "Sembilan makam menunggu kita, berjajar tiga kali tiga seperti formasi kita, lengkap dengan tanggal yang belum tiba. Bran mengenali batu nisannya: ia sendiri yang memahatnya pada putaran ketika ia pulang sendirian.\n\nDi antara nisan, Ilse menyanyikan lagu duka untuk orang yang belum meninggal. Ia berhenti saat membaca nama kita.\n\nDi balik makam berdiri penjaga-penjaga putih. Mereka bukan kita yang telah mati. Mereka adalah keputusan-keputusan kita yang memilih berhenti mencoba.\n\nSable menghitung senjata mereka. “Mereka tahu semua trik lama kita.” Nyx tersenyum tipis. “Untung kita sudah ganti build.”",
+      "outro": "Makam kosong tidak runtuh saat kita menang. Kita hanya mencabut tanggalnya. Kematian tetap mungkin; kepastian bukan takdir.\n\nBran meninggalkan surat di atas nisannya: kali ini kami menunggu. Kestrel mencatat semua nama agar kemenangan berikutnya tidak perlu dibayar dengan lupa.\n\nIlse mencoret lagu duka dari buku nyanyiannya. “Lagu ini belum dibutuhkan,” katanya, lalu ikut pulang.",
       "enemies": [
         "goblin-frost",
         "revenant-frost",
@@ -6077,7 +6110,7 @@
         "wraith-frost"
       ],
       "beats": [
-        "Sembilan lilin menyala. Nyala kesepuluh muncul ketika Lyra mendekat.",
+        "Satu lilin untuk setiap nama di party. Satu nyala tambahan muncul tanpa nama.",
         "Lawan menandai hero terkuat: mereka mengenali strategi kita.",
         "Nama-nama di batu berubah setiap kali seseorang terluka.",
         "Bran memecah perisai yang serupa miliknya. Di baliknya ada surat yang ia tak pernah kirim.",
@@ -6093,7 +6126,7 @@
           "kind": "wave",
           "name": "Crossing · Nine Funerals",
           "hp": 2688,
-          "beat": "Sembilan lilin menyala. Nyala kesepuluh muncul ketika Lyra mendekat.",
+          "beat": "Satu lilin untuk setiap nama di party. Satu nyala tambahan muncul tanpa nama.",
           "combatHp": 11693
         },
         {
@@ -6138,7 +6171,7 @@
       "subtitle": "ACT III · Refuse the perfect rescue",
       "speaker": "ELIAN · THROUGH A CRACKED BELL",
       "intro": "Elian akhirnya berbicara tanpa mesin. Ia menawarkan jalan aman: ulangi satu kali lagi, dengan semua ingatan dipertahankan. Kita akan tahu setiap serangan dan tidak kehilangan siapa pun.\n\nOrin menunjukkan masalahnya. Janji itu tercatat di setiap putaran sebelumnya. Yang selalu hilang bukan ingatan mereka—melainkan kemampuan untuk percaya bahwa jalan lain mungkin.\n\nAldric menjawab anak yang tak pernah sempat ia kenal: “Aku tidak bisa menjanjikan kita semua selamat. Aku bisa menjanjikan aku tidak akan memilihkan hidupmu lagi.”",
-      "outro": "Pengulang waktu pecah. Untuk pertama kalinya, jam bergerak melewati tanggal yang tercatat di semua makam. Badai datang tanpa ramalan.\n\nElian tidak marah. Ia takut. Ia telah hidup sebagai kemungkinan selama ratusan putaran dan belum pernah punya satu menit yang benar-benar miliknya. Kita menyalakan api dan menunggu bersama sampai menit itu selesai.",
+      "outro": "Rantai di tubuh Vharok putus bersama ritus pengulang. Pengulang waktu pecah. Untuk pertama kalinya, jam bergerak melewati tanggal yang tercatat di semua makam. Badai datang tanpa ramalan.\n\nElian tidak marah. Ia takut. Ia telah hidup sebagai kemungkinan selama ratusan putaran dan belum pernah punya satu menit yang benar-benar miliknya. Kita menyalakan api dan menunggu bersama sampai menit itu selesai.",
       "enemies": [
         "wolf-frost",
         "choir",
@@ -6149,8 +6182,8 @@
       "beats": [
         "Pola serangan lama datang dalam urutan baru. Pengetahuan bukan jaminan.",
         "Mesin meniru suara seseorang yang paling kita rindukan.",
-        "Jejak pulang mulai menghilang dari peta. Tidak ada retry di dalam cerita ini.",
-        "Vharok berdiri di depan retakan waktu, menahan seluruh kemungkinan yang ingin kembali.",
+        "Jejak pulang mulai menghilang dari peta. Di dalam cerita ini, tidak ada putaran ulang.",
+        "Frostward Colossus berdiri di depan retakan waktu, menahannya tetap terbuka bagi setiap kemungkinan yang ingin kembali.",
         "Putuskan ritus pengulang. Guard untuk yang tak bisa dihindari; lindungi yang masih bisa diselamatkan."
       ],
       "recruit": [],
@@ -6177,7 +6210,7 @@
           "kind": "wave",
           "name": "Pressure · The Last Rehearsal",
           "hp": 3965,
-          "beat": "Jejak pulang mulai menghilang dari peta. Tidak ada retry di dalam cerita ini.",
+          "beat": "Jejak pulang mulai menghilang dari peta. Di dalam cerita ini, tidak ada putaran ulang.",
           "combatHp": 16534
         },
         {
@@ -6185,7 +6218,7 @@
           "kind": "miniboss",
           "name": "The threshold · The Last Rehearsal",
           "hp": 5795,
-          "beat": "Vharok berdiri di depan retakan waktu, menahan seluruh kemungkinan yang ingin kembali.",
+          "beat": "Frostward Colossus berdiri di depan retakan waktu, menahannya tetap terbuka bagi setiap kemungkinan yang ingin kembali.",
           "combatHp": 24165
         },
         {
@@ -6194,6 +6227,8 @@
           "name": "The reckoning · The Last Rehearsal",
           "hp": 9760,
           "beat": "Putuskan ritus pengulang. Guard untuk yang tak bisa dihindari; lindungi yang masih bisa diselamatkan.",
+          "enemyName": "Sang Pengulang",
+          "enemyTitle": "MEMBELENGGU VHAROK",
           "combatHp": 40699
         }
       ],
@@ -6205,8 +6240,8 @@
       "name": "A City Without Bells",
       "subtitle": "ACT IV · Safety has to be built together",
       "speaker": "KESTREL · THE OPEN SQUARE",
-      "intro": "Tanpa pengulang, Emberhollow bukan benteng lagi. Warga meminta kita menyalakan mesin. Sebagian tahu harganya dan tetap memilih aman.\n\nMira tidak berpidato. Ia menggambar jalur evakuasi, membagikan ember, dan mengajarkan cara membaca tanda monster. Keselamatan pertama yang tidak menuntut korban tersembunyi dibuat dari pekerjaan biasa.\n\nKita menjaga jalan cukup lama agar kota belajar menjaga dirinya. Lonceng kecil Kestrel kini berarti berkumpul, bukan patuh.",
-      "outro": "Kota bertahan tanpa menelan satu nama pun. Tidak semua bangunan selamat. Warga menuliskan yang hilang, lalu membangun lagi tanpa meminta siapa pun melupakannya.\n\nDi bekas sekolah, Aldric menggantung tujuh belas papan nama. Satu papan dibiarkan kosong, bukan karena lupa, tetapi karena pemiliknya belum memilih nama.",
+      "intro": "Tanpa pengulang, Emberhollow bukan benteng lagi. Warga meminta kita menyalakan mesin. Sebagian tahu harganya dan tetap memilih aman.\n\nMira tidak berpidato. Ia menggambar jalur evakuasi dan membagikan ember; Hale dari Koperasi Hearth mengajarkan cara membaca tanda monster. Keselamatan pertama yang tidak menuntut korban tersembunyi dibuat dari pekerjaan biasa.\n\nKita menjaga jalan cukup lama agar kota belajar menjaga dirinya. Lonceng kecil Kestrel kini berarti berkumpul, bukan patuh.",
+      "outro": "Kota bertahan tanpa menelan satu nama pun. Tidak semua bangunan selamat. Warga menuliskan yang hilang, lalu membangun lagi tanpa meminta siapa pun melupakannya.\n\nDi bekas sekolah, Aldric menggantung tujuh belas papan nama. Satu papan dibiarkan kosong, bukan karena lupa, tetapi karena pemiliknya belum memilih nama.\n\nEnam belas papan lain bertuliskan nama anak-anak yang masa depannya ditukar. Mereka tidak kembali; tetapi untuk pertama kalinya, keluarga mereka menangis dengan tahu alasannya. Tamsin menyanyikan enam belas bait, lalu membiarkan bait terakhir kosong.\n\nHale menggantung alarm terakhir di alun-alun dan menuliskan cara mematikannya tepat di bawahnya.",
       "enemies": [
         "goblin-auric",
         "harpy-auric",
@@ -6215,11 +6250,11 @@
         "hydra-auric"
       ],
       "beats": [
-        "Barikade dibuat warga, bukan sihir. Beri mereka waktu menyelesaikannya.",
+        "Hale dari Koperasi Hearth mengubah lonceng kecil menjadi alarm. Setiap warga memegang tombol untuk mematikannya.",
         "Jaga jalan utama; yang berlari di belakang party bukan minion, melainkan tetangga.",
         "Mira membagi obat tanpa meminta ingatan sebagai pembayaran.",
         "Golem memakai lonceng lama sebagai perisai. Pecahkan logamnya, bukan jalan evakuasi.",
-        "Akar terakhir menutup saluran air. Lepaskan aliran sebelum api mencapai rumah."
+        "Hydra terakhir melilit saluran air. Lepaskan aliran sebelum api mencapai rumah."
       ],
       "recruit": [
         14
@@ -6231,7 +6266,7 @@
           "kind": "wave",
           "name": "Crossing · A City Without Bells",
           "hp": 3168,
-          "beat": "Barikade dibuat warga, bukan sihir. Beri mereka waktu menyelesaikannya.",
+          "beat": "Hale dari Koperasi Hearth mengubah lonceng kecil menjadi alarm. Setiap warga memegang tombol untuk mematikannya.",
           "combatHp": 12704
         },
         {
@@ -6263,7 +6298,7 @@
           "kind": "boss",
           "name": "The reckoning · A City Without Bells",
           "hp": 10560,
-          "beat": "Akar terakhir menutup saluran air. Lepaskan aliran sebelum api mencapai rumah.",
+          "beat": "Hydra terakhir melilit saluran air. Lepaskan aliran sebelum api mencapai rumah.",
           "combatHp": 42346
         }
       ],
@@ -6344,7 +6379,7 @@
       "subtitle": "ACT IV · Carry a future that cannot fight",
       "speaker": "ELIAN · THE UNFINISHED ROOM",
       "intro": "Elian ingin meninggalkan mesin, tetapi ia belum punya tubuh. Benih dari kebun bisa memberinya satu kehidupan biasa. Bukan hidup yang direncanakan Aldric, bukan hidup yang dijanjikan mesin.\n\nKonsekuensinya jelas: semua kemungkinan Elian yang lain akan berhenti. Ia tidak akan menjadi setiap hal yang bisa diinginkan ayahnya. Ia hanya akan menjadi dirinya sendiri.\n\n“Aku mau terlambat bangun,” katanya. “Aku mau buruk dalam sesuatu dan tetap boleh belajar.” Aldric mengangguk. Party menjaga ruangan tempat hari esok mulai tumbuh.",
-      "outro": "Anak yang keluar dari ruangan tidak mengingat putaran-putaran itu. Ia tidak berutang rasa terima kasih atas hidup yang baru dimulainya.\n\nIa memilih nama Eda. Aldric menuliskannya di papan kosong tanpa menghapus nama Elian dari sensus. Keduanya pernah berarti sesuatu. Salah satunya kini boleh berarti sesuatu yang baru.",
+      "outro": "Anak yang keluar dari ruangan tidak mengingat putaran-putaran itu. Ia tidak berutang rasa terima kasih atas hidup yang baru dimulainya.\n\nIa memilih nama Eda. Nyx mengukirnya di papan yang dibiarkan kosong; Aldric tidak menghapus nama Elian dari sensus. Keduanya pernah berarti sesuatu. Salah satunya kini boleh berarti sesuatu yang baru.\n\nDi belakang papan tulis sekolah, Aldric menambahkan garis tinggi badan baru untuk Eda, bertanggal hari ini.",
       "enemies": [
         "moth-auric",
         "spider-auric",
@@ -6355,9 +6390,9 @@
       "beats": [
         "Benih membutuhkan waktu. Musuh mengejar sumber cahaya di tengah ruangan.",
         "Ingatan yang dibuang mencoba kembali ke mesin. Jangan biarkan mereka memakan benih.",
-        "Wraith memakai suara Elian kecil untuk memanggil Aldric menjauh.",
-        "Cantor memulai ritus terakhir. Semua tile terancam: waktunya Guard atau interrupt.",
-        "Mournbark menawarkan akarnya sebagai tempat tumbuh. Lepaskan cengkeraman mesin dari batangnya."
+        "Frostward Colossus memakai suara Elian kecil untuk memanggil Aldric menjauh.",
+        "Bellshore Claw menyeret lonceng-lonceng tua untuk ritus terakhir. Semua tile terancam: waktunya Guard atau interrupt.",
+        "Frostward Colossus terakhir membungkus benih dengan es agar hari esok tidak tumbuh. Lepaskan cengkeraman mesin dari benih itu."
       ],
       "recruit": [],
       "reward": 780,
@@ -6383,7 +6418,7 @@
           "kind": "wave",
           "name": "Pressure · A Name for Tomorrow",
           "hp": 4940,
-          "beat": "Wraith memakai suara Elian kecil untuk memanggil Aldric menjauh.",
+          "beat": "Frostward Colossus memakai suara Elian kecil untuk memanggil Aldric menjauh.",
           "combatHp": 18624
         },
         {
@@ -6391,7 +6426,7 @@
           "kind": "miniboss",
           "name": "The threshold · A Name for Tomorrow",
           "hp": 7220,
-          "beat": "Cantor memulai ritus terakhir. Semua tile terancam: waktunya Guard atau interrupt.",
+          "beat": "Bellshore Claw menyeret lonceng-lonceng tua untuk ritus terakhir. Semua tile terancam: waktunya Guard atau interrupt.",
           "combatHp": 27219
         },
         {
@@ -6399,7 +6434,7 @@
           "kind": "boss",
           "name": "The reckoning · A Name for Tomorrow",
           "hp": 12160,
-          "beat": "Mournbark menawarkan akarnya sebagai tempat tumbuh. Lepaskan cengkeraman mesin dari batangnya.",
+          "beat": "Frostward Colossus terakhir membungkus benih dengan es agar hari esok tidak tumbuh. Lepaskan cengkeraman mesin dari benih itu.",
           "combatHp": 45843
         }
       ],
@@ -6412,7 +6447,7 @@
       "subtitle": "ACT IV · The last boss is not the last word",
       "speaker": "THE BELLKEEPERS · AT FIRST LIGHT",
       "intro": "Mesin yang kehilangan penjaganya melakukan satu hal terakhir: mencoba menyelamatkan dirinya. Ia mengambil bentuk semua ketakutan kota, lalu memakai Vharok sebagai sayap.\n\nTidak ada nubuat untuk pertarungan ini. Orin menutup bukunya. Kestrel berhenti menghitung. Lyra bertanya apakah semua sudah siap, bukan apakah semua akan selamat.\n\nDi town, Eda mencoba bersiul. Nadanya sumbang. Itulah suara masa depan yang sedang kita pertahankan.",
-      "outro": "Saat inti mesin padam, Vharok terbang tanpa membawa mimpi siapa pun. Tidak ada cahaya yang mengembalikan rumah-rumah, tidak ada mantra yang membatalkan luka. Hanya pagi yang datang sekali.\n\nLyra membuka klinik atas namanya sendiri. Sable menjaga arsip agar tidak ada kontrak yang disembunyikan. Orin menulis buku yang boleh salah. Rowan mengajarkan lagu baru kepada Eda; ia tidak perlu mendapatkan lagu lamanya kembali untuk bisa bernyanyi.\n\nAldric menggantung perisai di samping pintu sekolah. Lonceng baru dibuat kecil, dari logam mesin yang dilebur. Ia berbunyi untuk memanggil makan siang. Di bawahnya tertulis: YANG HILANG AKAN DIINGAT. YANG HIDUP TIDAK BERUTANG MASA DEPANNYA.\n\nCampaign complete. Emberhollow tetap terbuka: raid hunt, respec, dan Sunken Bell menjadi tantangan postgame, bukan pengulangan ending.",
+      "outro": "Saat inti mesin padam, Vharok terbang tanpa membawa mimpi siapa pun. Tidak ada cahaya yang mengembalikan rumah-rumah, tidak ada mantra yang membatalkan luka. Hanya pagi yang datang sekali.\n\nLyra membuka klinik atas namanya sendiri. Sable menjaga arsip agar tidak ada kontrak yang disembunyikan. Orin menulis buku yang boleh salah. Rowan mengajarkan lagu baru kepada Eda; ia tidak perlu mendapatkan lagu lamanya kembali untuk bisa bernyanyi. Nyx akhirnya membangun bengkel yang dulu hanya ada di tiket feri.\n\nAldric menggantung perisai di samping pintu sekolah. Lonceng baru dibuat kecil, dari logam mesin yang dilebur. Ia berbunyi untuk memanggil makan siang. Di bawahnya tertulis: YANG HILANG AKAN DIINGAT. YANG HIDUP TIDAK BERUTANG MASA DEPANNYA.",
       "enemies": [
         "choir-frost",
         "wraith-auric",
@@ -6468,6 +6503,8 @@
           "name": "The reckoning · The Unwritten Dawn",
           "hp": 12960,
           "beat": "Vharok masih ada di balik logam dan cahaya. Hancurkan inti, lepaskan sang penjaga. Ini bukan penyelamatan sempurna. Ini milik kita.",
+          "enemyName": "Mesin Terakhir",
+          "enemyTitle": "BERSAYAPKAN VHAROK",
           "combatHp": 51710
         }
       ],

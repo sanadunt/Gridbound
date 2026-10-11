@@ -9,7 +9,7 @@ import type { Battle } from './simulation';
 import { normalizeStoryParty, benchExperience, storyPartyCap, roleTiles, placeParty } from './story-party';
 import { createCurrencyState, creditCurrency, type CurrencyState } from '../economy/currency';
 import { bankRaidReward, bankRoguelikeReward, buyBankItem, normalizeChallengeUnlocks, raidReward, roguelikeBankReward, creditRunRoom, type RunWallet } from '../economy/challenge';
-import { normalizeNarrative } from './narrative';
+import { normalizeNarrative, chapterHasScene } from './narrative';
 import { createJourney, normalizeJourney, claimableChests, chestReward, recordStars, heroicReward, type Journey } from './journey';
 import type { Pouch } from './dungeon';
 import { MAX_REFINE } from './jobs';
@@ -65,8 +65,8 @@ const medianLevel=(p:Profile,ids:readonly number[])=>{const levels=ids.map(i=>he
 export function completeZone(p:Profile,index:number) {
   if(!canEnterZone(p,index)||p.cleared.includes(index))return false;
   p.cleared.push(index);
-  const cap=storyPartyCap(p.cleared);
-  for(const id of CAMPAIGN[index].recruit)if(!p.roster.includes(id)){
+  const cap=storyPartyCap(p.cleared),joined:number[]=[];
+  for(const id of CAMPAIGN[index].recruit)if(!p.roster.includes(id)){joined.push(id);
     const deployed=new Set(p.storyActive.map(other=>p.loadouts[other].slot));
     const slot=roleTiles(ROSTER[id].classId).find(i=>!deployed.has(i))??ROSTER[id].slot;
     p.loadouts[id]={skills:[0,1],talents:[],slot,xp:xpForLevel(medianLevel(p,p.roster))};p.roster.push(id);
@@ -74,6 +74,9 @@ export function completeZone(p:Profile,index:number) {
   }
   for(const id of p.roster)if(p.storyActive.length<cap&&!p.storyActive.includes(id))p.storyActive.push(id);
   placeParty(p.loadouts,p.storyActive);
+  // Scenes the camp owes for this first clear: each new hero's join scene, then the chapter's story choice or the finale.
+  if(joined.length)p.journey.pendingRecruitScenes=[...new Set([...(p.journey.pendingRecruitScenes??[]),...joined])];
+  if(chapterHasScene(index))p.journey.pendingChapterScenes=[...new Set([...(p.journey.pendingChapterScenes??[]),index])].sort((a,b)=>a-b);
   return true;
 }
 /** Normal replays pay this share of a chapter's gold reward; the full reward comes only with the first clear. */

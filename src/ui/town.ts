@@ -19,6 +19,7 @@ import { renderWorldMap } from './world-map';
 import { dungeonScene } from './dungeon';
 import { heroPower, partyPower, powerVerdict, recommendedPower } from '../game/power';
 import { claimableChests } from '../game/journey';
+import { pendingChoices } from '../game/narrative';
 import { DEPTHS, unlockedDepth } from '../game/dungeon';
 import { refineCost } from '../game/profile';
 import { t, gameText, lang, type StringKey } from '../i18n';
@@ -94,7 +95,7 @@ function emptySlots(p: Profile) {
 }
 
 /** The single most useful next step, with the place it happens. */
-function nextObjective(p: Profile): { text: string; facility?: string; tab?: TrainingTab } {
+function nextObjective(p: Profile): { text: string; facility?: string; tab?: TrainingTab; action?: string } {
   const ready = QUESTS.filter(q => questProgress(p, q).ready).length;
   if (!p.cleared.length) return { text: t('town.msg.first'), facility: 'campaign' };
   if (p.journey.run?.status === 'active') return { text: t('guide.run'), facility: 'dungeon' };
@@ -103,6 +104,8 @@ function nextObjective(p: Profile): { text: string; facility?: string; tab?: Tra
   if (empty) return { text: t('guide.emptySlots', { n: empty }), facility: 'party', tab: 'formation' };
   if (claimableChests(p.journey)) return { text: t('guide.chest'), facility: 'campaign' };
   if (ready) return { text: t('town.msg.quests', { n: ready }), facility: 'quests' };
+  // A story choice left for later waits in the Journal (below chests and quests, so 'Decide later' never hides them).
+  if (pendingChoices(p.narrative ?? {}, p.cleared).length) return { text: t('guide.choice'), action: 'journal' };
   const idle = normalizeStoryParty(p.storyActive, p.roster, p.cleared).find(id => availablePoints(p, id) >= 2);
   if (idle !== undefined) return { text: t('guide.points', { name: ROSTER[idle].name, n: availablePoints(p, idle) }), facility: 'party-advanced' };
   if (p.cleared.length >= CAMPAIGN.length) return { text: t('guide.heroic'), facility: 'campaign' };
@@ -138,7 +141,7 @@ function campScene(p: Profile) {
     </div>
     <div class="msg-window camp-copy">
       <h1 id="camp-title">${t('town.name')} <small>${t('town.seals', { n: p.cleared.length, total: CAMPAIGN.length })}</small></h1>
-      ${(() => { const goal = nextObjective(p); return `<p><b class="guide-label">${t('guide.title')}:</b> ${escape(goal.text)}</p>${goal.facility ? `<button class="btn guide-go" data-facility="${goal.facility}"${goal.tab ? ` data-training-tab="${goal.tab}"` : ''}>${t('common.go')} ▶</button>` : ''}`; })()}
+      ${(() => { const goal = nextObjective(p); return `<p><b class="guide-label">${t('guide.title')}:</b> ${escape(goal.text)}</p>${goal.action ? `<button class="btn guide-go" data-open-action="${goal.action}">${t('common.go')} ▶</button>` : goal.facility ? `<button class="btn guide-go" data-facility="${goal.facility}"${goal.tab ? ` data-training-tab="${goal.tab}"` : ''}>${t('common.go')} ▶</button>` : ''}`; })()}
       <span class="msg-caret" aria-hidden="true">▼</span>
     </div>
   </section>`;
@@ -163,7 +166,7 @@ function moreScene(p: Profile) {
     <div class="win menu-party">${party.map(id => { const r = ROSTER[id], lv = heroProgress(p.loadouts[id].xp); return `<div class="menu-hero"><img src="${portrait(r.classId)}" alt=""/><div><b>${r.name}</b><small>${escape(JOBS[p.loadouts[id].job ?? '']?.name ?? className(r.classId))}</small></div><div class="menu-hero-stats"><span>LV <b>${lv.level}</b></span><span class="gauge xp" aria-hidden="true"><i style="width:${lv.needed ? lv.current / lv.needed * 100 : 100}%"></i></span></div></div>`; }).join('')}</div>
     <div class="menu-columns">
       <nav class="win menu-list more-grid" aria-label="${t('route.menu')}">${items.map(([attr, title, detail]) => `<button class="menu-item more-card" ${attr}><b>${t(title)}</b><span>${t(detail)}</span></button>`).join('')}</nav>
-      <div class="win menu-summary"><dl class="stat-table"><div><dt>${t('menu.seals')}</dt><dd>${p.cleared.length}/${CAMPAIGN.length}</dd></div><div><dt>${t('menu.heroes')}</dt><dd>${p.roster.length}/9</dd></div><div><dt>${t('menu.victories')}</dt><dd>${p.wins}</dd></div><div><dt>${t('menu.quests.done')}</dt><dd>${p.claimedQuests.length}/${QUESTS.length}</dd></div><div><dt>${t('menu.bestfloor')}</dt><dd>${p.bestFloor}</dd></div></dl></div>
+      <div class="win menu-summary"><dl class="stat-table"><div><dt>${t('menu.seals')}</dt><dd>${p.cleared.length}/${CAMPAIGN.length}</dd></div><div><dt>${t('menu.heroes')}</dt><dd>${p.roster.length}/${ROSTER.length}</dd></div><div><dt>${t('menu.victories')}</dt><dd>${p.wins}</dd></div><div><dt>${t('menu.quests.done')}</dt><dd>${p.claimedQuests.length}/${QUESTS.length}</dd></div><div><dt>${t('menu.bestfloor')}</dt><dd>${p.bestFloor}</dd></div></dl></div>
     </div>
   </section>`;
 }

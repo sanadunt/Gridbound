@@ -34,4 +34,22 @@ const joins=[
 'Aku menyanyi untuk orang yang belum meninggal. Bantu aku membuat lagu itu tidak pernah dibutuhkan.',
 'Kota tanpa lonceng tetap butuh tanda bahaya. Aku membangunnya, dan kali ini setiap orang bisa mematikannya.',
 ];
-export const CHARACTERS=ROSTER.map((r,id)=>({id,...r,bio:bios[id],joinLine:joins[id],recruitChapter:id===0||id===4||id===3?0:id===2?1:id===7?2:id===1||id===5?3:id<=8?4:[5,6,7,9,11,13][id-9]}));
+/** Each hero's line in the finale, after the last chapter. */
+const fates=[
+'Aldric belajar menunggu di depan pintu sekolah tanpa memilihkan apa pun untuk siapa pun.',
+'Bran tidak lagi membawa perisai cadangan. Ia datang tepat waktu, dan itu cukup.',
+'Sable masih menyimpan kuitansi. Kini ia mengembalikannya kepada pemiliknya.',
+'Burung-burung di jalan setapak bernyanyi lagi, dan Rowan menjawab dengan nada yang belum pernah ia dengar.',
+'Lyra tidak lagi bertanya apakah ia pernah manusia. Ia bertanya siapa yang belum makan.',
+'Lonceng kecil Kestrel kini berbunyi untuk rapat warga.',
+'Nyx mengukir papan nama Eda dari kayu yang mudah diganti.',
+'Orin membiarkan halaman terakhir bukunya kosong. Untuk pertama kalinya, ia tidak takut.',
+'Mira masih menghitung ember, dan kota masih hidup.',
+'Tamsin mengajarkan tujuh belas bait itu di sekolah.',
+'Vesper membuka kedai tempat orang menceritakan kenangan tanpa membayar.',
+'Jam kota kembali berdetak, dengan tombol mati di depan.',
+'Koa berhenti menghitung napas. Ia mulai menghitung musim.',
+'Lagu duka Ilse tak dibutuhkan musim ini.',
+'Alarm Hale berbunyi sekali setahun, untuk latihan.',
+];
+export const CHARACTERS=ROSTER.map((r,id)=>({id,...r,bio:bios[id],joinLine:joins[id],fateLine:fates[id],recruitChapter:id===0||id===4||id===3?0:id===2?1:id===7?2:id===1||id===5?3:id<=8?4:[5,6,7,9,11,13][id-9]}));

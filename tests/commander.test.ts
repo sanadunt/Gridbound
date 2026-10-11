@@ -99,6 +99,8 @@ test('WP1: every Profile field survives create → JSON → normalize → materi
   const p=richProfile(), blank=createProfile() as Record<string,unknown>;
   for(const key of Object.keys(PROFILE_KEYS))if(key!=='version')assert.notDeepEqual((p as Record<string,unknown>)[key],blank[key],`fixture must give ${key} a non-default value`);
   assert.equal(p.loadouts[0].refine?.['oath-edge'],1); assert.equal(p.loadouts[0].job,'paladin'); assert.equal(p.journey.chests,1);
+  // WP9: queued join scenes and the archive choice scene (first clears of chapters 1-6) ride in the journey.
+  assert.deepEqual(p.journey.pendingRecruitScenes,[2,7,1,5,6,8,9,10]); assert.deepEqual(p.journey.pendingChapterScenes,[5]);
   const back=materializeProfile(roundTrip(createCommanderDocument(p,'QA')),'story') as Record<string,unknown>;
   // Story never holds the challenge wallet: Crystal and challenge unlocks live in document.shared.
   const expected={...structuredClone(p),challengeUnlocks:[],economy:{...p.economy,commanderCrystal:0}} as Record<string,unknown>;

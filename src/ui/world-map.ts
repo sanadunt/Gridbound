@@ -62,8 +62,8 @@ export function renderWorldMap(p: Profile, state: TownState): string {
   }).join('');
   const dossier = `<article class="win mission-brief world-map-dossier" aria-label="${t('map.dossier')}">
     <header class="dossier-header"><small>${escape(zone.speaker)}</small><h3>${escape(zone.name)}</h3><p class="zone-subtitle">${escape(zone.subtitle)}</p></header>
-    <div class="dossier-boss-card"><div class="boss-avatar-frame"><img src="${cached(`m-${finalStage.enemy}`, () => monsterCanvas(finalStage.enemy))}" alt="${escape(boss.name)}"/></div>
-      <div class="boss-intel"><small>${t('map.boss')}</small><h4>${escape(boss.name)}</h4><small class="dossier-boss-title">${escape(boss.title)}</small>
+    <div class="dossier-boss-card"><div class="boss-avatar-frame"><img src="${cached(`m-${finalStage.enemy}`, () => monsterCanvas(finalStage.enemy))}" alt="${escape(finalStage.enemyName ?? boss.name)}"/></div>
+      <div class="boss-intel"><small>${t('map.boss')}</small><h4>${escape(finalStage.enemyName ?? boss.name)}</h4><small class="dossier-boss-title">${escape(finalStage.enemyTitle ?? boss.title)}</small>
         <div class="intent-row">${boss.patterns.map((intent, i) => `<span class="intent-chip intent-${intent}">${i + 1}. ${t(`intent.${intent}` as StringKey)}</span>`).join('')}</div></div></div>
     ${heroicOpen ? `<nav class="tabs heroic-toggle" aria-label="${t('heroic.heroic')}"><button data-heroic="0" aria-pressed="${!heroic}">${t('heroic.normal')}</button><button data-heroic="1" aria-pressed="${heroic}">${t('heroic.heroic')}${heroicDone ? ' ✓' : ''}</button></nav>` : ''}
     ${heroic ? `<p class="heroic-note"><b>${t('heroic.badge')}</b> ${t('heroic.desc', { hp: Math.round((heroicScale(state.zone + 1).hp - 1) * 100), dmg: Math.round((heroicScale(state.zone + 1).dmg - 1) * 100) })} ${heroicDone ? t('heroic.cleared') : ''}</p>` : ''}

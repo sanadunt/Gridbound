@@ -3,7 +3,12 @@
 import { CAMPAIGN } from './world';
 import { normalizeRun, type DungeonRun, type Pouch } from './dungeon';
 
-export type Journey = { stars: Record<number, number>; chests: number; heroic: number[]; depth: number; run?: DungeonRun };
+/**
+ * `pendingRecruitScenes`: heroes whose join scene has not played yet; `pendingChapterScenes`: first clears (0-based chapters) whose camp
+ * scene (a story choice it opens, the finale) has not played yet. Both are set on a chapter's first clear and drained when the camp opens,
+ * so a Retry or a reload never loses them. Omitted when empty.
+ */
+export type Journey = { stars: Record<number, number>; chests: number; heroic: number[]; depth: number; run?: DungeonRun; pendingRecruitScenes?: number[]; pendingChapterScenes?: number[] };
 
 /** Boss-stage time for the third star. */
 export const STAR_PAR_SECONDS = 80;
@@ -50,5 +55,11 @@ export function normalizeJourney(raw: unknown, cleared: readonly number[]): Jour
   j.depth = Number.isInteger(r.depth) ? Math.max(0, Math.min(8, r.depth!)) : 0;
   const run = normalizeRun(r.run);
   if (run) j.run = run;
+  // Only a hero recruited by a cleared chapter can owe a join scene; only a cleared chapter can owe its camp scene.
+  const recruited = new Set(cleared.flatMap(c => CAMPAIGN[c]?.recruit ?? []));
+  const recruits = Array.isArray(r.pendingRecruitScenes) ? [...new Set(r.pendingRecruitScenes.filter(id => Number.isInteger(id) && recruited.has(id)))] : [];
+  if (recruits.length) j.pendingRecruitScenes = recruits;
+  const chapters = Array.isArray(r.pendingChapterScenes) ? [...new Set(r.pendingChapterScenes.filter(c => Number.isInteger(c) && cleared.includes(c)))].sort((a, b) => a - b) : [];
+  if (chapters.length) j.pendingChapterScenes = chapters;
   return j;
 }

@@ -113,16 +113,17 @@ await withBrowser(async ({ send, wait, evaluate, click, screenshot, errors }) =>
   assert.equal(await evaluate(status()), before, 'ten hero taps keep the same revision');
   assert.deepEqual(await evaluate('window.__statuses.filter(text => text.startsWith("warn"))'), [], 'no unsaved warning while saving');
 
-  // A real change still saves, quietly.
-  await click.nav('more');
-  await click('.more-scene [data-open-action="journal"]');
-  await wait('Boolean(document.querySelector("dialog[open] [data-story-choice]"))');
-  const outcomes = await evaluate('document.querySelectorAll("dialog[open] .journal-outcome").length');
-  await click('dialog[open] [data-story-choice]');
-  await wait(`document.querySelectorAll("dialog[open] .journal-outcome").length === ${outcomes + 1}`);
+  // A real change still saves, quietly (the sound setting lives in the Story save; with five chapters no story choice is open yet).
+  const sound = await evaluate('window.gridbound.profile().sound');
+  await click('#settings');
+  await wait('Boolean(document.querySelector("#setting-sound"))');
+  await click('#setting-sound');
+  await wait(`window.gridbound.profile().sound === ${!sound}`);
   await wait(`${status()}.startsWith("Saved") && ${status()} !== ${JSON.stringify(before)}`);
   assert.deepEqual(await evaluate('window.__statuses.filter(text => text.startsWith("warn"))'), [], 'a real save never shows the warning');
-  await screenshot('artifacts/save-safety-journal.png');
+  await screenshot('artifacts/save-safety-quiet-save.png');
+  await click('#modal [data-close]');
+  await wait('!document.querySelector("#modal[open]")');
 
   // The default path now has multi-tab protection: another tab committing this Commander makes this tab read-only.
   await evaluate(`(async () => {

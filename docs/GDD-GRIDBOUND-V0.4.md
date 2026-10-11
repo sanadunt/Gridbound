@@ -112,7 +112,7 @@ Tema yang tertanam di naskah meliputi:
 
 ### Struktur campaign
 
-Campaign berjalan dalam urutan linear empat act. Setiap empat chapter membentuk satu act. Chapter 1 sampai 4 memiliki empat stage; chapter 5 sampai 16 memiliki lima stage. Totalnya 76 encounter, bukan 76 model musuh unik. Stage awal menggabungkan wave, miniboss, dan boss; stage dari act berikutnya menambah beat naratif pada perjalanan menuju boss.
+Campaign berjalan dalam urutan linear empat act. Setiap empat chapter membentuk satu act. Chapter 1 sampai 4 memiliki empat stage; chapter 5 sampai 16 memiliki lima stage. Totalnya 76 encounter, bukan 76 model musuh unik. Stage menggabungkan wave, miniboss, dan boss, dan setiap stage (termasuk 16 stage Act I) membawa beat naratif yang tampil di kartu sebelum wave. Beat yang menyebut musuh selalu menyebut musuh wave itu (dijaga `tests/story-beats.test.ts`).
 
 | Act | Chapter | Arah cerita |
 |---|---|---|
@@ -121,7 +121,7 @@ Campaign berjalan dalam urutan linear empat act. Setiap empat chapter membentuk 
 | III | 9. Winter Ledger; 10. The Unborn Orchard; 11. Nine Funerals; 12. The Last Rehearsal | Menemukan masa depan Elian di dalam mesin, menolak pengorbanan berulang, memperoleh benih untuk masa depan baru, lalu memutus time repeater. |
 | IV | 13. A City Without Bells; 14. The Borrowed Crown; 15. A Name for Tomorrow; 16. The Unwritten Dawn | Membangun perlindungan melalui kerja komunitas, menghadapi sejarah Bellkeeper pertama, memberi Elian ruang memilih nama Eda, dan menghentikan mesin sambil membebaskan Vharok. |
 
-Chapter 1 merekrut Sable, chapter 2 merekrut Orin, chapter 3 merekrut Bran dan Kestrel, chapter 4 merekrut Nyx dan Mira. Pemain memulai dengan Aldric, Lyra, dan Rowan. Recruitment tidak pernah mengganti hero yang sedang aktif: setelah first clear, recruit baru mengisi slot party yang masih kosong (cap dihitung setelah chapter tercatat), lalu sisa slot kosong diisi hero bench sesuai urutan roster. Hero yang perlu tile baru ditempatkan menurut perannya: warrior dan monk di tile depan terendah yang kosong (0–2), class lain di baris belakang (6–8) lalu tengah (3–5).
+Chapter 1 merekrut Sable, chapter 2 merekrut Orin, chapter 3 merekrut Bran dan Kestrel, chapter 4 merekrut Nyx dan Mira; lalu Tamsin (chapter 5), Vesper (6), Pell (7), Koa (9), Ilse (11), dan Hale (13). Keenam hero baru muncul langsung di chapter perekrutannya (intro, beat, atau outro) sebelum adegan bergabungnya. Pemain memulai dengan Aldric, Lyra, dan Rowan. Recruitment tidak pernah mengganti hero yang sedang aktif: setelah first clear, recruit baru mengisi slot party yang masih kosong (cap dihitung setelah chapter tercatat), lalu sisa slot kosong diisi hero bench sesuai urutan roster. Hero yang perlu tile baru ditempatkan menurut perannya: warrior dan monk di tile depan terendah yang kosong (0–2), class lain di baris belakang (6–8) lalu tengah (3–5).
 
 ### Chapter-by-chapter story beats
 
@@ -131,30 +131,32 @@ Chapter 1 merekrut Sable, chapter 2 merekrut Orin, chapter 3 merekrut Bran dan K
 | 2. Sunken Ruins | Orin ditemukan di reruntuhan; suara di bawah jembatan adalah gema sumpah lama, bukan suara Orin. |
 | 3. Blackbriar Keep | Party menahan siege di menara dan mencegah lonceng ketiga runtuh; Bran dan Kestrel bergabung. |
 | 4. The Emerald Gate | Party membangunkan Vharok sebagai guardian, bukan membunuhnya; Nyx dan Mira ikut pulang. |
-| 5. The Empty Census | Mira menemukan tujuh belas kursi sekolah yang kosong dan arsip anak-anak yang tidak diingat warga. |
-| 6. The Glass Ferry | Penyeberangan meminta memori sebagai ongkos; Rowan menyerahkan lagu ibunya dan menemukan jejak bengkel Nyx yang belum dibangun. |
-| 7. The Choir Ward | Catatan rumah sakit mengaitkan Lyra dengan percobaan lama; kebenarannya, Lyra adalah memori rasa bersalah yang diberi tubuh untuk merawat korban. |
-| 8. The Thirteenth Stroke | Kontrak perlindungan diperbarui setiap kali memori warga dihapus; party memutus pengulang di menara. |
-| 9. Winter Ledger | Arsip beku menyimpan surat dari putaran sebelumnya dan mengungkap jantung mesin bernama Elian. |
+| 5. The Empty Census | Mira menemukan tujuh belas kursi sekolah yang kosong dan arsip anak-anak yang tidak diingat warga; penyanyi jalanan Tamsin, yang tak pernah membayar lonceng, menyanyikan bait berisi nama Elian. |
+| 6. The Glass Ferry | Vesper, penjaga feri, meminta memori sebagai ongkos; Rowan menyerahkan lagu ibunya dan menemukan jejak bengkel Nyx yang belum dibangun. Vesper merobek buku ongkosnya dan ikut. |
+| 7. The Choir Ward | Catatan rumah sakit mengaitkan Lyra dengan percobaan lama; kebenarannya, Lyra adalah memori rasa bersalah yang diberi tubuh untuk merawat korban. Pell, pembuat jam muda, memasang tombol mati pada mesin bangsal. |
+| 8. The Thirteenth Stroke | Kontrak perlindungan diperbarui setiap kali memori warga dihapus; party menghancurkan Simpul Ketiga Belas yang menunggangi Vharok (Vharok bangkit, terluka tapi bebas) dan memutus pengulang di menara. |
+| 9. Winter Ledger | Arsip beku menyimpan surat untuk party dari putaran sebelumnya, semuanya tulisan tangan Koa, dan mengungkap jantung mesin bernama Elian. |
 | 10. The Unborn Orchard | Kemungkinan masa depan tergantung pada pohon; Rowan tidak mengambil kembali lagunya dan party memperoleh benih untuk waktu yang tidak memakan dirinya sendiri. |
-| 11. Nine Funerals | Party menghadapi penjaga yang mewakili keputusan untuk berhenti mencoba, di antara sembilan makam bertanggal masa depan. |
-| 12. The Last Rehearsal | Elian menawarkan satu pengulangan sempurna; party menolak janji itu dan menghancurkan time repeater. |
-| 13. A City Without Bells | Warga membangun evakuasi, pertolongan, dan tanda bahaya sendiri tanpa mengaktifkan lagi mesin pengorbanan. |
+| 11. Nine Funerals | Party menghadapi penjaga yang mewakili keputusan untuk berhenti mencoba, di antara sembilan makam bertanggal masa depan yang berjajar tiga kali tiga; Ilse menyanyikan lagu duka untuk yang belum meninggal. |
+| 12. The Last Rehearsal | Elian menawarkan satu pengulangan sempurna; party menolak janji itu, mengalahkan Sang Pengulang yang membelenggu Vharok, dan menghancurkan time repeater. |
+| 13. A City Without Bells | Warga membangun evakuasi, pertolongan, dan tanda bahaya sendiri (alarm Hale dari Koperasi Hearth) tanpa mengaktifkan lagi mesin pengorbanan. Enam belas papan nama lain milik anak-anak yang masa depannya ditukar: mereka tidak kembali, tetapi keluarganya kini tahu alasannya. |
 | 14. The Borrowed Crown | Bellkeeper pertama ternyata Aldric dari putaran tertua, yang menukar ingatan tentang dirinya kepada mesin. |
-| 15. A Name for Tomorrow | Elian memilih kehidupan biasa yang tidak dirancang ayahnya; nama Eda dipilih sendiri. |
-| 16. The Unwritten Dawn | Mesin mencoba menyelamatkan dirinya dengan mengambil bentuk ketakutan kota dan memakai Vharok; party menghentikannya dan membebaskan naga. |
+| 15. A Name for Tomorrow | Elian memilih kehidupan biasa yang tidak dirancang ayahnya; nama Eda dipilih sendiri, Nyx mengukirnya, dan Aldric menambahkan garis tinggi badan Eda bertanggal hari ini. |
+| 16. The Unwritten Dawn | Mesin Terakhir mencoba menyelamatkan dirinya dengan mengambil bentuk ketakutan kota dan memakai Vharok sebagai sayap; party menghentikannya dan membebaskan naga. |
 
 ### Pilihan cerita dan ending
 
-Cerita memiliki tiga pilihan yang dikunci oleh jumlah chapter yang telah selesai. Pemain hanya dapat menetapkan setiap pilihan satu kali. Pilihan menambah kartu epilog dan tidak mengganti ending utama.
+Cerita memiliki tiga pilihan yang dikunci oleh jumlah chapter yang telah selesai. Pemain hanya dapat menetapkan setiap pilihan satu kali. Saat kembali ke Camp setelah chapter yang membukanya, pilihan tampil sebagai adegan dialog berisi opsinya dan **Putuskan nanti**; setelah memilih, akibatnya tampil sebagai halaman berikutnya. Fokus awal ada pada **Putuskan nanti**, dan klik/tombol dalam 0,6 detik setelah opsi muncul diabaikan, sehingga menekan Enter berulang kali melewati adegan tidak pernah menjawab pilihan. Adegan Camp tidak diputar di atas layar judul; adegan menunggu sampai pemain masuk ke Emberhollow. **Putuskan nanti** (juga Skip/Escape) membiarkan pilihan terbuka: panduan Camp menulis "Ada pilihan menunggu di Jurnal." dengan tombol Go ke Jurnal, dan Jurnal menawarkan opsi yang sama serta **Putuskan nanti** (tidak ada lagi opsi default diam-diam). Pilihan menambah kartu epilog, dan dua di antaranya mengganti satu kalimat outro chapter 16 (`storyOutro`); ending utama tidak berubah.
 
 | Pilihan | Gate | Opsi | Akibat yang dicatat |
 |---|---:|---|---|
-| Lonceng untuk sekolah | Tiga chapter pertama selesai | Kembalikan lonceng ke sekolah; atau simpan di taman peringatan. | Anak-anak memakai lonceng untuk waktu makan, atau mempelajari nama warga yang hilang. |
-| Nama di atas tembaga | Enam chapter pertama selesai | Buka arsip dengan persetujuan warga; atau kembalikan catatan kepada keluarga. | Arsip publik yang berbasis izin, atau keluarga menyimpan catatan dan Sable hanya menyimpan daftar tanpa rahasia. |
-| Kota tanpa lonceng | Tiga belas chapter pertama selesai | Perkuat klinik; atau perbaiki jalur air dan pengiriman. | Mira dan Lyra membuka klinik bersama, atau Mira mengatur koperasi pengiriman air dan obat. |
+| Nama di atas tembaga | Enam chapter pertama selesai | Buka arsip dengan persetujuan warga; atau kembalikan catatan kepada keluarga. | Arsip publik yang berbasis izin, atau keluarga menyimpan catatan dan Sable hanya menyimpan daftar tanpa rahasia (outro chapter 16: "Sable menjaga daftar yang tidak pernah ia buka."). |
+| Lonceng untuk sekolah | Tiga belas chapter pertama selesai | Kestrel menemukan lonceng kecil di reruntuhan Blackbriar: gantung di sekolah yang kosong; atau simpan di taman peringatan. | Lonceng di sekolah yang kosong, tempat tak seorang pun ingat mengapa kursinya kecil; atau di taman peringatan untuk nama-nama yang belum kembali. |
+| Kota tanpa lonceng | Tiga belas chapter pertama selesai | Mira dan Hale bertanya: perkuat klinik; atau perbaiki jalur air dan pengiriman. | Mira dan Lyra membuka klinik bersama (outro chapter 16: Lyra membuka klinik bersama Mira dan warga), atau Hale dan Mira mengatur koperasi pengiriman air dan obat. |
 
-Ending utama menyatakan mesin berhenti, Vharok bebas, Eda memilih namanya sendiri, dan kota membangun perlindungan bersama tanpa memperoleh kembali semua yang hilang. Pilihan pemain menambahkan epilog lokal, bukan cabang ending utama. Chapter dan pilihan dapat dibaca kembali melalui Story Journal.
+Ending utama menyatakan mesin berhenti, Vharok bebas, Eda memilih namanya sendiri, dan kota membangun perlindungan bersama tanpa memperoleh kembali semua yang hilang (kalimat pembuka epilog adalah string UI `journal.epilogue.lead`, diterjemahkan EN/ID). Pilihan pemain menambahkan epilog lokal, bukan cabang ending utama. Setelah chapter 16, kembali ke Camp memutar adegan penutup: outro chapter 16 (sesuai pilihan), satu kalimat "sesudahnya" per hero yang direkrut dengan potretnya (`CHARACTERS[id].fateLine`), kalimat epilog dan akibat setiap pilihan, lalu kartu judul **Emberhollow**. Catatan "Campaign selesai… tantangan postgame" bukan lagi bagian prosa cerita: catatan itu tampil di bawah layar hasil chapter 16. Chapter, pilihan, adegan bergabung, dan adegan penutup dapat dibaca atau diputar ulang melalui Story Journal.
+
+Narasi intro chapter memakai papan nama **KRONIK** (tanpa potret) dengan nama tempatnya; nama dan potret speaker chapter hanya tampil pada halaman yang berupa ucapan langsung (diawali tanda kutip). Pada chapter 8, 12, dan 16, Vharok berada di pihak party, jadi stage boss memakai nama yang menunggangi atau memakainya (`StageDef.enemyName`/`enemyTitle`): **Simpul Ketiga Belas** (MENUNGGANGI VHAROK), **Sang Pengulang** (MEMBELENGGU VHAROK), dan **Mesin Terakhir** (BERSAYAPKAN VHAROK) di HP bar, banner, dan dossier World Map; art dan pola serangannya tetap milik naga.
 
 ### Roster Bellkeeper
 
@@ -169,14 +171,14 @@ Ending utama menyatakan mesin berhenti, Vharok bebas, Eda memilih namanya sendir
 | Nyx | Rogue | Pengukir yang memberi bentuk tahan lama kepada nama dan hal-hal yang memilih untuk ada. |
 | Orin | Wizard | Menulis prediksi dalam buku yang selalu mengoreksi dirinya, lalu belajar menutup buku itu. |
 | Mira | Healer | Membangun obat, jalur evakuasi, dan cara hidup aman tanpa mengorbankan seseorang. |
-| Tamsin | Bard | Menyanyikan lagu tujuh belas anak yang hilang; arsip yang bisa berjalan. Bergabung di Chapter 6. |
-| Vesper | Hexer | Mantan pemungut ongkos ingatan di Feri Kaca; kutukannya mengembalikan beban kepada pembuatnya. Chapter 7. |
-| Pell | Engineer | Perawat jam kota yang kini hanya membangun alat yang bisa dimatikan siapa saja. Chapter 8. |
-| Koa | Monk | Penjaga Frostward yang menghitung napas, bukan hari. Chapter 10. |
-| Ilse | Bard | Penyanyi duka untuk orang yang belum meninggal; lagunya adalah janji. Chapter 12. |
-| Hale | Engineer | Membangun tanda bahaya untuk kota tanpa lonceng, dengan tombol mati untuk semua orang. Chapter 14. |
+| Tamsin | Bard | Menyanyikan lagu tujuh belas anak yang hilang; arsip yang bisa berjalan. Bergabung di Chapter 5. |
+| Vesper | Hexer | Mantan pemungut ongkos ingatan di Feri Kaca; kutukannya mengembalikan beban kepada pembuatnya. Chapter 6. |
+| Pell | Engineer | Perawat jam kota yang kini hanya membangun alat yang bisa dimatikan siapa saja. Chapter 7. |
+| Koa | Monk | Penjaga Frostward yang menghitung napas, bukan hari. Chapter 9. |
+| Ilse | Bard | Penyanyi duka untuk orang yang belum meninggal; lagunya adalah janji. Chapter 11. |
+| Hale | Engineer | Membangun tanda bahaya untuk kota tanpa lonceng, dengan tombol mati untuk semua orang. Chapter 13. |
 
-Setiap hero yang direkrut memutar adegan singkat "Sekutu baru" (kartu judul, potret, dan kalimat pertama hero) saat pemain kembali ke Camp setelah chapter perekrutan.
+Setiap hero yang direkrut memutar adegan singkat "Sekutu baru" (kartu judul, potret, dan kalimat pertama hero) saat pemain kembali ke Camp setelah chapter perekrutan. Adegan yang masih terutang disimpan di journey (`pendingRecruitScenes`, serta `pendingChapterScenes` untuk adegan pilihan dan penutup) saat first clear dan baru dihapus setelah diputar, sehingga Retry di layar hasil, reload, atau ganti bahasa tidak menghilangkannya. Jurnal memuat bagian **Rekan** untuk memutar ulang adegan bergabung setiap hero.
 
 ## 5. Struktur sesi dan loop pemain
 
@@ -202,7 +204,7 @@ World Map menampilkan empat act dengan route pins, status chapter terkunci/terse
 
 - **Party power** merangkum level, gear, refine, talent, job, dan skill yang sedang dipakai setiap hero menjadi satu angka. Offense dihitung dari skill stance (nilai per detik, termasuk efek job dan perk) dibandingkan skill pertama class-nya pada party tiga hero (`REF_PARTY`); skill pendukung (heal, shield, partyshield, buff, haste, delay) dinilai menurut ukuran party, sehingga satu party shield bernilai lebih besar untuk party delapan hero, dan power seorang hero tidak pernah turun ketika party bertambah. Defense adalah HP efektif (HP maksimum, reduksi damage, Fortitude, barrier awal). Skill job serangan bernilai lebih tinggi dari skill dasar class-nya; skill job kontrol atau pendukung dinilai dari apa yang diberikannya kepada party, sehingga sebagian (misalnya Ember Mine milik Sapper, Silence Between Bells milik Bell Oracle) bernilai lebih rendah dari skill pertama class. World Map, dossier, dan daftar depth Undercroft membandingkannya dengan **recommended power** per chapter (power pemain casual hasil simulasi balance di awal chapter tersebut, `npm run power-curve`; tidak pernah turun dari chapter ke chapter) dengan status Ready / Close / Under. Saat Heroic dipilih, dossier memakai rekomendasi Heroic tersendiri (`recommendedHeroicPower` = recommended power × `HEROIC_POWER_FACTOR` 1,29, median power yang dibutuhkan pemain casual untuk memenangkan separuh percobaan Heroic) beserta status-nya.
 - **Chapter stars:** ★ untuk clear, ★ jika semua hero masih berdiri, ★ jika boss kalah dalam 80 detik atau kurang. Setiap 8 bintang membuka **star chest** (Gold + material); setelah peti keenam (48/48 bintang) bar bintang menulis "Semua peti bintang sudah dibuka".
-- **Next step** di Camp selalu menunjuk satu tujuan berikutnya (dungeon yang sedang berjalan, slot party kosong yang bisa diisi hero bench, chest, point yang belum dipakai, chapter berikutnya, Undercroft saat party under-power, atau Heroic setelah campaign tamat) dengan tombol Go. Untuk slot kosong, Go membuka tab Formation dengan panel party Story sudah terbuka.
+- **Next step** di Camp selalu menunjuk satu tujuan berikutnya (dungeon yang sedang berjalan, slot party kosong yang bisa diisi hero bench, chest, quest siap klaim, pilihan cerita yang ditunda (Go membuka Jurnal), point yang belum dipakai, chapter berikutnya, Undercroft saat party under-power, atau Heroic setelah campaign tamat) dengan tombol Go. Untuk slot kosong, Go membuka tab Formation dengan panel party Story sudah terbuka.
 
 ### Core loop Story
 
@@ -344,7 +346,7 @@ Victory terjadi saat HP boss habis. Bila counter atau thorns menghabisi boss pad
 
 ### Musuh
 
-Runtime memuat 12 archetype dengan 3 varian warna/tekanan per archetype, total 48 records musuh. Ashbound, Frostbound, dan Gilded masing-masing mengalikan HP menjadi 1,12/1,22/1,32 dan damage menjadi 1,05/1,10/1,15; Frostbound dan Gilded juga memendekkan interval (0,3/0,6 detik) dan memutar urutan intent, sedangkan Ashbound mempertahankan urutan dan interval dasar. Deskripsi varian menyebutkan perbedaan itu.
+Runtime memuat 12 archetype dengan 3 varian warna/tekanan per archetype, total 48 records musuh. Ashbound, Frostbound, dan Gilded masing-masing mengalikan HP menjadi 1,12/1,22/1,32 dan damage menjadi 1,05/1,10/1,15; Frostbound dan Gilded juga memendekkan interval (0,3/0,6 detik) dan memutar urutan intent, sedangkan Ashbound mempertahankan urutan dan interval dasar. Deskripsi varian menyebutkan perbedaan itu. Nama varian membuang awalan "The" ("Ashbound Last Watch", "Frostbound Unburied") dan Frostbound tidak menambah awalan pada nama yang sudah memuat Frost ("Frostward Colossus").
 
 | Archetype | Nama dalam game | Pola utama |
 |---|---|---|
@@ -418,7 +420,7 @@ Skill, talent, equipment, job, XP curve, koefisien damage, dan deskripsi lengkap
 
 ## 9. Konten campaign dan musuh
 
-Campaign memakai empat chapter pembuka yang di-author di `src/game/world.ts`, lalu 12 chapter lanjutan di `src/game/story.ts`. Chapter lanjutan masing-masing berisi lima stage: tiga wave, miniboss, dan boss. Stage menyimpan enemy, nama stage, HP authoring, serta beat teks. Pertarungan pertama dalam campaign memakai tiga hero dan empat stage.
+Campaign memakai empat chapter pembuka yang di-author di `src/game/world.ts`, lalu 12 chapter lanjutan di `src/game/story.ts`. Chapter lanjutan masing-masing berisi lima stage: tiga wave, miniboss, dan boss. Stage menyimpan enemy, nama stage, HP authoring, beat teks, dan opsional `enemyName`/`enemyTitle` (nama musuh khusus stage itu). Keenam belas stage Act I juga memiliki beat. Pertarungan pertama dalam campaign memakai tiga hero dan empat stage.
 
 Contoh progres cerita dari chapter pembuka:
 

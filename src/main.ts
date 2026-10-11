@@ -23,7 +23,7 @@ import { startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFigh
 import { chapterStars } from './game/journey';
 import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
 import { actArt } from './ui/world-map';
-import { playDialogue, paginate } from './ui/dialogue';
+import { playDialogue, paginate, type DialoguePage } from './ui/dialogue';
 import { BattleScene, ARENA, cell } from './render/BattleScene';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
@@ -109,6 +109,7 @@ function enterEmberhollow() {
         titleScreen.classList.remove('dismissing');
         gsap.set([titleScreen, '.title-menu'], { clearProps: 'all' });
         animateTownEntrance();
+        if (inTown && townState.tab === 'camp') void playCampScenes();
       }
     });
     tl.to('#title-enter', { x: 8, duration: 0.08, yoyo: true, repeat: 1 })
@@ -118,6 +119,7 @@ function enterEmberhollow() {
     setTimeout(() => {
       titleScreen.hidden = true;
       titleScreen.classList.remove('dismissing');
+      if (inTown && townState.tab === 'camp') void playCampScenes();
     }, 250);
   }
 }
@@ -181,7 +183,7 @@ let initialized = false;
 let recorded = false;
 let chapterResult: { stars: number; improved: boolean; heroic?: { gold: number; materials: Record<string, number> } } | undefined;
 /** What the last settled result credited (gold for Story, bank Crystal otherwise) and the party cap it unlocked (0 = unchanged). */
-let resultReward: { gold: number; crystal: number; partyCap: number } | undefined;
+let resultReward: { gold: number; crystal: number; partyCap: number; firstClear?: boolean } | undefined;
 /** The current adventure battle's start checkpoint ('Retry this battle'); cleared whenever a new battle is booted. */
 let stageStart: NonNullable<typeof encounter> | undefined;
 let experienceRewards:NonNullable<ReturnType<typeof settleProgress>>=[];
@@ -267,6 +269,7 @@ $('app').innerHTML = `
             <small id="ready-label"></small>
             <h3 id="ready-title"></h3>
             <p id="ready-copy"></p>
+            <p id="ready-tip" class="ready-tip" hidden>${t('ready.copy.story')}</p>
             <button id="start" class="btn primary">${t('battle.begin')}</button>
           </div>
         </section>
@@ -354,6 +357,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
     else if (tab === 'raid') animatePactRaid();
     else if (tab === 'endless') animateSunkenDescent();
   }
+  if (tab === 'camp') void playCampScenes();
 }
 $('town-screen').addEventListener('click', event => {
   if (modal.open) modal.close();
@@ -768,16 +772,21 @@ const INTRO_KEY = 'gridbound.introsSeen';
 /** Intros already shown in this browser; kept outside the save so retries after a defeat go straight to battle. */
 function introSeen(zone: number) { try { return (JSON.parse(localStorage.getItem(INTRO_KEY) ?? '[]') as number[]).includes(zone); } catch { return false; } }
 function markIntroSeen(zone: number) { try { const seen = JSON.parse(localStorage.getItem(INTRO_KEY) ?? '[]') as number[]; if (!seen.includes(zone)) localStorage.setItem(INTRO_KEY, JSON.stringify([...seen, zone])); } catch { /* storage blocked */ } }
-/** Chapter intro as a JRPG scene: title card, then the speaker's lines in a message box. */
+/** A story page: narration gets the CHRONICLE nameplate; only quoted speech shows the chapter speaker (and their portrait when they are a hero). */
+function storyPage(text: string, speaker: string | undefined, place: string | undefined): DialoguePage {
+  const hero = ROSTER.find(r => r.name.toUpperCase() === speaker?.toUpperCase());
+  return /^[“"]/.test(text) && speaker ? { speaker, place, portrait: hero ? portrait(hero.classId) : undefined, text } : { speaker: t('story.chronicle'), place, text };
+}
+/** Chapter intro as a JRPG scene: title card, then the chronicle in a message box. */
 function chapterIntro(zoneIndex: number) {
   const zone = CAMPAIGN[zoneIndex];
-  const [name, place] = zone.speaker.split(' · ');
-  const hero = ROSTER.find(r => r.name.toUpperCase() === name?.trim().toUpperCase());
-  const pages = paginate(zone.intro).map(text => ({ speaker: name?.trim(), place: place?.trim(), portrait: hero ? portrait(hero.classId) : undefined, text }));
+  const [name, place] = zone.speaker.split(' · ').map(part => part.trim());
+  const pages = paginate(zone.intro).map(text => storyPage(text, name, place));
   playingScene = true;
   return playDialogue($('app'), { kicker: t('battle.chapter', { n: zoneIndex + 1 }), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(Math.floor(zoneIndex / 4)), pages, motion: profile.motion, onBlip: () => sound.play('text') })
     .finally(() => { playingScene = false; markIntroSeen(zoneIndex); });
 }
+/** Recruits of the chapter just cleared, for the result screen's notice (their join scenes are queued in the journey). */
 let recruitedIds: number[] = [];
 /** A short scene for a hero joining: their portrait and first words. */
 function recruitScene(id: number, force = false) {
@@ -788,8 +797,65 @@ function recruitScene(id: number, force = false) {
   return playDialogue($('app'), { kicker: t('recruit.kicker'), title: t('recruit.title', { name: hero.name }), subtitle: KITS[hero.classId].name, backdrop: actArt(Math.min(3, Math.floor(hero.recruitChapter / 4))), pages: [{ speaker: hero.name, portrait: portrait(hero.classId), text: hero.joinLine }], motion: profile.motion, onBlip: () => sound.play('text') })
     .finally(() => { playingScene = false; });
 }
+/** A story choice as a scene: its question, its options and 'Decide later' (which leaves it open in the Journal). */
+async function choiceScene(scene: (typeof STORY_CHOICES)[number]) {
+  playingScene = true;
+  const choices = [...scene.options.map(o => ({ value: o.id, label: o.label, reply: o.outcome })), { value: '', label: t('journal.later') }];
+  const value = await playDialogue($('app'), { kicker: t('choice.kicker'), title: scene.title, backdrop: actArt(Math.min(3, Math.floor((scene.chapter - 1) / 4))), pages: [{ speaker: t('story.chronicle'), place: scene.title, text: scene.text, choices, safeChoice: choices.length - 1 }], motion: profile.motion, onBlip: () => sound.play('text') })
+    .finally(() => { playingScene = false; });
+  if (!value || commander.stale) return;
+  profile.narrative ??= {};
+  if (narrativeChoice(profile.narrative, scene.id, value, profile.cleared)) await persist();
+}
+/** The finale: the last outro (as the story choices shaped it), one line per hero, the epilogue and the choices' outcomes, then a closing title card. */
+function endingScene() {
+  const last = CAMPAIGN.length - 1, zone = CAMPAIGN[last], state = profile.narrative ?? {};
+  const chronicle = (place: string | undefined, text: string): DialoguePage => ({ speaker: t('story.chronicle'), place, text });
+  const pages: DialoguePage[] = [
+    ...paginate(storyOutro(last, state)).map(text => chronicle(zone.speaker.split(' · ')[1]?.trim(), text)),
+    ...[...profile.roster].sort((a, b) => a - b).map(id => ({ speaker: CHARACTERS[id].name, place: t('ending.fate'), portrait: portrait(CHARACTERS[id].classId), text: CHARACTERS[id].fateLine })),
+    chronicle(t('journal.epilogue'), t('journal.epilogue.lead')),
+    ...STORY_CHOICES.filter(s => Object.hasOwn(state, s.id)).map(s => chronicle(s.title, s.options.find(o => o.id === state[s.id])!.outcome)),
+    { text: '', card: { kicker: t('ending.card.kicker'), title: t('town.name'), subtitle: t('ending.card.subtitle') } },
+  ];
+  playingScene = true;
+  return playDialogue($('app'), { kicker: t('ending.kicker'), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(3), pages, motion: profile.motion, onBlip: () => sound.play('text') })
+    .finally(() => { playingScene = false; });
+}
+let campScenesRunning = false;
+/**
+ * Scenes the camp owes after a first clear, saved in the journey so a Retry or a reload keeps them: each join scene, then the
+ * chapter's story choice, then the finale. Each one is dropped (and saved) once it has played. Skipped under automation like the
+ * chapter intros; QA plays them through window.gridbound.campScenes.
+ */
+async function playCampScenes(force = false) {
+  const owed = () => Boolean(profile.journey.pendingRecruitScenes?.length || profile.journey.pendingChapterScenes?.length);
+  if (campScenesRunning || playingScene || (!force && navigator.webdriver) || !owed()) return;
+  // Not before the boot step has settled (the title screen is not up yet and the boot-time profile may be replaced), nor over the title screen.
+  if (!commanderChecked || !inTown || commander.stale || pendingSettlement || (commander.document && commander.mode !== 'story') || $('title-screen')?.hidden === false) return;
+  campScenesRunning = true;
+  try {
+    while (inTown && !commander.stale && owed()) {
+      const journey = profile.journey, id = journey.pendingRecruitScenes?.[0];
+      if (id !== undefined) {
+        await recruitScene(id, true);
+        const rest = (profile.journey.pendingRecruitScenes ?? []).filter(other => other !== id);
+        if (rest.length) profile.journey.pendingRecruitScenes = rest; else delete profile.journey.pendingRecruitScenes;
+      } else {
+        const chapter = journey.pendingChapterScenes![0];
+        for (const scene of pendingChoices(profile.narrative ?? {}, profile.cleared).filter(s => s.chapter === chapter + 1)) await choiceScene(scene);
+        if (chapter === CAMPAIGN.length - 1) await endingScene();
+        const rest = (profile.journey.pendingChapterScenes ?? []).filter(other => other !== chapter);
+        if (rest.length) profile.journey.pendingChapterScenes = rest; else delete profile.journey.pendingChapterScenes;
+      }
+      await persist();
+    }
+  } finally { campScenesRunning = false; }
+  // The guide may now point at a choice left for later.
+  if (inTown && townState.tab === 'camp') showTown('camp');
+}
 function depart(mode: Mode) {
-  if (playingScene) return;
+  if (playingScene || campScenesRunning) return;
   commander.mode = mode === 'raid' ? 'raid' : mode === 'endless' ? 'roguelike' : 'story';
   if (commander.document) commander.document.activeMode = commander.mode;
   if (mode === 'adventure' && !canEnterZone(profile, townState.zone)) return;
@@ -928,6 +994,8 @@ function showReady() {
   const beat = battle.mode === 'adventure' ? CAMPAIGN[battle.floor - 1]?.stages[battle.stage]?.beat : undefined;
   $('ready-copy').textContent = beat ?? (battle.stage > 0 ? t('ready.copy.next') : battle.mode === 'adventure' ? t('ready.copy.story') : t('ready.copy.other'));
   $('ready-copy').classList.toggle('story-beat', Boolean(beat));
+  // The very first wave keeps its how-to-play tip under the story beat.
+  $('ready-tip').hidden = !(beat && battle.floor === 1 && battle.stage === 0 && !battle.heroic);
   $('start').textContent = t('battle.begin');
   if (profile.motion) {
     gsap.fromTo('#start-overlay .start-window', { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
@@ -1721,11 +1789,11 @@ async function presentResult() {
       if (battle.mode === 'adventure') {
         reward = battle.gold + chapterReward(candidate, battle.floor - 1, battle.heroic);
         candidate.gold += reward;
-        const before = new Set(candidate.roster), cap = storyPartyCap(candidate.cleared);
+        const before = new Set(candidate.roster), cap = storyPartyCap(candidate.cleared), firstClear = !candidate.cleared.includes(battle.floor - 1);
         completeZone(candidate, battle.floor - 1);
         recruitedIds = candidate.roster.filter(id => !before.has(id));
         chapterResult = { stars: chapterStars(battle.living().length === battle.heroes.length, battle.stageTime), ...recordChapterResult(candidate, battle.floor - 1, chapterStars(battle.living().length === battle.heroes.length, battle.stageTime), battle.heroic) };
-        resultReward = { gold: reward + (chapterResult.heroic?.gold ?? 0), crystal: 0, partyCap: storyPartyCap(candidate.cleared) > cap ? storyPartyCap(candidate.cleared) : 0 };
+        resultReward = { gold: reward + (chapterResult.heroic?.gold ?? 0), crystal: 0, partyCap: storyPartyCap(candidate.cleared) > cap ? storyPartyCap(candidate.cleared) : 0, firstClear };
       } else resultReward = { gold: 0, crystal: Math.max(0, candidate.economy.commanderCrystal - profile.economy.commanderCrystal), partyCap: 0 };
       candidate.wins++;
       if (battle.mode === 'endless') candidate.bestFloor = Math.max(candidate.bestFloor, battle.floor);
@@ -1747,8 +1815,9 @@ async function presentResult() {
   $('ready-label').textContent = '';
   $('ready-title').textContent = won ? moreWaves ? t('ready.after.wave') : t('ready.after.win') : t('ready.after.lose');
   $('ready-copy').textContent = t('ready.after.copy');
+  $('ready-tip').hidden = true;
   $('start').textContent = t('ready.after.button');
-  const description = moreWaves ? t('result.desc.wave') : won && battle.mode === 'adventure' ? zone.outro : won && battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('result.desc.sandbox') : t('result.desc.raid', { tier: t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never) })) : won ? t('result.desc.room', { n: runWallet.crystal }) : t('result.desc.defeat');
+  const description = moreWaves ? t('result.desc.wave') : won && battle.mode === 'adventure' ? storyOutro(battle.floor - 1, profile.narrative ?? {}) : won && battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('result.desc.sandbox') : t('result.desc.raid', { tier: t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never) })) : won ? t('result.desc.room', { n: runWallet.crystal }) : t('result.desc.defeat');
   if (won && battle.mode === 'endless') {
     const cardsHtml = offeredBoons.map(b => {
       const meta = getBoonMeta(b.id);
@@ -1795,6 +1864,7 @@ async function presentResult() {
         <h2 id="result-title" class="ceremony-title">${titleText}</h2>
         <p class="ceremony-desc">${escapeUI(description).replace(/\n/g, '<br>')}</p>
         ${([['result.recruited', true], ['result.recruited.bench', false]] as const).map(([key, deployed]) => { const names = recruitedIds.filter(id => profile.storyActive.includes(id) === deployed).map(id => ROSTER[id].name); return names.length ? `<p class="recruit-notice">${t(key, { names: names.join(' & ') })}</p>` : ''; }).join('')}
+        ${won && !moreWaves && battle.mode === 'adventure' && battle.floor === CAMPAIGN.length && resultReward?.firstClear ? `<p class="recruit-notice campaign-complete">${t('result.campaign.complete')}</p>` : ''}
         ${resultReward?.partyCap && won && !moreWaves ? `<p class="recruit-notice party-grew">${t('notice.party.grew', { n: resultReward.partyCap })}</p>` : ''}
         ${won && !moreWaves && battle.heroic ? `<p class="result-stars heroic-stars">${t('stars.heroic')}</p>` : chapterResult && won && !moreWaves ? `<p class="result-stars"><span>${t('result.stars')}</span> <b class="star-row">${'★'.repeat(chapterResult.stars)}${'☆'.repeat(3 - chapterResult.stars)}</b>${chapterResult.improved ? ` <em>${t('result.stars.new')}</em>` : ''}</p>` : ''}
         ${chapterResult?.heroic ? `<p class="recruit-notice">${t('result.heroic', { gold: chapterResult.heroic.gold, mat: materialList(chapterResult.heroic.materials) })}</p>` : ''}
@@ -1878,9 +1948,9 @@ async function presentResult() {
     if (battle.mode === 'adventure' && commander.document) activateCommander(commander.document, 'story');
     closeWithoutResume();
     inTown = true;
+    recruitedIds = [];
+    // Opening the camp plays the scenes this clear queued (join scenes, a story choice, the finale).
     showTown('camp', '', true);
-    const joined = recruitedIds; recruitedIds = [];
-    void joined.reduce((chain, id) => chain.then(() => recruitScene(id)), Promise.resolve());
   });
 }
 
@@ -1982,7 +2052,7 @@ function resumeEncounter(savedEncounter: NonNullable<typeof encounter>) {
   townState.rogueSetup = battle.rogueBuild ? structuredClone(battle.rogueBuild) : townState.rogueSetup;
   if (initialized) scene.replace(battle);
   makeUnits(); updateExpedition(); showReady();
-  $('ready-copy').textContent = t('ready.resume');
+  $('ready-copy').textContent = t('ready.resume'); $('ready-tip').hidden = true;
   if (frozen.settled) result();
 }
 /** Town changes could not be saved: retry (then continue with `next`) or export them. */
@@ -2102,10 +2172,10 @@ function exportCommander() {
   if (!commander.document) { download(legacyBackup(legacyProfile() as Profile), 'Gridbound-Save.json'); return; }
   download(commander.dirty || pendingSettlement ? { kind:'gridbound-recovery', mode:commander.mode, document:commander.document, pendingProfile:profile, pendingEncounter:encounter } : commander.document, 'Gridbound-Commander.json');
 }
-import { STORY_CHOICES, narrativeChoice, epilogue } from './game/narrative';
+import { STORY_CHOICES, narrativeChoice, epilogue, storyOutro, choiceOpen, pendingChoices } from './game/narrative';
 function chapterChronicle() {
   if (!profile.cleared.length) return '';
-  return `<section class="journal-chronicle"><h3>${t('journal.chronicle', { n: profile.cleared.length })}</h3>${[...profile.cleared].sort((a, b) => a - b).map(i => `<details class="journal-entry-card"><summary>CH ${i + 1} · ${escapeUI(CAMPAIGN[i].name)}</summary><button class="btn journal-replay" data-replay-chapter="${i}">▶ ${t('journal.watch')}</button><p>${escapeUI(CAMPAIGN[i].intro).replace(/\n/g, '<br>')}</p><p>${escapeUI(CAMPAIGN[i].outro).replace(/\n/g, '<br>')}</p></details>`).join('')}</section>`;
+  return `<section class="journal-chronicle"><h3>${t('journal.chronicle', { n: profile.cleared.length })}</h3>${[...profile.cleared].sort((a, b) => a - b).map(i => `<details class="journal-entry-card"><summary>CH ${i + 1} · ${escapeUI(CAMPAIGN[i].name)}</summary><button class="btn journal-replay" data-replay-chapter="${i}">▶ ${t('journal.watch')}</button><p>${escapeUI(CAMPAIGN[i].intro).replace(/\n/g, '<br>')}</p><p>${escapeUI(storyOutro(i, profile.narrative ?? {})).replace(/\n/g, '<br>')}</p></details>`).join('')}</section>`;
 }
 async function storyJournal() {
   if (commander.document && commander.mode !== 'story') {
@@ -2115,10 +2185,16 @@ async function storyJournal() {
   }
   if (!inTown || !(await commander.flush())) return;
  const state=profile.narrative??{};
- const scenes=STORY_CHOICES.filter(s=>Array.from({length:s.chapter},(_,i)=>i).every(i=>profile.cleared.includes(i)));
- const ending=epilogue(state,profile.cleared);
- openModal(`<h2 id="modal-title">${t('journal.title')}</h2><p class="hint">${t('journal.intro')}</p>${scenes.length?'':`<p>${t('journal.locked')}</p>`}${scenes.map(s=>`<section class="journal-scene"><h3>${s.title}</h3><p>${s.text}</p>${state[s.id]?`<p class="journal-outcome">${s.options.find(o=>o.id===state[s.id])?.outcome}</p>`:`<nav class="menu-list">${s.options.map(o=>`<button class="menu-item" data-story-choice="${s.id}" data-story-option="${o.id}">${o.label}</button>`).join('')}<button class="menu-item" data-story-choice="${s.id}" data-story-option="${s.options[0].id}">${t('journal.skip', { label: s.options[0].label })}</button></nav>`}</section>`).join('')}${chapterChronicle()}${ending.map(text=>`<p>${text}</p>`).join('')}<button class="btn primary" data-close>${t('common.back')}</button>`);
+ const scenes=STORY_CHOICES.filter(s=>choiceOpen(s,profile.cleared));
+ const finished=CAMPAIGN.every((_,i)=>profile.cleared.includes(i));
+ const companions=[...profile.roster].filter(id=>CHARACTERS[id].recruitChapter>0).sort((a,b)=>a-b);
+ const choice=(s:(typeof STORY_CHOICES)[number])=>`<section class="journal-scene"><h3>${escapeUI(s.title)}</h3><p>${escapeUI(s.text)}</p>${state[s.id]?`<p class="journal-outcome">${escapeUI(s.options.find(o=>o.id===state[s.id])?.outcome??'')}</p>`:`<nav class="menu-list">${s.options.map(o=>`<button class="menu-item" data-story-choice="${s.id}" data-story-option="${o.id}">${escapeUI(o.label)}</button>`).join('')}<button class="menu-item" data-close>${t('journal.later')}</button></nav>`}</section>`;
+ const recruits=companions.length?`<section class="journal-companions-list"><h3>${t('journal.companions')}</h3><div class="journal-companions">${companions.map(id=>`<button class="btn" data-replay-recruit="${id}" title="${escapeUI(t('journal.recruit',{name:CHARACTERS[id].name}))}" aria-label="${escapeUI(t('journal.recruit',{name:CHARACTERS[id].name}))}">▶ ${escapeUI(CHARACTERS[id].name)}</button>`).join('')}</div></section>`:'';
+ const ending=finished?`<section class="journal-epilogue"><h3>${t('journal.epilogue')}</h3><p>${escapeUI(t('journal.epilogue.lead'))}</p>${epilogue(state,profile.cleared).map(text=>`<p>${escapeUI(text)}</p>`).join('')}<button class="btn journal-replay" data-replay-ending>▶ ${t('journal.ending')}</button></section>`:'';
+ openModal(`<h2 id="modal-title">${t('journal.title')}</h2><p class="hint">${t('journal.intro')}</p>${scenes.length?'':`<p>${t('journal.locked',{n:Math.min(...STORY_CHOICES.map(s=>s.chapter))})}</p>`}${scenes.map(choice).join('')}${recruits}${chapterChronicle()}${ending}<button class="btn primary" data-close>${t('common.back')}</button>`);
  modal.querySelectorAll<HTMLElement>('[data-replay-chapter]').forEach(button=>button.onclick=()=>{ closeWithoutResume(); void chapterIntro(Number(button.dataset.replayChapter)); });
+ modal.querySelectorAll<HTMLElement>('[data-replay-recruit]').forEach(button=>button.onclick=()=>{ closeWithoutResume(); void recruitScene(Number(button.dataset.replayRecruit),true); });
+ modal.querySelector<HTMLElement>('[data-replay-ending]')?.addEventListener('click',()=>{ closeWithoutResume(); void endingScene(); });
  modal.querySelectorAll<HTMLElement>('[data-story-choice]').forEach(button=>button.onclick=async()=>{
   if(commander.stale)return;
   profile.narrative??={};
@@ -2331,7 +2407,7 @@ const exposeQaHook = () => { if (import.meta.env.DEV) Object.assign(window, { gr
   get runBoons() { return runBoons; },
   setRunBoons: (b: string[]) => { runBoons = [...b]; battle.boons = [...b]; updateExpedition(); },
   step: (seconds: number) => { for (let t = 0; t < Math.min(600, Math.max(0, seconds)); t += 1 / 60) battle.tick(1 / 60); frame(1); },
-  boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro, recruitScene: (id: number) => recruitScene(id, true),
+  boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro, recruitScene: (id: number) => recruitScene(id, true), campScenes: () => playCampScenes(true), endingScene,
 } }); };
 // Every player gets a Commander: the latest one, or one migrated from the legacy save (backed up first). The dev QA hook appears once that has settled, so tests never race the migration.
-void ensureCommander().finally(() => { commanderChecked = true; storageStatus(); window.clearTimeout(saveFallback); window.clearTimeout(engineFallback); startEngine(); exposeQaHook(); });
+void ensureCommander().finally(() => { commanderChecked = true; storageStatus(); window.clearTimeout(saveFallback); window.clearTimeout(engineFallback); startEngine(); exposeQaHook(); if (inTown && townState.tab === 'camp') void playCampScenes(); });

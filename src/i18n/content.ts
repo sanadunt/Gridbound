@@ -10,7 +10,7 @@
  *
  * `eventText()` translates strings emitted at runtime by src/game/simulation.ts
  * (banners, floating texts, threat names and counters) plus a few other
- * runtime-composed strings (talent/gear lock reasons, the epilogue lead line).
+ * runtime-composed strings (talent/gear lock reasons, epilogue choice cards).
  */
 import { KITS, UPGRADES } from '../game/content';
 import { CHARACTERS } from '../game/characters';
@@ -187,8 +187,6 @@ const EVENT_TEXT: ContentText[] = [
   // Battle.stageName outside the campaign (shown raw and upper-cased as the start banner).
   { en: 'Practice arena · no Crystal', id: 'Arena latihan · tanpa Crystal' },
   { en: 'Raid contract', id: 'Kontrak raid' },
-  // narrative.ts epilogue() lead line.
-  { en: 'The machine stops. Vharok is free. Eda chooses a name of their own. The town builds its protection together; they do not get back everything that was lost.', id: 'Mesin berhenti. Vharok bebas. Eda memilih namanya sendiri. Kota membangun perlindungan bersama; mereka tidak mendapatkan kembali semua yang hilang.' },
   // profile.ts talentReason() / gearReason().
   { en: 'Hero not yet recruited', id: 'Hero belum direkrut' },
   { en: 'Already learned', id: 'Sudah dipelajari' },

@@ -169,7 +169,9 @@ export class Battle {
       const raidHp=()=>CAMPAIGN[ch-1].stages.at(-1)!.hp*chapterHp(ch)*RAID_HP*Math.pow(1.15,Math.max(0,this.floor-CAMPAIGN.length))*Math.pow(this.raidParty,.9);
       this.bossMax=Math.round((this.mode==='endless'?ENDLESS_HP*Math.pow(this.heroes.length/3,.9)*Math.pow(ENDLESS_HP_GROWTH,this.floor-1):raidHp()*(this.raidTier()?.hp??1))*ENEMIES[this.enemyId].hp*hpScale);
     }
-    this.bossHp=this.bossMax; this.enemyName=ENEMIES[this.enemyId].name; this.enemyTitle=ENEMIES[this.enemyId].title;
+    // A story stage may rename its enemy (Vharok's chapters name what rides him); art and patterns stay the archetype's.
+    const stage=this.mode==='adventure'?CAMPAIGN[this.floor-1].stages[this.stage]:undefined;
+    this.bossHp=this.bossMax; this.enemyName=stage?.enemyName??ENEMIES[this.enemyId].name; this.enemyTitle=stage?.enemyTitle??ENEMIES[this.enemyId].title;
   }
   nextWave() {
     if(this.mode!=='adventure'||this.status!=='victory'||this.stage+1>=this.stageCount) return false;
