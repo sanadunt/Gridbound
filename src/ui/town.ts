@@ -216,7 +216,7 @@ function heroSheet(p: Profile, id: number, preview: ReturnType<Battle['hero']> &
   const r = ROSTER[id], kit = KITS[r.classId], loadout = p.loadouts[id];
   const job = JOBS[loadout.job ?? ''];
   const exp = progress.needed ? progress.current / progress.needed * 100 : 100;
-  const stats: [string, string][] = [[t('power.hero'), String(heroPower(preview))], ['HP', String(preview.maxHp)], [t('party.cd'), `${preview.total.toFixed(2)}s`], ['SP', String(availablePoints(p, id))]];
+  const stats: [string, string][] = [[t('power.hero'), String(heroPower(preview, normalizeStoryParty(p.storyActive, p.roster, p.cleared).length))], ['HP', String(preview.maxHp)], [t('party.cd'), `${preview.total.toFixed(2)}s`], ['SP', String(availablePoints(p, id))]];
   return `<div class="win hero-sheet training-identity" style="--class-color:${kit.color}">
     <div class="sheet-portrait"><img src="${portrait(r.classId)}" alt=""/><span>LV ${progress.level}</span></div>
     <div class="sheet-body"><small>${escape(job?.name ?? kit.name)} · ${escape(kit.role)}</small><h2>${r.name}</h2>

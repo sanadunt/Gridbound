@@ -7,6 +7,7 @@ import { monsterCanvas } from '../art/monsters';
 import { overworldCanvas } from '../art/overworld';
 import { expeditionModes, type TownState } from './town';
 import { t, type StringKey } from '../i18n';
+import { heroicScale } from '../game/simulation';
 
 export type ActId = 0 | 1 | 2 | 3;
 export const ACTS: { id: ActId; roman: string; biomeClass: string; zones: number[] }[] = [0, 1, 2, 3].map(id => ({ id: id as ActId, roman: ['I', 'II', 'III', 'IV'][id], biomeClass: `biome-act-${id + 1}`, zones: [id * 4, id * 4 + 1, id * 4 + 2, id * 4 + 3] }));
@@ -65,7 +66,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
       <div class="boss-intel"><small>${t('map.boss')}</small><h4>${escape(boss.name)}</h4><small class="dossier-boss-title">${escape(boss.title)}</small>
         <div class="intent-row">${boss.patterns.map((intent, i) => `<span class="intent-chip intent-${intent}">${i + 1}. ${t(`intent.${intent}` as StringKey)}</span>`).join('')}</div></div></div>
     ${heroicOpen ? `<nav class="tabs heroic-toggle" aria-label="${t('heroic.heroic')}"><button data-heroic="0" aria-pressed="${!heroic}">${t('heroic.normal')}</button><button data-heroic="1" aria-pressed="${heroic}">${t('heroic.heroic')}${heroicDone ? ' ✓' : ''}</button></nav>` : ''}
-    ${heroic ? `<p class="heroic-note"><b>${t('heroic.badge')}</b> ${t('heroic.desc')} ${heroicDone ? t('heroic.cleared') : ''}</p>` : ''}
+    ${heroic ? `<p class="heroic-note"><b>${t('heroic.badge')}</b> ${t('heroic.desc', { hp: Math.round((heroicScale(state.zone + 1).hp - 1) * 100), dmg: Math.round((heroicScale(state.zone + 1).dmg - 1) * 100) })} ${heroicDone ? t('heroic.cleared') : ''}</p>` : ''}
     ${powerLine}
     ${heroic ? `<p class="star-goals heroic-stars">${t('stars.heroic')}</p>` : `<div class="star-goals">${starRow(stars)}<ul><li class="${stars >= 1 ? 'met' : ''}">${t('stars.goal.clear')}</li><li class="${stars >= 2 ? 'met' : ''}">${t('stars.goal.standing')}</li><li class="${stars >= 3 ? 'met' : ''}">${t('stars.goal.par', { s: STAR_PAR_SECONDS })}</li></ul></div>`}
     <dl class="stat-table mission-facts"><div><dt>${t('map.waves')}</dt><dd>${zone.stages.length}</dd></div><div class="reward-row"><dt>${rewardRow[0]}</dt><dd>${escape(rewardRow[1])}</dd></div><div><dt>${t('map.potions')}</dt><dd>${heroic ? 1 : 2}</dd></div>${zone.recruit.length && !replay ? `<div><dt>${t('map.recruit')}</dt><dd>${zone.recruit.map(id => ROSTER[id].name).join(', ')}</dd></div>` : ''}</dl>

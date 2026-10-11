@@ -3,11 +3,13 @@ import { normalizedXP } from './levels';
 import type { Profile } from './profile';
 import type { BattleOptions } from './simulation';
 
+/** The largest story party: one of the nine tiles always stays free, so a ground telegraph can still be dodged with a full party. */
+export const STORY_PARTY_MAX = 8;
 export function storyPartyCap(cleared: readonly number[]): number {
   let chapters = 0;
   while (cleared.includes(chapters)) chapters++;
-  // The grid fills up as the story grows: 6 after Act I, then 7, 8 and finally all 9 tiles.
-  return chapters >= 12 ? 9 : chapters >= 9 ? 8 : chapters >= 6 ? 7 : chapters >= 4 ? 6 : chapters >= 3 ? 5 : chapters >= 2 ? 4 : 3;
+  // The grid fills up as the story grows: 6 after Act I, then 7 and 8 (saves with nine deployed bench the ninth).
+  return chapters >= 9 ? STORY_PARTY_MAX : chapters >= 6 ? 7 : chapters >= 4 ? 6 : chapters >= 3 ? 5 : chapters >= 2 ? 4 : 3;
 }
 
 export function normalizeStoryParty(value: unknown, roster: readonly number[], cleared: readonly number[]): number[] {

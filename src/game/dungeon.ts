@@ -3,7 +3,7 @@
 // HP between rooms; gold and materials go into a pouch that is only kept by extracting or by beating
 // the guardian. Pure logic only: text lives in the i18n tables under `dungeon.*`.
 import { CAMPAIGN, ENEMIES } from './world';
-import { storyBattleOptions } from './story-party';
+import { storyBattleOptions, STORY_PARTY_MAX } from './story-party';
 import type { Profile } from './profile';
 import type { BattleOptions } from './simulation';
 
@@ -44,6 +44,9 @@ export const DUNGEON_ROWS = 7;
 export const CAMP_ROW = 5;
 /** HP a 'leave' choice restores; the party's share of a flee; the wound an interrupted (reloaded) fight leaves. */
 export const LEAVE_HEAL = .05, FLEE_KEEP = .5, INTERRUPT_WOUND = .25;
+/** The camp's rest heals this share of max HP and wakes the fallen at CAMP_REVIVE: a little short of a full recovery, so the HP
+ *  a party brings to the guardian still depends on the rooms before it. */
+export const CAMP_REST = .25, CAMP_REVIVE = .25;
 
 /** Event ids and the choices each offers; outcomes are resolved by `chooseEvent`. */
 export const DUNGEON_EVENTS: Record<string, string[]> = {
@@ -138,16 +141,23 @@ export function enterNode(run: DungeonRun, id: number): DungeonNode | undefined 
   return node;
 }
 
-/** Enemy HP and damage multipliers for a dungeon fight at this depth, before the chapter tables. */
-// Dungeon rooms hit harder than the chapter they unlock with: HP carries over, so attrition is the challenge.
-export const DUNGEON_HP = 1.45, DUNGEON_DMG = 1.3;
-// Per-depth damage trim (fitted with the balance harness's casual player at each depth's unlock).
-export const DEPTH_DMG = [1, 1, 1, .92, 1, .8, .95, .78];
+/** Enemy HP and damage multipliers for a dungeon fight at this depth. */
+// Rooms carry the unlock chapter's HP curve times DUNGEON_HP (HP carries over, so attrition is the challenge); their damage is
+// the depth's own DEPTH_DMG (in CHAPTER_DMG units) times the kind of fight's FIGHT_DMG.
+export const DUNGEON_HP = 1.45;
+// Enemy damage of each depth, never falling with depth: fitted with `DUNGEON=1 npm run calibrate` so the balance harness's casual
+// player (right after the depth's unlock chapter, careful and greedy routes) wipes in about one run in five, most often at the
+// guardian. Depth 8 alone wants less than depth 7, so the pair shares the value that keeps depth 8 near a quarter (depth 7 ~10%).
+export const DEPTH_DMG = [4.1, 8.4, 8.7, 8.7, 10.5, 10.5, 11.7, 11.7];
+/** The guardian's HP as a share of its chapter boss's stage HP. */
+export const GUARDIAN_HP = 1.1;
+/** Damage factor of each kind of fight. */
+export const FIGHT_DMG: Record<'battle' | 'elite' | 'guardian', number> = { battle: 1.1, elite: 1.3, guardian: 1.2 };
 
 export function fightScale(run: DungeonRun, kind: 'battle' | 'elite' | 'guardian') {
   const chapter = depthDef(run.depth).unlock, stages = CAMPAIGN[chapter - 1].stages;
-  const base = kind === 'guardian' ? stages.at(-1)!.hp * .85 : kind === 'elite' ? stages.at(-2)!.hp : stages[1].hp;
-  return { chapter, hp: base * DUNGEON_HP, damage: DUNGEON_DMG * DEPTH_DMG[run.depth - 1] * (kind === 'elite' ? 1.12 : kind === 'guardian' ? 1 : .9) };
+  const base = kind === 'guardian' ? stages.at(-1)!.hp * GUARDIAN_HP : kind === 'elite' ? stages.at(-2)!.hp : stages[1].hp;
+  return { chapter, hp: base * DUNGEON_HP, damage: DEPTH_DMG[run.depth - 1] * FIGHT_DMG[kind] };
 }
 
 export function dungeonXP(run: DungeonRun, kind: 'battle' | 'elite' | 'guardian') {
@@ -289,13 +299,13 @@ export function openTreasure(run: DungeonRun): Outcome | undefined {
   return out;
 }
 
-/** Camp: rest (heal 35%, revive the fallen at 25%) or extract with the pouch. */
+/** Camp: rest (heal CAMP_REST, revive the fallen at CAMP_REVIVE) or extract with the pouch. */
 export function campChoice(run: DungeonRun, choice: 'rest' | 'extract'): boolean {
   const node = run.nodes[run.at];
   if (!node || node.kind !== 'camp' || node.done || run.status !== 'active') return false;
   node.done = true;
   if (choice === 'extract') { run.status = 'extracted'; return true; }
-  for (const id of run.party) run.hp[id] = run.hp[id] <= 0 ? .25 : Math.min(1, run.hp[id] + .35);
+  for (const id of run.party) run.hp[id] = run.hp[id] <= 0 ? CAMP_REVIVE : Math.min(1, run.hp[id] + CAMP_REST);
   return true;
 }
 
@@ -317,11 +327,13 @@ export function normalizeRun(raw: unknown): DungeonRun | undefined {
   const at = Number.isInteger(r.at) && (r.at === -1 || nodes[r.at]) ? r.at : -1;
   const ratio = (v: unknown) => typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
   const bless = (v: unknown) => typeof v === 'number' && Number.isFinite(v) ? Math.max(1, Math.min(2, v)) : 1;
+  // A run saved with nine heroes (before the story party stopped at eight) keeps the first eight: the ninth could never fight.
+  const party = r.party.filter(id => Number.isInteger(id)).slice(0, STORY_PARTY_MAX);
   const materials: Record<string, number> = {};
   for (const [id, amount] of Object.entries(r.pouch?.materials ?? {})) if (MATERIALS.includes(id as MaterialId) && Number.isSafeInteger(amount) && amount > 0) materials[id] = amount;
   const run: DungeonRun = {
     depth: r.depth, seed: r.seed, rng: Number.isInteger(r.rng) ? r.rng >>> 0 : r.seed >>> 0, nodes, at, visited,
-    party: r.party.filter(id => Number.isInteger(id)), hp: Object.fromEntries(r.party.map(id => [id, ratio(r.hp?.[id])])),
+    party, hp: Object.fromEntries(party.map(id => [id, ratio(r.hp?.[id])])),
     potions: Math.max(0, Math.min(3, Number.isInteger(r.potions) ? r.potions : 2)),
     pouch: { gold: Math.max(0, Math.min(1_000_000, Number.isSafeInteger(r.pouch?.gold) ? r.pouch.gold : 0)), materials },
     blessing: { power: bless(r.blessing?.power), vitality: bless(r.blessing?.vitality) },

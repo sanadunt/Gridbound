@@ -14,7 +14,7 @@ import './styles/result.css';
 import './styles/dungeon.css';
 import { currencyAmount } from './ui/currency';
 import { townSceneCanvas } from './art/town-scene';
-import { Battle, GUARD_DURATION, ENRAGE_WARN, ENRAGE_AT, ENRAGE_DMG, type BattleEvent, type BattleOptions } from './game/simulation';
+import { Battle, GUARD_DURATION, ENRAGE_WARN, ENRAGE_AT, ENRAGE_DMG, BREAK_SECONDS, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
 import { CAMPAIGN, BOONS, boonChoices } from './game/world';
@@ -1268,7 +1268,7 @@ function frame(dt: number) {
   const ghost = document.getElementById('boss-hp-ghost');
   if (ghost) ghost.style.width = hpPercent;
   $('phase').textContent = t('battle.phase', { n: battle.phase });
-  $('stagger').style.width = `${battle.breakLeft > 0 ? battle.breakLeft / 6 * 100 : battle.stagger / 800 * 100}%`;
+  $('stagger').style.width = `${Math.min(100, battle.breakLeft > 0 ? battle.breakLeft / BREAK_SECONDS * 100 : battle.stagger / battle.staggerThreshold() * 100)}%`;
   $('stagger-label').textContent = battle.breakLeft > 0 ? t('battle.break') : t('battle.armor');
   $('battle-screen').classList.toggle('boss-broken', battle.breakLeft > 0);
   $('clock').textContent = formatTime(battle.time);

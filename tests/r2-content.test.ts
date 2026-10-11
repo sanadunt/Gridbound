@@ -4,8 +4,8 @@ import { Battle } from '../src/game/simulation';
 import { KITS, ROSTER, CLASS_IDS } from '../src/game/content';
 import { JOBS } from '../src/game/jobs';
 import { CAMPAIGN, ENEMIES } from '../src/game/world';
-import { createProfile, completeZone, moveFormation } from '../src/game/profile';
-import { storyPartyCap, setStoryParty } from '../src/game/story-party';
+import { createProfile, completeZone, moveFormation, normalizeProfile } from '../src/game/profile';
+import { storyPartyCap, setStoryParty, storyBattleOptions } from '../src/game/story-party';
 
 // A one-hero raid with the given class and skill in slot 0, ready to act.
 function solo(classId: string, skill: number, extra: number[] = [0, 4, 3]) {
@@ -95,18 +95,24 @@ test('six new enemies have art-ready ids and three variants each; later chapters
   for (const id of ['moth', 'basilisk', 'crab', 'revenant', 'lich', 'knight', 'hydra', 'harpy', 'colossus', 'choir']) assert.ok(used.has(id), id);
 });
 
-test('new heroes join through the story and the grid grows to nine', () => {
+test('new heroes join through the story; the story grid stops at eight so one tile stays free', () => {
   const p = createProfile();
   for (let i = 0; i < 13; i++) completeZone(p, i);
   assert.deepEqual(p.roster.slice(9), [9, 10, 11, 12, 13, 14]);
-  assert.equal(storyPartyCap(p.cleared), 9);
-  assert.ok(setStoryParty(p, p.roster.slice(-9)));
-  assert.equal(new Set(p.storyActive.map(id => p.loadouts[id].slot)).size, 9, 'deployed heroes never share a tile');
+  assert.equal(storyPartyCap(p.cleared), 8, 'WP8: one of the nine tiles always stays free for dodging');
+  assert.equal(setStoryParty(p, p.roster.slice(-9)), false, 'nine heroes no longer fit');
+  assert.ok(setStoryParty(p, p.roster.slice(-8)));
+  assert.equal(new Set(p.storyActive.map(id => p.loadouts[id].slot)).size, 8, 'deployed heroes never share a tile');
+  // A save from before the cap with nine deployed loads with the ninth benched, and the battle fields eight.
+  const old = normalizeProfile({ ...structuredClone(p), storyActive: p.roster.slice(-9) });
+  assert.deepEqual(old.storyActive, p.roster.slice(-9, -1));
+  const story = new Battle('adventure', 13, undefined, { ...storyBattleOptions(p), roster: p.roster.slice(-9) });
+  assert.equal(story.heroes.length, 8); assert.equal(new Set(story.heroes.map(h => h.slot)).size, 8);
   const b = new Battle('raid', 1, undefined, { roster: ROSTER.map((_, id) => id) });
   assert.equal(b.heroes.length, 9); assert.equal(new Set(b.heroes.map(h => h.slot)).size, 9);
   const first = p.storyActive[0], tile = p.loadouts[p.storyActive[1]].slot;
   assert.ok(moveFormation(p, first, tile));
-  assert.equal(new Set(p.storyActive.map(id => p.loadouts[id].slot)).size, 9);
+  assert.equal(new Set(p.storyActive.map(id => p.loadouts[id].slot)).size, 8);
 });
 
 test('variant descriptions match their intent order and pace', () => {

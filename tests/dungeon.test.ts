@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateMap, startRun, reachable, enterNode, resolveFight, fleeFight, interruptFight, noteFight, chooseEvent, choiceNeed, openTreasure, campChoice, unlockedDepth, normalizeRun, dungeonBattleOptions, DEPTHS, DUNGEON_ROWS, CAMP_ROW, DUNGEON_EVENTS, DUNGEON_LETTERS, EVENT_COST, LEAVE_HEAL, INTERRUPT_WOUND, MAP_VERSION, type DungeonRun } from '../src/game/dungeon';
+import { STORY_PARTY_MAX } from '../src/game/story-party';
+import { generateMap, startRun, reachable, enterNode, resolveFight, fleeFight, interruptFight, noteFight, chooseEvent, choiceNeed, openTreasure, campChoice, CAMP_REST, CAMP_REVIVE, unlockedDepth, normalizeRun, dungeonBattleOptions, DEPTHS, DUNGEON_ROWS, CAMP_ROW, DUNGEON_EVENTS, DUNGEON_LETTERS, EVENT_COST, LEAVE_HEAL, INTERRUPT_WOUND, MAP_VERSION, type DungeonRun } from '../src/game/dungeon';
 import { ENEMIES } from '../src/game/world';
 import { createProfile, normalizeProfile, profileModifiers } from '../src/game/profile';
 import { setStoryParty } from '../src/game/story-party';
@@ -52,7 +53,7 @@ test('events, treasure and camp resolve once; camp revives and extract ends the 
   room('treasure', 3);
   const loot = openTreasure(run)!; assert.ok(loot.gold! > 0 && Object.values(run.pouch.materials).some(v => v > 0));
   room('camp', CAMP_ROW); run.hp = { 0: 0, 4: .5 };
-  assert.ok(campChoice(run, 'rest')); assert.equal(run.hp[0], .25); assert.equal(run.hp[4], .85);
+  assert.ok(campChoice(run, 'rest')); assert.equal(run.hp[0], CAMP_REVIVE); assert.equal(run.hp[4], .5 + CAMP_REST); assert.equal(CAMP_REST, .25, 'WP8: rest heals 25%, not a full recovery');
   room('camp', CAMP_ROW);
   assert.ok(campChoice(run, 'extract')); assert.equal(run.status, 'extracted');
 });
@@ -133,6 +134,13 @@ test('normalizeRun repairs corrupted runs: unknown enemies, non-numeric blessing
   delete raw.pendingFight; assert.deepEqual(normalizeRun(raw)!.pendingFight, { kind: 'battle', enemy: room.enemy }, 'an unwon fight room gets its fight back');
   const ambush = eventRoom('archive'); ambush.pendingFight = { kind: 'elite', enemy: 'gone' };
   assert.equal(normalizeRun(JSON.parse(JSON.stringify({ ...ambush, nodes: ambush.nodes.slice(0, -1), at: -1 })))?.pendingFight, undefined, 'a fight with no room to fall back on is dropped');
+});
+
+test('a run saved with nine heroes keeps the first eight, the story party cap', () => {
+  const nine = [0, 1, 2, 3, 4, 5, 6, 7, 8], run = startRun(4, 3, nine); nine.forEach((id, i) => run.hp[id] = 1 - i * .05);
+  const fixed = normalizeRun(JSON.parse(JSON.stringify(run)))!;
+  assert.deepEqual(fixed.party, nine.slice(0, STORY_PARTY_MAX)); assert.deepEqual(Object.keys(fixed.hp).map(Number), nine.slice(0, STORY_PARTY_MAX));
+  assert.equal(fixed.hp[7], run.hp[7]);
 });
 
 test('event choices are honest: unaffordable ones are refused without using the event, and every choice does something', () => {

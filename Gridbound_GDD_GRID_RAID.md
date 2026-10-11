@@ -424,10 +424,10 @@ Pecahan segel bergetar dekat reruntuhan. Orin, seorang peneliti yang hilang, men
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Stolen relics | wave | goblin | 1760 | Opening-act encounter |
-| The false voice | wave | shaman | 2200 | Opening-act encounter |
-| Warden of the bridge | miniboss | golem | 3520 | Opening-act encounter |
-| The oath below | boss | wraith | 5280 | Opening-act encounter |
+| Stolen relics | wave | goblin | 1560 | Opening-act encounter |
+| The false voice | wave | shaman | 1950 | Opening-act encounter |
+| Warden of the bridge | miniboss | golem | 3120 | Opening-act encounter |
+| The oath below | boss | wraith | 4680 | Opening-act encounter |
 
 **Aftermath:** Orin memutus nyanyian palsu dengan segel kedua. Suara itu bukan miliknya, melainkan gema sumpah para penjaga lama. “Empat segel bukan penjara,” ia berkata. “Mereka menahan mimpi seekor naga.”
 
@@ -443,10 +443,10 @@ Bran dan Kestrel masih menjaga menara luar, tetapi akarnya sudah menembus tembok
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Brood at the walls | wave | spider | 2860 | Opening-act encounter |
-| The hungry vanguard | wave | wolf | 3190 | Opening-act encounter |
-| Cantor of the siege | miniboss | shaman | 5060 | Opening-act encounter |
-| Ironroot awakens | boss | golem | 8360 | Opening-act encounter |
+| Brood at the walls | wave | spider | 2288 | Opening-act encounter |
+| The hungry vanguard | wave | wolf | 2552 | Opening-act encounter |
+| Cantor of the siege | miniboss | shaman | 4048 | Opening-act encounter |
+| Ironroot awakens | boss | golem | 6688 | Opening-act encounter |
 
 **Aftermath:** Bran menahan pintu sementara Kestrel menyalakan lonceng ketiga. Mereka ikut pulang, membawa peta gerbang. Dari kejauhan terdengar sayap: Vharok sudah membuka satu mata.
 
@@ -462,10 +462,10 @@ Nyx dan Mira menjaga segel terakhir sendirian. Di seberang gerbang, naga memimpi
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Echoes of the lost | wave | wraith | 4400 | Opening-act encounter |
-| The final chorus | wave | shaman | 5170 | Opening-act encounter |
-| Heart of the forest | miniboss | treant | 7700 | Opening-act encounter |
-| A guardian dreaming | boss | dragon | 13640 | Opening-act encounter |
+| Echoes of the lost | wave | wraith | 4080 | Opening-act encounter |
+| The final chorus | wave | shaman | 4794 | Opening-act encounter |
+| Heart of the forest | miniboss | treant | 7140 | Opening-act encounter |
+| A guardian dreaming | boss | dragon | 12648 | Opening-act encounter |
 
 **Aftermath:** Cahaya empat segel bertemu di dada Vharok. Naga itu menunduk, bukan kalah, melainkan terbangun. Nyx dan Mira membawa api terakhir pulang. Untuk pertama kalinya, lonceng Emberhollow berbunyi bukan sebagai peringatan. Di bawah menara, masih ada satu tangga yang belum dijelajahi…
 
@@ -485,11 +485,11 @@ Kita pergi mencari arsip sekolah di desa sebelah. Lyra membawa bekal untuk empat
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · The Empty Census | wave | wolf-ash | 9672 | Mainan dari arang terserak di jalan. Jejak kecil berhenti tepat di tepi wilayah lonceng. |
-| Pursuit · The Empty Census | wave | moth | 11284 | Pemulung memakai lencana murid. Mereka mempertahankan kotak makan kosong, bukan harta. |
-| Pressure · The Empty Census | wave | goblin-ash | 13098 | Di dalam kepompong: daftar nama, dibungkus agar tidak dicuri angin. |
-| The threshold · The Empty Census | miniboss | revenant | 19143 | Cantor bernyanyi memakai suara anak yang tak seorang pun bisa ingat. |
-| The reckoning · The Empty Census | boss | golem-ash | 32240 | Ironroot menutupi pintu arsip. Di pelat dadanya terukir: JANGAN BIARKAN MEREKA MEMBAYAR DUA KALI. |
+| Crossing · The Empty Census | wave | wolf-ash | 4393 | Mainan dari arang terserak di jalan. Jejak kecil berhenti tepat di tepi wilayah lonceng. |
+| Pursuit · The Empty Census | wave | moth | 5125 | Pemulung memakai lencana murid. Mereka mempertahankan kotak makan kosong, bukan harta. |
+| Pressure · The Empty Census | wave | goblin-ash | 5949 | Di dalam kepompong: daftar nama, dibungkus agar tidak dicuri angin. |
+| The threshold · The Empty Census | miniboss | revenant | 8694 | Cantor bernyanyi memakai suara anak yang tak seorang pun bisa ingat. |
+| The reckoning · The Empty Census | boss | golem-ash | 14643 | Ironroot menutupi pintu arsip. Di pelat dadanya terukir: JANGAN BIARKAN MEREKA MEMBAYAR DUA KALI. |
 
 **Aftermath:** Buku sensus tersimpan di rongga Ironroot. Setiap halaman memiliki cap lonceng. Tujuh belas nama telah dicoret, tetapi tinta di ujung jarinya masih basah.
 
@@ -511,11 +511,11 @@ Rowan menyerahkan lagu yang diajarkan ibunya. Ia masih ingat wajahnya, tetapi sa
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · The Glass Ferry | wave | spider-ash | 12648 | Air memantulkan party dengan satu orang tambahan. Jangan menoleh mencari wajahnya. |
-| Pursuit · The Glass Ferry | wave | harpy | 14756 | Bayangan di air terluka sebelum hero yang di darat terkena serangan. |
-| Pressure · The Glass Ferry | wave | basilisk | 17128 | Gema menyerang yang paling rapuh: ia tahu tepat bagaimana luka itu dibuat. |
-| The threshold · The Glass Ferry | miniboss | wraith-ash | 25033 | Awak feri menumpuk tiket bertuliskan satu tanggal yang sama. |
-| The reckoning · The Glass Ferry | boss | hydra | 42160 | Pengemudi melepas topeng. Tidak ada wajah, hanya mulut yang menyanyikan lagu Rowan. |
+| Crossing · The Glass Ferry | wave | spider-ash | 5833 | Air memantulkan party dengan satu orang tambahan. Jangan menoleh mencari wajahnya. |
+| Pursuit · The Glass Ferry | wave | harpy | 6805 | Bayangan di air terluka sebelum hero yang di darat terkena serangan. |
+| Pressure · The Glass Ferry | wave | basilisk | 7899 | Gema menyerang yang paling rapuh: ia tahu tepat bagaimana luka itu dibuat. |
+| The threshold · The Glass Ferry | miniboss | wraith-ash | 11544 | Awak feri menumpuk tiket bertuliskan satu tanggal yang sama. |
+| The reckoning · The Glass Ferry | boss | hydra | 19443 | Pengemudi melepas topeng. Tidak ada wajah, hanya mulut yang menyanyikan lagu Rowan. |
 
 **Aftermath:** Di seberang, lagu Rowan terdengar dari mulut makhluk yang kita kalahkan. Wraith menyerahkan tiket balik: penumpangnya tercatat sebagai bahan bakar, bukan warga.
 
@@ -537,11 +537,11 @@ Di kamar paling ujung, ada sembilan tempat tidur. Buku perawat mencatat nama par
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · The Choir Ward | wave | shaman-ash | 15984 | Botol obat berlabel kata-kata: amarah, rindu, malu. Semuanya kosong. |
-| Pursuit · The Choir Ward | wave | spider-ash | 18648 | Catatan perawatan selalu berakhir pada hari yang sama, lalu dimulai kembali. |
-| Pressure · The Choir Ward | wave | moth-ash | 21645 | Sebuah pesan ditulis di bawah ranjang: jika Lyra lupa, tolong ingatkan bahwa ia pernah baik. |
-| The threshold · The Choir Ward | miniboss | revenant-ash | 31635 | Cantor menuntut Lyra pulang ke penciptanya. Party berdiri menghalangi pintu. |
-| The reckoning · The Choir Ward | boss | lich | 53280 | Choirmaster mengaku dapat membuat rasa bersalah Lyra hilang. Ia menolak dengan mengangkat tongkatnya. |
+| Crossing · The Choir Ward | wave | shaman-ash | 6204 | Botol obat berlabel kata-kata: amarah, rindu, malu. Semuanya kosong. |
+| Pursuit · The Choir Ward | wave | spider-ash | 7237 | Catatan perawatan selalu berakhir pada hari yang sama, lalu dimulai kembali. |
+| Pressure · The Choir Ward | wave | moth-ash | 8401 | Sebuah pesan ditulis di bawah ranjang: jika Lyra lupa, tolong ingatkan bahwa ia pernah baik. |
+| The threshold · The Choir Ward | miniboss | revenant-ash | 12278 | Cantor menuntut Lyra pulang ke penciptanya. Party berdiri menghalangi pintu. |
+| The reckoning · The Choir Ward | boss | lich | 20678 | Choirmaster mengaku dapat membuat rasa bersalah Lyra hilang. Ia menolak dengan mengangkat tongkatnya. |
 
 **Aftermath:** Lyra bukan kepala percobaan. Ia adalah ingatan rasa bersalah milik kepala percobaan, diberi tubuh agar dapat merawat para korban. Tidak ada tanggal lahirnya; hanya tanggal keputusan untuk menyesal.
 
@@ -563,11 +563,11 @@ Vharok mendarat tanpa menyerang. Ia menunggu jawaban kita. Mengembalikan segel t
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · The Thirteenth Stroke | wave | goblin-ash | 19680 | Penjaga gerbang membaca perintah dengan suara wali kota, tetapi bibirnya tidak bergerak. |
-| Pursuit · The Thirteenth Stroke | wave | knight | 22960 | Monster mengambil jalan pulang seolah mereka pernah tinggal di sini. |
-| Pressure · The Thirteenth Stroke | wave | crab | 26650 | Akar membentuk dinding di sekitar menara, bukan untuk menyerang kota: untuk mengurung lonceng. |
-| The threshold · The Thirteenth Stroke | miniboss | golem-ash | 38950 | Kestrel membunyikan lonceng kecilnya sendiri agar warga menemukan jalur evakuasi. |
-| The reckoning · The Thirteenth Stroke | boss | dragon-ash | 65600 | Vharok menahan mesin dengan tubuhnya. Hancurkan simpul yang menguasainya, bukan sang penjaga. |
+| Crossing · The Thirteenth Stroke | wave | goblin-ash | 7242 | Penjaga gerbang membaca perintah dengan suara wali kota, tetapi bibirnya tidak bergerak. |
+| Pursuit · The Thirteenth Stroke | wave | knight | 8449 | Monster mengambil jalan pulang seolah mereka pernah tinggal di sini. |
+| Pressure · The Thirteenth Stroke | wave | crab | 9807 | Akar membentuk dinding di sekitar menara, bukan untuk menyerang kota: untuk mengurung lonceng. |
+| The threshold · The Thirteenth Stroke | miniboss | golem-ash | 14334 | Kestrel membunyikan lonceng kecilnya sendiri agar warga menemukan jalur evakuasi. |
+| The reckoning · The Thirteenth Stroke | boss | dragon-ash | 24141 | Vharok menahan mesin dengan tubuhnya. Hancurkan simpul yang menguasainya, bukan sang penjaga. |
 
 **Aftermath:** Kita memutus pengulang di menara. Ingatan warga kembali sekaligus: cinta, kehilangan, dan semua janji yang mereka langgar. Tidak ada perayaan. Ada rumah yang pintunya dibuka kembali untuk orang asing yang ternyata keluarga.
 
@@ -589,11 +589,11 @@ Kita menunggu. Di atas salju, untuk pertama kalinya, ada sembilan pasang jejak y
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · Winter Ledger | wave | wolf-frost | 23736 | Tulisan di salju muncul sebelum langkah kaki kita menyentuhnya. |
-| Pursuit · Winter Ledger | wave | harpy-frost | 27692 | Sarang es menyimpan surat dari diri kita yang lebih tua. |
-| Pressure · Winter Ledger | wave | basilisk-frost | 32143 | Pemulung membakar halaman yang belum kita baca. Mereka takut pada isinya. |
-| The threshold · Winter Ledger | miniboss | knight-frost | 46978 | Penjaga arsip menghitung sembilan pengunjung, lalu memanggil sepuluh nama. |
-| The reckoning · Winter Ledger | boss | colossus | 79120 | Wraith menawarkan satu masa depan tanpa kehilangan. Harganya adalah semua masa depan yang lain. |
+| Crossing · Winter Ledger | wave | wolf-frost | 8412 | Tulisan di salju muncul sebelum langkah kaki kita menyentuhnya. |
+| Pursuit · Winter Ledger | wave | harpy-frost | 9815 | Sarang es menyimpan surat dari diri kita yang lebih tua. |
+| Pressure · Winter Ledger | wave | basilisk-frost | 11392 | Pemulung membakar halaman yang belum kita baca. Mereka takut pada isinya. |
+| The threshold · Winter Ledger | miniboss | knight-frost | 16650 | Penjaga arsip menghitung sembilan pengunjung, lalu memanggil sepuluh nama. |
+| The reckoning · Winter Ledger | boss | colossus | 28042 | Wraith menawarkan satu masa depan tanpa kehilangan. Harganya adalah semua masa depan yang lain. |
 
 **Aftermath:** Catatan terakhir menjelaskan mengapa penjara itu berulang. Jantung mesin bernama Elian, tetapi ia bukan anak yang ditawan. Ia adalah masa depan Elian yang tidak jadi terjadi, dijahit dari semua kemungkinan yang ditukar demi menyelamatkan kota.
 
@@ -615,11 +615,11 @@ Kita mencari benih yang bisa menumbuhkan waktu tanpa memakannya. Para penjaga ke
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · The Unborn Orchard | wave | spider-frost | 28152 | Setiap buah menampilkan wajah yang hampir kita kenal. |
-| Pursuit · The Unborn Orchard | wave | moth-frost | 32844 | Mournbark melindungi dahan muda dengan tubuhnya yang retak. |
-| Pressure · The Unborn Orchard | wave | hydra-frost | 38123 | Ashfang tidak memburu kita; ia memburu bayangan masa depan di belakang kita. |
-| The threshold · The Unborn Orchard | miniboss | shaman-frost | 55718 | Cantor menukar suara-suara kemungkinan sampai tidak bisa menyebut namanya sendiri. |
-| The reckoning · The Unborn Orchard | boss | treant-frost | 93840 | Jangan bakar akar. Lepaskan parasit yang hidup dari janji tidak ditepati. |
+| Crossing · The Unborn Orchard | wave | spider-frost | 8886 | Setiap buah menampilkan wajah yang hampir kita kenal. |
+| Pursuit · The Unborn Orchard | wave | moth-frost | 10367 | Mournbark melindungi dahan muda dengan tubuhnya yang retak. |
+| Pressure · The Unborn Orchard | wave | hydra-frost | 12033 | Ashfang tidak memburu kita; ia memburu bayangan masa depan di belakang kita. |
+| The threshold · The Unborn Orchard | miniboss | shaman-frost | 17587 | Cantor menukar suara-suara kemungkinan sampai tidak bisa menyebut namanya sendiri. |
+| The reckoning · The Unborn Orchard | boss | treant-frost | 29621 | Jangan bakar akar. Lepaskan parasit yang hidup dari janji tidak ditepati. |
 
 **Aftermath:** Benih yang kita dapat tidak memulihkan masa lalu. Ia membiarkan dua hal benar sekaligus: kota pernah diselamatkan, dan caranya salah.
 
@@ -641,11 +641,11 @@ Sable menghitung senjata mereka. “Mereka tahu semua trik lama kita.” Nyx ter
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · Nine Funerals | wave | goblin-frost | 32928 | Sembilan lilin menyala. Nyala kesepuluh muncul ketika Lyra mendekat. |
-| Pursuit · Nine Funerals | wave | revenant-frost | 38416 | Lawan menandai hero terkuat: mereka mengenali strategi kita. |
-| Pressure · Nine Funerals | wave | knight-frost | 44590 | Nama-nama di batu berubah setiap kali seseorang terluka. |
-| The threshold · Nine Funerals | miniboss | lich-frost | 65170 | Bran memecah perisai yang serupa miliknya. Di baliknya ada surat yang ia tak pernah kirim. |
-| The reckoning · Nine Funerals | boss | wraith-frost | 109760 | Unburied meminta kita memilih siapa yang akan ditinggal. Jawab dengan membawa semua yang masih berdiri. |
+| Crossing · Nine Funerals | wave | goblin-frost | 11693 | Sembilan lilin menyala. Nyala kesepuluh muncul ketika Lyra mendekat. |
+| Pursuit · Nine Funerals | wave | revenant-frost | 13642 | Lawan menandai hero terkuat: mereka mengenali strategi kita. |
+| Pressure · Nine Funerals | wave | knight-frost | 15834 | Nama-nama di batu berubah setiap kali seseorang terluka. |
+| The threshold · Nine Funerals | miniboss | lich-frost | 23142 | Bran memecah perisai yang serupa miliknya. Di baliknya ada surat yang ia tak pernah kirim. |
+| The reckoning · Nine Funerals | boss | wraith-frost | 38976 | Unburied meminta kita memilih siapa yang akan ditinggal. Jawab dengan membawa semua yang masih berdiri. |
 
 **Aftermath:** Makam kosong tidak runtuh saat kita menang. Kita hanya mencabut tanggalnya. Kematian tetap mungkin; kepastian bukan takdir.
 
@@ -667,11 +667,11 @@ Aldric menjawab anak yang tak pernah sempat ia kenal: “Aku tidak bisa menjanji
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · The Last Rehearsal | wave | wolf-frost | 38064 | Pola serangan lama datang dalam urutan baru. Pengetahuan bukan jaminan. |
-| Pursuit · The Last Rehearsal | wave | choir | 44408 | Mesin meniru suara seseorang yang paling kita rindukan. |
-| Pressure · The Last Rehearsal | wave | crab-frost | 51545 | Jejak pulang mulai menghilang dari peta. Tidak ada retry di dalam cerita ini. |
-| The threshold · The Last Rehearsal | miniboss | colossus-frost | 75335 | Vharok berdiri di depan retakan waktu, menahan seluruh kemungkinan yang ingin kembali. |
-| The reckoning · The Last Rehearsal | boss | dragon-frost | 126880 | Putuskan ritus pengulang. Guard untuk yang tak bisa dihindari; lindungi yang masih bisa diselamatkan. |
+| Crossing · The Last Rehearsal | wave | wolf-frost | 12210 | Pola serangan lama datang dalam urutan baru. Pengetahuan bukan jaminan. |
+| Pursuit · The Last Rehearsal | wave | choir | 14245 | Mesin meniru suara seseorang yang paling kita rindukan. |
+| Pressure · The Last Rehearsal | wave | crab-frost | 16534 | Jejak pulang mulai menghilang dari peta. Tidak ada retry di dalam cerita ini. |
+| The threshold · The Last Rehearsal | miniboss | colossus-frost | 24165 | Vharok berdiri di depan retakan waktu, menahan seluruh kemungkinan yang ingin kembali. |
+| The reckoning · The Last Rehearsal | boss | dragon-frost | 40699 | Putuskan ritus pengulang. Guard untuk yang tak bisa dihindari; lindungi yang masih bisa diselamatkan. |
 
 **Aftermath:** Pengulang waktu pecah. Untuk pertama kalinya, jam bergerak melewati tanggal yang tercatat di semua makam. Badai datang tanpa ramalan.
 
@@ -693,11 +693,11 @@ Kita menjaga jalan cukup lama agar kota belajar menjaga dirinya. Lonceng kecil K
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · A City Without Bells | wave | goblin-auric | 43560 | Barikade dibuat warga, bukan sihir. Beri mereka waktu menyelesaikannya. |
-| Pursuit · A City Without Bells | wave | harpy-auric | 50820 | Jaga jalan utama; yang berlari di belakang party bukan minion, melainkan tetangga. |
-| Pressure · A City Without Bells | wave | basilisk-auric | 58988 | Mira membagi obat tanpa meminta ingatan sebagai pembayaran. |
-| The threshold · A City Without Bells | miniboss | golem-auric | 86213 | Golem memakai lonceng lama sebagai perisai. Pecahkan logamnya, bukan jalan evakuasi. |
-| The reckoning · A City Without Bells | boss | hydra-auric | 145200 | Akar terakhir menutup saluran air. Lepaskan aliran sebelum api mencapai rumah. |
+| Crossing · A City Without Bells | wave | goblin-auric | 12704 | Barikade dibuat warga, bukan sihir. Beri mereka waktu menyelesaikannya. |
+| Pursuit · A City Without Bells | wave | harpy-auric | 14821 | Jaga jalan utama; yang berlari di belakang party bukan minion, melainkan tetangga. |
+| Pressure · A City Without Bells | wave | basilisk-auric | 17203 | Mira membagi obat tanpa meminta ingatan sebagai pembayaran. |
+| The threshold · A City Without Bells | miniboss | golem-auric | 25143 | Golem memakai lonceng lama sebagai perisai. Pecahkan logamnya, bukan jalan evakuasi. |
+| The reckoning · A City Without Bells | boss | hydra-auric | 42346 | Akar terakhir menutup saluran air. Lepaskan aliran sebelum api mencapai rumah. |
 
 **Aftermath:** Kota bertahan tanpa menelan satu nama pun. Tidak semua bangunan selamat. Warga menuliskan yang hilang, lalu membangun lagi tanpa meminta siapa pun melupakannya.
 
@@ -719,11 +719,11 @@ Aldric muda meletakkan pedangnya di lantai. “Kau menyimpan tujuan dan membuang
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · The Borrowed Crown | wave | wraith-auric | 49416 | Mahkota di dinding dibuat dari kunci rumah yang pernah diselamatkan. |
-| Pursuit · The Borrowed Crown | wave | knight-auric | 57652 | Tentara menarget hero terkuat, sama seperti pelajaran pertama Aldric. |
-| Pressure · The Borrowed Crown | wave | lich-auric | 66918 | Ritual menawarkan perlindungan dengan harga satu rekan. Putuskan ritualnya. |
-| The threshold · The Borrowed Crown | miniboss | revenant-auric | 97803 | Penjaga terakhir bergerak seperti Aldric ketika melindungi Lyra. |
-| The reckoning · The Borrowed Crown | boss | choir-auric | 164720 | Hadapi tujuan yang kehilangan alasannya. Jangan biarkan party terpecah. |
+| Crossing · The Borrowed Crown | wave | wraith-auric | 12712 | Mahkota di dinding dibuat dari kunci rumah yang pernah diselamatkan. |
+| Pursuit · The Borrowed Crown | wave | knight-auric | 14830 | Tentara menarget hero terkuat, sama seperti pelajaran pertama Aldric. |
+| Pressure · The Borrowed Crown | wave | lich-auric | 17214 | Ritual menawarkan perlindungan dengan harga satu rekan. Putuskan ritualnya. |
+| The threshold · The Borrowed Crown | miniboss | revenant-auric | 25159 | Penjaga terakhir bergerak seperti Aldric ketika melindungi Lyra. |
+| The reckoning · The Borrowed Crown | boss | choir-auric | 42373 | Hadapi tujuan yang kehilangan alasannya. Jangan biarkan party terpecah. |
 
 **Aftermath:** Mereka tidak berdamai. Yang tua tetap yakin pengorbanannya benar. Namun saat Lyra merawat lukanya tanpa meminta balasan, ia mengingat satu nama. Bukan Elian. Nama orang yang pertama kali mengajarinya meminta maaf.
 
@@ -745,11 +745,11 @@ Konsekuensinya jelas: semua kemungkinan Elian yang lain akan berhenti. Ia tidak 
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · A Name for Tomorrow | wave | moth-auric | 55632 | Benih membutuhkan waktu. Musuh mengejar sumber cahaya di tengah ruangan. |
-| Pursuit · A Name for Tomorrow | wave | spider-auric | 64904 | Ingatan yang dibuang mencoba kembali ke mesin. Jangan biarkan mereka memakan benih. |
-| Pressure · A Name for Tomorrow | wave | colossus-frost | 75335 | Wraith memakai suara Elian kecil untuk memanggil Aldric menjauh. |
-| The threshold · A Name for Tomorrow | miniboss | crab-auric | 110105 | Cantor memulai ritus terakhir. Semua tile terancam: waktunya Guard atau interrupt. |
-| The reckoning · A Name for Tomorrow | boss | colossus-auric | 185440 | Mournbark menawarkan akarnya sebagai tempat tumbuh. Lepaskan cengkeraman mesin dari batangnya. |
+| Crossing · A Name for Tomorrow | wave | moth-auric | 13753 | Benih membutuhkan waktu. Musuh mengejar sumber cahaya di tengah ruangan. |
+| Pursuit · A Name for Tomorrow | wave | spider-auric | 16045 | Ingatan yang dibuang mencoba kembali ke mesin. Jangan biarkan mereka memakan benih. |
+| Pressure · A Name for Tomorrow | wave | colossus-frost | 18624 | Wraith memakai suara Elian kecil untuk memanggil Aldric menjauh. |
+| The threshold · A Name for Tomorrow | miniboss | crab-auric | 27219 | Cantor memulai ritus terakhir. Semua tile terancam: waktunya Guard atau interrupt. |
+| The reckoning · A Name for Tomorrow | boss | colossus-auric | 45843 | Mournbark menawarkan akarnya sebagai tempat tumbuh. Lepaskan cengkeraman mesin dari batangnya. |
 
 **Aftermath:** Anak yang keluar dari ruangan tidak mengingat putaran-putaran itu. Ia tidak berutang rasa terima kasih atas hidup yang baru dimulainya.
 
@@ -771,11 +771,11 @@ Di town, Eda mencoba bersiul. Nadanya sumbang. Itulah suara masa depan yang seda
 
 | Stage | Role | Enemy | Combat HP | Beat |
 | --- | --- | --- | --- | --- |
-| Crossing · The Unwritten Dawn | wave | choir-frost | 62208 | Barisan mesin mengenali seluruh party. Balas dengan build yang telah kalian pilih sendiri. |
-| Pursuit · The Unwritten Dawn | wave | wraith-auric | 72576 | Echo tertua menawarkan satu rewind lagi. Jalan terus. |
-| Pressure · The Unwritten Dawn | wave | lich-auric | 84240 | Setiap ritual yang diputus memberi kota satu tarikan napas. |
-| The threshold · The Unwritten Dawn | miniboss | golem-auric | 123120 | Jaga yang terluka sebelum mengejar damage terakhir. Tidak ada kemenangan jika rumah kehilangan semua penghuninya. |
-| The reckoning · The Unwritten Dawn | boss | dragon-auric | 207360 | Vharok masih ada di balik logam dan cahaya. Hancurkan inti, lepaskan sang penjaga. Ini bukan penyelamatan sempurna. Ini milik kita. |
+| Crossing · The Unwritten Dawn | wave | choir-frost | 15513 | Barisan mesin mengenali seluruh party. Balas dengan build yang telah kalian pilih sendiri. |
+| Pursuit · The Unwritten Dawn | wave | wraith-auric | 18099 | Echo tertua menawarkan satu rewind lagi. Jalan terus. |
+| Pressure · The Unwritten Dawn | wave | lich-auric | 21007 | Setiap ritual yang diputus memberi kota satu tarikan napas. |
+| The threshold · The Unwritten Dawn | miniboss | golem-auric | 30703 | Jaga yang terluka sebelum mengejar damage terakhir. Tidak ada kemenangan jika rumah kehilangan semua penghuninya. |
+| The reckoning · The Unwritten Dawn | boss | dragon-auric | 51710 | Vharok masih ada di balik logam dan cahaya. Hancurkan inti, lepaskan sang penjaga. Ini bukan penyelamatan sempurna. Ini milik kita. |
 
 **Aftermath:** Saat inti mesin padam, Vharok terbang tanpa membawa mimpi siapa pun. Tidak ada cahaya yang mengembalikan rumah-rumah, tidak ada mantra yang membatalkan luka. Hanya pagi yang datang sekali.
 

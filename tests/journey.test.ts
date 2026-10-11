@@ -90,7 +90,9 @@ test('party power grows with progress and the recommendation follows the campaig
   assert.ok(before > 200 && before < 400, `fresh party ~300, got ${before}`);
   p.loadouts[0].xp = 5000;
   assert.ok(partyPower(p) > before);
-  assert.ok(RECOMMENDED_POWER.every((v, i) => i === 0 || v > RECOMMENDED_POWER[i - 1]), 'recommendation rises each chapter');
+  // Never falls from one chapter to the next (power-curve keeps a running max when the scripted party swaps in a weaker recruit) and rises over each act.
+  assert.ok(RECOMMENDED_POWER.every((v, i) => i === 0 || v >= RECOMMENDED_POWER[i - 1]), 'recommendation never falls');
+  for (let act = 0; act < 4; act++) assert.ok(RECOMMENDED_POWER[act * 4 + 3] > RECOMMENDED_POWER[act * 4], `recommendation rises over act ${act + 1}`);
   assert.equal(recommendedPower(-3), RECOMMENDED_POWER[0]);
   assert.equal(recommendedPower(99), RECOMMENDED_POWER.at(-1));
   assert.equal(powerVerdict(100, 100), 'ready');

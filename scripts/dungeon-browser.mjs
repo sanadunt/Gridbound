@@ -57,6 +57,7 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     await wait('Boolean(document.querySelector(".heroic-toggle"))');
     await click('[data-heroic="1"]');
     await wait('Boolean(document.querySelector(".heroic-note")) && Boolean(document.querySelector(".heroic-depart"))');
+    assert.match(await evaluate('document.querySelector(".heroic-note").textContent'), /60%[^]*45%/, 'the Heroic note names the chapter\'s HP and damage bonus (heroicScale)');
     await screenshot(`artifacts/progress-heroic-${viewport.tag}.png`);
     await click('[data-heroic="0"]');
     await wait('!document.querySelector(".heroic-note")');
@@ -103,7 +104,9 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
         if (await evaluate('window.gridbound.profile().journey.run?.status') !== 'active') return false;
         if (await evaluate('Boolean(document.querySelector("[data-dungeon-fight]"))')) return true;
         for (const sel of ['[data-dungeon-choice]:not(:disabled)', '[data-dungeon-open]', '[data-dungeon-camp="rest"]']) {
-          if (await evaluate(`Boolean(document.querySelector(${JSON.stringify(sel)}))`)) { await click(sel); await wait('Boolean(document.querySelector(".room-outcome")) || Boolean(document.querySelector("[data-dungeon-fight]"))', 5000).catch(() => {}); break; }
+          if (await evaluate(`Boolean(document.querySelector(${JSON.stringify(sel)}))`)) {
+            if (sel.includes('camp')) assert.match(await evaluate(`document.querySelector('[data-dungeon-camp="rest"]').closest('.event-choices')?.previousElementSibling?.textContent ?? ''`), /25%/, 'the camp says its rest heals 25% (CAMP_REST)');
+            await click(sel); await wait('Boolean(document.querySelector(".room-outcome")) || Boolean(document.querySelector("[data-dungeon-fight]"))', 5000).catch(() => {}); break; }
         }
         if (await evaluate('Boolean(document.querySelector("[data-dungeon-fight]"))')) return true;
         const before = await evaluate('window.gridbound.profile().journey.run?.at');

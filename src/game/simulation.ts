@@ -14,12 +14,18 @@ export type BattleEvent = { type:string; source?:number; slot?:number; lane?:num
 export type Status = 'ready'|'fighting'|'paused'|'victory'|'defeat';
 export type BattleOptions = { rogueBuild?:RogueBuild; raidBuild?:RaidBuild; raidSandbox?:RaidSandbox; roster?:number[]; storyCleared?:number[]; storyRecruited?:number[]; loadouts?:Record<number,{skills:number[];talents:string[];xp?:number;slot?:number;job?:string;gear?:Record<string,string>;refine?:Record<string,number>}>; boons?:string[]; enemyId?:string; stage?:number; settlementId?:string; raidContract?:RaidContract; runWallet?:RunWallet; runAct?:1|2|3; runActClear?:boolean; runFinalClear?:boolean; heroic?:boolean; relics?:string[]; extraPotions?:number; dungeon?:{chapter:number;hp:number;damage:number;xp:number;startHp?:Record<number,number>;potions?:number;power?:number;vitality?:number} };
 const defaultUpgrades = {power:1,vitality:1,tempo:1};
-// Per-chapter enemy tuning, calibrated by scripts/calibrate.ts against the balance harness's casual player.
-export const CHAPTER_HP:number[]=[2.78,2.29,1.73,1.62,3.63,2.89,2.85,3.77,3.04,3.35,3.36,4.05,3.94,3.1,2.35,3.89];
-export const CHAPTER_DMG:number[]=[2.32,3.33,4.22,3.96,4.45,5.3,8.02,6.58,7.65,7.79,9.64,8.73,12.9,14.62,15.23,13.97];
+// Per-chapter enemy tuning, fitted by scripts/calibrate.ts: HP to the casual player's boss time, damage to the novice's win rate
+// (with a margin for the casual player), then smoothed (no damage spike or cliff, HP steps of at most 20% inside an act).
+// Damage also stays at or above each chapter's idle floor, so an idle player loses (chapters 4 and 7 were raised onto it after the
+// last full fit; a chapter an idle player wins even at the casual cap, 9 and 10 today, keeps no floor).
+export const CHAPTER_HP:number[]=[2.2,1.95,1.76,2.04,3.52,3.92,3.59,3.68,3.81,3.63,4.35,4.17,4.01,3.73,3.77,3.99];
+export const CHAPTER_DMG:number[]=[2.37,3.02,4.18,5.15,8.35,7.74,8.7,8.45,8.86,10.61,12.71,11.36,12.61,13.71,13.39,12.76];
 // Damage shape: telegraphs are punishing but survivable; steady front-row strikes and minions keep healers busy.
 // Raids (tuned with scripts/balance.ts on the shipped path): story heroes vs the next chapter's boss; RAID_PARTY_DMG eases hits for a party smaller than that chapter's story party.
-export const RAID_HP=1.1,RAID_DMG=1.1,RAID_PARTY_DMG=.5,ENDLESS_HP=1300,ENDLESS_HP_GROWTH=1.13,ENDLESS_DMG_GROWTH=1.075;
+export const RAID_HP=1.1,RAID_DMG=1.1,RAID_PARTY_DMG=.5,ENDLESS_HP=1300,ENDLESS_HP_GROWTH=1.13,ENDLESS_DMG=.82,ENDLESS_DMG_GROWTH=1.075;
+// Roguelike floors that pay bank Crystal (1 to ENDLESS_EARLY_FLOORS) hit ENDLESS_EARLY_DMG times harder, fading out over the next
+// three floors, so the rewarded floors carry real risk while the deep floors keep their curve.
+export const ENDLESS_EARLY_DMG=1.15,ENDLESS_EARLY_FLOORS=9;
 // Contract tiers scale the raid boss on top of the story curve; sandbox practice uses its own sliders instead.
 export const RAID_TIER_SCALE:Record<RaidTier,{hp:number;dmg:number}>={bronze:{hp:1,dmg:1},silver:{hp:1.15,dmg:1.1},gold:{hp:1.3,dmg:1.2}};
 // Pact modifiers: RM01 cuts barrier gains, RM03 adds an aftershock after each all-grid impact, RM05 summons a wave on each phase change.
@@ -27,9 +33,21 @@ export const RM01_BARRIER=.75;
 // Roguelike relics bought with bank Crystal.
 export const WARD_RELIC_BARRIER=.15;
 export const MEND_HEAL=.05;
-// Heroic chapters: more HP, harder hits, faster intents, one potion and aftershocks after phase 2.
-export const HEROIC_HP=1.6,HEROIC_DMG=1.45,HEROIC_INTERVAL=.85;
+// Heroic chapters: more HP, harder hits, faster intents, one potion and aftershocks after phase 2. HEROIC_ACT eases the HP and
+// damage bonus per act (fitted with scripts/power-curve.ts) so Act IV opens a few levels after its first clear, as Acts I-III do.
+export const HEROIC_HP=1.6,HEROIC_DMG=1.45,HEROIC_INTERVAL=.85,HEROIC_ACT:readonly number[]=[1,1,1,.55];
+/** Heroic HP and damage multipliers of a chapter (1-based). */
+export function heroicScale(chapter:number){const a=HEROIC_ACT[Math.max(0,Math.min(HEROIC_ACT.length-1,Math.floor((chapter-1)/4)))];return {hp:1+(HEROIC_HP-1)*a,dmg:1+(HEROIC_DMG-1)*a};}
 export const TELEGRAPH_SHARE=.5,CLAW_BASE=24,CLAW_EVERY=4.2,MINION_HIT=22;
+// Late fights keep their threats: the stagger bar is a share of the boss's HP (capped by STAGGER_CAP × STAGGER_CAP_GROWTH^(chapter-1)),
+// a break lasts BREAK_SECONDS, and minions strike MINION_FIRST seconds after they appear with MINION_HP × the chapter boss's HP.
+export const STAGGER_SHARE=.08,STAGGER_CAP=800,STAGGER_CAP_GROWTH=1.2,BREAK_SECONDS=4.5,MINION_FIRST=2.2,MINION_HP=.03;
+// Party tools scale with the party and the fight: a potion heals POTION_HEAL of each hero's max HP; Ninefold Dawn deals
+// ULT_BASE + ULT_DAMAGE × boss max HP and heals/shields ULT_HEAL/ULT_SHIELD of each hero's max HP. Resolve comes from damage
+// dealt as a share of the chapter boss's HP (RESOLVE_DEALT per boss's worth, RESOLVE_MINION for minions) and from damage
+// taken as a share of the whole party's max HP (RESOLVE_TAKEN per party's worth), so ultimates come at the same pace in every
+// chapter and with any party size.
+export const POTION_HEAL=.28,ULT_BASE=220,ULT_DAMAGE=.05,ULT_HEAL=.12,ULT_SHIELD=.08,RESOLVE_DEALT=45,RESOLVE_MINION=26,RESOLVE_TAKEN=25;
 // Skill kinds that are not offensive casts: they never count toward precision, echoes, Second Thunder or cast leech.
 export const SUPPORT_KINDS:readonly string[]=['shield','partyshield','heal','regen','buff','haste','delay','stun','resolve','selfheal','repair','counter'];
 // Control budget: delay/stun/frost/intent-delay add at most max(CONTROL_MIN, CONTROL_SHARE × intent interval) seconds per intent cycle.
@@ -40,6 +58,8 @@ export const GUARD_DURATION=2.8,ENRAGE_WARN=135,ENRAGE_AT=150,ENRAGE_DMG=1.7;
 export const NO_SAFE_TILE='GROUND: tidak ada tile aman. Tukar tank atau hero ber-shield ke tanda, atau Guard (G).';
 const chapterHp=(floor:number)=>CHAPTER_HP[Math.min(CHAPTER_HP.length,floor)-1];
 const chapterDmg=(floor:number)=>CHAPTER_DMG[Math.min(CHAPTER_DMG.length,floor)-1];
+/** Max HP of a chapter's final boss on Normal: minions and resolve are measured against it. */
+const chapterBoss=(floor:number)=>{const ch=Math.max(1,Math.min(CAMPAIGN.length,floor));return CAMPAIGN[ch-1].stages.at(-1)!.hp*chapterHp(ch);};
 export class Battle {
   heroes:Hero[]=[]; threats:Telegraph[]=[]; minions:Minion[]=[]; events:BattleEvent[]=[];
   storyRecruited:readonly number[]=[];
@@ -132,7 +152,7 @@ export class Battle {
     if(this.mode==='adventure') {
       const zone=CAMPAIGN[this.floor-1],stage=zone.stages[this.stage];
       this.stageCount=zone.stages.length; this.enemyId=stage.enemy; this.stageName=stage.name;
-      this.bossMax=Math.round(stage.hp*chapterHp(this.floor)*(this.heroic?HEROIC_HP:1));
+      this.bossMax=Math.round(stage.hp*chapterHp(this.floor)*(this.heroic?heroicScale(this.floor).hp:1));
     } else if(this.mode==='dungeon'&&this.dungeon) {
       this.stageCount=1; this.enemyId=ENEMIES[this.options.enemyId??'']?this.options.enemyId!:'wolf'; this.stageName='Undercroft';
       this.bossMax=Math.round(this.dungeon.hp*chapterHp(this.dungeon.chapter));
@@ -176,6 +196,8 @@ export class Battle {
   availableSkills(id:number) { return [...(this.hero(id)?.skills??[])]; }
   start() { if(this.status==='ready') {this.status='fighting';this.emit({type:'banner',kind:'stage',text:this.stageName.toUpperCase()});} }
   pause() { if(this.status==='fighting')this.status='paused';else if(this.status==='paused')this.status='fighting'; }
+  /** HP that damage dealt is measured against for resolve: the chapter's final boss in Story and the Undercroft, the boss itself elsewhere. */
+  resolveRef() { return Math.max(1,this.mode==='adventure'?chapterBoss(this.floor):this.mode==='dungeon'?chapterBoss(this.dungeon?.chapter??1):this.bossMax); }
   private gainResolve(amount:number) { this.resolve=Math.min(100,this.resolve+amount*(this.boons.includes('resolve')?1.6:1)); }
   private cooldown(h:Hero) { return KITS[h.classId].skills[h.stance].cooldown/(this.tempo*h.gearTempo*(h.talents.includes('focus')?1.1:1)*(h.talents.includes('focus-2')?1.08:1)*(JOBS[h.job??'']?.effect==='time'?1.15:1)); }
   tap(id:number,sync=false) {
@@ -203,12 +225,12 @@ export class Battle {
     if(this.status==='fighting') for(const ally of [h,other])if(ally&&ally.hp>0){ally.remaining+=ally.talents.includes('evasive')?Math.min(.45,penalty):penalty;ally.moveLock=.65;if(this.boons.includes('fleet'))this.shield(ally,30);}
     this.relocations++;this.emit({type:'move',source:id,slot,targets:other?[other.id]:[],text:this.status==='fighting'?`+${penalty}s`:'FORMATION'});return true;
   }
-  potion() { if(this.status!=='fighting'||this.potions<=0)return false;this.potions--;for(const h of this.living())this.heal(h,130*this.vitality);this.emit({type:'banner',kind:'potion',text:'MENDING MIST'});return true; }
+  potion() { if(this.status!=='fighting'||this.potions<=0)return false;this.potions--;for(const h of this.living())this.heal(h,h.maxHp*POTION_HEAL);this.emit({type:'banner',kind:'potion',text:'MENDING MIST'});return true; }
   guard() { if(this.status!=='fighting'||this.guardCooldown>0)return false;this.guardLeft=GUARD_DURATION;this.guardCooldown=this.boons.includes('bell')?15:18;if(this.boons.includes('bell'))this.gainResolve(18);this.emit({type:'shield',text:'PARTY GUARD · 65% REDUCTION',targets:this.living().map(h=>h.slot)});return true; }
   ultimate() {
     if(this.status!=='fighting'||this.resolve<100)return false;this.resolve=0;
-    this.living().forEach(h=>{this.heal(h,90*this.power);this.shield(h,65);});
-    this.hitBoss(220+this.heroes.length*48,-1,'ultimate');
+    this.living().forEach(h=>{this.heal(h,h.maxHp*ULT_HEAL*this.power);this.shield(h,h.maxHp*ULT_SHIELD);});
+    this.hitBoss(ULT_BASE+this.bossMax*ULT_DAMAGE,-1,'ultimate');
     for(const m of this.minions.filter(m=>m.hp>0))this.hitMinion(m,m.hp,-1,'ultimate');
     this.emit({type:'ultimate',text:'NINEFOLD DAWN'});return true;
   }
@@ -258,11 +280,13 @@ export class Battle {
     if(!this.living().length){this.status='defeat';this.abandonRogue();this.emit({type:'defeat'});return true;}
     return false;
   }
-  enemyScale() { return (this.mode==='adventure'?chapterDmg(this.floor)*(this.heroic?HEROIC_DMG:1):this.mode==='dungeon'?chapterDmg(this.dungeon?.chapter??this.floor)*(this.dungeon?.damage??1):this.mode==='endless'?.82*Math.pow(ENDLESS_DMG_GROWTH,this.floor-1):RAID_DMG*chapterDmg(this.floor)*Math.pow(1.06,Math.max(0,this.floor-CAMPAIGN.length)))*(this.enraged()?ENRAGE_DMG:1)*(this.mode==='raid'?(this.raidSandbox?.damageScale??1)*(this.raidTier()?.dmg??1)*Math.pow(Math.min(1,this.raidParty),RAID_PARTY_DMG):1); }
+  enemyScale() { return (this.mode==='adventure'?chapterDmg(this.floor)*(this.heroic?heroicScale(this.floor).dmg:1):this.mode==='dungeon'?this.dungeon?.damage??chapterDmg(this.floor):this.mode==='endless'?ENDLESS_DMG*Math.pow(ENDLESS_DMG_GROWTH,this.floor-1)*(1+(ENDLESS_EARLY_DMG-1)*Math.max(0,Math.min(1,(ENDLESS_EARLY_FLOORS+3-this.floor)/3))):RAID_DMG*chapterDmg(this.floor)*Math.pow(1.06,Math.max(0,this.floor-CAMPAIGN.length)))*(this.enraged()?ENRAGE_DMG:1)*(this.mode==='raid'?(this.raidSandbox?.damageScale??1)*(this.raidTier()?.dmg??1)*Math.pow(Math.min(1,this.raidParty),RAID_PARTY_DMG):1); }
   /** Past ENRAGE_AT seconds of the stage enemy hits land ENRAGE_DMG times harder. */
   enraged() { return this.stageTime>ENRAGE_AT; }
   /** The certified contract tier's scale; undefined outside rewarded raids (sandbox practice uses its sliders). */
   raidTier() { const c=this.mode==='raid'?this.raidContract:undefined;return c&&!c.sandbox?RAID_TIER_SCALE[c.tier]:undefined; }
+  /** Stagger needed for an armour break: a share of the boss's HP, capped by a cap that grows with the chapter. */
+  staggerThreshold() { const ch=this.mode==='dungeon'?this.dungeon?.chapter??1:Math.min(CAMPAIGN.length,this.floor);return Math.min(this.bossMax*STAGGER_SHARE,STAGGER_CAP*Math.pow(STAGGER_CAP_GROWTH,ch-1)); }
   /** Seconds between two telegraphs at the current phase. */
   intentInterval() { return (ENEMIES[this.enemyId].interval-(this.phase-1)*.6)*(this.raidSandbox?.intervalScale??1)*(this.heroic?HEROIC_INTERVAL:1); }
   /** Push the next intent back, within this cycle's control budget and the 14 s cap; returns the seconds actually added. */
@@ -291,7 +315,7 @@ export class Battle {
     }else{
       const candidates=[...alive];while(slots.length<Math.min(3,alive.length)){const i=Math.floor(this.random()*candidates.length);slots.push(candidates.splice(i,1)[0].slot);}type='meteor';name=this.enemyId==='spider'?'VENOM WEB':'FALLING SHARDS';counter='GROUND: pindahkan hero ke tile aman. Tanda tetap di tanah.';
     }
-    // A full grid leaves nowhere to step: point at the counters that still work (WP8 changes the rule itself).
+    // Story parties stop at eight, so a tile is always free, but a marked row or lane can still cover it: point at the counters that still work.
     if((type==='front'||type==='breath'||type==='meteor')&&Array.from({length:9},(_,i)=>i).every(i=>slots.includes(i)||alive.some(h=>h.slot===i)))counter=NO_SAFE_TILE;
     const total=type==='all'||type==='channel'?4.2:3.2;
     this.threats.push({id:this.eventId++,name,type,slots,left:total,total,targetId,counter,effect,damage:enemy.damage*TELEGRAPH_SHARE*(effect==='silence'?.5:type==='all'?.85:1)*(1+(this.phase-1)*.1)});
@@ -322,7 +346,7 @@ export class Battle {
   summon() {
     const lanes=this.heroes.length<=3?[1]:this.heroes.length<=5?[0,2]:[0,1,2];
     let spawned=0;
-    for(const lane of lanes){if(this.minions.some(m=>m.lane===lane&&m.hp>0))continue;spawned++;const hp=Math.round((this.mode==='adventure'?36*chapterHp(this.floor)*(this.heroic?HEROIC_HP:1):this.mode==='dungeon'?36*chapterHp(this.dungeon?.chapter??1):170)*Math.pow(1.1,this.mode==='adventure'?0:this.floor-1));this.minions.push({id:this.eventId++,lane,hp,maxHp:hp,timer:4,enemyId:['wolf','spider','goblin'][(this.stage+lane)%3]});}
+    for(const lane of lanes){if(this.minions.some(m=>m.lane===lane&&m.hp>0))continue;spawned++;const hp=Math.round(this.mode==='adventure'?MINION_HP*chapterBoss(this.floor)*(this.heroic?heroicScale(this.floor).hp:1):this.mode==='dungeon'?MINION_HP*chapterBoss(this.dungeon?.chapter??1):170*Math.pow(1.1,this.floor-1));this.minions.push({id:this.eventId++,lane,hp,maxHp:hp,timer:MINION_FIRST,enemyId:['wolf','spider','goblin'][(this.stage+lane)%3]});}
     if(spawned)this.emit({type:'summon',text:'REINFORCEMENTS'});
     return spawned;
   }
@@ -341,7 +365,7 @@ export class Battle {
       this.living().filter(a=>s.kind==='partyshield'||a.slot%3===lane).forEach(a=>this.shield(a,p));
       if(h.classId==='rogue')h.buff=Math.max(2,h.buff);
     }else if(s.kind==='heal'){
-      const lowest=this.living().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(lowest)this.heal(lowest,p,h);this.living().forEach(a=>this.heal(a,20*this.power,h));
+      const lowest=this.living().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(lowest)this.heal(lowest,p,h);this.living().forEach(a=>this.heal(a,20*this.skillPower(h),h));
     }else if(s.kind==='regen'){
       // Overlapping regens keep the stronger flow; a recast refreshes the duration instead of stacking.
       this.living().forEach(a=>{if(a.regen<=0||p>=a.regenPower){a.regenPower=p;a.regenSource=h.id;}a.regen=Math.max(a.regen,6);});
@@ -407,20 +431,20 @@ export class Battle {
     const killer=this.hero(source),minionHeal=JOBS[killer?.job??'']?.perk?.minionHeal;
     if(JOBS[killer?.job??'']?.effect==='hunter')amount*=1.45;
     amount*=(1+(killer?.perks.minionDamage??0))*(this.markLeft>0?1.2:1);
-    const actual=Math.min(m.hp,amount);m.hp=Math.max(0,m.hp-amount);this.damage+=actual;this.gainResolve(actual*.008);this.emit({type:'projectile',source,lane:m.lane,amount:actual,kind});
+    const actual=Math.min(m.hp,amount);m.hp=Math.max(0,m.hp-amount);this.damage+=actual;this.gainResolve(actual/this.resolveRef()*RESOLVE_MINION);this.emit({type:'projectile',source,lane:m.lane,amount:actual,kind});
     if(m.hp===0&&minionHeal)this.living().forEach(h=>this.heal(h,minionHeal,killer));
     if(m.hp===0){this.emit({type:'minionDown',lane:m.lane});if(this.boons.includes('feast'))this.living().forEach(h=>this.heal(h,24));}
   }
   addStagger(amount:number) {
     if(this.breakLeft>0||this.bossHp<=0)return;
-    this.stagger+=amount*.23;const threshold=Math.min(800,this.bossMax*.14);
-    if(this.stagger>=threshold){this.stagger=0;this.breakLeft=6;this.emit({type:'break',text:'ARMOR BREAK · +60% DMG'});}
+    this.stagger+=amount*.23;
+    if(this.stagger>=this.staggerThreshold()){this.stagger=0;this.breakLeft=BREAK_SECONDS;this.emit({type:'break',text:'ARMOR BREAK · +60% DMG'});}
   }
   hitBoss(amount:number,source:number,kind:string) {
     if(!Number.isFinite(amount)||amount<=0||this.bossHp<=0)return;
     const execute=this.boons.includes('execution')&&this.bossHp/this.bossMax<.3;
     const dmg=Math.min(this.bossHp,Math.round(amount*(this.breakLeft>0?1.6:1)*(this.markLeft>0?1.2:1)*(execute?1.4:1)));
-    this.bossHp=Math.max(0,this.bossHp-dmg);this.damage+=dmg;this.gainResolve(dmg*.014);
+    this.bossHp=Math.max(0,this.bossHp-dmg);this.damage+=dmg;this.gainResolve(dmg/this.resolveRef()*RESOLVE_DEALT);
     this.addStagger(amount);
     this.emit({type:'projectile',source,lane:-1,amount:dmg,kind});
   }
@@ -444,7 +468,7 @@ export class Battle {
     amount*=1-Math.min(.45,h.perks.reduction+(h.equipment.reduction??0));
     const guard=this.guardLeft>0?amount*.65:0;amount-=guard;
     const absorbed=Math.min(h.shield,amount);h.shield-=absorbed;this.blocked+=absorbed+guard;
-    const dmg=Math.round(amount-absorbed),lost=Math.min(h.hp,dmg);h.hp=Math.max(0,h.hp-dmg);this.gainResolve(amount*.028);
+    const dmg=Math.round(amount-absorbed),lost=Math.min(h.hp,dmg);h.hp=Math.max(0,h.hp-dmg);this.gainResolve(amount/Math.max(1,this.heroes.reduce((s,a)=>s+a.maxHp,0))*RESOLVE_TAKEN);
     if(this.boons.includes('thorn'))this.hitBoss((absorbed+guard)*.35,h.id,'thorn');
     if(h.perks.thorns)this.hitBoss((absorbed+guard)*h.perks.thorns,h.id,'thorn');
     // Nobody is downed once the boss has fallen: a counter or thorn kill on this hit leaves the hero standing at 1 HP.
