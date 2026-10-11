@@ -70,6 +70,8 @@
   .xp-grid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
   .ceremony-actions { gap: 6px; }
 }
+/* A chapter's closing outro is the story payoff: shown in full (the result screen scrolls, its actions stay at the bottom). */
+.ceremony-desc.ceremony-outro { display: block; -webkit-line-clamp: unset; overflow: visible; }
 
 
 /* Story scenes */

@@ -195,13 +195,16 @@ export function gearReason(p:Profile,id:number,gearId:string,ignoreGold=false):L
   }
   return undefined;
 }
-export function claimQuest(p:Profile,id:string,recipient:number) {
+/** Claim a ready quest for its own hero (or `recipient`): gold, EXP and its gear go to that hero. A gear reward the hero already owns is sold
+ *  for its price instead of vanishing. Returns who received it, the gear and the refund (false when nothing was claimed). */
+export function claimQuest(p:Profile,id:string,recipient:number):{hero:number;gear?:string;refund:number}|false {
   const q=QUESTS.find(q=>q.id===id);if(!q||!questProgress(p,q).ready)return false;
   const heroId=q.heroId??recipient,h=loadout(p,heroId);if(!h)return false;
   p.claimedQuests.push(q.id);p.gold+=q.gold;awardExperience(p,heroId,q.xp);
-  if(q.gear&&GEAR.some(g=>g.id===q.gear)){h.inventory??=[];if(!h.inventory.includes(q.gear))h.inventory.push(q.gear);}
+  const g=q.gear?GEAR.find(g=>g.id===q.gear):undefined;let refund=0;
+  if(g){h.inventory??=[];if(h.inventory.includes(g.id)){refund=g.cost;p.gold=Math.min(1000000,p.gold+refund);}else h.inventory.push(g.id);}
   if(p.trackedQuest===q.id)delete p.trackedQuest;
-  return true;
+  return {hero:heroId,...(g?{gear:g.id}:{}),refund};
 }
 const settled=new WeakSet<Battle>();
 function bankRewardForRun(b: Battle): number {

@@ -6,8 +6,11 @@ import { QUESTS, questProgress } from '../src/game/quests';
 import { boardQuests, claimAllQuests, questGroup } from '../src/ui/quests';
 import { UNLOCKS, featureOpen, routeLocked, pendingIntros, isNew, markIntro, markVisited, noteModesInUse, resetUnlockFlags } from '../src/ui/unlocks';
 import { pushRoute, backRoute } from '../src/ui/route-stack';
-import { heroNeeds, trainingBadge, menuBadge, dungeonBadge } from '../src/ui/badges';
+import { affordableUpgrade, heroNeeds, trainingBadge, menuBadge, dungeonBadge } from '../src/ui/badges';
+import { GEAR } from '../src/game/jobs';
+import { gearReason } from '../src/game/profile';
 import { defeatFixes } from '../src/ui/result-help';
+import { nextObjective, promotion } from '../src/ui/town';
 import { HERO_LOOKS, heroKey } from '../src/art/pixels';
 import { COACH_STEPS, coachDone, coachEnabled, markCoach, resetCoach, setCoachEnabled, skipCoach } from '../src/ui/coach';
 
@@ -42,8 +45,9 @@ test('WP10 Claim all claims every ready quest (chains included) for the chosen h
   assert.ok(out.claimed.length >= ready && ready > 0, `${out.claimed.length} claimed of ${ready} ready`);
   assert.equal(out.gold, p.gold - gold);
   assert.equal(QUESTS.filter(q => questProgress(p, q).ready).length, 0, 'nothing is left to claim');
-  assert.equal(out.gear, out.claimed.some(id => QUESTS.find(q => q.id === id)?.gear), 'the notice mentions gear only when a reward had some');
-  assert.deepEqual(claimAllQuests(p, 0), { claimed: [], gold: 0, gear: false });
+  assert.deepEqual(out.gear.map(g => g.gear), out.claimed.map(id => QUESTS.find(q => q.id === id)?.gear).filter(Boolean), 'each gear reward is listed (the notice names who got it)');
+  assert.ok(out.gear.every(g => g.hero === (QUESTS.find(q => q.gear === g.gear)?.heroId ?? 0)), 'gear goes to the quest hero or the chosen recipient');
+  assert.deepEqual(claimAllQuests(p, 0), { claimed: [], gold: 0, gear: [] });
 });
 
 test('WP10 modes open with the story: Undercroft after chapter 1, Raids after 2, Bell Trials after 4; saves that used a mode keep it', () => {
@@ -126,6 +130,18 @@ test('WP10 a Story defeat suggests at most two fixes: the Undercroft when under-
   assert.deepEqual(defeatFixes(first, 0).filter(f => f.kind === 'dungeon'), [], 'no Undercroft before chapter 1 is cleared');
 });
 
+test('the defeat gear fix names the slot and piece it found, so it opens on an affordable upgrade (not the Weapon list)', () => {
+  const p = createProfile(); p.gold = 60; // 60G: a charm is affordable, no weapon is
+  const fix = defeatFixes(p, 0).find(f => f.kind === 'gear');
+  const up = affordableUpgrade(p, fix?.hero ?? 0);
+  assert.ok(fix && up, JSON.stringify(defeatFixes(p, 0)));
+  assert.equal(fix.slot, up.slot); assert.equal(fix.gearId, up.gearId);
+  assert.equal(GEAR.find(g => g.id === fix.gearId)?.slot, fix.slot);
+  assert.equal(gearReason(p, fix.hero!, fix.gearId!), undefined, 'the piece can be equipped now');
+  assert.ok(GEAR.filter(g => g.slot === 'weapon').every(g => gearReason(p, fix.hero!, g.id)) ? fix.slot !== 'weapon' : true, 'no unaffordable slot is suggested');
+  p.gold = 0; assert.equal(affordableUpgrade(p, 0), undefined);
+});
+
 test('WP10 the first-battle coach remembers each tip, can be skipped, and turning tips back on replays them', () => {
   resetCoach(); setCoachEnabled(true);
   assert.equal(coachEnabled(), true); assert.equal(coachDone('tap'), false);
@@ -133,4 +149,15 @@ test('WP10 the first-battle coach remembers each tip, can be skipped, and turnin
   skipCoach(); assert.ok(COACH_STEPS.every(coachDone));
   setCoachEnabled(false); assert.equal(coachEnabled(), false);
   setCoachEnabled(true); assert.equal(coachEnabled(), true); assert.ok(COACH_STEPS.every(step => !coachDone(step)), 'tips replay');
+});
+
+test('an under-powered party with a promotion in reach is pointed at the Training Hall before training or gear', () => {
+  const p = createProfile(); for (let i = 0; i < 3; i++) completeZone(p, i); p.gold = p.economy.gold = 600;
+  const n = normalizeProfile(p); n.claimedQuests = QUESTS.filter(q => questProgress(n, q).ready).map(q => q.id);
+  const goal = nextObjective(n), promo = promotion(n);
+  assert.ok(promo && promo.job.tier === 2 && n.storyActive.includes(promo.hero));
+  assert.deepEqual({ facility: goal.facility, tab: goal.tab }, { facility: 'party-advanced', tab: 'jobs' });
+  assert.match(goal.text, new RegExp(`${ROSTER[promo.hero].name} can become a ${promo.job.name}`));
+  n.gold = n.economy.gold = 0;
+  assert.equal(promotion(n), undefined); assert.match(nextObjective(n).text, /^Party power .* Promote heroes/, 'without gold the guide still names promotion first');
 });

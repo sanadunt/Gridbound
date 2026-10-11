@@ -57,6 +57,8 @@ export type TownState = {
   rogueSetup?: RogueBuild;
   /** Bell Tonic ticked for the next Raid/Roguelike departure (paid with bank Crystal when the run starts). */
   tonic?: boolean;
+  /** Suspended challenge runs (unsettled encounters): their setup is locked and the departure resumes them. */
+  suspended?: { raid?: { enemy: string; tier: RaidTier; practice: boolean }; roguelike?: { floor: number } };
 };
 
 const portraits = new Map<string, string>();
@@ -93,7 +95,16 @@ function emptySlots(p: Profile) {
 }
 
 /** The single most useful next step, with the place it happens. */
-function nextObjective(p: Profile): { text: string; facility?: string; tab?: TrainingTab; action?: string; chapter?: number } {
+/** A deployed hero who can take a job now (rank reached, gold in hand), and the cheapest such job. */
+export function promotion(p: Profile) {
+  for (const hero of normalizeStoryParty(p.storyActive, p.roster, p.cleared)) {
+    const h = p.loadouts[hero], cls = ROSTER[hero]?.classId;
+    const job = h && Object.values(JOBS).filter(j => j.base === cls && (j.tier === 2 ? !h.job : h.job === j.parent) && p.cleared.length + 1 >= j.level && p.gold >= j.cost).sort((a, b) => a.cost - b.cost || a.index - b.index)[0];
+    if (job) return { hero, job };
+  }
+  return undefined;
+}
+export function nextObjective(p: Profile): { text: string; facility?: string; tab?: TrainingTab; action?: string; chapter?: number } {
   const ready = QUESTS.filter(q => questProgress(p, q).ready).length;
   if (!p.cleared.length) return { text: t('town.msg.first'), facility: 'campaign', chapter: 0 };
   if (p.journey.run?.status === 'active') return { text: t('guide.run'), facility: 'dungeon' };
@@ -108,7 +119,12 @@ function nextObjective(p: Profile): { text: string; facility?: string; tab?: Tra
   if (idle !== undefined) return { text: t('guide.points', { name: ROSTER[idle].name, n: availablePoints(p, idle), place: t('town.spot.hall') }), facility: 'party-advanced' };
   if (p.cleared.length >= CAMPAIGN.length) return { text: t('guide.heroic'), facility: 'campaign' };
   const next = Math.min(p.cleared.length, CAMPAIGN.length - 1), power = partyPower(p), rec = recommendedPower(next);
-  if (powerVerdict(power, rec) === 'under') return { text: t('guide.underpowered', { n: power, rec, name: CAMPAIGN[next].name }), facility: unlockedDepth(p.cleared, p.journey.depth) ? 'dungeon' : 'party' };
+  if (powerVerdict(power, rec) === 'under') {
+    // A promotion is the biggest step a party can buy (the recommendation assumes promoted heroes): name it before training or gear.
+    const promo = promotion(p);
+    if (promo) return { text: t('guide.promote', { name: ROSTER[promo.hero].name, job: promo.job.name, place: t('town.spot.hall') }), facility: 'party-advanced', tab: 'jobs' };
+    return { text: t('guide.underpowered', { n: power, rec, name: CAMPAIGN[next].name, place: t('town.spot.hall') }), facility: unlockedDepth(p.cleared, p.journey.depth) ? 'dungeon' : 'party' };
+  }
   if (unlockedDepth(p.cleared, p.journey.depth) > p.journey.depth && p.journey.depth < DEPTHS.length) return { text: t('guide.dungeon'), facility: 'dungeon' };
   return { text: t('town.msg.next', { chapter: next + 1, name: CAMPAIGN[next].name }), facility: 'campaign', chapter: next };
 }
@@ -195,10 +211,12 @@ function secondaryScene(p: Profile, state: TownState) {
   const tab = state.tab as 'quests' | 'bestiary' | 'challenge-shop' | 'raid' | 'endless';
   const body = tab === 'quests' ? questBoard(p, state.hero, state.questFilter) : tab === 'bestiary' ? bestiary(p, state.bestiaryPick) : tab === 'challenge-shop' ? challengeShop(p) : tab === 'raid' ? raids(p, state) : endless(p, state);
   const modeNav = tab === 'raid' || tab === 'endless' ? expeditionModes(tab, p) : '';
+  // A suspended run is resumed by the departure button, which names it (the setup above is locked until it ends).
+  const raidRun = state.suspended?.raid, rogueRun = state.suspended?.roguelike;
   const deployment = tab === 'raid'
-    ? `<div class="deploy-bar secondary-deploy" role="group" aria-label="${t('common.depart')}">${raidQuarryUnlocked(p, state.raid) ? `<button class="btn primary" data-depart="raid">${t('raid.hunt', { name: escape(ENEMIES[state.raid]?.name ?? '?') })} ▶</button>` : `<button class="btn primary" data-depart="raid" disabled>${t('raid.none')}</button>`}</div>`
+    ? `<div class="deploy-bar secondary-deploy" role="group" aria-label="${t('common.depart')}">${raidRun ? `<button class="btn primary" data-depart="raid" data-resume-run>${t('raid.resume', { name: escape(raidName(p, raidRun.enemy)), tier: raidTierName(raidRun) })} ▶</button>` : raidQuarryUnlocked(p, state.raid) ? `<button class="btn primary" data-depart="raid">${t('raid.hunt', { name: escape(raidName(p, state.raid)) })} ▶</button>` : `<button class="btn primary" data-depart="raid" disabled>${t('raid.none')}</button>`}</div>`
     : tab === 'endless'
-      ? `<div class="deploy-bar secondary-deploy" role="group" aria-label="${t('common.depart')}"><button class="btn primary" data-depart="endless">${t('endless.descend')} ▶</button></div>`
+      ? `<div class="deploy-bar secondary-deploy" role="group" aria-label="${t('common.depart')}"><button class="btn primary" data-depart="endless" ${rogueRun ? 'data-resume-run' : ''}>${rogueRun ? t('endless.resume', { n: rogueRun.floor }) : t('endless.descend')} ▶</button></div>`
       : '';
   return `<section class="secondary-scene" aria-labelledby="secondary-title"><h1 id="secondary-title" class="sr-only">${routeTitle(state.tab)}</h1>${modeNav}<div class="secondary-content">${body}</div>${deployment}</section>`;
 }
@@ -248,7 +266,7 @@ function heroSheet(p: Profile, id: number, preview: ReturnType<Battle['hero']> &
   return `<div class="win hero-sheet training-identity" style="--class-color:${kit.color}">
     <div class="sheet-portrait"><img src="${portrait(r.classId, 0, id)}" alt=""/><span>LV ${progress.level}</span></div>
     <div class="sheet-body"><small>${escape(job?.name ?? kit.name)} · ${escape(kit.role)}</small><h2>${r.name}<span class="sheet-line" aria-hidden="true">LV ${progress.level} · ${stats[0][0]} ${stats[0][1]} · SP ${stats[3][1]}</span></h2>
-      <div class="sheet-exp"><span class="gauge xp" aria-hidden="true"><i style="width:${exp}%"></i></span><small>${progress.needed ? `EXP ${progress.current}/${progress.needed}` : t('party.xp.cap')}</small></div>
+      <div class="sheet-exp"><span class="gauge xp" aria-hidden="true"><i style="width:${exp}%"></i></span><small>${progress.needed ? `EXP ${fmtInt(progress.current)}/${fmtInt(progress.needed)}` : t('party.xp.cap')}</small></div>
       <dl class="sheet-stats">${stats.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>
     </div>
     <div class="sheet-gear" aria-label="${t('gear.title')}">${SLOTS.map(slot => { const g = gearOf(loadout, slot); return `<span class="sheet-gear-slot ${g ? 'filled' : ''}" title="${t(`gear.slot.${slot}` as StringKey)}: ${escape(g?.name ?? t('gear.none'))}"><img src="${itemIcon(slot, g?.rarity ?? 'common', !g)}" alt="${t(`gear.slot.${slot}` as StringKey)}"/></span>`; }).join('')}</div>
@@ -404,7 +422,24 @@ function tonicToggle(p: Profile, state: TownState) {
   return `<label class="raid-modifier bell-tonic"><input type="checkbox" data-bell-tonic ${state.tonic && affordable ? 'checked' : ''} ${affordable ? '' : 'disabled'}/><span><b>${escape(item.name)} · ${fmtInt(item.cost)} ◆</b><small>${escape(item.description)}</small></span></label>`;
 }
 
+/** A raid boss the Bestiary has not met yet keeps its secret here too: a silhouette and '???' until it is beaten once. */
+const raidKnown = (p: Profile, id: string) => seenFamily(p, ENEMIES[id]?.archetype ?? id);
+const raidName = (p: Profile, id: string) => raidKnown(p, id) ? ENEMIES[id]?.name ?? '?' : '???';
+const raidTierName = (run: { tier: RaidTier; practice: boolean }) => run.practice ? t('raid.sandbox') : t(`raid.tier.${run.tier}` as StringKey);
+/** The suspended run's card: what it is, and an explicit Abandon (the departure button resumes it). */
+function resumeCard(mode: 'raid' | 'roguelike', copy: string) {
+  return `<article class="win resume-card" data-suspended-run="${mode}"><h3 class="subheading">${t('run.suspended.title')}</h3><p>${escape(copy)}</p><button class="btn danger" data-abandon-run="${mode}">${t('run.abandon')}</button></article>`;
+}
+/** While a run is suspended its setup is shown but locked (a disabled fieldset disables every control in it). */
+const lockSetup = (locked: boolean, html: string) => locked ? `<fieldset class="setup-lock" disabled>${html}</fieldset>` : html;
+
 function raids(p: Profile, state: TownState) {
+  const run = state.suspended?.raid;
+  const body = raidSetup(p, state);
+  return run ? resumeCard('raid', t('raid.resume.copy', { name: raidName(p, run.enemy), tier: raidTierName(run) })) + lockSetup(true, body) : body;
+}
+
+function raidSetup(p: Profile, state: TownState) {
   const quarry = openRaidQuarry(p, state.raid) ?? state.raid;
   const selected = ENEMIES[quarry] ?? ENEMIES.golem, base = selected.archetype ?? selected.id;
   const build = state.raidBuild && validRaidBuild(state.raidBuild, p.roster) ? state.raidBuild : defaultRaidBuild(p);
@@ -414,22 +449,24 @@ function raids(p: Profile, state: TownState) {
     return `<option value="${tier}" ${state.raidTier === tier ? 'selected' : ''} ${tierContract ? '' : 'disabled'}>${t(`raid.tier.${tier}` as StringKey)} · ${tierContract ? t('raid.tier.reward', { risk: tierContract.riskPoints, n: raidReward(tierContract, quarry) }) : t('raid.sandbox')}</option>`;
   }).join('');
   // Only simulated modifiers can be ticked; authored-but-unbuilt ones are listed as not yet available.
-  const modifiers = RAID_MODIFIERS.map(raw => localizedRaidModifier(raw, lang())).map(modifier => { const ready = raidModifierAvailable(modifier.id), on = ready && state.raidModifiers.includes(modifier.id), open = ready && (on || state.raidModifiers.length < 3); return `<label class="raid-modifier ${ready ? '' : 'unavailable'}"><input type="checkbox" data-raid-modifier="${modifier.id}" ${on ? 'checked' : ''} ${open ? '' : 'disabled'}/><span><b>${escape(modifier.name)}</b><small>${escape(ready ? modifier.description : t('raid.modifier.soon'))}</small></span></label>`; }).join('');
+  // A pact that would turn the contract into an unpaid practice run says so before it is ticked (only certified combinations pay).
+  const modifiers = RAID_MODIFIERS.map(raw => localizedRaidModifier(raw, lang())).map(modifier => { const ready = raidModifierAvailable(modifier.id), on = ready && state.raidModifiers.includes(modifier.id), open = ready && (on || state.raidModifiers.length < 3); const practice = ready && !on && open && !state.raidSandbox && !getRaidContractForEnemy(quarry, state.raidTier, [...state.raidModifiers, modifier.id]); return `<label class="raid-modifier ${ready ? '' : 'unavailable'}"><input type="checkbox" data-raid-modifier="${modifier.id}" ${on ? 'checked' : ''} ${open ? '' : 'disabled'}/><span><b>${escape(modifier.name)}${practice ? ` <em class="pact-practice" data-pact-practice>${t('raid.modifier.practice')}</em>` : ''}</b><small>${escape(ready ? modifier.description : t('raid.modifier.soon'))}</small></span></label>`; }).join('');
   const taken = new Set(build.slots.map(slot => slot.heroId));
   const party = build.slots.map((slot, index) => `<div class="raid-party-slot"><span>${index + 1}.</span><select data-raid-hero="${index}" aria-label="${t('raid.hero', { n: index + 1 })}">${p.roster.map(id => `<option value="${id}" ${slot.heroId === id ? 'selected' : ''} ${slot.heroId !== id && taken.has(id) ? 'disabled' : ''}>${t('raid.hero.option', { name: ROSTER[id].name, lv: heroProgress(p.loadouts[id]?.xp).level })}</option>`).join('')}</select><select data-raid-job="${index}" aria-label="${t('raid.job', { n: index + 1 })}">${RAID_BASIC_JOBS.map(job => `<option value="${job}" ${slot.classId === job ? 'selected' : ''}>${escape(KITS[job].name)}</option>`).join('')}</select></div>`).join('');
   const sandbox = state.raidSandbox;
   const status = contract && !sandbox ? t('raid.contract', { n: raidReward(contract, quarry) }) : t('raid.sandbox.short');
   const total = contract && !sandbox ? t('raid.total', { tier: t(`raid.tier.${contract.tier}` as StringKey), pacts: contract.modifiers.length, n: raidReward(contract, quarry) }) : t('raid.total.practice');
   const quarries = RAID_QUARRIES.map(id => raidQuarryUnlocked(p, id)
-    ? `<button data-raid="${id}" class="${base === id ? 'chosen' : ''}" aria-pressed="${base === id}"><img src="${monsterDataURL(id)}" alt=""/><b>${escape(ENEMIES[id].name)}</b></button>`
+    ? `<button data-raid="${id}" class="${base === id ? 'chosen' : ''} ${raidKnown(p, id) ? '' : 'unseen'}" aria-pressed="${base === id}" ${raidKnown(p, id) ? '' : `aria-label="${t('bestiary.unknown')}"`}><img src="${raidKnown(p, id) ? monsterDataURL(id) : silhouette(id)}" alt=""/><b>${escape(raidName(p, id))}</b></button>`
     : `<button data-raid="${id}" class="locked" disabled aria-label="${t('raid.locked', { n: raidQuarryUnlockAt(id) })}"><span class="raid-lock" aria-hidden="true">?</span><b>???</b><small>${t('raid.locked', { n: raidQuarryUnlockAt(id) })}</small></button>`).join('');
-  const variants = Object.values(ENEMIES).filter(e => e.archetype === base).map(e => `<button class="raid-variant-chip ${quarry === e.id ? 'chosen' : ''}" data-raid-variant="${e.id}" aria-pressed="${quarry === e.id}">T${e.tier ?? 1} · ${escape(e.name)}</button>`).join('');
-  return `<article class="win mission-brief raid-departure"><img class="brief-art" src="${monsterDataURL(selected.id)}" alt=""/><div><small>${status}</small><h3>${escape(selected.name)}</h3><p>${escape(selected.title)}</p><p class="counter-note">${escape(selected.counter)}</p></div></article>
+  const variants = Object.values(ENEMIES).filter(e => e.archetype === base).map(e => `<button class="raid-variant-chip ${quarry === e.id ? 'chosen' : ''}" data-raid-variant="${e.id}" aria-pressed="${quarry === e.id}">T${e.tier ?? 1} · ${escape(raidName(p, e.id))}</button>`).join('');
+  const known = raidKnown(p, selected.id);
+  return `<article class="win mission-brief raid-departure ${known ? '' : 'unseen'}"><img class="brief-art" src="${known ? monsterDataURL(selected.id) : silhouette(base)}" alt=""/><div><small>${status}</small><h3>${escape(raidName(p, selected.id))}</h3>${known ? `<p>${escape(selected.title)}</p><p class="counter-note">${escape(selected.counter)}</p>` : `<p class="hint">${t('raid.unseen')}</p>`}</div></article>
   <div class="win raid-pick"><h3 class="subheading">${t('raid.quarry')}</h3><div class="raid-roster">${quarries}</div>
   <div class="raid-variants" role="group" aria-label="${t('raid.variant')}">${variants}</div>
   <label class="raid-tier">${t('raid.reward')}<select data-raid-tier aria-label="${t('raid.reward')}">${tiers}</select></label><p class="raid-total" data-raid-total>${total}</p></div>
   <details class="win" open><summary>${t('raid.party', { n: build.slots.length })}</summary><label class="raid-party-size">${t('raid.size')}<select data-raid-party-size aria-label="${t('raid.size')}">${[1,2,3,4,5,6].map(size => `<option value="${size}" ${build.slots.length === size ? 'selected' : ''} ${size > p.roster.length ? 'disabled' : ''}>${size}</option>`).join('')}</select></label><div class="raid-party-grid">${party}</div><p class="hint">${t('raid.party.hint')}</p>${tonicToggle(p, state)}</details>
-  <section class="win raid-modifiers-box"><h3 class="subheading">${t('raid.modifiers')}</h3><fieldset class="raid-modifiers"><legend class="sr-only">${t('raid.modifiers')}</legend>${modifiers}</fieldset><p class="hint">${t('raid.modifiers.hint')}</p></section>
+  <section class="win raid-modifiers-box"><h3 class="subheading">${t('raid.modifiers')}</h3><fieldset class="raid-modifiers"><legend class="sr-only">${t('raid.modifiers')}</legend>${modifiers}</fieldset><p class="raid-total" data-raid-total-pacts>${total}</p><p class="hint">${t('raid.modifiers.hint')}</p></section>
   <details class="win raid-sandbox"><summary>${t('raid.practice')}</summary><p class="hint">${t('raid.practice.hint')}</p>
     <label>${t('raid.slider.hp')} <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.hpScale ?? 1}" data-raid-sandbox="hpScale"/><output>${fmtDec(sandbox?.hpScale ?? 1)}×</output></label>
     <label>${t('raid.slider.damage')} <input type="range" min="0.5" max="3" step="0.1" value="${sandbox?.damageScale ?? 1}" data-raid-sandbox="damageScale"/><output>${fmtDec(sandbox?.damageScale ?? 1)}×</output></label>
@@ -442,6 +479,10 @@ function challengeShop(p: Profile) {
 }
 
 function endless(p: Profile, state: TownState) {
+  const run = state.suspended?.roguelike;
+  return run ? resumeCard('roguelike', t('endless.resume.copy', { n: run.floor })) + lockSetup(true, endlessSetup(p, state)) : endlessSetup(p, state);
+}
+function endlessSetup(p: Profile, state: TownState) {
   const build = state.rogueSetup ?? createRogueBuild();
   return `<article class="win mission-brief"><div><small>${t('endless.best', { n: p.bestFloor })}</small><h3>${t('route.endless')}</h3><p>${t('endless.intro')}</p></div></article>
   <fieldset class="win loadout-slots"><legend>${t('endless.recruits')}</legend>${build.recruits.map((r, i) => `<label>${t('endless.recruit', { n: i + 1 })}<select data-rogue-slot="${i}" aria-label="${t('endless.recruit', { n: i + 1 })}">${BASIC_JOBS.map(id => `<option value="${id}" ${r.classId === id ? 'selected' : ''}>${KITS[id].name}</option>`).join('')}</select></label>`).join('')}<p class="hint">${t('endless.recruits.hint')}</p></fieldset>

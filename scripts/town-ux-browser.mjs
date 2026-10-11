@@ -160,9 +160,12 @@ for (const [width, height] of [[390, 844], [1280, 900]]) {
     const actions = await evaluate('[...document.querySelectorAll(".ceremony-actions button")].map(b => { const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })');
     assert.ok(actions.length >= 3 && actions.every(Boolean), `defeat actions on screen: ${JSON.stringify(actions)}`);
     await screenshot(`artifacts/town-ux-defeat-${width}x${height}.png`);
-    await click(`[data-defeat-fix="${fixes.includes('jobs') ? 'jobs' : fixes[0]}"]`);
+    if (fixes.includes('gear')) assert.ok(await evaluate('Boolean(document.querySelector("[data-defeat-fix=gear][data-fix-slot][data-fix-gear]"))'), 'the gear fix names the slot and piece it found');
+    const fixKind = fixes.includes('jobs') ? 'jobs' : fixes[0], fixHero = await evaluate(`document.querySelector('[data-defeat-fix="${fixKind}"]').dataset.fixHero ?? null`);
+    await click(`[data-defeat-fix="${fixKind}"]`);
     await wait(`["party-advanced", "party", "dungeon"].includes(${route})`);
     if (fixes.includes('jobs')) assert.equal(await evaluate('document.querySelector("[data-training-panel]").dataset.trainingPanel'), 'talents', 'the Jobs fix opens the talents');
+    if (fixHero !== null) assert.equal(await evaluate('document.querySelector(".party-roster .active")?.dataset.townHero'), fixHero, 'the fix opens the Training Hall on the hero it names');
 
     // A victory with a full party and a bench: the actions stay on screen (sticky), the EXP is a compact grid.
     await evaluate('window.gridbound.boot("adventure", 7)');

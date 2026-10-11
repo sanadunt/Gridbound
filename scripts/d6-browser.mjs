@@ -30,6 +30,9 @@ try {
   await click('[data-save-slot="manual-1"]');
   await wait('document.querySelector("[data-load-slot=manual-1]")?.disabled===false');
   await click('[data-load-slot="manual-1"]');await wait('Boolean(document.querySelector("#load-confirm"))');
+  // The preview says what the slot holds in words (chapters, gold, heroes, saved time), never a raw JSON dump.
+  assert.match(await evaluate('document.querySelector("dialog[open] .slot-summary")?.textContent ?? ""'),/Chapters cleared: \d+\/16.*Gold: .*G.*Heroes: \d+.*Saved /);
+  assert.equal(await evaluate('Boolean(document.querySelector("dialog[open] pre"))'),false);
   await click('#load-confirm');await wait('!document.querySelector("dialog[open]")');
   // The first visit already migrated the starting profile into a Commander, so Alpha and Beta fill the three files.
   for(const n of ['Smoke Beta']) { await openProfiles(); await name(n); await click('#new-commander'); await wait('!document.querySelector("dialog[open]")'); }

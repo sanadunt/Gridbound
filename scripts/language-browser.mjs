@@ -29,6 +29,26 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
   console.log('PASS language switch EN → ID → EN (UI strings, town buildings, enemy content)');
 }, { width: 390, height: 844, mobile: true });
 
+// PRESS START on a phone: the tap that leaves the press phase must not also press the menu item or language button that appears
+// under the finger (the touch's compatibility click). The real title screen plays (navigator.webdriver reads false).
+await withBrowser(async ({ send, wait, evaluate, errors }) => {
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: `Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false }); if (!sessionStorage.getItem('press-test')) { sessionStorage.setItem('press-test', '1'); localStorage.clear(); localStorage.setItem('gridbound.lang', 'en'); }` });
+  const tap = async (x, y) => { await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await new Promise(r => setTimeout(r, 60)); await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await new Promise(r => setTimeout(r, 700)); };
+  // Where a control will appear once the menu shows (measured with the press phase lifted for a moment).
+  const spot = selector => evaluate(`(() => { const t = document.querySelector('#title-screen'); t.classList.remove('press-phase'); const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); t.classList.add('press-phase'); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
+  for (const selector of ['.title-lang [data-lang="id"]', '#title-journal']) {
+    await send('Page.navigate', { url });
+    await wait('Boolean(window.gridbound) && document.querySelector("#title-screen.press-phase") && !document.querySelector("#title-screen").hidden', 20000);
+    await evaluate('window.__samePage = true');
+    const { x, y } = await spot(selector);
+    await tap(x, y);
+    assert.deepEqual(await evaluate(`({ same: window.__samePage === true, lang: localStorage.getItem('gridbound.lang'), press: document.querySelector('#title-screen').classList.contains('press-phase'), modal: document.querySelector('#modal').open })`),
+      { same: true, lang: 'en', press: false, modal: false }, `the PRESS START tap does not also press ${selector}`);
+  }
+  assert.deepEqual(errors, []);
+  console.log('PASS PRESS START tap on a phone opens only the title menu');
+}, { width: 390, height: 844, mobile: true });
+
 // WP12 leak sweep: a finished campaign walked in both languages. The visible text of each screen must not carry the
 // other language's function words once proper names (which stay English by policy) are taken out.
 const WORDS = { en: '\\b(yang|dan|untuk|dengan|tidak|setiap|pada|kita|ini)\\b', id: '\\b(the|and|with|your|every)\\b' };

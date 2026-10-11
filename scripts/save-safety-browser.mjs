@@ -22,6 +22,7 @@ const docs = `(async () => {
 })()`;
 const progress = () => '(() => { const p = window.gridbound.profile(); return { cleared: p.cleared.length, gold: p.gold, roster: p.roster.length }; })()';
 const status = () => 'document.querySelector("#storage-status").textContent';
+const revision = () => 'document.querySelector("#storage-status").dataset.revision';
 
 await withBrowser(async ({ send, wait, evaluate, click, screenshot, errors }) => {
   await send('Page.navigate', { url });
@@ -80,16 +81,23 @@ await withBrowser(async ({ send, wait, evaluate, click, screenshot, errors }) =>
   await wait('document.querySelector("#profile-error").textContent.includes("not a Gridbound save")');
   await importFile(exported);
   await wait(`${docs}.then(list => list.length === 2)`, 10000);
+  // The copy is named as one and the dialog says where the bank stayed (restoring a backup never looks like losing the Crystal).
+  await wait('Boolean(document.querySelector("dialog[open] [data-import-note]"))');
+  assert.match(await evaluate('document.querySelector("[data-import-note]").textContent'), /0 ◆.*"Commander"/, 'the import names the file that keeps the bank');
+  await click('dialog[open] [data-close].btn');
   await wait('!document.querySelector("dialog[open]")');
   files = await evaluate(docs);
   const copy = files.find(file => file.id !== parsed.commanderId);
-  assert.deepEqual({ cleared: copy.cleared, gold: copy.gold, crystal: copy.crystal }, { cleared: 5, gold: 4321, crystal: 0 }, 'a second copy of a loaded file keeps the progress but not a second bank');
+  assert.deepEqual({ cleared: copy.cleared, gold: copy.gold, crystal: copy.crystal, name: copy.name }, { cleared: 5, gold: 4321, crystal: 0, name: 'Commander (imported)' }, 'a second copy of a loaded file keeps the progress but not a second bank');
   await wait(`${status()}.startsWith("Saved")`);
   assert.deepEqual(await evaluate(progress()), baseline, 'the imported Commander is active');
   await click('.town-spot[data-open-action="profiles"]');
   await wait('Boolean(document.querySelector("dialog[open] #import-save-button"))');
   await importFile(exported);
   await wait(`${docs}.then(list => list.length === 3)`, 10000);
+  await wait('Boolean(document.querySelector("dialog[open] [data-import-note]"))');
+  await click('dialog[open] [data-close].btn');
+  await wait('!document.querySelector("dialog[open]")');
   await click('.town-spot[data-open-action="profiles"]');
   await wait('Boolean(document.querySelector("dialog[open] #import-save-button"))');
   assert.equal(await evaluate('document.querySelector("#import-save-button").disabled && document.querySelector("#new-commander").disabled'), true, 'three files is the limit');
@@ -103,14 +111,15 @@ await withBrowser(async ({ send, wait, evaluate, click, screenshot, errors }) =>
   // Re-rendering the town (hero tabs) commits nothing and never flashes the unsaved warning.
   await click.nav('party');
   await wait(`${status()}.startsWith("Saved")`);
-  const before = await evaluate(status());
+  const before = await evaluate(revision());
   await evaluate(`window.__statuses = []; new MutationObserver(() => window.__statuses.push(document.querySelector('#storage-status').dataset.level + ':' + document.querySelector('#storage-status').textContent)).observe(document.querySelector('#storage-status'), { childList: true, characterData: true, subtree: true, attributes: true })`);
   for (let i = 0; i < 10; i++) {
     const heroes = await evaluate('[...document.querySelectorAll("[data-town-hero]")].map(button => button.dataset.townHero)');
     await click(`[data-town-hero="${heroes[i % heroes.length]}"]`);
   }
   await new Promise(resolve => setTimeout(resolve, 300));
-  assert.equal(await evaluate(status()), before, 'ten hero taps keep the same revision');
+  assert.equal(await evaluate(revision()), before, 'ten hero taps keep the same revision');
+  assert.equal(await evaluate(status()), 'Saved', 'the status names no revision number');
   assert.deepEqual(await evaluate('window.__statuses.filter(text => text.startsWith("warn"))'), [], 'no unsaved warning while saving');
 
   // A real change still saves, quietly (the sound setting lives in the Story save; with five chapters no story choice is open yet).
@@ -119,7 +128,7 @@ await withBrowser(async ({ send, wait, evaluate, click, screenshot, errors }) =>
   await wait('Boolean(document.querySelector("#setting-sound"))');
   await click('#setting-sound');
   await wait(`window.gridbound.profile().sound === ${!sound}`);
-  await wait(`${status()}.startsWith("Saved") && ${status()} !== ${JSON.stringify(before)}`);
+  await wait(`${status()}.startsWith("Saved") && ${revision()} !== ${JSON.stringify(before)}`);
   assert.deepEqual(await evaluate('window.__statuses.filter(text => text.startsWith("warn"))'), [], 'a real save never shows the warning');
   await screenshot('artifacts/save-safety-quiet-save.png');
   await click('#modal [data-close]');
@@ -193,6 +202,9 @@ await withBrowser(async ({ send, wait, evaluate, click, screenshot }) => {
   await wait('Boolean(document.querySelector("dialog[open] #import-save"))');
   await evaluate(`(() => { const input = document.querySelector('#import-save'); const data = new DataTransfer(); data.items.add(new File([${JSON.stringify(backup)}], 'Gridbound-Save.json')); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await wait(`${docs}.then(list => list.length === 2)`, 10000);
+  await wait('Boolean(document.querySelector("dialog[open] [data-import-note]"))');
+  await click('dialog[open] [data-close].btn');
+  await wait('!document.querySelector("dialog[open]")');
   const copy = (await evaluate(docs)).find(doc => doc.id !== file.id);
   assert.deepEqual({ cleared: copy.cleared, gold: copy.gold, crystal: copy.crystal }, { cleared: 5, gold: 4321, crystal: 0 }, 'the legacy backup imports; next to a Commander it brings no second bank');
 
@@ -265,6 +277,37 @@ await withBrowser(async ({ send, wait, evaluate, click }) => {
   await wait('window.gridbound.inTown === false && window.gridbound.battle.status === "ready"');
   assert.equal(await evaluate('window.gridbound.battle.floor'), 6, 'the suspended chapter resumes');
   await wait(`${status()}.startsWith("Saved")`);
+  // A wave result that could not be saved: a successful Retry closes the 'Not saved' dialog, so Next is not covered.
+  await click('#start');
+  await wait('window.gridbound.battle.status === "fighting"');
+  await wait(`${status()}.startsWith("Saved")`);
+  await evaluate("localStorage.setItem('qa.failPut', '1')");
+  await evaluate('window.gridbound.battle.bossHp = 0; window.gridbound.step(.05)');
+  await wait('Boolean(document.querySelector("dialog[open] #retry-save"))', 15000);
+  await evaluate("localStorage.removeItem('qa.failPut')");
+  await click('#retry-save');
+  await wait('Boolean(document.querySelector("#result-screen:not([hidden]) #next-wave")) && !document.querySelector("#next-wave").disabled', 15000);
+  assert.equal(await evaluate('document.querySelector("#modal").open'), false, 'a successful retry closes the Not saved dialog');
+  await click('#next-wave');
+  await wait('window.gridbound.battle.status === "ready" && window.gridbound.battle.stage === 1');
+  // The battle-start save fails: Retreat offers retry/export (never a silent dead button); after a retry it asks Suspend or Abandon.
+  await evaluate("localStorage.setItem('qa.failPut', '1')");
+  await click('#start');
+  await wait('window.gridbound.battle.status === "fighting"');
+  await wait(`document.querySelector("#storage-status").dataset.level === "warn"`);
+  await click.retreat();
+  await wait('Boolean(document.querySelector("dialog[open] #retry-save"))');
+  assert.match(await evaluate('document.querySelector("dialog[open]").textContent'), /before you leave this screen/, 'Retreat after a failed save explains itself');
+  assert.equal(await evaluate('window.gridbound.inTown'), false);
+  await evaluate("localStorage.removeItem('qa.failPut')");
+  await click('#retry-save');
+  await wait('Boolean(document.querySelector("dialog[open] #suspend-run"))');
+  await click('dialog[open] [data-close].menu-item');
+  await wait('!document.querySelector("dialog[open]") && window.gridbound.battle.status === "fighting"');
+  await click.retreat();
+  await wait('Boolean(document.querySelector("dialog[open] #suspend-run"))');
+  await click('#suspend-run');
+  await wait('window.gridbound.inTown === true');
 }, { width: 390, height: 844, mobile: true });
 
 // Without IndexedDB the Commander is session-only, so gridbound.v3 mirrors its Story progress and bank: a

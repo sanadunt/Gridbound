@@ -19,11 +19,11 @@ import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
 import { CAMPAIGN, BOONS, ENEMIES, boonChoices } from './game/world';
 import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, ownsChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult, chapterReward } from './game/profile';
-import { startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fleeFight, interruptFight, noteFight, dungeonBattleOptions, type Outcome, type Pouch } from './game/dungeon';
+import { DEPTHS, startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fleeFight, interruptFight, noteFight, dungeonBattleOptions, type Outcome, type Pouch } from './game/dungeon';
 import { chapterStars, STAR_PAR_SECONDS } from './game/journey';
 import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
 import { partyPower, powerVerdict, recommendedHeroicPower, recommendedPower } from './game/power';
-import { claimAllQuests } from './ui/quests';
+import { claimAllQuests, questGearText } from './ui/quests';
 import { UNLOCKS, isFeature, markIntro, markVisited, noteModesInUse, pendingIntros, routeLocked, type Feature } from './ui/unlocks';
 import { menuBadge } from './ui/badges';
 import { pushRoute, backRoute } from './ui/route-stack';
@@ -36,16 +36,18 @@ import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './
 import { Sound } from './audio/sound';
 import { loadSave, saveProfile, backupLegacy, legacyBackup, commanderFromBackup, isCompleteV3, SAVE_KEY } from './game/save';
 import { createProfile, FALLEN_XP, type Profile } from './game/profile';
+import { heroProgress } from './game/levels';
 import { CommanderSession } from './game/commander-session';
 import { CommanderError, copyLegacyToCommander, createCommanderDocument, createRunCheckpoint, errorCode, terminalRun, storedStateFor, materializeProfile, type CommanderDocument, type CommanderMode, type SlotId } from './game/commander';
 import { storyBattleOptions, setStoryParty, normalizeStoryParty, storyPartyCap, storyPartyLocked } from './game/story-party';
 import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-build';
-import { JOBS } from './game/jobs';
+import { JOBS, GEAR } from './game/jobs';
 import { defaultRaidBuild, setRaidJob, setRaidHero, setRaidPartySize, normalizeRaidBuild, openRaidQuarry, raidQuarryUnlocked } from './game/raid-build';
 import { QUESTS, questProgress } from './game/quests';
-import { BELL_TONIC, CHALLENGE_SHOP, RELIC_IDS, bankShopItem, createRunWallet, creditRun, resetRunWallet, getRaidContractForEnemy, sandboxRaidContract, roguelikeMilestoneForFloor, buyRunItem, buyBellTonic, boonDraftSize, raidModifierAvailable, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
+import { BELL_TONIC, CHALLENGE_SHOP, RELIC_IDS, bankShopItem, createRunWallet, resetRunWallet, getRaidContractForEnemy, sandboxRaidContract, roguelikeMilestoneForFloor, buyRunItem, buyBellTonic, boonDraftSize, raidModifierAvailable, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
 import { t, lang, setLang, errorText, fmtInt, fmtDec, fmtSec, fmtDateTime, type Lang } from './i18n';
 import { localizeContent, eventText } from './i18n/content';
+import { version } from '../package.json';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const store = { getItem: (key: string) => localStorage.getItem(key), setItem: (key: string, value: string) => localStorage.setItem(key, value) };
@@ -69,6 +71,10 @@ function updateTitleStatus() {
   const nameEl = $('title-commander-name');
   if (!nameEl) return;
   nameEl.textContent = `${commander.document?.name || t('title.recruit')} · ${modeName(commander.mode)}`;
+  // A brand-new save has nothing to continue: the first option reads Begin.
+  const fresh = !hasProgress(profile), enter = $('title-enter');
+  setText(enter.querySelector('.menu-title')!, t(fresh ? 'title.begin' : 'title.enter'));
+  setText(enter.querySelector('.menu-subtext')!, t(fresh ? 'title.begin.sub' : 'title.enter.sub'));
 }
 function titleMarkup() {
   return `<div class="title-backdrop" aria-hidden="true"><img class="title-world-art" alt="" /><div class="title-vignette"></div></div>
@@ -83,7 +89,7 @@ function titleMarkup() {
     </nav>
     <div class="title-lang" role="group" aria-label="${t('settings.language')}">${(['en', 'id'] as Lang[]).map(code => `<button type="button" data-lang="${code}" aria-pressed="${lang() === code}">${code === 'en' ? 'English' : 'Indonesia'}</button>`).join('')}</div>
   </div>
-  <footer class="title-footer"><div class="title-active-commander" id="title-commander-status"><b>${t('title.active')}</b> <span id="title-commander-name"></span></div><div class="title-meta-info"><span>© EMBERHOLLOW</span><span>v0.5</span></div></footer>`;
+  <footer class="title-footer"><div class="title-active-commander" id="title-commander-status"><b>${t('title.active')}</b> <span id="title-commander-name"></span></div><div class="title-meta-info"><span>© EMBERHOLLOW</span><span>v${version.split('.').slice(0, 2).join('.')}</span></div></footer>`;
 }
 function showTitleScreen(animated = true) {
   const titleScreen = $('title-screen');
@@ -148,8 +154,10 @@ function storageStatus() {
   const status = $('storage-status');
   // Warn only after a failed, stale or blocked save; a save in flight is the quiet 'busy' level.
   const warning = saved.readOnly && saved.warning ? errorText(saved.warning) : commander.error ? errorText(commander.error) : commander.failed || (!commander.document && storageFailed) ? t('storage.dirty') : '';
-  status.textContent = warning || (!commander.document ? t('storage.none') : commander.dirty ? t('storage.saving') : commander.repository?.persistent ? t('storage.saved', { n: String(commander.document.revision) }) : legacyMirrored() ? t('storage.session.kept') : t('storage.session'));
+  status.textContent = warning || (!commander.document ? t('storage.none') : commander.dirty ? t('storage.saving') : commander.repository?.persistent ? t('storage.saved') : legacyMirrored() ? t('storage.session.kept') : t('storage.session'));
   status.dataset.level = warning || (commander.document && !commander.repository?.persistent) ? 'warn' : commander.dirty ? 'busy' : 'ok';
+  // The revision stays out of the visible text (developer jargon) but is kept on the element for bug reports and tests.
+  status.dataset.revision = commander.document ? String(commander.document.revision) : '';
   updateTitleStatus();
 }
 /** A storage failure the player must see: its code goes to the status bar (errorText), the raw message only to the console. */
@@ -353,7 +361,7 @@ $('app').innerHTML = `
       <button id="focus-bar" type="button" class="win focus-bar" aria-label="${t('battle.focus.aria')}"><img class="focus-face" alt=""/><span class="focus-id"><b class="focus-name"></b><small class="focus-skill"></small></span><span class="focus-stats"><span class="focus-hp">HP <b></b></span><span class="focus-status"></span></span></button>
       <div class="action-bar">
         <button id="guard" class="cmd guard-button"><span>${t('battle.guard')}<small><kbd class="key-hint">G</kbd><span id="guard-label"></span></small></span></button>
-        <button id="potion" class="cmd potion-button"><span>${t('battle.potion')}<small><kbd class="key-hint">H</kbd><span id="potions"></span></small></span><b>2</b></button>
+        <button id="potion" class="cmd potion-button"><span>${t('battle.potion')}<small><kbd class="key-hint">H</kbd></small></span><b>2</b></button>
         <button id="ultimate" class="cmd ultimate-button" disabled><i id="resolve-fill"></i><span>${t('battle.ultimate')}<small><kbd class="key-hint">R</kbd><span id="resolve-label"></span></small></span></button>
       </div>
     </section>
@@ -374,6 +382,11 @@ $('app').innerHTML = `
 const modal = $<HTMLDialogElement>('modal');
 const resultScreen = $<HTMLElement>('result-screen');
 
+/** Unsettled Raid and Bell Trials encounters of the open file: what Depart would resume. */
+function suspendedRuns(): NonNullable<TownState['suspended']> {
+  const encounters = commander.document?.encounters, raid = encounters?.raid && !encounters.raid.settled ? encounters.raid.battle : undefined, rogue = encounters?.roguelike && !encounters.roguelike.settled ? encounters.roguelike.battle : undefined;
+  return { ...(raid ? { raid: { enemy: raid.enemyId, tier: raid.raidContract?.tier ?? 'bronze', practice: Boolean(raid.raidContract?.sandbox) } } : {}), ...(rogue ? { roguelike: { floor: rogue.floor } } : {}) };
+}
 function modeForTownTab(tab: TownTab, fallback = commander.mode): CommanderMode {
   if (tab === 'raid') return 'raid';
   if (tab === 'endless') return 'roguelike';
@@ -404,6 +417,9 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   townState.notice = notice;
   // A locked quarry (unseen boss, chapter not cleared) is never offered: fall back to the first open one.
   if (tab === 'raid') { townState.raid = openRaidQuarry(profile, townState.raid) ?? townState.raid; huntTarget = undefined; }
+  // A suspended Raid or Bell Trials run locks its setup and names itself on the departure button (Depart resumes it).
+  townState.suspended = suspendedRuns();
+  if ((tab === 'raid' && townState.suspended.raid) || (tab === 'endless' && townState.suspended.roguelike)) townState.tonic = false;
   $('town-screen').hidden = false;
   $('battle-screen').hidden = true;
   engineAwake(false);
@@ -550,7 +566,7 @@ $('town-screen').addEventListener('click', event => {
   if (button.hasAttribute('data-claim-all')) {
     const { claimed, gold, gear } = claimAllQuests(profile, townState.hero);
     if (claimed.length) sound.play('coin');
-    showTown('quests', claimed.length ? t(gear ? 'notice.quest.all.gear' : 'notice.quest.all', { n: claimed.length, gold }) : t('notice.quest.fail'), true);
+    showTown('quests', claimed.length ? t(gear.length ? 'notice.quest.all.gear' : 'notice.quest.all', { n: claimed.length, gold, gear: questGearText(gear) }) : t('notice.quest.fail'), true);
     $('town-screen').querySelector('.secondary-content')?.scrollTo({ top: 0 });
     return;
   }
@@ -686,9 +702,9 @@ $('town-screen').addEventListener('click', event => {
   }
   if(button.dataset.claimQuest){
     const questId = button.dataset.claimQuest;
-    const q=QUESTS.find(q=>q.id===questId);
     const ok=claimQuest(profile,questId,townState.hero);
-    showTown('quests',ok?t('notice.quest.ok', { name: ROSTER[q?.heroId??townState.hero].name }):t('notice.quest.fail'), true);
+    const gearName = ok && ok.gear ? GEAR.find(g => g.id === ok.gear)?.name ?? ok.gear : '';
+    showTown('quests',ok?t(!ok.gear ? 'notice.quest.ok' : ok.refund ? 'notice.quest.gear.refund' : 'notice.quest.ok.gear', { name: ROSTER[ok.hero].name, gear: gearName, gold: ok.refund }):t('notice.quest.fail'), true);
     if (ok && motionOn()) {
       const entry = document.querySelector<HTMLElement>(`[data-quest="${questId}"]`);
       if (entry) gsap.fromTo(entry, { scale: 0.96, filter: 'brightness(1.5)' }, { scale: 1, filter: 'brightness(1)', duration: 0.35, ease: 'back.out(2)', clearProps: 'transform,filter' });
@@ -700,7 +716,18 @@ $('town-screen').addEventListener('click', event => {
   if (button.dataset.depart) {
     depart(button.dataset.depart as Mode);
   }
+  if (button.dataset.abandonRun) abandonSuspended(button.dataset.abandonRun as 'raid' | 'roguelike');
 });
+/** Abandon a suspended Raid or Bell Trials run from its setup (confirmed): it ends with no reward and the setup opens again. */
+function abandonSuspended(mode: 'raid' | 'roguelike') {
+  const tab: TownTab = mode === 'raid' ? 'raid' : 'endless';
+  openModal(`<h2 id="modal-title">${t('run.abandon.title')}</h2><p>${t('run.abandon.copy')}</p><button id="abandon-suspended" class="btn danger">${t('run.abandon')}</button><button class="btn" data-close>${t('common.cancel')}</button>`);
+  $('abandon-suspended').addEventListener('click', () => {
+    modal.close();
+    if (!ensureMode(mode, () => abandonSuspended(mode))) return;
+    void clearEncounter().then(ok => { if (ok) showTown(tab, t('run.abandon.done')); else if (!commander.stale) unsavedTownModal(() => abandonSuspended(mode)); else storageStatus(); });
+  });
+}
 $('town-screen').addEventListener('change', event => {
   const el = event.target as HTMLSelectElement;
   if (!inTown || commander.stale || pendingSettlement) return;
@@ -806,11 +833,11 @@ function settleInterruptedFight() {
 }
 /** Fight the pending dungeon room with the run's own party, its carried HP, potions and blessings. */
 function startDungeonFight() {
+  if (!ensureMode('story', startDungeonFight)) return;
   const run = profile.journey.run;
   if (!run?.pendingFight || run.status !== 'active') return;
   if (settleInterruptedFight()) { showTown('dungeon'); return; }
   const options = dungeonBattleOptions(profile, run)!;
-  commander.mode = 'story';
   runBoons = [];
   boot('dungeon', options.dungeon!.chapter, options);
 }
@@ -976,9 +1003,25 @@ async function playCampScenes(force = false) {
   // The guide may now point at a choice left for later.
   if (inTown && townState.tab === 'camp') showTown('camp');
 }
+/**
+ * Make `target` the Commander's mode before a departure. The town normally did so already (showTown); a switch it skipped (a save was in
+ * flight or had failed) happens here, re-materializing that mode's profile so a Story profile is never saved as a challenge (or the reverse).
+ * The setup picks (quarry, tier, pacts, parties, tonic) survive the switch. With a save in flight it waits and runs `retry`; a failed save
+ * gets the retry/export prompt. Returns false when the caller must stop.
+ */
+function ensureMode(target: CommanderMode, retry: () => void) {
+  const doc = commander.document;
+  if (!doc || commander.mode === target) return true;
+  if (commander.stale) { storageStatus(); return false; }
+  if (commander.dirty || commander.busy) { void commander.flush().then(ok => { if (ok) retry(); else if (!commander.stale) unsavedTownModal(retry, 'storage.unsaved.leave'); else storageStatus(); }); return false; }
+  const { raid, raidTier, raidModifiers, raidBuild, raidSandbox, rogueSetup, tonic, hero, zone, heroic } = townState;
+  activateCommander(doc, target, false);
+  Object.assign(townState, { raid, raidTier, raidModifiers, raidBuild, raidSandbox, rogueSetup, tonic, hero, zone, heroic });
+  return true;
+}
 function depart(mode: Mode) {
   if (playingScene || campScenesRunning) return;
-  commander.mode = mode === 'raid' ? 'raid' : mode === 'endless' ? 'roguelike' : 'story';
+  if (!ensureMode(mode === 'raid' ? 'raid' : mode === 'endless' ? 'roguelike' : 'story', () => depart(mode))) return;
   if (commander.document) commander.document.activeMode = commander.mode;
   if (mode === 'adventure' && !canEnterZone(profile, townState.zone)) return;
   const existing = commander.document?.encounters?.[commander.mode];
@@ -1107,6 +1150,8 @@ function updateExpedition() {
   // Run boons and the Journey shop only exist in a Roguelike run.
   document.querySelectorAll<HTMLElement>('#battle-screen .run-boons, #battle-screen .run-shop-panel').forEach(panel => { panel.hidden = battle.mode !== 'endless'; });
   $('boon-list').innerHTML = runBoons.length ? runBoons.map(id => { const b = BOONS.find(b => b.id === id)!; return `<p><b>${b.name}</b><small>${b.description}</small></p>`; }).join('') : `<p class="hint">${t('battle.noboons')}</p>`;
+  // Boons belong to Bell Trials (raids list their pacts there): a Story or Undercroft fight without boons has no tray button.
+  $('combat-boons').hidden = !runBoons.length && battle.mode !== 'endless' && battle.mode !== 'raid';
   const boonBadge = $('boon-count-badge');
   if (boonBadge) {
     boonBadge.textContent = String(runBoons.length);
@@ -1491,7 +1536,7 @@ function frame(dt: number) {
   if (isDanger && !wasDanger && motionOn()) {
     gsap.fromTo('#intent', { scale: 1.08 }, { scale: 1, duration: 0.25, ease: 'back.out(2)', clearProps: 'transform' });
   }
-  setText(intent.querySelector('b')!, threat ? `${t('battle.intent.time', { name: eventText(threat.name, lang()), s: fmtDec(Math.max(0, threat.left)) })}${threat.targetId !== undefined ? ` → ${battle.hero(threat.targetId)?.name ?? '?'}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: fmtDec(battle.guardLeft) }) : t('battle.watch'));
+  setText(intent.querySelector('b')!, threat ? `${t('battle.intent.time', { name: eventText(threat.name, lang()), s: fmtDec(Math.max(0, threat.left)) })}${threat.targetId !== undefined ? ` → ${heroLabel(threat.targetId)}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: fmtDec(battle.guardLeft) }) : t('battle.watch'));
   setText(intent.querySelector('span')!, threat ? `${threat.counter ? touchText(eventText(threat.counter, lang())) : t('battle.counter.default')}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.hint'));
   placeBanner();
   $('damage').textContent = fmtInt(battle.damage);
@@ -1505,7 +1550,6 @@ function frame(dt: number) {
   $<HTMLButtonElement>('ultimate').disabled = !ultReady;
   $('ultimate').classList.toggle('ready', ultReady);
   $<HTMLButtonElement>('potion').disabled = battle.potions <= 0 || battle.status !== 'fighting';
-  $('potions').textContent = t('battle.potion.left', { n: battle.potions });
   $('potion').querySelector('b')!.textContent = String(battle.potions);
   $<HTMLButtonElement>('guard').disabled = battle.guardCooldown > 0 || battle.status !== 'fighting';
   // Guard only helps if it is still up at impact: cue the window once an all-grid hit is within GUARD_DURATION
@@ -1722,7 +1766,7 @@ function pauseMenu() {
 }
 const escapeUI = (value: string) => value.replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]!));
 function showBoonTray() {
-  if (inTown) return;
+  if (inTown || $('combat-boons').hidden) return;
   if (modal.open && modal.querySelector('.boon-tray-modal')) { modal.close(); return; }
   sound.cardDeal();
   const activeBoonIds = (runBoons.length > 0 ? runBoons : battle.boons) ?? [];
@@ -1931,14 +1975,15 @@ function result() {
 /** The outcome could not be saved: navigation stays locked until a retry succeeds; the outcome can be exported meanwhile. */
 function unsavedResultModal() {
   openModal(`<h2 id="modal-title">${t('result.unsaved.title')}</h2><p>${t('result.unsaved.copy')}</p><button id="retry-save" class="btn primary">${t('result.unsaved.retry')}</button><button id="pending-export" class="btn">${t('result.unsaved.export')}</button>`);
-  $('retry-save').onclick = () => { presentingResult = false; result(); };
+  // A retry closes this dialog first (a failure opens it again), so a saved result is never left under a 'Not saved' dialog.
+  $('retry-save').onclick = retryResultSave;
   $('pending-export').onclick = exportCommander;
 }
+function retryResultSave() { resumeOnClose = false; if (modal.open) modal.close(); presentingResult = false; result(); }
 async function presentResult() {
   if (battle.mode === 'dungeon') return presentDungeonResult();
   const won = battle.status === 'victory';
   const moreWaves = won && battle.mode === 'adventure' && battle.stage + 1 < battle.stageCount;
-  const zone = CAMPAIGN[battle.floor - 1];
   recruitedIds = [];
   let reward = 0;
   if (!recorded) {
@@ -2019,6 +2064,10 @@ async function presentResult() {
     const credited = !won ? 0 : resultReward ? (battle.mode === 'adventure' ? resultReward.gold : resultReward.crystal) : undefined;
     const rewardPlaque = moreWaves ? [t('result.carried'), `${fmtInt(battle.gold)}G`] : battle.mode === 'adventure' ? [t('result.gold'), credited === undefined ? '—' : `${fmtInt(credited)}G`] : [t('currency.crystal'), credited === undefined ? '—' : `+${fmtInt(credited)}`];
     const retryBattle = !won && battle.mode === 'adventure' && battle.stage > 0 && stageStart?.battle.stage === battle.stage && stageStart.battle.floor === battle.floor;
+    // HP carries between battles and nothing revives in between: a checkpoint that began with a hero down (or the party under 40% HP)
+    // would replay the same loss, so restarting the chapter becomes the main button and the hint says why.
+    const startHeroes = retryBattle ? stageStart!.battle.heroes : [], startDown = startHeroes.filter(h => h.hp <= 0).map(h => heroName(h));
+    const weakStart = retryBattle && (startDown.length > 0 || startHeroes.reduce((n, h) => n + Math.max(0, h.hp), 0) < .4 * startHeroes.reduce((n, h) => n + h.maxHp, 0));
     // A Raid hero keeps the class the slot fielded (its colours stay its own); everyone else shows their roster class.
     const xpRows = xpSummary(experienceRewards, id => { const h = battle.mode === 'raid' ? battle.hero(id) : undefined; return h ? face(h) : portrait(ROSTER[id].classId, 0, id); });
     // A Story defeat says why and what to do: power vs the recommendation, who fell first, the enemy's counter, up to two one-tap fixes.
@@ -2032,7 +2081,7 @@ async function presentResult() {
         ${battle.mode === 'adventure' ? `<p class="power-line power-${verdict}" data-defeat-power>${t('result.defeat.power', { n: power, rec })} <em>${t(`power.verdict.${verdict}` as never)}</em></p>` : ''}
         ${fall ? `<p class="defeat-first">${escapeUI(fall.cause ? t('result.defeat.first', { name: fall.name, cause: fall.cause }) : t('result.defeat.first.plain', { name: fall.name }))}</p>` : ''}
         ${enemy?.counter ? `<p class="counter-note defeat-tip"><b>${escapeUI(t('result.defeat.tip', { name: eventText(battle.enemyName, lang()) }))}:</b> ${escapeUI(enemy.counter)}</p>` : ''}
-        ${fixes.length ? `<h3 class="subheading">${t('result.fix.title')}</h3><div class="defeat-fixes">${fixes.map(fix => `<button class="btn" data-defeat-fix="${fix.kind}" ${fix.hero !== undefined ? `data-fix-hero="${fix.hero}"` : ''}>${escapeUI(fixLabel(fix))} ▶</button>`).join('')}</div>` : ''}
+        ${fixes.length ? `<h3 class="subheading">${t('result.fix.title')}</h3><div class="defeat-fixes">${fixes.map(fix => `<button class="btn" data-defeat-fix="${fix.kind}" ${fix.hero !== undefined ? `data-fix-hero="${fix.hero}"` : ''} ${fix.slot ? `data-fix-slot="${fix.slot}" data-fix-gear="${fix.gearId}"` : ''}>${escapeUI(fixLabel(fix))} ▶</button>`).join('')}</div>` : ''}
       </section>`;
     // Details: the real breakdown (the fight's numbers and which star goals this clear met).
     const starGoals = won && !moreWaves && battle.mode === 'adventure' && !battle.heroic ? ([['stars.goal.clear', true], ['stars.goal.standing', battle.living().length === battle.heroes.length], ['stars.goal.par', battle.stageTime <= STAR_PAR_SECONDS]] as const) : [];
@@ -2041,7 +2090,7 @@ async function presentResult() {
       <p class="result-banner" aria-hidden="true">${banner}</p>
       <header class="win ceremony-header">
         <h2 id="result-title" class="ceremony-title">${titleText}</h2>
-        <p class="ceremony-desc">${escapeUI(description).replace(/\n/g, '<br>')}</p>
+        <p class="ceremony-desc${won && !moreWaves && battle.mode === 'adventure' ? ' ceremony-outro' : ''}">${escapeUI(description).replace(/\n/g, '<br>')}</p>
         ${([['result.recruited', true], ['result.recruited.bench', false]] as const).map(([key, deployed]) => { const names = recruitedIds.filter(id => profile.storyActive.includes(id) === deployed).map(id => ROSTER[id].name); return names.length ? `<p class="recruit-notice">${t(key, { names: names.join(' & ') })}</p>` : ''; }).join('')}
         ${won && !moreWaves && battle.mode === 'adventure' && battle.floor === CAMPAIGN.length && resultReward?.firstClear ? `<p class="recruit-notice campaign-complete">${t('result.campaign.complete')}</p>` : ''}
         ${resultReward?.partyCap && won && !moreWaves ? `<p class="recruit-notice party-grew">${t('notice.party.grew', { n: resultReward.partyCap })}</p>` : ''}
@@ -2053,6 +2102,7 @@ async function presentResult() {
         ${xpRows}
         ${readyQuests && !moreWaves && won ? `<p class="hint">${t('result.quests', { n: readyQuests })}</p>` : ''}
         ${retryBattle ? `<p class="hint retry-battle-hint">${t('result.retry.battle.hint')}</p>` : ''}
+        ${weakStart ? `<p class="hint retry-weak-hint" data-weak-checkpoint>${escapeUI(startDown.length ? t('result.retry.battle.down', { names: startDown.join(' & ') }) : t('result.retry.battle.low'))}</p>` : ''}
       </section>
       ${defeatHelp}
       <section class="win result-details" id="result-details" aria-label="${t('result.details')}" hidden>
@@ -2061,8 +2111,9 @@ async function presentResult() {
         <p class="hint">${t('result.xp.note', { n: Math.round(FALLEN_XP * 100) })}</p>
       </section>
       <div class="ceremony-actions">
-        ${retryBattle ? `<button id="retry-battle" class="btn primary" title="${escapeUI(t('result.retry.battle.hint'))}">${t('result.retry.battle')}</button>` : ''}
-        ${moreWaves ? `<button id="next-wave" class="btn primary">${t('result.next')} ▶</button>` : `<button id="retry" class="btn">${!won && battle.stage > 0 ? t('result.restart') : t('result.retry')}</button>`}
+        ${weakStart ? `<button id="retry" class="btn primary">${t('result.restart')}</button>` : ''}
+        ${retryBattle ? `<button id="retry-battle" class="btn ${weakStart ? '' : 'primary'}" title="${escapeUI(t('result.retry.battle.hint'))}">${t('result.retry.battle')}</button>` : ''}
+        ${moreWaves ? `<button id="next-wave" class="btn primary">${t('result.next')} ▶</button>` : weakStart ? '' : `<button id="retry" class="btn">${!won && battle.stage > 0 ? t('result.restart') : t('result.retry')}</button>`}
         <button id="result-town" class="btn ${moreWaves || retryBattle ? '' : 'primary'}">${moreWaves ? t('result.abandon') : t('result.town')}</button>
         <button id="result-details-toggle" class="btn result-details-toggle" type="button" aria-controls="result-details" aria-expanded="false">${t('result.details')}</button>
       </div>
@@ -2121,9 +2172,12 @@ async function presentResult() {
     void checkpoint();
   });
   // Leave the settled result for a town route (the camp plays the scenes a clear queued: join scenes, a story choice, the finale).
-  const leaveResult = (tab: TownTab) => {
+  const leaveResult = (tab: TownTab, prepare?: () => void) => {
     runBoons = [];
+    // The selected hero and chapter stay (activateCommander keeps them in the same file); a first clear moves on to the next chapter.
     if (battle.mode === 'adventure' && commander.document) activateCommander(commander.document, 'story');
+    if (battle.mode === 'adventure' && won && !moreWaves && resultReward?.firstClear) selectZone(Math.min(profile.cleared.length, CAMPAIGN.length - 1));
+    prepare?.();
     closeWithoutResume();
     inTown = true;
     recruitedIds = [];
@@ -2138,12 +2192,16 @@ async function presentResult() {
     leaveResult('camp');
   });
   resultScreen.querySelectorAll<HTMLButtonElement>('[data-defeat-fix]').forEach(button => button.addEventListener('click', () => {
-    const kind = button.dataset.defeatFix, hero = Number(button.dataset.fixHero);
+    const kind = button.dataset.defeatFix, hero = Number(button.dataset.fixHero), slot = button.dataset.fixSlot as TownState['gearSlot'] | undefined, gearId = button.dataset.fixGear;
     if (Number.isInteger(hero) && profile.roster.includes(hero)) townState.hero = hero;
     townState.pendingGear = undefined;
     if (kind === 'jobs') townState.trainingTab = 'talents';
     if (kind === 'gear') townState.trainingTab = 'gear';
-    leaveResult(kind === 'dungeon' ? 'dungeon' : kind === 'jobs' ? 'party-advanced' : 'party');
+    // The gear fix opens on the upgrade it found: its slot, with the piece in the inspector.
+    leaveResult(kind === 'dungeon' ? 'dungeon' : kind === 'jobs' ? 'party-advanced' : 'party', () => {
+      if (Number.isInteger(hero) && profile.roster.includes(hero)) townState.hero = hero;
+      if (kind === 'gear' && slot && gearId) { townState.gearSlot = slot; townState.pendingGear = { hero: townState.hero, slot, gearId }; }
+    });
   }));
 }
 
@@ -2174,7 +2232,10 @@ async function presentDungeonResult() {
   loot = dungeonLoot;
   const run = profile.journey.run, cleared = run?.status === 'cleared';
   const xpRows = xpSummary(experienceRewards, id => portrait(ROSTER[id].classId, 0, id));
-  const desc = !won ? t('dungeon.end.wiped') : cleared ? t('dungeon.end.cleared') : loot ? `${t('dungeon.out.gold', { n: loot.gold })} ${Object.entries(loot.materials).map(([id, n]) => t('dungeon.out.material', { n, name: t(`material.${id}` as never) })).join(' ')}` : '';
+  // A cleared depth says what the next stair needs: open now, behind a chapter, or none (the deepest depth).
+  const nextDepth = DEPTHS.find(d => d.id === (run?.depth ?? 0) + 1);
+  const clearedText = !nextDepth ? t('dungeon.end.cleared.last') : profile.cleared.includes(nextDepth.unlock - 1) ? t('dungeon.end.cleared') : t('dungeon.end.cleared.wait', { n: nextDepth.unlock });
+  const desc = !won ? t('dungeon.end.wiped') : cleared ? clearedText : loot ? `${t('dungeon.out.gold', { n: loot.gold })} ${Object.entries(loot.materials).map(([id, n]) => t('dungeon.out.material', { n, name: t(`material.${id}` as never) })).join(' ')}` : '';
   // A wipe names what the pouch held; with an empty pouch there is nothing to lose and nothing to say.
   const before = dungeonBefore, lost = !won && before && (before.pouch.gold > 0 || Object.values(before.pouch.materials).some(n => n > 0)) ? before.pouch : undefined;
   const pct = (ratio: number) => `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
@@ -2252,7 +2313,9 @@ function resumeEncounter(savedEncounter: NonNullable<typeof encounter>) {
 function unsavedTownModal(next: () => unknown, copy: 'storage.unsaved.copy' | 'storage.unsaved.leave' = 'storage.unsaved.copy') {
   storageStatus();
   openModal(`<h2 id="modal-title">${t('result.unsaved.title')}</h2><p>${t(copy)}</p><p class="hint">${commander.error ? escapeUI(errorText(commander.error)) : ''}</p><button id="retry-save" class="btn primary">${t('result.unsaved.retry')}</button><button id="pending-export" class="btn">${t('result.unsaved.export')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
-  $('retry-save').onclick = () => { void persist().then(ok => { if (ok) { closeWithoutResume(); void next(); } else unsavedTownModal(next, copy); }); };
+  // In a battle the dialog stays open for what comes next (the Suspend/Abandon prompt replaces it), so Cancel there still resumes the fight.
+  // In a battle the retry saves the encounter checkpoint too (the battle-start save may be the one that failed).
+  $('retry-save').onclick = () => { void (inTown ? persist() : checkpoint()).then(ok => { if (ok) { if (inTown) closeWithoutResume(); void next(); } else unsavedTownModal(next, copy); }); };
   $('pending-export').onclick = exportCommander;
 }
 async function clearEncounter() {
@@ -2277,7 +2340,7 @@ function renderRoguePromote() {
     const hero = battle.hero(i), options = rogueUpgrades(build, i);
     if (!hero) return '';
     const current = recruit.job ? JOBS[recruit.job]?.name : KITS[recruit.classId].name;
-    return `<div class="rogue-promote-row"><span><b>${escapeUI(hero.name)}</b><small>${escapeUI(current ?? '')}</small></span><span class="rogue-promote-options">${options.length ? options.map(j => `<button class="btn" data-rogue-promote="${i}" data-job="${j.id}">${escapeUI(j.name)} ▲</button>`).join('') : `<small>${t('rogue.promote.max')}</small>`}</span></div>`;
+    return `<div class="rogue-promote-row"><span><b>${escapeUI(heroName(hero))}</b><small>${escapeUI(current ?? '')}</small></span><span class="rogue-promote-options">${options.length ? options.map(j => `<button class="btn" data-rogue-promote="${i}" data-job="${j.id}">${escapeUI(j.name)} ▲</button>`).join('') : `<small>${t('rogue.promote.max')}</small>`}</span></div>`;
   }).join('');
   host.hidden = false;
   host.innerHTML = `<h3>${t('rogue.promote.title', { n: build.points })}</h3><p class="hint">${t('rogue.promote.sub')}</p>${rows}`;
@@ -2295,6 +2358,8 @@ async function nextFloor() {
 }
 /** `resumed`: the document is exactly what storage holds (just loaded or just saved), so the next unchanged town render does not commit another revision. */
 function activateCommander(document: CommanderDocument, mode = document.activeMode, renderTownAfterActivation = true, resumed = false) {
+  // A mode switch inside the same file keeps the selected hero and chapter (and with it the Heroic toggle); another file starts from its own.
+  const same = commander.document?.commanderId === document.commanderId;
   profile = commander.select(document, mode);
   encounter = undefined; runBoons = []; runWallet = createRunWallet(); recorded = false; pendingSettlement = false;
   const rogue = storedStateFor(document, 'roguelike', 'auto');
@@ -2304,7 +2369,9 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
   const contract = raid && 'contract' in raid ? raid.contract : undefined;
   townState.raid = huntTarget ?? contract?.bossId ?? 'golem'; townState.raidTier = contract?.tier ?? 'bronze'; townState.raidModifiers = (contract?.modifiers ?? []).filter(raidModifierAvailable);
   townState.raidSandbox = raid && 'sandbox' in raid ? raid.sandbox : undefined;
-  townState.pendingGear = undefined; townState.hero = profile.roster[0]; selectZone(Math.min(profile.cleared.length,CAMPAIGN.length-1));
+  townState.pendingGear = undefined;
+  if (!same || !profile.roster.includes(townState.hero)) townState.hero = profile.roster[0];
+  if (!same || !canEnterZone(profile, townState.zone)) selectZone(Math.min(profile.cleared.length, CAMPAIGN.length - 1));
   sound.enabled = profile.sound; applyMotion();
   $('sound').setAttribute('aria-pressed', String(profile.sound));
   if (resumed && mode === document.activeMode) { syncProfileEconomy(profile); savedSignature = `${document.commanderId}:${commander.document!.revision}:${JSON.stringify(context())}`; } else savedSignature = '';
@@ -2313,7 +2380,8 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
 }
 async function leaveSafely(action: () => void | Promise<void>) {
   if (pendingSettlement || presentingResult || commander.stale) { storageStatus(); return; }
-  if (!(await commander.flush())) { storageStatus(); return; }
+  // A failed save gets the same retry/export prompt as town navigation (its Retry runs this again), never a silent dead button.
+  if (!(await commander.flush())) { if (!commander.stale) unsavedTownModal(() => leaveSafely(action), 'storage.unsaved.leave'); else storageStatus(); return; }
   // A dungeon fight under way can only be left by fleeing (wounds kept, half the pouch lost); before Begin or after the result it just closes.
   if (dungeonFightLive() && battle.status !== 'ready') { fleeDungeonModal(); return; }
   if (inTown || battle.mode === 'dungeon') { closeWithoutResume(); inTown = true; await action(); return; }
@@ -2371,12 +2439,16 @@ function chapterChronicle() {
   return `<section class="journal-chronicle"><h3>${t('journal.chronicle', { n: profile.cleared.length })}</h3>${[...profile.cleared].sort((a, b) => a - b).map(i => `<details class="journal-entry-card"><summary>CH ${i + 1} · ${escapeUI(CAMPAIGN[i].name)}</summary><button class="btn journal-replay" data-replay-chapter="${i}">▶ ${t('journal.watch')}</button><p>${escapeUI(CAMPAIGN[i].intro).replace(/\n/g, '<br>')}</p><p>${escapeUI(storyOutro(i, profile.narrative ?? {})).replace(/\n/g, '<br>')}</p></details>`).join('')}</section>`;
 }
 async function storyJournal() {
+  if (!inTown) return;
+  // A failed save gets the retry/export prompt; the Journal opens once it is saved.
+  if (!(await commander.flush())) { if (!commander.stale) unsavedTownModal(() => storyJournal(), 'storage.unsaved.leave'); else storageStatus(); return; }
+  if (!inTown) return;
+  // The Journal is Story: from a Raid or Bell Trials route (or the title screen over one) it switches to Story properly, so the profile, the
+  // mode and the visible route agree (a Story profile left in a challenge mode would be saved over the Crystal bank at the next departure).
   if (commander.document && commander.mode !== 'story') {
-    commander.mode = 'story';
-    commander.document.activeMode = 'story';
-    profile = commander.select(commander.document, 'story');
+    activateCommander(commander.document, 'story', false);
+    showTown(modeForTownTab(townState.tab, 'story') === 'story' ? townState.tab : 'camp');
   }
-  if (!inTown || !(await commander.flush())) return;
  const state=profile.narrative??{};
  const scenes=STORY_CHOICES.filter(s=>choiceOpen(s,profile.cleared));
  const finished=CAMPAIGN.every((_,i)=>profile.cleared.includes(i));
@@ -2394,21 +2466,51 @@ async function storyJournal() {
   if(narrativeChoice(profile.narrative,button.dataset.storyChoice!,button.dataset.storyOption!,profile.cleared)){ await persist(); await storyJournal(); }
  });
 }
-const hasProgress = (p: Profile) => p.cleared.length > 0 || p.roster.length > 3 || p.gold !== createProfile().gold;
+function hasProgress(p: Profile) { return p.cleared.length > 0 || p.roster.length > 3 || p.gold !== createProfile().gold; }
 const progressSummary = (p: Profile) => ({ ch: p.cleared.length, gold: p.gold, heroes: p.roster.length });
 /** Import a downloaded backup as a new Commander (fresh id, three-file limit). It keeps its Crystal bank only when that cannot duplicate one: no Commander here came from the same file (a legacy backup: no Commander at all). */
 async function importSave(file: File, documents: CommanderDocument[]) {
   if (documents.length >= 3) throw new CommanderError('import-full', 'All three Commander files are in use.');
   const imported = commanderFromBackup(await file.text().catch(() => ''), { id: globalThis.crypto?.randomUUID?.() ?? `commander-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, name: t('profiles.legacy.name'), timestamp: Date.now() });
   if (!imported) throw new CommanderError('import-invalid', 'This file is not a Gridbound save backup.');
-  if (imported.sourceId ? documents.some(doc => doc.commanderId === imported.sourceId) : documents.length > 0) { imported.document.shared.bankCrystal = 0; imported.document.shared.challengeUnlocks = []; }
-  await leaveSafely(() => creatingCommander(async () => { activateCommander(await commander.create(imported.document.name, imported.document)); }));
+  // A copy next to its source (or a legacy backup next to any Commander) keeps the progress but not a second bank: it is named as a copy,
+  // and the dialog says where the Crystal and relics stayed, so restoring a backup never looks like losing them.
+  const original = imported.document.name, stripped = imported.sourceId ? documents.some(doc => doc.commanderId === imported.sourceId) : documents.length > 0;
+  if (stripped) { imported.document.shared.bankCrystal = 0; imported.document.shared.challengeUnlocks = []; imported.document.name = t('profiles.import.copyName', { name: original }).slice(0, 32); }
+  const source = imported.sourceId ? documents.find(doc => doc.commanderId === imported.sourceId)?.name : undefined;
+  await leaveSafely(() => creatingCommander(async () => { activateCommander(await commander.create(imported.document.name, imported.document)); }, stripped ? t(source ? 'profiles.import.bankStays' : 'profiles.import.bankNone', { name: source ?? original }) : undefined));
 }
-/** Creating a Commander file: a 'Saving…' dialog stays up until the new file is active (so a late activation never pulls the player off another screen) and shows the error if creation fails. */
-async function creatingCommander(task: () => Promise<void>) {
+/** Creating a Commander file: a 'Saving…' dialog stays up until the new file is active (so a late activation never pulls the player off another screen) and shows the error if creation fails. `done`: a note shown once it succeeds (the dialog then stays open). */
+async function creatingCommander(task: () => Promise<void>, done?: string) {
   openModal(`<h2 id="modal-title">${t('profiles.title')}</h2><p id="creating-status">${t('storage.saving')}</p><p id="profile-error" role="status"></p><button data-close class="btn">${t('common.close')}</button>`);
-  try { await task(); closeWithoutResume(); }
+  try { await task(); if (done && modal.open) openModal(`<h2 id="modal-title">${t('profiles.import.done')}</h2><p data-import-note>${escapeUI(done)}</p><button data-close class="btn primary">${t('common.close')}</button>`, false); else closeWithoutResume(); }
   catch (error) { if (modal.open && document.getElementById('profile-error')) { console.warn('Commander storage:', error); $('creating-status').textContent = t('result.unsaved.title'); $('profile-error').textContent = errorText(error); } else storageError(error); }
+}
+/** What loading a slot would bring back, in words: Story progress (chapters, gold, strongest heroes), a Raid contract and party, or a Bell Trials build and best floor, plus when it was saved. */
+function slotSummary(state: unknown, savedAt: number) {
+  const rows: string[] = [];
+  if (state && typeof state === 'object') {
+    if ('cleared' in state) {
+      const story = state as { cleared: number[]; gold: number; roster: number[]; loadouts: Profile['loadouts'] };
+      const last = Math.max(-1, ...story.cleared);
+      rows.push(t('profiles.preview.chapters', { n: story.cleared.length, total: CAMPAIGN.length }) + (CAMPAIGN[last] ? ` · ${CAMPAIGN[last].name}` : ''));
+      rows.push(t('profiles.preview.gold', { n: story.gold }));
+      const top = story.roster.filter(id => ROSTER[id]).map(id => ({ id, level: heroProgress(story.loadouts[id]?.xp).level })).sort((a, b) => b.level - a.level || a.id - b.id).slice(0, 3);
+      rows.push(t('profiles.preview.heroes', { n: story.roster.length, list: top.map(h => `${ROSTER[h.id].name} LV ${h.level}`).join(', ') }));
+    } else if ('bestFloor' in state) {
+      const rogue = state as { bestFloor: number; build?: { recruits?: { classId: keyof typeof KITS }[] } };
+      rows.push(t('profiles.preview.floor', { n: rogue.bestFloor }));
+      const party = (rogue.build?.recruits ?? []).map(r => KITS[r.classId]?.name).filter(Boolean);
+      if (party.length) rows.push(t('profiles.preview.party', { list: party.join(', ') }));
+    } else {
+      const raid = state as { contract?: { bossId: string; tier: RaidTier }; build?: { slots?: { heroId: number }[] } };
+      if (raid.contract) rows.push(t('profiles.preview.raid', { name: ENEMIES[raid.contract.bossId]?.name ?? '?', tier: t(`raid.tier.${raid.contract.tier}` as never) }));
+      const party = (raid.build?.slots ?? []).map(slot => ROSTER[slot.heroId]?.name).filter(Boolean);
+      if (party.length) rows.push(t('profiles.preview.party', { list: party.join(', ') }));
+    }
+  }
+  if (savedAt) rows.push(t('profiles.preview.saved', { time: fmtDateTime(savedAt) }));
+  return `<ul class="slot-summary">${rows.map(row => `<li>${escapeUI(row)}</li>`).join('')}</ul>`;
 }
 async function profilesMenu() {
   openModal(`<h2 id="modal-title">${t('profiles.title')}</h2><p>${t('profiles.loading')}</p>`);
@@ -2422,11 +2524,15 @@ async function profilesMenu() {
     // No Commander holds the live progress (migration pending or failed, or a protected legacy save): keeping it is the primary action.
     const unheld = !current, full = documents.length >= 3;
     const slots = current ? (commander.mode === 'story' ? current.story : commander.mode === 'raid' ? current.raid : current.rogue).slots : [];
+    // The old save is read when the preview opens and again on confirm, never from the page-load snapshot.
+    const rawV3 = () => { try { return store.getItem(SAVE_KEY); } catch { return null; } };
+    // 'Retry save' only when a save failed or a result waits to be saved; 'Old save' only when there is an old save to look at.
+    const retryable = commander.failed || pendingSettlement, legacyHere = Boolean(rawV3());
     openModal(`<h2 id="modal-title">${t('profiles.title')}</h2><p class="hint">${t('profiles.intro')}</p>
-      <div class="save-files">${documents.map((doc,index) => `<div class="save-file ${current?.commanderId === doc.commanderId ? 'current' : ''}"><div><b>${escapeUI(doc.name)}</b><small>${t('profiles.file', { ch: doc.story.slots[3].state?.cleared.length ?? 0, crystal: doc.shared.bankCrystal, rev: doc.revision })}</small></div><button data-commander="${index}" class="btn">${current?.commanderId === doc.commanderId ? t('profiles.current') : t('profiles.switch')}</button></div>`).join('') || (unheld ? '' : `<p>${t('profiles.empty')}</p>`)}</div>
+      <div class="save-files">${documents.map((doc,index) => `<div class="save-file ${current?.commanderId === doc.commanderId ? 'current' : ''}"><div><b>${escapeUI(doc.name)}</b><small>${t('profiles.file', { ch: doc.story.slots[3].state?.cleared.length ?? 0, total: CAMPAIGN.length, crystal: doc.shared.bankCrystal })}</small></div><button data-commander="${index}" class="btn">${current?.commanderId === doc.commanderId ? t('profiles.current') : t('profiles.switch')}</button></div>`).join('') || (unheld ? '' : `<p>${t('profiles.empty')}</p>`)}</div>
       <label class="name-field">${t('profiles.name')} <input id="commander-name" maxlength="32" value="${escapeUI(current?.name ?? t('profiles.default.name'))}"></label>
       ${unheld ? `<p class="hint" id="continue-summary">${t('profiles.continue.summary', progressSummary(profile))}</p>` : ''}
-      <div class="departure-actions">${unheld ? `<button id="continue-mine" class="btn primary" ${full ? 'disabled' : ''}>${t('profiles.continue.mine')}</button>` : ''}<button id="new-commander" class="btn" ${full ? 'disabled' : ''}>${t('profiles.new')}</button>${current ? `<button id="rename-commander" class="btn">${t('profiles.rename')}</button><button id="export-commander" class="btn">${t('profiles.export')}</button><button id="delete-commander" class="btn danger">${t('profiles.delete')}</button><button id="save-retry" class="btn">${t('result.unsaved.retry')}</button>` : ''}<button id="legacy-preview" class="btn">${t('profiles.legacy')}</button><button id="import-save-button" class="btn" ${full ? 'disabled' : ''}>${t('profiles.import')}</button><input id="import-save" type="file" accept="application/json,.json" hidden></div>
+      <div class="departure-actions">${unheld ? `<button id="continue-mine" class="btn primary" ${full ? 'disabled' : ''}>${t('profiles.continue.mine')}</button>` : ''}<button id="new-commander" class="btn" ${full ? 'disabled' : ''}>${t('profiles.new')}</button>${current ? `<button id="rename-commander" class="btn">${t('profiles.rename')}</button><button id="export-commander" class="btn">${t('profiles.export')}</button><button id="delete-commander" class="btn danger">${t('profiles.delete')}</button>${retryable ? `<button id="save-retry" class="btn">${t('result.unsaved.retry')}</button>` : ''}` : ''}${legacyHere ? `<button id="legacy-preview" class="btn">${t('profiles.legacy')}</button>` : ''}<button id="import-save-button" class="btn" ${full ? 'disabled' : ''}>${t('profiles.import')}</button><input id="import-save" type="file" accept="application/json,.json" hidden></div>
       ${current ? `<h3 class="subheading">${t('profiles.slots', { mode: modeName(commander.mode) })}</h3><p class="hint">${t('profiles.slots.hint')}</p><div class="save-files">${slots.map(slot => `<div class="save-file"><div><b>${slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) })}</b><small>${t(`profiles.status.${slot.status}` as never)} · ${slot.savedAt ? fmtDateTime(slot.savedAt) : t('profiles.emptyslot')}</small></div><span>${slot.slotId !== 'auto' ? `<button data-save-slot="${slot.slotId}" class="btn">${t('profiles.save')}</button>` : ''}<button data-load-slot="${slot.slotId}" class="btn" ${!slot.state ? 'disabled' : ''}>${t('profiles.load')}</button></span></div>`).join('')}</div><button id="continue-latest" class="btn primary">${t('profiles.continue')}</button>` : ''}
       <p id="profile-error" role="status">${commander.error || commander.repository?.warning ? escapeUI(errorText(commander.error || commander.repository?.warning)) : ''}</p><button data-close class="btn">${t('common.close')}</button>`);
     const attempt = async (task: () => Promise<void>) => { try { await task(); } catch(error) { console.warn('Commander storage:', error); $('profile-error').textContent = errorText(error); } };
@@ -2445,16 +2551,14 @@ async function profilesMenu() {
     $('import-save').onchange = () => { const file = $<HTMLInputElement>('import-save').files?.[0]; if (file) void attempt(() => importSave(file, documents)); };
     $('rename-commander')?.addEventListener('click', () => { const name = $<HTMLInputElement>('commander-name').value.trim().slice(0,32); void attempt(async () => { if (!name) throw new CommanderError('name-required', 'Enter a name.'); if (await persist('auto', doc => { doc.name=name; })) await profilesMenu(); }); });
     $('export-commander')?.addEventListener('click',exportCommander);
-    $('save-retry')?.addEventListener('click', () => { if (pendingSettlement) { presentingResult=false; result(); } else void persist().then(() => profilesMenu()); });
+    $('save-retry')?.addEventListener('click', () => { if (pendingSettlement) retryResultSave(); else void persist().then(() => profilesMenu()); });
     $('delete-commander')?.addEventListener('click', () => {
       openModal(`<h2 id="modal-title">${t('profiles.delete.title', { name: escapeUI(current!.name) })}</h2><p>${t('profiles.delete.copy', { crystal: current!.shared.bankCrystal, receipts: current!.shared.settlementReceipts.length })}</p><input id="delete-word" aria-label="DELETE"><button id="delete-confirm" class="btn danger" disabled>${t('profiles.delete.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
       $('delete-word').oninput = () => { $<HTMLButtonElement>('delete-confirm').disabled = $<HTMLInputElement>('delete-word').value !== 'DELETE'; };
       // Always-on Commander: the next file takes over, or a fresh one when the last is deleted (gridbound.v3 is never overwritten with a fresh profile).
       $('delete-confirm').onclick = async () => { if (!inTown || pendingSettlement || commander.stale) return; try { await commander.flush(); await commander.repository!.remove(current!.commanderId,commander.document!.revision); commander.document=undefined; profile=createProfile(); const rest=(await commander.open()).sort((a,b)=>b.lastPlayed-a.lastPlayed); activateCommander(rest[0] ?? await commander.create(t('profiles.default.name'), createCommanderDocument(createProfile(), t('profiles.default.name')))); await profilesMenu(); } catch(error) { storageError(error); } };
     });
-    // The old save is read when the preview opens and again on confirm, never from the page-load snapshot.
-    const rawV3 = () => { try { return store.getItem(SAVE_KEY); } catch { return null; } };
-    $('legacy-preview').onclick = () => {
+    if (legacyHere) $('legacy-preview').onclick = () => {
       const old = loadSave(store), raw = rawV3();
       openModal(`<h2 id="modal-title">${t('profiles.legacy.title')}</h2><p>${t('profiles.legacy.copy', { ch: old.profile.cleared.length, gold: old.profile.gold, roster: old.profile.roster.length })}</p><p>${old.warning ? escapeUI(errorText(old.warning)) : ''}</p><button id="legacy-export" class="btn" ${raw ? '' : 'disabled'}>${t('profiles.legacy.export')}</button><button id="legacy-confirm" class="btn primary" ${!raw || old.readOnly || full ? 'disabled' : ''}>${t('profiles.legacy.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
       $('legacy-export').onclick = () => download(rawV3() ?? '', 'Gridbound-original-v3.json');
@@ -2463,7 +2567,7 @@ async function profilesMenu() {
     modal.querySelectorAll<HTMLElement>('[data-save-slot]').forEach(button => button.onclick = () => { void attempt(async () => { if (!inTown && encounter && !pendingSettlement) { const frozen=structuredClone(encounter); await persist(button.dataset.saveSlot as SlotId, doc => { const state=commander.mode==='story'?doc.story:commander.mode==='raid'?doc.raid:doc.rogue; const auto=state.slots[3]; const index=state.slots.findIndex(slot=>slot.slotId===button.dataset.saveSlot); state.slots[index]=structuredClone({...auto,slotId:button.dataset.saveSlot as SlotId}); doc.encounters ??={}; doc.encounters[commander.mode]=frozen; }); } else await persist(button.dataset.saveSlot as SlotId); sound.play('save'); await profilesMenu(); }); });
     modal.querySelectorAll<HTMLElement>('[data-load-slot]').forEach(button => button.onclick = () => {
       const slot=slots.find(item=>item.slotId===button.dataset.loadSlot)!;
-      openModal(`<h2 id="modal-title">${t('profiles.preview', { slot: slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) }) })}</h2><pre class="slot-preview">${escapeUI(JSON.stringify(slot.state,null,2))}</pre><p class="hint">${t('profiles.preview.hint')}</p><button id="load-confirm" class="btn primary">${t('profiles.load.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button><p id="load-error" role="status"></p>`);
+      openModal(`<h2 id="modal-title">${t('profiles.preview', { slot: slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) }) })}</h2>${slotSummary(slot.state, slot.savedAt)}<p class="hint">${t('profiles.preview.hint')}</p><button id="load-confirm" class="btn primary">${t('profiles.load.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button><p id="load-error" role="status"></p>`);
       $('load-confirm').onclick = async () => { if (!inTown || pendingSettlement) { $('load-error').textContent=t('profiles.load.blocked'); return; } try { profile=await commander.loadSlot(slot.slotId); activateCommander(commander.document!,commander.mode); closeWithoutResume(); } catch(error) { console.warn('Commander storage:', error); $('load-error').textContent=errorText(error); } };
     });
     $('continue-latest')?.addEventListener('click', () => { const savedEncounter=commander.document?.encounters?.[commander.mode]; if (!savedEncounter) { $('profile-error').textContent=t('profiles.nocheckpoint'); return; } closeWithoutResume(); void restoreEncounter(savedEncounter); });
@@ -2511,7 +2615,9 @@ document.addEventListener('pointerdown', event => {
 }, true);
 const titleScreenEl = $('title-screen');
 const leavePressPhase = () => { if (!titleScreenEl.classList.contains('press-phase')) return false; titleScreenEl.classList.remove('press-phase'); sound.unlock(); sound.play('confirm'); requestAnimationFrame(() => $('title-enter').focus({ preventScroll: true })); return true; };
-titleScreenEl.addEventListener('pointerdown', event => { if (titleScreenEl.classList.contains('press-phase')) { event.preventDefault(); leavePressPhase(); } });
+// PRESS START ends on the click itself, not on pointerdown: a touch's compatibility click lands where the finger was, and leaving on
+// pointerdown would reveal the menu (Journal, language buttons) under the finger in time for that click to press it.
+titleScreenEl.addEventListener('click', event => { if (leavePressPhase()) { event.preventDefault(); event.stopPropagation(); } }, true);
 $('retreat').addEventListener('click', () => navigateTown(battle.mode === 'dungeon' ? 'dungeon' : 'camp'));
 $('battle-screen').addEventListener('click', event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-run-buy]');

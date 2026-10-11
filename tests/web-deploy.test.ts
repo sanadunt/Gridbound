@@ -1,6 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { loadConfigFromFile } from 'vite';
 
 test('managed Vite deployment explicitly emits the dist directory configured in hPanel', async () => {

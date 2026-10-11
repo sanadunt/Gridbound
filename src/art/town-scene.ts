@@ -70,7 +70,6 @@ function seeded(seed: number) {
 }
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
 const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
-const hex = (h: string): RGB => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 
 // ---------------------------------------------------------------- reusable props
 function pine(c: C, cx: number, base: number, h: number, pal = F, outline = true) {

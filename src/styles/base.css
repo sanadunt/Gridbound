@@ -113,6 +113,8 @@ b, strong { font-weight: 600; }
 .btn.on, .btn[aria-pressed="true"] { border-color: var(--gold-border); background: var(--gold-bg); color: var(--gold); }
 .btn:disabled, .icon-button:disabled, .tabs > button:disabled, .menu-item:disabled, .page-controls button:disabled { opacity: 0.45; filter: grayscale(0.6); cursor: default; }
 .icon-button { min-width: var(--touch); padding: 6px 8px; font-family: var(--pixel); font-size: 11px; }
+/* Glyph buttons (settings ⚙, sound ♫) use the body font at icon size: the pixel font draws them at about 10px. */
+.header-tools #settings, .header-tools #sound { font-family: var(--text); font-size: 22px; line-height: 1; }
 
 /* Menus with the ▶ cursor */
 .menu-list { display: flex; flex-direction: column; gap: 4px; }
@@ -260,7 +262,7 @@ dialog#modal > .btn { width: 100%; }
 .save-file small { display: block; color: var(--ink-dim); }
 .save-file > span { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .name-field { margin: 10px 0; }
-.slot-preview { max-height: 14rem; overflow: auto; white-space: pre-wrap; font-size: 11px; background: var(--inset); padding: 8px; }
+.slot-summary { margin: 8px 0; padding: 8px 10px 8px 26px; border-radius: var(--radius); background: var(--inset); line-height: 1.5; }
 .journal-scene, .journal-chronicle { margin: 10px 0; padding-top: 8px; border-top: 1px solid var(--line); }
 .journal-outcome { color: var(--gold); }
 .journal-entry-card { margin: 4px 0; }

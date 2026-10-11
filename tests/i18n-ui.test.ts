@@ -126,7 +126,7 @@ test('WP12 the Indonesian glossary holds in UI strings, content text and runtime
   const broken = ID_GLOSSARY.flatMap(rule => strings.filter(([key, text]) => rule.banned.test(text) && !rule.allow?.test(key)).map(([key, text]) => `${rule.term} → ${rule.use}: ${key}: ${text.slice(0, 80)}`));
   assert.deepEqual(broken, []);
   // A rule that would never fire is not a rule: every banned form is still caught.
-  for (const [rule, sample] of [[0, 'ACT 2'], [1, '+1 Potion'], [2, 'Ninefold Dawn'], [3, 'Tampilan battle'], [9, 'ritual all-grid'], [11, 'kalian kabur']] as const) assert.match(sample, ID_GLOSSARY[rule].banned);
+  for (const [rule, sample] of [[0, 'ACT 2'], [1, '+1 Potion'], [2, 'Ninefold Dawn'], [3, 'Tampilan battle'], [9, 'ritual all-grid'], [11, 'kalian kabur'], [12, 'per hero per floor'], [13, 'Power party 5.834']] as const) assert.match(sample, ID_GLOSSARY[rule].banned);
   assert.doesNotMatch('Battle Hymn seluruh party', ID_GLOSSARY[3].banned, 'skill names stay English');
 });
 

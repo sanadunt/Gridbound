@@ -23,7 +23,7 @@ const KINDS: DungeonNodeKind[] = ['battle', 'elite', 'event', 'treasure', 'camp'
 /** `outcome`: what the last choice did; `letter`: a letter id found by a lore choice (`dungeon.letter.<id>`). */
 export function dungeonScene(p: Profile, outcome?: string, modes = '', letter?: string): string {
   const run = p.journey.run;
-  return `<section class="dungeon-scene" aria-labelledby="dungeon-title"><h1 id="dungeon-title" class="sr-only">${t('route.dungeon')}</h1>${run?.status === 'active' ? '' : modes}${run ? run.status === 'active' ? activeRun(p, run, outcome, letter) : finishedRun(run) : depthPicker(p)}</section>`;
+  return `<section class="dungeon-scene" aria-labelledby="dungeon-title"><h1 id="dungeon-title" class="sr-only">${t('route.dungeon')}</h1>${run?.status === 'active' ? '' : modes}${run ? run.status === 'active' ? activeRun(run, outcome, letter) : finishedRun(run) : depthPicker(p)}</section>`;
 }
 
 function depthPicker(p: Profile): string {
@@ -95,7 +95,7 @@ function roomPanel(run: DungeonRun, outcome?: string, letter?: string): string {
   return `<small>${t(`dungeon.kind.${node.kind}` as StringKey)}</small><h3>${t('dungeon.cleared.room')}</h3>${done}<p class="hint">${t('dungeon.pick')}</p>`;
 }
 
-function activeRun(p: Profile, run: DungeonRun, outcome?: string, letter?: string): string {
+function activeRun(run: DungeonRun, outcome?: string, letter?: string): string {
   const def = depthDef(run.depth);
   const party = run.party.filter(id => ROSTER[id]).map(id => {
     const ratio = run.hp[id] ?? 0;

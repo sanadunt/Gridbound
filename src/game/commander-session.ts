@@ -39,12 +39,16 @@ export class CommanderSession {
   }
 
   select(document: CommanderDocument, mode: CommanderMode = document.activeMode) {
+    // Re-selecting the file already open (a mode switch) keeps a stale tab read-only and a failed save marked failed: only another file, or a newer revision of this one, starts clean.
+    const same = this.document?.commanderId === document.commanderId && document.revision <= this.document.revision;
     this.document = structuredClone(document);
     this.mode = mode;
-    this.stale = false;
-    this.dirty = false;
-    this.failed = false;
-    this.error = this.errorDetail = '';
+    if (!same) {
+      this.stale = false;
+      this.dirty = false;
+      this.failed = false;
+      this.error = this.errorDetail = '';
+    }
     return materializeProfile(this.document, mode, 'auto');
   }
 

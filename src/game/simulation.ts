@@ -26,8 +26,9 @@ export const RAID_HP=1.1,RAID_DMG=1.1,RAID_PARTY_DMG=.5,ENDLESS_HP=1300,ENDLESS_
 // Roguelike floors that pay bank Crystal (1 to ENDLESS_EARLY_FLOORS) hit ENDLESS_EARLY_DMG times harder, fading out over the next
 // three floors, so the rewarded floors carry real risk while the deep floors keep their curve.
 export const ENDLESS_EARLY_DMG=1.15,ENDLESS_EARLY_FLOORS=9;
-// Contract tiers scale the raid boss on top of the story curve; sandbox practice uses its own sliders instead.
-export const RAID_TIER_SCALE:Record<RaidTier,{hp:number;dmg:number}>={bronze:{hp:1,dmg:1},silver:{hp:1.15,dmg:1.1},gold:{hp:1.3,dmg:1.2}};
+// Contract tiers scale the raid boss on top of the story curve; sandbox practice uses its own sliders instead. Bronze is the plain hunt; Silver and Gold hit much harder (tuned with scripts/balance.ts: the expert still wins every Gold raid,
+// a casual player on its end-of-campaign party wins most Silver and about 60% of Gold raids, with potions spent). More HP would only push fights into the enrage.
+export const RAID_TIER_SCALE:Record<RaidTier,{hp:number;dmg:number}>={bronze:{hp:1,dmg:1},silver:{hp:1.15,dmg:1.5},gold:{hp:1.3,dmg:1.9}};
 // Pact modifiers: RM01 cuts barrier gains, RM03 adds an aftershock after each all-grid impact, RM05 summons a wave on each phase change.
 export const RM01_BARRIER=.75;
 // Roguelike relics bought with bank Crystal.
@@ -54,6 +55,8 @@ export const SUPPORT_KINDS:readonly string[]=['shield','partyshield','heal','reg
 export const CONTROL_MIN=3,CONTROL_SHARE=.4,CHORUS_BUFF=1,CHORUS_EVERY=4;
 // Party Guard lasts GUARD_DURATION seconds; the soft enrage multiplies enemy damage by ENRAGE_DMG after ENRAGE_AT seconds of a stage (warned at ENRAGE_WARN).
 export const GUARD_DURATION=2.8,ENRAGE_WARN=135,ENRAGE_AT=150,ENRAGE_DMG=1.7;
+// Guard's cooldown (the Bell boon shortens it); a tap cuts a hero's cooldown by TAP_CUT (TAP_SYNC_CUT for a two-finger sync tap), repeats within TAP_REPEAT seconds are ignored.
+export const GUARD_COOLDOWN=18,GUARD_COOLDOWN_BELL=15,TAP_CUT=.64,TAP_SYNC_CUT=.88,TAP_REPEAT=.11;
 /** The telegraph name an enemy gives an intent. The map and bestiary chips show it too, so a preview and the battle use one name. */
 export const threatName=(enemyId:string,intent:Intent)=>intent==='weakest'?'HUNT THE WOUNDED':intent==='strongest'?'BREAK THE STRONG':intent==='front'?'CRUSHING FRONT':intent==='breath'?'LANE ERUPTION':intent==='silence'?'TOLLING SILENCE':intent==='mend'?'MENDING RITE':intent==='all'?(enemyId.startsWith('dragon')?'EMERALD CATACLYSM':'WORLDLESS RITUAL'):enemyId==='spider'?'VENOM WEB':'FALLING SHARDS';
 /** The counter family of an intent, the tag its counter line starts with (MARKED / GROUND / ALL GRID / CHANNEL). */
@@ -212,8 +215,8 @@ export class Battle {
   private cooldown(h:Hero) { return KITS[h.classId].skills[h.stance].cooldown/(this.tempo*h.gearTempo*(h.talents.includes('focus')?1.1:1)*(h.talents.includes('focus-2')?1.08:1)*(JOBS[h.job??'']?.effect==='time'?1.15:1)); }
   tap(id:number,sync=false) {
     const h=this.hero(id);
-    if(!h||h.hp<=0||this.status!=='fighting'||h.moveLock>0||this.time-h.lastTap<.11)return false;
-    const amount=((sync?.88:.64)+(h.talents.includes('momentum')?.2:0)+h.perks.tapBonus+(h.equipment.tapBonus??0))*(h.fatigue>70?.14:h.fatigue>40?.5:1);
+    if(!h||h.hp<=0||this.status!=='fighting'||h.moveLock>0||this.time-h.lastTap<TAP_REPEAT)return false;
+    const amount=((sync?TAP_SYNC_CUT:TAP_CUT)+(h.talents.includes('momentum')?.2:0)+h.perks.tapBonus+(h.equipment.tapBonus??0))*(h.fatigue>70?.14:h.fatigue>40?.5:1);
     h.remaining=Math.max(0,h.remaining-amount);h.fatigue=Math.min(100,h.fatigue+5.5);h.lastTap=this.time;this.taps++;
     this.gainResolve(.3);
     if(this.boons.includes('chorus')&&this.lastTapped!==id&&this.time-(this.chorusAt[id]??-99)>=CHORUS_EVERY){h.buff=Math.max(h.buff,CHORUS_BUFF);this.chorusAt[id]=this.time;}
@@ -236,7 +239,7 @@ export class Battle {
     this.relocations++;this.emit({type:'move',source:id,slot,targets:other?[other.id]:[],text:this.status==='fighting'?`+${penalty}s`:'FORMATION'});return true;
   }
   potion() { if(this.status!=='fighting'||this.potions<=0)return false;this.potions--;for(const h of this.living())this.heal(h,h.maxHp*POTION_HEAL);this.emit({type:'banner',kind:'potion',text:'MENDING MIST'});return true; }
-  guard() { if(this.status!=='fighting'||this.guardCooldown>0)return false;this.guardLeft=GUARD_DURATION;this.guardCooldown=this.boons.includes('bell')?15:18;if(this.boons.includes('bell'))this.gainResolve(18);this.emit({type:'shield',text:'PARTY GUARD · 65% REDUCTION',targets:this.living().map(h=>h.slot)});return true; }
+  guard() { if(this.status!=='fighting'||this.guardCooldown>0)return false;this.guardLeft=GUARD_DURATION;this.guardCooldown=this.boons.includes('bell')?GUARD_COOLDOWN_BELL:GUARD_COOLDOWN;if(this.boons.includes('bell'))this.gainResolve(18);this.emit({type:'shield',text:'PARTY GUARD · 65% REDUCTION',targets:this.living().map(h=>h.slot)});return true; }
   ultimate() {
     if(this.status!=='fighting'||this.resolve<100)return false;this.resolve=0;
     this.living().forEach(h=>{this.heal(h,h.maxHp*ULT_HEAL*this.power);this.shield(h,h.maxHp*ULT_SHIELD);});

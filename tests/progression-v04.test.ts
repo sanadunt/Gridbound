@@ -5,6 +5,7 @@ import { heroProgress, xpForLevel } from '../src/game/levels';
 import { Battle } from '../src/game/simulation';
 import { QUESTS, questProgress } from '../src/game/quests';
 import { TALENTS } from '../src/game/profile';
+import { GEAR } from '../src/game/jobs';
 
 test('independent hero XP caps safely and affects actual combat HP and power', () => {
   const p=createProfile();
@@ -51,6 +52,17 @@ test('quests have measurable objectives, explicit claims, chain gates and no dou
   const before=p.gold;assert.ok(claimQuest(p,q.id,0));assert.ok(p.gold>before);
   const saved=structuredClone(p);assert.equal(claimQuest(p,q.id,0),false);assert.deepEqual(p,saved);
   assert.equal(claimQuest(p,'unknown',0),false);
+});
+test('a quest gear reward goes to the named hero; one the hero already owns is sold for its price instead of vanishing', () => {
+  const p=createProfile(),q=QUESTS.find(q=>q.id==='hunt-goblin')!,gear=GEAR.find(g=>g.id===q.gear)!;
+  p.ledger.enemies.goblin=1;p.loadouts[0].inventory=[gear.id];
+  const before=p.gold,got=claimQuest(p,q.id,0);
+  assert.deepEqual(got,{hero:0,gear:gear.id,refund:gear.cost});
+  assert.equal(p.gold,before+q.gold+gear.cost,'the duplicate is refunded');
+  assert.deepEqual(p.loadouts[0].inventory,[gear.id]);
+  const other=createProfile(),wolf=QUESTS.find(q=>q.id==='hunt-wolf')!;other.ledger.enemies.wolf=1;
+  assert.deepEqual(claimQuest(other,wolf.id,4),{hero:4,gear:wolf.gear,refund:0});
+  assert.ok(other.loadouts[4].inventory?.includes(wolf.gear!),'the chosen recipient receives the gear');
 });
 test('normalization drops impossible points, wrong-class nodes and invalid quest records', () => {
   const p=createProfile();p.loadouts[0].talents=['assault-crown','rogue-1'];

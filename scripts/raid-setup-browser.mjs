@@ -70,6 +70,10 @@ await withBrowser(async browser => {
   await click('[data-raid-modifier="RM01"]');
   await wait('/Pacts 1/.test(document.querySelector("[data-raid-total]")?.textContent ?? "")');
   assert.match(await evaluate('document.querySelector("[data-raid-total]").textContent'), /Payout 45 Crystal · Gold · Pacts 1/);
+  // Which pacts pay is shown before ticking: RM02 keeps RM01 certified, RM03 would make it practice. The payout repeats under the pacts.
+  assert.equal(await evaluate('Boolean(document.querySelector("[data-raid-modifier=\\"RM02\\"]").closest("label").querySelector("[data-pact-practice]"))'), false, 'a pact that keeps the contract paid has no practice tag');
+  assert.match(await evaluate('document.querySelector("[data-raid-modifier=\\"RM03\\"]").closest("label").textContent'), /practice only/, 'a pact that would make the raid unpaid says so');
+  assert.match(await evaluate('document.querySelector("[data-raid-total-pacts]").textContent'), /Payout 45 Crystal · Gold · Pacts 1/);
   // Three pacts at most: the fourth is disabled, and an uncertified combo is practice (it still plays its pacts).
   await click('[data-raid-modifier="RM03"]');
   await wait('document.querySelector("[data-raid-modifier=\\"RM03\\"]")?.checked === true');
@@ -124,8 +128,25 @@ await withBrowser(async browser => {
   assert.ok(fight.heroes.every(h => h.power > 1.5), 'level and gear power carry into the raid');
   assert.equal(await evaluate('window.gridbound.profile().economy.commanderCrystal'), 34, 'the tonic costs 6 bank Crystal');
   await wait(`${bankOf(id)}.then(bank => bank === 34)`);
+  // A suspended raid: the setup names it, locks its controls, and Depart resumes it; Abandon (confirmed) opens the setup again.
+  await click('#start');
+  await wait('window.gridbound.battle.status === "fighting"');
+  await click.retreat();
+  await wait('Boolean(document.querySelector("dialog[open] #suspend-run"))');
+  await click('#suspend-run');
+  await wait('window.gridbound.inTown === true');
+  await click.nav('raid');
+  await wait('Boolean(document.querySelector("[data-suspended-run=raid]"))');
+  assert.match(await evaluate('document.querySelector("[data-suspended-run=raid]").textContent'), /Gold hunt against .* is suspended/);
+  assert.match(await evaluate('document.querySelector(".secondary-scene [data-depart=raid]").textContent'), /Resume hunt: .* · Gold/);
+  assert.equal(await evaluate('[...document.querySelectorAll(".setup-lock select, .setup-lock input")].every(el => el.matches(":disabled"))'), true, 'the setup controls are locked');
+  await click('[data-abandon-run="raid"]');
+  await wait('Boolean(document.querySelector("dialog[open] #abandon-suspended"))');
+  await click('#abandon-suspended');
+  await wait('!document.querySelector("[data-suspended-run]") && /Hunt /.test(document.querySelector(".secondary-scene [data-depart=raid]")?.textContent ?? "")');
+  assert.equal(await evaluate('Boolean(document.querySelector(".setup-lock"))'), false, 'the setup opens again');
   assert.deepEqual(errors, [], 'no uncaught errors');
-  console.log('PASS raid setup: story heroes, locked quarries, 9 jobs, hero picker, variant chips, pact total, Bell Tonic');
+  console.log('PASS raid setup: story heroes, locked quarries, 9 jobs, hero picker, variant chips, pact total, practice tags, Bell Tonic, suspended run');
 }, { width: 390, height: 844, mobile: true });
 
 for (const view of [{ width: 390, height: 844, mobile: true }, { width: 1440, height: 900 }]) await withBrowser(async browser => {

@@ -51,7 +51,7 @@
 .talent-flow-label { font-family: var(--pixel); font-size: 7px; color: var(--ink-dim); text-transform: uppercase; }
 .talent-flow-cards { display: flex; flex-wrap: wrap; gap: 6px; }
 .talent-flow-node { flex: 1 1 110px; display: flex; flex-direction: column; align-items: flex-start; min-height: 46px; padding: 4px 8px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink); text-align: left; }
-.talent-flow-node b { font-weight: 600; font-size: 14px; }
+.talent-flow-node b { font-weight: 600; font-size: 14px; min-width: 0; max-width: 100%; overflow-wrap: anywhere; hyphens: auto; }
 .talent-flow-node span { font-size: 12px; color: var(--ink-dim); }
 .talent-flow-node.learned { border-color: var(--hp); }
 .talent-flow-node.learned span { color: var(--hp); }
@@ -143,6 +143,7 @@
 .raid-modifiers { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .raid-modifier { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; padding: 4px 0; }
 .raid-modifier small { display: block; color: var(--ink-dim); }
+.raid-modifier input { flex: 0 0 auto; }
 .raid-sandbox label { margin: 8px 0; display: grid; grid-template-columns: 1fr 50px; gap: 4px 8px; align-items: center; }
 .raid-sandbox label input { grid-column: 1 / -1; }
 
@@ -324,3 +325,10 @@
 .status-item b { display: block; font-size: 13px; color: var(--rarity, var(--ink)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .status-item.empty b { color: var(--ink-dim); }
 .status-item .skill-emblem { width: 36px; height: 36px; }
+
+/* A suspended Raid / Bell Trials run: its card, and the setup shown but locked until it is resumed or abandoned. */
+.resume-card { border-color: var(--gold-border); }
+.resume-card p { margin: 4px 0 8px; }
+.setup-lock { display: contents; border: 0; margin: 0; padding: 0; min-width: 0; }
+.setup-lock[disabled] > * { opacity: .55; }
+.pact-practice { margin-left: 4px; font-style: normal; font-size: 11px; font-weight: 600; color: var(--ink-dim); text-transform: uppercase; letter-spacing: .5px; }

@@ -8,17 +8,17 @@ A mobile-friendly real-time grid RPG with an authored four-act campaign and repe
 
 ## 2. Full playable loop
 
-Town → assign two skills, talents, job and three equipment slots → place heroes → depart → read encounter beat → Begin → waves → miniboss → boss → return with banked loot and first-clear progression. Chapters 1–4 have four stages each; chapters 5–16 have five. There are 76 encounters, not 76 unique enemy models. HP, cooldown, formation and potion attrition carry between stages; surviving heroes receive a small 8% HP breather. Downed allies remain down until town. Quitting or losing an unfinished expedition forfeits carried loot. Replaying a completed chapter grants encounter gold but not another campaign-rank bonus or recruit; hero XP is repeatable.
+Town → assign two skills, talents, job and three equipment slots → place heroes → depart → read encounter beat → Begin → waves → miniboss → boss → return with banked loot and first-clear progression. Chapters 1–4 have four stages each; chapters 5–16 have five. There are 76 encounters, not that many unique enemy models. HP, cooldowns, formation and potions carry between stages, and nothing revives a hero between stages: downed allies stay down until the chapter ends. After a defeat in battle 2 or later, Retry this battle resumes that battle's start checkpoint with the HP and potions it began with; restarting the chapter brings everyone back. Quitting or losing an unfinished expedition forfeits carried loot. Replaying a completed chapter on Normal pays the encounter gold and 30% of the chapter gold (Heroic replays pay their own first-clear reward), with no new recruit; hero XP is repeatable, scaled down for chapters far behind the frontier.
 
 ## 3. Input and pacing
 
-Tap the sprite-area button marked TAP ↓ CD. A separate small chip beneath it changes stance. At tested mobile widths the chip is 24 px high and the tap area at least 44 px high; they do not overlap. Larger skill and movement alternatives exist in the selected-character panel. Two simultaneous touches can accelerate separate heroes. Drag/swap uses atomic grid relocation with 0.9 seconds cooldown penalty, except preparation is free. Relocation talents/boons reduce that penalty. Stance switching preserves normalized cooldown progress.
+Tap a hero's grid card to speed up its cooldown. A skill chip under the portrait changes the hero's skill; on phones its tap target is 36–40 px and never covers the middle of the card. Larger skill and movement alternatives exist in the selected-character panel. Two simultaneous touches can accelerate separate heroes. Drag/swap uses atomic grid relocation with a 0.9-second cooldown penalty, except preparation is free. Relocation talents/boons reduce that penalty. Stance switching preserves normalized cooldown progress.
 
-A fresh tap removes 0.62 seconds before talents; an accepted sync tap removes 0.85. Repeats within 0.11 seconds are rejected. Fatigue reduces the bonus, encouraging rotation. The simulation ticks at 60 Hz independently of rendering. It uses seeded RNG and has terminal-state guards.
+A fresh tap removes 0.64 seconds before talents; an accepted sync tap removes 0.88. Repeats within 0.11 seconds are rejected. Fatigue reduces the bonus, encouraging rotation. The simulation ticks at 60 Hz independently of rendering. It uses seeded RNG and has terminal-state guards.
 
 ## 4. Characters and recruitment
 
-Start with Aldric, Lyra and Rowan. Additional recruits arrive on first clears of the opening four chapters, ultimately forming a nine-hero party. Recruitment assigns an unoccupied formation tile.
+Start with Aldric, Lyra and Rowan. Additional recruits arrive on chapter first clears until the roster holds fifteen heroes. The story party grows with the campaign to at most eight deployed heroes (one grid tile always stays free); a recruit joins a free party slot when there is one and otherwise waits on the bench. Heroes are placed by role: warriors and monks in front, the others behind.
 
 | Hero | Basic job | Biography |
 | --- | --- | --- |
@@ -65,7 +65,7 @@ Each basic job branches into two mutually exclusive advanced jobs at campaign ra
 
 ## 6. Active skill database
 
-Forty definitions: four foundational and four job-specific skills per basic job. Only two are equipped per hero.
+72 definitions: four foundational and four job-specific skills for each of the nine basic jobs. Only two are equipped per hero.
 
 ### Warrior
 
@@ -178,7 +178,7 @@ Forty definitions: four foundational and four job-specific skills per basic job.
 
 ## 7. Talent tree
 
-Fifty catalog nodes; thirty-four apply to each hero: fifteen retained foundational nodes, fifteen shared Assault/Bastion/Tempo nodes and four class-specific disciplines. New nodes require individual hero levels and earned skill points; some require both preceding branches. Only one of the three keystones can be held. Foundational talents remain gold-only for legacy compatibility. Respec returns both gold and spent points without resetting XP. Job advancement remains a separate campaign-rank system.
+66 catalog nodes; 34 apply to each hero: fifteen retained foundational nodes, fifteen shared Assault/Bastion/Tempo nodes and four class-specific disciplines. New nodes require individual hero levels and earned skill points; some require both preceding branches. Only one of the three keystones can be held. Foundational talents remain gold-only for legacy compatibility. Respec returns both gold and spent points without resetting XP. Job advancement remains a separate campaign-rank system.
 
 | Node | Branch/class | Hero level | Gold / SP | Prerequisite | Effect |
 | --- | --- | --- | --- | --- | --- |
@@ -251,7 +251,7 @@ Fifty catalog nodes; thirty-four apply to each hero: fifteen retained foundation
 
 ## 8. Equipment and economy
 
-Three slots: weapon, armor and charm. Forty-two items include nine original items, eighteen pieces across six sets, and fifteen class weapons across three tiers. Set effects activate at two and three correctly equipped pieces; bonuses stack. Class/level gates apply before purchase. Three Unbound set pieces are quest-only, not zero-price shop items. Buying records ownership per hero; switching an owned item is free and repeated equip cannot deduct currency twice. There are no loot boxes, random affixes or monetization. Currency is earned in encounters and banked at expedition completion. Skill/gear/job effects alter the simulation, not just labels.
+Three slots: weapon, armor and charm. 54 items include nine original items, eighteen pieces across six sets, and 27 class weapons across three tiers. Set effects activate at two and three correctly equipped pieces; bonuses stack. Class/level gates apply before purchase. Three Unbound set pieces are quest-only, not zero-price shop items. Buying records ownership per hero; switching an owned item is free and repeated equip cannot deduct currency twice. There are no loot boxes, random affixes or monetization. Currency is earned in encounters and banked at expedition completion. Skill/gear/job effects alter the simulation, not just labels. Undercroft materials refine owned gear; a quest gear reward the hero already owns is sold for its price.
 
 | Item | Slot | Cost | Effect |
 | --- | --- | --- | --- |
@@ -312,9 +312,9 @@ Three slots: weapon, armor and charm. Forty-two items include nine original item
 
 ## 9. Enemy AI and counterplay
 
-Intent selection is an authored per-archetype pattern with phase-dependent pace and seeded lane/tile choices, not a machine-learned agent. Marked weakest-target attacks choose the lowest living HP ratio. Strongest-target attacks rank living skill throughput. Their marker follows the hero until resolution; dragging does not evade a tracking attack. Front-row, lane breath and meteor attacks stay at their ground locations. Ritual attacks target all nine tiles. Guard mitigates party damage by 65% for 2.3 seconds with a 12-second cooldown. Interrupt skills can cancel an all-grid ritual; ultimate also interrupts. Shield/heal timing gives additional counterplay. Encounters enrage after 150 seconds.
+Intent selection is an authored per-archetype pattern with phase-dependent pace and seeded lane/tile choices, not a machine-learned agent. Marked weakest-target attacks choose the lowest living HP ratio. Strongest-target attacks rank living skill throughput. Their marker follows the hero until resolution; dragging does not evade a tracking attack. Front-row, lane breath and meteor attacks stay at their ground locations. Ritual attacks target all nine tiles. Guard mitigates party damage by 65% for 2.8 seconds with an 18-second cooldown. Interrupt skills can cancel an all-grid ritual; ultimate also interrupts. Shield/heal timing gives additional counterplay. Encounters enrage after 150 seconds of a stage.
 
-The twelve base silhouettes have ash/frost/auric palette variants. Ashbound variants keep the base intent order; Frostbound and Gilded variants rotate it and shorten the interval. Strength in campaign additionally comes from encounter HP and chapter scaling.
+The eighteen base silhouettes have ash/frost/auric palette variants (72 records in all). Ashbound variants keep the base intent order; Frostbound and Gilded variants rotate it and shorten the interval. Strength in campaign additionally comes from encounter HP and chapter scaling.
 
 | Monster | Title | Pattern | Counter |
 | --- | --- | --- | --- |
@@ -393,7 +393,7 @@ The twelve base silhouettes have ash/frost/auric palette variants. Ashbound vari
 
 ## 10. Campaign: four acts
 
-Narrative is authored prose in Indonesian with English chapter/skill names. Chapter intros establish the mission, intermediate stages carry short story beats, and clear results deliver the next reveal. Cleared chapter intros/outros remain readable in the town journal. The ending is authored and singular, not a branching-choice system. Full text is preserved in data/database.json and src/game/story.ts.
+Narrative is authored prose in Indonesian with English chapter/skill names (the English UI reads translated text). Chapter intros establish the mission, intermediate stages carry short story beats, and clear results deliver the next reveal. Cleared chapter intros/outros remain readable in the town journal. A few story choices open at camp after key chapters (or later from the Journal): each option replaces one sentence of the final outro and adds its outcome to the epilogue, so the finale reflects them; the ending is otherwise authored. Full text is preserved in data/database.json and src/game/story.ts.
 
 ### 1. Ashwood Trail
 
@@ -808,7 +808,7 @@ Reward: 825g zone bonus. Recruits: none.
 
 ## 11. Raids and roguelike
 
-Raids select any of twelve base silhouettes and all forty-eight variants. The new lantern-eater moth, basilisk, river crab and revenant are hunt/raid opponents and enter the endless rotation; the sixteen authored campaign chapters retain their existing opponents. Contract level follows cleared campaign chapters, while HP also scales to roster size. Sunken Bell starts a fresh floor-one run with the prepared roster and no boons; persistent job/gear/talents carry in. Each victory banks reward and offers up to three distinct, not-yet-owned boons. Select one, fully recover and descend. All twelve can be collected; a dedicated continuation button prevents an exhausted draft from trapping the run. Death or return to town clears run boons.
+Raids hunt one of the eighteen base silhouettes and its tier variants with up to six Story heroes (each slot may swap to another basic class for the raid). A quarry opens once it is beaten anywhere, its first chapter is cleared, or a hunt quest for it is open; the others show as locked tiles. Contract level follows cleared campaign chapters, while HP also scales to party size. Bronze, Silver and Gold contracts hit progressively harder and pay more; pacts change the fight, and only certified pact combinations pay Crystal (others play as practice). A suspended raid or run is resumed from its setup screen, which stays locked until it is resumed or abandoned. Bell Trials (the roguelike) starts a fresh floor-one run with three recruits and no boons. Each victory banks reward and offers a draft of three distinct, not-yet-owned boons (four with the Fate relic). Select one and descend. All twelve can be collected; a dedicated continuation button prevents an exhausted draft from trapping the run. Death or abandoning the run clears run boons.
 
 | Boon | Patron | Effect |
 | --- | --- | --- |
@@ -827,7 +827,7 @@ Raids select any of twelve base silhouettes and all forty-eight variants. The ne
 
 ## 12. Architecture, saves and delivery
 
-Phaser 3 + TypeScript + Vite, procedural pixel art, Web Audio, local fonts. No runtime server or third-party network dependency. Profile validation repairs invalid skills, impossible jobs, equipment ownership, chapter gaps and duplicate tile placement. Profile v3 uses gridbound.v3. A valid v2 save migrates automatically and remains untouched for rollback; existing heroes receive XP corresponding to campaign rank. Corrupt or future-version primary saves disable writes rather than overwriting the original. Recruits join at the existing roster median level. A JSON backup download is available in Settings. Live combat is not persisted. Saves are tied to origin/browser. Development-only QA exposes snapshots and fixed-step simulation; production bundles do not expose that API.
+Phaser 3 + TypeScript + Vite, procedural pixel art, Web Audio, local fonts. No runtime server or third-party network dependency. Profile validation repairs invalid skills, impossible jobs, equipment ownership, chapter gaps and duplicate tile placement. Progress lives in Commander files in IndexedDB (up to three), each holding Story, Raid and Bell Trials state, manual slots, an autosave and encounter checkpoints saved at battle boundaries, so a reload resumes the battle that was under way. The legacy localStorage save (gridbound.v3) is only the migration source: it is backed up and moved into a Commander at first boot. Corrupt or future-version saves disable writes rather than overwriting the original. Recruits join at the existing roster median level. A JSON backup download is available in Settings and the Save menu, and backups can be imported again. Saves are tied to origin/browser. Development-only QA exposes snapshots and fixed-step simulation; production bundles do not expose that API.
 
 Production uses relative asset URLs and independently cached engine/application chunks. Upload dist contents to a static host, including a nested subfolder. Netlify and Vercel configurations are included. CI regenerates the database, checks it against Git, tests, builds and runs the full campaign policy.
 
@@ -837,9 +837,9 @@ See PLAYTEST.md for executed commands. Automated policy tests establish reachabi
 
 ## 14. Individual hero progression and quests
 
-Hero XP and campaign rank are separate. Each hero starts at level 1 and caps at level 40, gaining one skill point per level. Levels increase HP and power; only expedition participants earn combat XP, with downed heroes receiving 60%. XP and hunt counters settle once at a completed expedition/floor; defeat or an unfinished chapter earns neither. Successful replays continue earning XP. Quest XP goes to the selected recruited hero, except companion rewards always go to their named hero.
+Hero XP and campaign rank are separate. Each hero starts at level 1 and caps at level 40, gaining one skill point per level. Levels increase HP and power; only expedition participants earn combat XP, with downed heroes receiving 60%. XP and hunt counters settle once at a completed expedition/floor; defeat or an unfinished chapter earns neither. Successful replays continue earning XP. Quest rewards (XP and gear) go to the selected recruited hero, except companion rewards always go to their named hero.
 
-Thirty quests: twelve hunts, six chained town requests, nine companion milestones and three chained endless milestones. Objectives recognize recorded lifetime achievements; hunt counters begin with v3 migration rather than inventing past kills. Rewards are claimed manually once, never auto-spent. Tracking does not reset objective counters. Locked prerequisites and already claimed rewards cannot be bypassed through the UI.
+30 quests: twelve hunts, six chained town requests, nine companion milestones and three chained endless milestones. Objectives recognize recorded lifetime achievements; hunt counters begin with v3 migration rather than inventing past kills. Rewards are claimed manually once, never auto-spent. Tracking does not reset objective counters. Locked prerequisites and already claimed rewards cannot be bypassed through the UI.
 
 | Quest | Kind / giver | Unlock / objective | Gold / XP | Item reward |
 | --- | --- | --- | --- | --- |

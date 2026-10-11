@@ -139,7 +139,7 @@ export type RuntimeCommanderContext = {
 };
 
 /** Stable codes for storage and save failures (and the few the save UI raises itself). The UI shows `t('error.<code>')` (en.ts/id.ts, checked by tests/i18n-ui.test.ts); the English message stays for console logs only. */
-export const ERROR_CODES = ['stale', 'incompatible', 'loading', 'unsaved', 'slot-empty', 'bookmark-rewind', 'run-active', 'profiles-full', 'storage-full', 'idb-read', 'idb-write', 'idb-delete', 'idb-unavailable', 'idb-blocked', 'idb-open', 'storage-blocked', 'save-corrupt', 'save-incomplete', 'save-migrated', 'save-protected', 'settlement', 'import-full', 'import-invalid', 'name-required'] as const;
+export const ERROR_CODES = ['stale', 'incompatible', 'loading', 'unsaved', 'slot-empty', 'bookmark-rewind', 'run-active', 'profiles-full', 'storage-full', 'idb-read', 'idb-write', 'idb-delete', 'idb-unavailable', 'idb-blocked', 'idb-open', 'storage-blocked', 'save-corrupt', 'save-incomplete', 'save-migrated', 'save-protected', 'settlement', 'import-full', 'import-invalid', 'name-required', 'mode-mismatch'] as const;
 export type CommanderErrorCode = typeof ERROR_CODES[number];
 
 export class CommanderError extends Error {
@@ -175,7 +175,6 @@ export function commanderError(error: unknown, fallback: CommanderErrorCode): Co
 export const errorCode = (error: unknown): CommanderErrorCode | 'unknown' => error instanceof CommanderError ? error.code : 'unknown';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
-const own = (record: Record<string, unknown>, key: string) => Object.prototype.hasOwnProperty.call(record, key);
 const safeInt = (value: unknown, fallback: number, max: number) => typeof value === 'number' && Number.isSafeInteger(value) ? Math.max(0, Math.min(max, value)) : fallback;
 const safeFiniteInt = (value: unknown, fallback: number, min: number, max: number) => typeof value === 'number' && Number.isSafeInteger(value) ? Math.max(min, Math.min(max, value)) : fallback;
 const clone = <T>(value: T): T => structuredClone(value);
@@ -567,6 +566,9 @@ export function storedStateFor(document: CommanderDocument, mode: CommanderMode,
 }
 
 export function applyRuntimeToDocument(document: CommanderDocument, context: RuntimeCommanderContext, timestamp = now()): void {
+  // A challenge profile always has its gold zeroed (materializeProfile): one with gold is a Story profile saved under a challenge mode,
+  // which would write the Story profile's 0 Crystal and empty unlocks into the bank. Refuse it as a visible save error instead.
+  if (context.mode !== 'story' && context.profile.gold > 0) throw new CommanderError('mode-mismatch', `A Story profile was saved as ${context.mode}; nothing was written.`);
   document.activeMode = context.mode;
   document.lastPlayed = timestamp;
   // Ledger, wins, receipts and the best floor are account-wide and merged from every mode; Crystal and challenge unlocks belong to the challenge modes.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createProfile } from '../src/game/profile';
 import { Battle } from '../src/game/simulation';
-import { createCommanderDocument, copyLegacyToCommander, materializeProfile, applyRuntimeToDocument, normalizeCommanderDocument, CommanderRepository, StaleCommanderError } from '../src/game/commander';
+import { createCommanderDocument, copyLegacyToCommander, materializeProfile, applyRuntimeToDocument, normalizeCommanderDocument, CommanderRepository, CommanderError, StaleCommanderError } from '../src/game/commander';
 
 test('D6 has four slots per mode and isolates Story from shared Challenge wallet', () => {
   const doc=createCommanderDocument(createProfile(),'A');
@@ -208,4 +208,20 @@ test('WP1: the deepest Roguelike floor is kept once, survives loading an older p
   const old=JSON.parse(JSON.stringify(session.document)); delete old.shared.bestFloor; old.rogue.slots[1]={slotId:'manual-2',state:{build:old.rogue.slots[3].state.build,bestFloor:8},savedAt:1,status:'valid'};
   const migrated=normalizeCommanderDocument(old)!;
   assert.equal(migrated.shared.bestFloor,8); assert.equal(materializeProfile(migrated,'story').bestFloor,8);
+});
+
+test('a Story profile saved under a challenge mode is refused instead of wiping the Crystal bank', async () => {
+  const p=createProfile(); p.gold=p.economy.gold=500; const doc=createCommanderDocument(p,'guard'); doc.shared.bankCrystal=120; doc.shared.challengeUnlocks=['bank-relic-ward'];
+  const story=materializeProfile(doc,'story');
+  assert.throws(()=>applyRuntimeToDocument(doc,{mode:'raid',slotId:'auto',profile:story}),(error:unknown)=>error instanceof CommanderError&&error.code==='mode-mismatch');
+  assert.equal(doc.shared.bankCrystal,120); assert.deepEqual(doc.shared.challengeUnlocks,['bank-relic-ward']);
+  applyRuntimeToDocument(doc,{mode:'raid',slotId:'auto',profile:materializeProfile(doc,'raid')});
+  assert.equal(doc.shared.bankCrystal,120,'the raid profile keeps the bank');
+  const session=new CommanderSession(); session.repository=new CommanderRepository(undefined,'idb-unavailable');
+  session.select(await session.create('guard',createCommanderDocument(p,'guard')),'story');
+  assert.equal(await session.save({mode:'raid',slotId:'auto',profile:story}),false); assert.equal(session.error,'mode-mismatch'); assert.equal(session.failed,true);
+  session.select(session.document!,'raid');
+  assert.equal(session.failed,true,'re-selecting the open file (a mode switch) keeps a failed save marked');
+  session.stale=true; session.select(session.document!,'story');
+  assert.equal(session.stale,true,'a mode switch never lifts a stale tab\'s read-only state');
 });

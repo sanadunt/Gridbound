@@ -8,6 +8,7 @@
  * - Battle → pertarungan in prose ('pertempuran' is not used; the battle tab is 'Arena'). 'Battle Hymn' is a skill name.
  * - Tile → petak, row → baris, Click → Ketuk. 'lane' stays English like the other game terms below.
  * - Threat families: DITANDAI, TANAH, SELURUH GRID, RAPALAN (the counter tags and map/bestiary chips).
+ * - Floor (Bell Trials) → lantai; party power and the Power stat label → Kekuatan ('power' stays in skill and job texts, like +30% power).
  * - The commander is addressed as kamu/-mu. 'kalian' is only for heroes speaking to the party (letters, join lines, scenes).
  */
 export type GlossaryRule = { term: string; use: string; banned: RegExp; /** Content/UI keys where the banned form is allowed. */ allow?: RegExp };
@@ -25,6 +26,8 @@ export const ID_GLOSSARY: GlossaryRule[] = [
   { term: 'All grid', use: 'seluruh grid', banned: /\ball[- ]grid\b/i },
   { term: 'Marked / ground / channel', use: 'ditandai / tanah / rapalan', banned: /\b(marked|ground|channel)\b/i },
   { term: 'you (the commander)', use: 'kamu / -mu', banned: /\b(kalian|anda)\b/i, allow: /^(dungeon\.letter\.|character\.\d+\.(joinLine|fateLine)$|campaign\.[^.]+\.(intro|outro)$)/ },
+  { term: 'Floor (Bell Trials)', use: 'lantai', banned: /\bfloor\b/i },
+  { term: 'Party power / power stat', use: 'kekuatan (party)', banned: /\bpower party\b|^power$/i },
 ];
 
 /** Game terms that stay English in Indonesian text (they appear in buttons, tags and skill texts). */

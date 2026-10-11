@@ -180,6 +180,38 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
       claimedQuests: document.story.slots[3].state.claimedQuests };
   })()`);
 
+  // The title Journal over the Raids route switches to Story properly: departing a raid afterwards never saves the Story profile
+  // (0 Crystal, no unlocks) over the bank.
+  const bankOf = `(async () => {
+    const { openCommanderRepository } = await import('/src/game/commander.ts');
+    const repository = await openCommanderRepository();
+    const document = (await repository.list()).find(candidate => candidate.commanderId === ${JSON.stringify(commanderId)});
+    repository.close();
+    return { revision: document.revision, bankCrystal: document.shared.bankCrystal, challengeUnlocks: document.shared.challengeUnlocks, storyGold: document.story.slots[3].state.gold };
+  })()`;
+  await click.nav('raid');
+  await wait('Boolean(document.querySelector(".secondary-scene [data-depart=raid]")) && window.gridbound.profile().gold === 0');
+  await evaluate('window.gridbound.showTitle()');
+  await click('#title-journal');
+  await wait('document.querySelector("#modal").open');
+  assert.equal(await evaluate('window.gridbound.profile().gold'), 2465, 'the Journal reads the Story profile');
+  assert.equal(await evaluate('document.querySelector(".town-game-shell")?.dataset.townRoute'), 'camp', 'the Journal leaves the Raids route for the camp');
+  await evaluate('document.querySelector("#modal").close()');
+  await evaluate('window.gridbound.hideTitle()');
+  await wait('document.querySelector("#title-screen").hidden');
+  await click.nav('raid');
+  await wait('Boolean(document.querySelector(".secondary-scene [data-depart=raid]")) && window.gridbound.profile().gold === 0 && window.gridbound.profile().economy.commanderCrystal === 33');
+  const beforeHunt = await evaluate(bankOf);
+  await click('.secondary-scene [data-depart=raid]');
+  await wait('window.gridbound.battle.mode === "raid" && window.gridbound.battle.status === "ready"');
+  await click('#start');
+  await wait('window.gridbound.battle.status === "fighting"');
+  await wait(`${bankOf}.then(doc => doc.revision > ${beforeHunt.revision} && !document.querySelector('#storage-status').dataset.level?.includes('warn'))`);
+  await wait('!document.querySelector("#storage-status").textContent.includes("…")');
+  const afterHunt = await evaluate(bankOf);
+  assert.deepEqual({ bankCrystal: afterHunt.bankCrystal, challengeUnlocks: afterHunt.challengeUnlocks, storyGold: afterHunt.storyGold },
+    { bankCrystal: 33, challengeUnlocks: ['fixture-unlock', 'bank-relic-ward'], storyGold: 2465 }, 'Journal → Raids → Begin keeps the Crystal bank and relics');
+
   assert.deepEqual(afterQuest, { mode: 'story', storyGold: 2465, claimedQuests: ['hunt-wolf'] },
     'Quest rewards claimed from Raid are persisted in the Story projection');
   assert.deepEqual(afterShop, {
