@@ -13,7 +13,7 @@ import './styles/battle.css';
 import './styles/result.css';
 import './styles/dungeon.css';
 import { currencyAmount } from './ui/currency';
-import { townSceneCanvas } from './art/town-scene';
+import { townSceneDataURL } from './art/town-scene';
 import { Battle, GUARD_DURATION, ENRAGE_WARN, ENRAGE_AT, ENRAGE_DMG, BREAK_SECONDS, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
@@ -51,13 +51,14 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const store = { getItem: (key: string) => localStorage.getItem(key), setItem: (key: string, value: string) => localStorage.setItem(key, value) };
 localizeContent(lang());
 document.documentElement.lang = lang();
-const titleWorld = townSceneCanvas().toDataURL();
 const saved=loadSave(store);
 let profile = saved.profile;
 const commander = new CommanderSession();
 let encounter: NonNullable<CommanderDocument['encounters']>[CommanderMode];
 let pendingSettlement = false;
-if (matchMedia('(prefers-reduced-motion: reduce)').matches) profile.motion = false;
+const reduceMotionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+/** Effective motion: the player's Motion setting, unless the device asks for reduced motion (the saved setting is never overwritten). */
+const motionOn = () => profile.motion && !reduceMotionQuery.matches;
 let storageFailed = false;
 const heroName = (h: { name: string }) => eventText(h.name, lang());
 const stageLabel = () => eventText(battle.stageName, lang());
@@ -70,7 +71,7 @@ function updateTitleStatus() {
   nameEl.textContent = `${commander.document?.name || t('title.recruit')} · ${modeName(commander.mode)}`;
 }
 function titleMarkup() {
-  return `<div class="title-backdrop" aria-hidden="true"><img class="title-world-art" src="${titleWorld}" alt="" /><div class="title-vignette"></div></div>
+  return `<div class="title-backdrop" aria-hidden="true"><img class="title-world-art" alt="" /><div class="title-vignette"></div></div>
   <div class="title-content">
     <div class="title-brand"><span class="title-eyebrow">${t('title.eyebrow')}</span><h1 class="title-logo">GRIDBOUND</h1><div class="title-subtitle-wrap"><span class="title-flourish"></span><span>${t('title.subtitle')}</span><span class="title-flourish right"></span></div></div>
     <p class="title-press" aria-hidden="true">${t('title.press')}</p>
@@ -88,9 +89,12 @@ function showTitleScreen(animated = true) {
   const titleScreen = $('title-screen');
   if (!titleScreen) return;
   titleScreen.classList.remove('dismissing');
+  // The backdrop is drawn on the first showing (never under automation, which skips the title), from the camp's cached scene.
+  const art = titleScreen.querySelector<HTMLImageElement>('.title-world-art');
+  if (art && !art.src) art.src = townSceneDataURL();
   titleScreen.hidden = false;
   updateTitleStatus();
-  if (animated && profile.motion) {
+  if (animated && motionOn()) {
     const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
     tl.fromTo('.title-logo', { opacity: 0, y: -30, scale: 1.4 }, { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: 'back.out(1.6)' })
       .fromTo('.title-flourish', { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: 'power3.out' }, '-=0.2')
@@ -100,7 +104,7 @@ function showTitleScreen(animated = true) {
   requestAnimationFrame(() => $('title-enter')?.focus({ preventScroll: true }));
 }
 function animateTownEntrance() {
-  if (!profile.motion) return;
+  if (!motionOn()) return;
   const town = $('town-screen');
   if (!town || town.hidden) return;
   gsap.fromTo('.town-map', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', clearProps: 'opacity' });
@@ -111,7 +115,7 @@ function enterEmberhollow() {
   if (!titleScreen || titleScreen.hidden) return;
   sound.unlock();
   sound.play('confirm');
-  if (profile.motion) {
+  if (motionOn()) {
     const tl = gsap.timeline({
       onComplete: () => {
         titleScreen.hidden = true;
@@ -189,6 +193,9 @@ let battle = new Battle('adventure', 1, profileModifiers(profile), storyBattleOp
 let scene: BattleScene;
 let inTown = true;
 let initialized = false;
+let engine: Phaser.Game | undefined;
+/** The Phaser loop runs only while a fight is on screen: in town (once the result screen is closed) it sleeps, so the hidden arena is not redrawn every frame; boot() wakes it. */
+function engineAwake(awake: boolean) { const loop = engine?.loop; if (!loop?.started) return; if (awake) loop.wake(); else if (resultScreen.hidden && $('battle-screen').hidden) loop.sleep(); }
 let recorded = false;
 let chapterResult: { stars: number; improved: boolean; heroic?: { gold: number; materials: Record<string, number> } } | undefined;
 /** What the last settled result credited (gold for Story, bank Crystal otherwise) and the party cap it unlocked (0 = unchanged). */
@@ -198,6 +205,52 @@ let stageStart: NonNullable<typeof encounter> | undefined;
 let experienceRewards:NonNullable<ReturnType<typeof settleProgress>>=[];
 let lastStatus = battle.status;
 let drawIn = 0;
+/** DOM writes that skip unchanged values, so a label or text is only touched (and re-read by assistive tech) when it changes. */
+const setText = (el: Element, text: string) => { if (el.textContent !== text) el.textContent = text; };
+const setAttr = (el: Element, name: string, value: string) => { if (el.getAttribute(name) !== value) el.setAttribute(name, value); };
+/** Heroes seen down in this battle (frame() announces one that gets back up). */
+const downed = new Set<number>();
+/** One visually hidden polite live region (#battle-announcer) speaks the fight's meaningful moments: a threat's onset with its target and
+ *  seconds, a hero down or back up, a boss phase, an armour break, victory and defeat. At most one message per ANNOUNCE_GAP_MS; a burst keeps
+ *  the newest ANNOUNCE_QUEUE messages (urgent ones clear the queue). The per-frame HUD text (countdowns, banners) is not live. */
+const ANNOUNCE_GAP_MS = 1500, ANNOUNCE_QUEUE = 2;
+/** A message, or a function that builds it when it is spoken (and returns '' when it is no longer true). */
+type Announcement = string | (() => string);
+let announceQueue: Announcement[] = [], announceTimer = 0, lastAnnounce = -Infinity;
+function announce(text: Announcement, urgent = false) {
+  if (inTown || !text) return;
+  if (urgent) announceQueue = [];
+  announceQueue.push(text);
+  announceQueue.splice(0, Math.max(0, announceQueue.length - ANNOUNCE_QUEUE));
+  flushAnnounce();
+}
+function flushAnnounce() {
+  if (inTown) { announceQueue = []; return; }
+  if (announceTimer || !announceQueue.length) return;
+  const wait = lastAnnounce + ANNOUNCE_GAP_MS - performance.now();
+  if (wait > 0) { announceTimer = window.setTimeout(() => { announceTimer = 0; flushAnnounce(); }, wait); return; }
+  const next = announceQueue.shift()!, text = typeof next === 'function' ? next() : next, el = $('battle-announcer');
+  if (!text) { flushAnnounce(); return; }
+  // The same sentence twice in a row is still news: a trailing no-break space makes it a change screen readers speak.
+  el.textContent = el.textContent === text ? `${text}\u00a0` : text;
+  lastAnnounce = performance.now();
+  flushAnnounce();
+}
+function clearAnnouncer() { announceQueue = []; window.clearTimeout(announceTimer); announceTimer = 0; downed.clear(); const el = document.getElementById('battle-announcer'); if (el) el.textContent = ''; }
+/** A new telegraph, spoken once: who it targets (a marked hero, or whoever stands on the marked tiles) and in how many whole seconds.
+ *  The sentence is built when it is spoken (a queued message can wait ~3 s), and a threat that has landed or lands within a second is dropped. */
+function announceThreat(e: BattleEvent) {
+  const id = [...battle.threats].reverse().find(v => v.name === e.text)?.id;
+  if (id === undefined) return;
+  announce(() => {
+    const threat = battle.threats.find(v => v.id === id);
+    if (!threat || threat.left < 1) return '';
+    const name = eventText(threat.name, lang()), s = Math.floor(threat.left), time = t(s === 1 ? 'a11y.second' : 'a11y.seconds', { s });
+    if (threat.type === 'all') return t('a11y.threat.all', { name, time });
+    const ids = threat.targetId !== undefined ? [threat.targetId] : battle.living().filter(h => threat.slots.includes(h.slot)).map(h => h.id);
+    return ids.length ? t('a11y.threat', { name, time, targets: ids.map(id => heroLabel(id)).join(', ') }) : t('a11y.threat.none', { name, time });
+  });
+}
 let moveMode = false;
 let selectedKey = '';
 let bannerTimer = 0;
@@ -270,11 +323,11 @@ $('app').innerHTML = `
       <div class="arena-slot">
       <div class="arena-intel">
         <div id="boss-status" class="boss-status" aria-label="${t('battle.status.aria')}"></div>
-        <div id="intent" class="intent-panel msg-window" role="status" aria-live="polite"><b></b><span></span></div>
+        <div id="intent" class="intent-panel msg-window"><b></b><span></span></div>
       </div>
       <div id="arena" class="arena">
-        <div id="game-canvas"></div>
-        <div id="banner" class="battle-banner" aria-live="polite"></div>
+        <div id="game-canvas" aria-hidden="true"></div>
+        <div id="banner" class="battle-banner" aria-hidden="true"></div>
         <div id="skill-toast" class="skill-toast" role="status" aria-live="polite" hidden></div>
         <div class="lane-targets" aria-label="${t('battle.lanes')}">${[0, 1, 2].map(i => `<button data-lane="${i}" aria-label="${t('battle.lane', { n: i + 1 })}" aria-pressed="false"><span>${['I', 'II', 'III'][i]}</span></button>`).join('')}</div>
         <div id="unit-layer"></div>
@@ -310,6 +363,7 @@ $('app').innerHTML = `
   </main>
   <main id="result-screen" class="result-screen" aria-labelledby="result-title" hidden></main>
   <footer id="storage-status" class="storage-status" role="status"></footer>
+  <div id="battle-announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <dialog id="modal" aria-labelledby="modal-title"></dialog>`;
 const modal = $<HTMLDialogElement>('modal');
 const resultScreen = $<HTMLElement>('result-screen');
@@ -336,6 +390,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   // An Undercroft fight a reload cut short resolves as a flee when the Undercroft opens (saved by the persist below).
   if (tab === 'dungeon') settleInterruptedFight();
   inTown = true;
+  clearAnnouncer();
   pauseForDetails = false;
   if (battle.status === 'fighting') battle.pause();
   if (coach.step) endCoachStep();
@@ -345,6 +400,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   if (tab === 'raid') { townState.raid = openRaidQuarry(profile, townState.raid) ?? townState.raid; huntTarget = undefined; }
   $('town-screen').hidden = false;
   $('battle-screen').hidden = true;
+  engineAwake(false);
   document.body.dataset.screen = tab === 'camp' ? 'camp' : 'town';
   routeStack = pushRoute(routeStack, tab);
   if (isFeature(tab)) markVisited(tab);
@@ -374,7 +430,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
     if (tab === 'dungeon' && townState.dungeonOutcome) scene?.querySelector('.room-panel')?.scrollIntoView({ block: 'end' });
   }
   persist();
-  if (animate && profile.motion) {
+  if (animate && motionOn()) {
     if (tab === 'camp') animateTownEntrance();
     else {
       const panel = document.querySelector<HTMLElement>('.town-scene');
@@ -539,6 +595,7 @@ $('town-screen').addEventListener('click', event => {
     townState.trainingTab = button.dataset.trainingTab as TownState['trainingTab'];
     townState.tab = button.dataset.trainingTab === 'overview' || button.dataset.trainingTab === 'jobs' || button.dataset.trainingTab === 'talents' ? 'party-advanced' : 'party';
     showTown(townState.tab, '', true);
+    return;
   }
   if (button.dataset.campaignPage) {
     const delta = Number(button.dataset.campaignPage);
@@ -559,7 +616,7 @@ $('town-screen').addEventListener('click', event => {
     townState.hero = Number(button.dataset.townHero);
     townState.pendingGear = undefined;
     showTown(townState.tab === 'party-advanced' ? 'party-advanced' : 'party', '', true);
-    if (profile.motion) {
+    if (motionOn()) {
       const heroBtn = document.querySelector<HTMLElement>(`[data-town-hero="${townState.hero}"]`);
       if (heroBtn) gsap.fromTo(heroBtn, { scale: 0.93 }, { scale: 1, duration: 0.22, ease: 'back.out(2)', clearProps: 'transform' });
     }
@@ -626,7 +683,7 @@ $('town-screen').addEventListener('click', event => {
     const q=QUESTS.find(q=>q.id===questId);
     const ok=claimQuest(profile,questId,townState.hero);
     showTown('quests',ok?t('notice.quest.ok', { name: ROSTER[q?.heroId??townState.hero].name }):t('notice.quest.fail'), true);
-    if (ok && profile.motion) {
+    if (ok && motionOn()) {
       const entry = document.querySelector<HTMLElement>(`[data-quest="${questId}"]`);
       if (entry) gsap.fromTo(entry, { scale: 0.96, filter: 'brightness(1.5)' }, { scale: 1, filter: 'brightness(1)', duration: 0.35, ease: 'back.out(2)', clearProps: 'transform,filter' });
     }
@@ -842,7 +899,7 @@ function chapterIntro(zoneIndex: number) {
   const [name, place] = zone.speaker.split(' · ').map(part => part.trim());
   const pages = paginate(zone.intro).map(text => storyPage(text, name, place));
   playingScene = true;
-  return playDialogue($('app'), { kicker: t('battle.chapter', { n: zoneIndex + 1 }), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(Math.floor(zoneIndex / 4)), pages, motion: profile.motion, onBlip: () => sound.play('text') })
+  return playDialogue($('app'), { kicker: t('battle.chapter', { n: zoneIndex + 1 }), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(Math.floor(zoneIndex / 4)), pages, motion: motionOn(), onBlip: () => sound.play('text') })
     .finally(() => { playingScene = false; markIntroSeen(zoneIndex); });
 }
 /** Recruits of the chapter just cleared, for the result screen's notice (their join scenes are queued in the journey). */
@@ -853,14 +910,14 @@ function recruitScene(id: number, force = false) {
   // Skipped under automation like the title screen and chapter intros; QA plays it through window.gridbound.recruitScene.
   if (!hero || (!force && navigator.webdriver)) return Promise.resolve();
   playingScene = true;
-  return playDialogue($('app'), { kicker: t('recruit.kicker'), title: t('recruit.title', { name: hero.name }), subtitle: KITS[hero.classId].name, backdrop: actArt(Math.min(3, Math.floor(hero.recruitChapter / 4))), pages: [{ speaker: hero.name, portrait: portrait(hero.classId, 0, id), text: hero.joinLine }], motion: profile.motion, onBlip: () => sound.play('text') })
+  return playDialogue($('app'), { kicker: t('recruit.kicker'), title: t('recruit.title', { name: hero.name }), subtitle: KITS[hero.classId].name, backdrop: actArt(Math.min(3, Math.floor(hero.recruitChapter / 4))), pages: [{ speaker: hero.name, portrait: portrait(hero.classId, 0, id), text: hero.joinLine }], motion: motionOn(), onBlip: () => sound.play('text') })
     .finally(() => { playingScene = false; });
 }
 /** A story choice as a scene: its question, its options and 'Decide later' (which leaves it open in the Journal). */
 async function choiceScene(scene: (typeof STORY_CHOICES)[number]) {
   playingScene = true;
   const choices = [...scene.options.map(o => ({ value: o.id, label: o.label, reply: o.outcome })), { value: '', label: t('journal.later') }];
-  const value = await playDialogue($('app'), { kicker: t('choice.kicker'), title: scene.title, backdrop: actArt(Math.min(3, Math.floor((scene.chapter - 1) / 4))), pages: [{ speaker: t('story.chronicle'), place: scene.title, text: scene.text, choices, safeChoice: choices.length - 1 }], motion: profile.motion, onBlip: () => sound.play('text') })
+  const value = await playDialogue($('app'), { kicker: t('choice.kicker'), title: scene.title, backdrop: actArt(Math.min(3, Math.floor((scene.chapter - 1) / 4))), pages: [{ speaker: t('story.chronicle'), place: scene.title, text: scene.text, choices, safeChoice: choices.length - 1 }], motion: motionOn(), onBlip: () => sound.play('text') })
     .finally(() => { playingScene = false; });
   if (!value || commander.stale) return;
   profile.narrative ??= {};
@@ -878,7 +935,7 @@ function endingScene() {
     { text: '', card: { kicker: t('ending.card.kicker'), title: t('town.name'), subtitle: t('ending.card.subtitle') } },
   ];
   playingScene = true;
-  return playDialogue($('app'), { kicker: t('ending.kicker'), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(3), pages, motion: profile.motion, onBlip: () => sound.play('text') })
+  return playDialogue($('app'), { kicker: t('ending.kicker'), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(3), pages, motion: motionOn(), onBlip: () => sound.play('text') })
     .finally(() => { playingScene = false; });
 }
 let campScenesRunning = false;
@@ -968,6 +1025,7 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
     ...(mode === 'adventure' ? storyBattleOptions(profile) : {}),
   });
   inTown = false;
+  clearAnnouncer();
   resultRequest++;
   presentingResult = false;
   resultGeneration = undefined;
@@ -996,6 +1054,8 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   $('combat-log').textContent = '';
   addLog(t('log.ready'));
   document.querySelectorAll<HTMLElement>('[data-lane]').forEach(el => { el.classList.remove('active'); el.setAttribute('aria-pressed', 'false'); });
+  // Waking runs one engine step at once (scene.update → frame()), so it comes after the new battle's unit layer and ready window exist.
+  engineAwake(true);
   frame(1);
   requestAnimationFrame(() => scene.scale?.refresh());
   $('battle-screen').scrollTop = 0;
@@ -1016,7 +1076,7 @@ function buyForRun(id: string) {
 /** Classic encounter transition: the screen shatters into blocks that fall away from the centre. */
 function battleWipe() {
   sound.play('encounter');
-  if (!profile.motion) return;
+  if (!motionOn()) return;
   const cols = 8, rows = 14, wipe = document.createElement('div');
   wipe.className = 'battle-wipe';
   wipe.setAttribute('aria-hidden', 'true');
@@ -1057,7 +1117,7 @@ function showReady() {
   // The very first wave keeps its how-to-play tip under the story beat.
   $('ready-tip').hidden = !(beat && battle.floor === 1 && battle.stage === 0 && !battle.heroic);
   $('start').textContent = t('battle.begin');
-  if (profile.motion) {
+  if (motionOn()) {
     gsap.fromTo('#start-overlay .start-window', { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
   }
 }
@@ -1120,6 +1180,8 @@ function updatePartyHealthView(h: PartyHero) {
   const cooldownSeconds = h.remaining > 0 ? Math.max(.1, h.remaining).toFixed(1) : '';
   const charge = h.total > 0 ? Math.min(1, Math.max(0, 1 - h.remaining / h.total)) : 1;
   const status = h.hp <= 0 ? t('battle.down') : cooldownSeconds ? `${cooldownSeconds}s` : t('battle.ready');
+  // The label counts whole seconds (the visible text keeps tenths), so it changes about once a second, not on every frame.
+  const label = t('battle.hero.aria', { name: heroName(h), hp, max: h.maxHp, shield, status: h.hp > 0 && h.remaining > 0 ? `${Math.ceil(h.remaining)}s` : status });
   for (const view of views) {
     view.hp.textContent = String(hp);
     view.shield.textContent = String(shield);
@@ -1130,8 +1192,8 @@ function updatePartyHealthView(h: PartyHero) {
     view.button.classList.toggle('downed', h.hp <= 0);
     view.button.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
     view.button.classList.toggle('charged', h.hp > 0 && charge > .97);
-    view.button.setAttribute('aria-pressed', String(h.id === battle.selected));
-    view.button.setAttribute('aria-label', t('battle.hero.aria', { name: heroName(h), hp, max: h.maxHp, shield, status }));
+    setAttr(view.button, 'aria-pressed', String(h.id === battle.selected));
+    setAttr(view.button, 'aria-label', label);
   }
 }
 function makeUnits() {
@@ -1183,11 +1245,11 @@ function updateUnitView(h: PartyHero) {
   if (view.key && view.key.split('-')[0] !== String(h.stance)) { view.card.classList.remove('switched'); void view.card.offsetWidth; view.card.classList.add('switched'); }
   view.key = key;
   const skill = KITS[h.classId].skills[h.stance];
-  view.name.textContent = skill.name;
-  view.icon.textContent = skills.length > 2 ? '▾' : '⇄';
+  setText(view.name, skill.name);
+  setText(view.icon, skills.length > 2 ? '▾' : '⇄');
   view.skill.disabled = !canSwitch;
-  view.skill.setAttribute('aria-label', t('battle.skill.switch', { name: heroName(h), skill: skill.name }));
-  view.skill.setAttribute('aria-haspopup', String(skills.length > 2));
+  setAttr(view.skill, 'aria-label', t('battle.skill.switch', { name: heroName(h), skill: skill.name }));
+  setAttr(view.skill, 'aria-haspopup', String(skills.length > 2));
 }
 function switchSkill(id: number) {
   const h = battle.hero(id);
@@ -1199,6 +1261,8 @@ function switchSkill(id: number) {
   openSkillPicker(id);
 }
 let pickerHero = -1;
+/** The control that opened the skill picker (its chip): focus returns there when the picker closes with the focus inside it. */
+let pickerReturn: HTMLElement | null = null;
 function openSkillPicker(id: number) {
   const h = battle.hero(id);
   if (!h) return;
@@ -1206,6 +1270,8 @@ function openSkillPicker(id: number) {
   battle.selected = id;
   pickerHero = id;
   const picker = $('skill-picker');
+  const active = document.activeElement;
+  pickerReturn = active instanceof HTMLElement && active !== document.body && !picker.contains(active) ? active : document.querySelector<HTMLElement>(`[data-skill-switch="${id}"]`);
   picker.setAttribute('aria-label', t('battle.skill.choose', { name: heroName(h) }));
   picker.innerHTML = `<h4>${t('battle.skill.choose', { name: heroName(h) })}</h4>${battle.availableSkills(id).map(i => { const s = kit.skills[i]; return `<button type="button" data-pick-skill="${i}" aria-pressed="${h.stance === i}"><span><b>${s.name}</b><small>${s.label}</small></span><em>${s.cooldown.toFixed(1)}s</em></button>`; }).join('')}`;
   const p = cell(h.slot);
@@ -1226,8 +1292,13 @@ function openSkillPicker(id: number) {
 }
 function closeSkillPicker() {
   pickerHero = -1;
-  const picker = document.getElementById('skill-picker');
-  if (picker) { picker.hidden = true; picker.innerHTML = ''; }
+  const picker = document.getElementById('skill-picker'), back = pickerReturn;
+  pickerReturn = null;
+  if (!picker || picker.hidden) return;
+  const hadFocus = picker.contains(document.activeElement);
+  picker.hidden = true; picker.innerHTML = '';
+  // A disabled chip (the hero just fell) cannot take the focus: fall back to that hero's card.
+  if (hadFocus && back?.isConnected) { back.focus({ preventScroll: true }); if (document.activeElement !== back) back.closest('.unit-card')?.querySelector<HTMLElement>('.unit-tap')?.focus({ preventScroll: true }); }
 }
 document.addEventListener('pointerdown', event => {
   if (pickerHero === -1) return;
@@ -1388,7 +1459,11 @@ function frame(dt: number) {
   drawIn -= dt;
   if (drawIn > 0) return;
   drawIn = .06;
-  if (battle.status !== lastStatus) { lastStatus = battle.status; renderInspector(); if (['victory', 'defeat'].includes(battle.status)) result(); }
+  if (battle.status !== lastStatus) {
+    lastStatus = battle.status; renderInspector();
+    if (battle.status === 'victory' || battle.status === 'defeat') { announce(t(battle.status === 'victory' ? 'a11y.victory' : 'a11y.defeat', { name: battle.enemyName }), true); result(); }
+  }
+  for (const h of battle.heroes) { if (h.hp <= 0) downed.add(h.id); else if (downed.delete(h.id)) announce(t('a11y.revived', { name: heroName(h) })); }
   if (battle.mode === 'dungeon' && battle.status === 'fighting') noteDungeonFight();
   $('boss-health').textContent = `${Math.ceil(battle.bossHp).toLocaleString()} / ${battle.bossMax.toLocaleString()}`;
   const hpPercent = `${battle.bossHp / battle.bossMax * 100}%`;
@@ -1407,11 +1482,11 @@ function frame(dt: number) {
   const wasDanger = intent.classList.contains('danger');
   intent.classList.toggle('danger', isDanger);
   intent.classList.toggle('guarding', !isDanger && battle.guardLeft > 0);
-  if (isDanger && !wasDanger && profile.motion) {
+  if (isDanger && !wasDanger && motionOn()) {
     gsap.fromTo('#intent', { scale: 1.08 }, { scale: 1, duration: 0.25, ease: 'back.out(2)', clearProps: 'transform' });
   }
-  intent.querySelector('b')!.textContent = threat ? `${t('battle.intent.time', { name: eventText(threat.name, lang()), s: Math.max(0, threat.left).toFixed(1) })}${threat.targetId !== undefined ? ` → ${battle.hero(threat.targetId)?.name ?? '?'}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: battle.guardLeft.toFixed(1) }) : t('battle.watch');
-  intent.querySelector('span')!.textContent = threat ? `${threat.counter ? touchText(eventText(threat.counter, lang())) : t('battle.counter.default')}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.hint');
+  setText(intent.querySelector('b')!, threat ? `${t('battle.intent.time', { name: eventText(threat.name, lang()), s: Math.max(0, threat.left).toFixed(1) })}${threat.targetId !== undefined ? ` → ${battle.hero(threat.targetId)?.name ?? '?'}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: battle.guardLeft.toFixed(1) }) : t('battle.watch'));
+  setText(intent.querySelector('span')!, threat ? `${threat.counter ? touchText(eventText(threat.counter, lang())) : t('battle.counter.default')}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.hint'));
   placeBanner();
   $('damage').textContent = Math.round(battle.damage).toLocaleString();
   $('blocked').textContent = Math.round(battle.blocked).toLocaleString();
@@ -1543,6 +1618,10 @@ const downCause = (e: BattleEvent) => e.kind === 'claw' ? t('log.cause.claw') : 
 window.addEventListener('battle-banner', event => {
   if (inTown) return;
   const e = (event as CustomEvent<BattleEvent>).detail;
+  if (e.type === 'warning') announceThreat(e);
+  else if (e.type === 'down') announce(t('a11y.down', { name: heroLabel(e.source) }));
+  else if (e.type === 'phase') announce(t('a11y.phase', { name: battle.enemyName, n: battle.phase }));
+  else if (e.type === 'break') announce(t('a11y.break', { s: BREAK_SECONDS }));
   const text = e.type === 'down' ? t('battle.ko', { name: heroLabel(e.source) }) : e.text ? eventText(e.text, lang()) : '';
   // The stage name already headlines the ready window: log it, but keep the arena clear for the FIGHT! cue.
   if (e.kind !== 'stage') {
@@ -1582,20 +1661,31 @@ window.addEventListener('battle-log', event => {
   addLog(e.hit?.length ? t('log.impact', { name, heroes: e.hit.map(id => heroLabel(id)).join(', '), n: Math.round(e.amount ?? 0).toLocaleString() }) : t('log.dodged', { name }));
 });
 
+/** The control that opened the modal: focus returns to it on close when nothing else took the focus (a re-render, a route change). */
+let modalReturn: HTMLElement | null = null;
 function openModal(content: string, pause = true) {
   const alreadyOpen = modal.open;
-  if (!alreadyOpen) resumeOnClose = !inTown && pause && battle.status === 'fighting';
+  if (!alreadyOpen) { resumeOnClose = !inTown && pause && battle.status === 'fighting'; modalReturn = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null; }
   if (!inTown && pause && battle.status === 'fighting') { resumeOnClose = true; battle.pause(); }
   modal.innerHTML = `${content}<button data-close class="modal-close icon-button" aria-label="${t('common.close')}">×</button>`;
   modal.scrollTop = 0;
   if (!alreadyOpen) {
     try { modal.showModal(); } catch { modal.show(); }
     sound.modalReveal();
-    if (profile.motion) gsap.fromTo(modal, { opacity: 0 }, { opacity: 1, duration: 0.15, ease: 'power2.out', clearProps: 'opacity' });
+    if (motionOn()) gsap.fromTo(modal, { opacity: 0 }, { opacity: 1, duration: 0.15, ease: 'power2.out', clearProps: 'opacity' });
+  } else {
+    // New content in an open modal (Pause → Settings) destroyed the focused button: move the focus to the new title, or its first control.
+    const title = modal.querySelector<HTMLElement>('#modal-title');
+    if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
+    else modal.querySelector<HTMLElement>('button:not([disabled]), input, select, textarea, [href]')?.focus({ preventScroll: true });
   }
   modal.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => modal.close()));
 }
-modal.addEventListener('close', () => { if (resumeOnClose && !inTown && battle.status === 'paused') battle.pause(); resumeOnClose = false; });
+modal.addEventListener('close', () => {
+  if (resumeOnClose && !inTown && battle.status === 'paused') battle.pause(); resumeOnClose = false;
+  const back = modalReturn; modalReturn = null;
+  if (back?.isConnected && !back.closest('[hidden],[inert]') && (document.activeElement === document.body || modal.contains(document.activeElement))) back.focus({ preventScroll: true });
+});
 function closeWithoutResume() { resumeOnClose = false; clearResultState(); if (modal.open) modal.close(); }
 function help() {
   const rows: [string, string][] = [['help.tap.title', 'help.tap'], ['help.skill.title', 'help.skill'], ['help.drag.title', 'help.drag'], ['help.guard.title', 'help.guard'], ['help.items.title', 'help.items'], ['help.lanes.title', 'help.lanes'], ['help.enrage.title', 'help.enrage']];
@@ -1606,13 +1696,13 @@ function settings() {
   openModal(`<h2 id="modal-title">${t('settings.title')}</h2>
     <div class="setting-row" role="group" aria-label="${t('settings.language')}"><span><b>${t('settings.language')}</b><small>${inTown ? t('settings.language.sub') : t('settings.language.town')}</small></span><span class="lang-switch">${(['en', 'id'] as Lang[]).map(code => `<button type="button" class="btn" data-lang="${code}" aria-pressed="${lang() === code}" ${inTown ? '' : 'disabled'}>${code === 'en' ? 'English' : 'Indonesia'}</button>`).join('')}</span></div>
     <label class="setting-row"><span><b>${t('settings.sound')}</b><small>${t('settings.sound.sub')}</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label>
-    <label class="setting-row"><span><b>${t('settings.motion')}</b><small>${t('settings.motion.sub')}</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label>
+    <label class="setting-row"><span><b>${t('settings.motion')}</b><small>${reduceMotionQuery.matches ? t('settings.motion.device') : t('settings.motion.sub')}</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.coach')}</b><small>${t('settings.coach.sub')}</small></span><input id="setting-coach" type="checkbox" ${coachEnabled() ? 'checked' : ''}></label>
     <p class="hint">${t('settings.save.note')}</p><button id="export-save" class="btn">${t('settings.export')}</button><button class="btn primary" data-close>${t('common.back')}</button>`);
   $('export-save').addEventListener('click',exportCommander);
   $('setting-sound').addEventListener('change', e => { profile.sound = (e.target as HTMLInputElement).checked; updateSound(); });
   $('setting-coach').addEventListener('change', e => { setCoachEnabled((e.target as HTMLInputElement).checked); if (coach.step) endCoachStep(); });
-  $('setting-motion').addEventListener('change', e => { profile.motion = (e.target as HTMLInputElement).checked; scene.reducedMotion = !profile.motion; document.body.classList.toggle('reduced-motion', !profile.motion); persist(); });
+  $('setting-motion').addEventListener('change', e => { profile.motion = (e.target as HTMLInputElement).checked; applyMotion(); persist(); });
 }
 function updateSound() { sound.enabled = profile.sound; if (profile.sound) sound.unlock(); $('sound').setAttribute('aria-pressed', String(profile.sound)); persist(); }
 function pauseMenu() {
@@ -1687,46 +1777,12 @@ resultScreen.addEventListener('click', event => {
   }
 }, true);
 
-type BoonMeta = {
-  icon: string;
-  color: string;
-  glow: string;
-  rarity: string;
-};
-
-function getBoonMeta(id: string): BoonMeta {
-  switch (id) {
-    case 'ember':
-      return { icon: '🔥', color: '#ff6b3d', glow: 'rgba(255, 107, 61, 0.45)', rarity: 'OLYMPIAN FAVOR' };
-    case 'storm':
-      return { icon: '⚡', color: '#4da6ff', glow: 'rgba(77, 166, 255, 0.45)', rarity: 'STORM CREST' };
-    case 'tide':
-      return { icon: '🌊', color: '#2de2bd', glow: 'rgba(45, 226, 189, 0.45)', rarity: 'ABYSSAL SIGIL' };
-    case 'thorn':
-      return { icon: '🌿', color: '#52cc6c', glow: 'rgba(82, 204, 108, 0.45)', rarity: 'BRIAR EMBLEM' };
-    case 'bell':
-      return { icon: '🔔', color: '#f5c462', glow: 'rgba(245, 196, 98, 0.45)', rarity: 'RESONANT RELIC' };
-    case 'fleet':
-      return { icon: '🌪️', color: '#5eead4', glow: 'rgba(94, 234, 212, 0.45)', rarity: 'ZEPHYR TRIBUTE' };
-    case 'resolve':
-      return { icon: '🌅', color: '#f97316', glow: 'rgba(249, 115, 22, 0.45)', rarity: 'SOLAR COVENANT' };
-    case 'execution':
-      return { icon: '💀', color: '#ef4444', glow: 'rgba(239, 68, 68, 0.45)', rarity: 'NETHER BRAND' };
-    case 'frost':
-      return { icon: '❄️', color: '#38bdf8', glow: 'rgba(56, 189, 248, 0.45)', rarity: 'GLACIAL SEED' };
-    case 'feast':
-      return { icon: '🌾', color: '#fb923c', glow: 'rgba(251, 146, 60, 0.45)', rarity: 'FERTILE OFFERING' };
-    case 'lifeline':
-      return { icon: '🕯️', color: '#fbbf24', glow: 'rgba(251, 191, 36, 0.45)', rarity: 'SACRED TETHER' };
-    case 'chorus':
-      return { icon: '🎵', color: '#e879f9', glow: 'rgba(232, 121, 249, 0.45)', rarity: 'HARMONIC CHORD' };
-    default:
-      return { icon: '✨', color: '#f5c462', glow: 'rgba(245, 196, 98, 0.45)', rarity: 'DIVINE BLESSING' };
-  }
-}
+/** Boon card accent colours (the draft cards' --card-accent). */
+const BOON_COLORS: Record<string, string> = { ember: '#ff6b3d', storm: '#4da6ff', tide: '#2de2bd', thorn: '#52cc6c', bell: '#f5c462', fleet: '#5eead4', resolve: '#f97316', execution: '#ef4444', frost: '#38bdf8', feast: '#fb923c', lifeline: '#fbbf24', chorus: '#e879f9' };
+const boonColor = (id: string) => BOON_COLORS[id] ?? '#f5c462';
 
 function animateBoonDraft() {
-  if (!profile.motion) return;
+  if (!motionOn()) return;
   const cards = resultScreen.querySelectorAll('.boon-card');
   if (!cards.length) return;
   gsap.fromTo(
@@ -1745,7 +1801,7 @@ function animateBoonDraft() {
 }
 
 function animateCeremony() {
-  if (!profile.motion) return;
+  if (!motionOn()) return;
   const modalEl = resultScreen.querySelector('.result-ceremony-modal');
   if (!modalEl) return;
   const crest = modalEl.querySelector('.result-banner');
@@ -1765,7 +1821,7 @@ function animateCeremony() {
 }
 
 function animateMirrorTalents() {
-  if (!profile.motion) return;
+  if (!motionOn()) return;
   const nodes = document.querySelectorAll('.talent-flow-node');
   if (!nodes.length) return;
   gsap.fromTo(
@@ -1776,7 +1832,7 @@ function animateMirrorTalents() {
 }
 
 function animateCodexEntry() {
-  if (!profile.motion) return;
+  if (!motionOn()) return;
   const art = document.querySelector<HTMLElement>('.bestiary-list article');
   if (!art) return;
   const img = art.querySelector<HTMLElement>('img');
@@ -1787,21 +1843,21 @@ function animateCodexEntry() {
 }
 
 function animateProphecies() {
-  if (!profile.motion) return;
+  if (!motionOn()) return;
   const entries = document.querySelectorAll<HTMLElement>('.quest-entry');
   if (!entries.length) return;
   gsap.fromTo(entries, { opacity: 0, y: 12 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.25, ease: 'power2.out', clearProps: 'all' });
 }
 
 function animateChallengeShop() {
-  if (!profile.motion) return;
+  if (!motionOn()) return;
   const items = document.querySelectorAll<HTMLElement>('.challenge-shop-grid .shop-item');
   if (!items.length) return;
   gsap.fromTo(items, { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: 0.03, duration: 0.22, ease: 'power2.out', clearProps: 'all' });
 }
 
 function animatePactRaid() {
-  if (!profile.motion) return;
+  if (!motionOn()) return;
   const cards = document.querySelectorAll<HTMLElement>('.raid-roster button');
   if (cards.length) {
     gsap.fromTo(cards, { opacity: 0, scale: 0.95, y: 8 }, { opacity: 1, scale: 1, y: 0, stagger: 0.03, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
@@ -1815,7 +1871,7 @@ function animatePactRaid() {
 }
 
 function animateSunkenDescent() {
-  if (!profile.motion) return;
+  if (!motionOn()) return;
   const pillars = document.querySelectorAll<HTMLElement>('.endless-rules p');
   if (pillars.length) {
     gsap.fromTo(pillars, { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.24, ease: 'power2.out', clearProps: 'opacity,transform' });
@@ -1926,8 +1982,7 @@ async function presentResult() {
   const description = moreWaves ? t('result.desc.wave') : won && battle.mode === 'adventure' ? storyOutro(battle.floor - 1, profile.narrative ?? {}) : won && battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('result.desc.sandbox') : t('result.desc.raid', { tier: t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never) })) : won ? t('result.desc.room', { n: runWallet.crystal }) : t('result.desc.defeat');
   if (won && battle.mode === 'endless') {
     const cardsHtml = offeredBoons.map(b => {
-      const meta = getBoonMeta(b.id);
-      return `<button class="boon-card" data-boon="${b.id}" style="--card-accent:${meta.color}" aria-label="${escapeUI(b.name)} - ${escapeUI(b.patron)}">
+      return `<button class="boon-card" data-boon="${b.id}" style="--card-accent:${boonColor(b.id)}" aria-label="${escapeUI(b.name)} - ${escapeUI(b.patron)}">
         <span class="boon-card-gem" aria-hidden="true"></span>
         <small class="boon-patron-badge boon-patron-name">${escapeUI(b.patron)}</small>
         <h4 class="boon-name">${escapeUI(b.name)}</h4>
@@ -2244,8 +2299,8 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
   townState.raid = huntTarget ?? contract?.bossId ?? 'golem'; townState.raidTier = contract?.tier ?? 'bronze'; townState.raidModifiers = (contract?.modifiers ?? []).filter(raidModifierAvailable);
   townState.raidSandbox = raid && 'sandbox' in raid ? raid.sandbox : undefined;
   townState.pendingGear = undefined; townState.hero = profile.roster[0]; selectZone(Math.min(profile.cleared.length,CAMPAIGN.length-1));
-  sound.enabled = profile.sound; scene.reducedMotion = !profile.motion;
-  $('sound').setAttribute('aria-pressed', String(profile.sound)); window.document.body.classList.toggle('reduced-motion', !profile.motion);
+  sound.enabled = profile.sound; applyMotion();
+  $('sound').setAttribute('aria-pressed', String(profile.sound));
   if (resumed && mode === document.activeMode) { syncProfileEconomy(profile); savedSignature = `${document.commanderId}:${commander.document!.revision}:${JSON.stringify(context())}`; } else savedSignature = '';
   updateTitleStatus();
   if (inTown && renderTownAfterActivation) showTown(mode === 'story' ? 'camp' : mode === 'raid' ? 'raid' : 'endless');
@@ -2516,13 +2571,17 @@ window.addEventListener('keydown', e => {
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden && !inTown && battle.status === 'fighting') pauseMenu(); });
 scene = new BattleScene(battle, sound, frame);
-scene.reducedMotion = !profile.motion;
-document.body.classList.toggle('reduced-motion', !profile.motion);
-/** The engine's first frame builds every procedural texture in one long task; it starts once the save layer has settled (or after 6 s, for a lookup that never answers) so the Commander is active before the player can act. A battle booted before that renders once the engine starts (scene calls are guarded by `initialized`). */
+/** Push the effective motion setting to the arena (no flashes, shake, hit-stop or boss bob) and the CSS (body.reduced-motion). */
+function applyMotion() { if (scene) scene.reducedMotion = !motionOn(); document.body.classList.toggle('reduced-motion', !motionOn()); }
+applyMotion();
+reduceMotionQuery.addEventListener('change', applyMotion);
+/** The engine's first frame sets up WebGL and the scene (enemy art is registered on first use); it starts once the save layer has settled (or after 6 s, for a lookup that never answers) so the Commander is active before the player can act. A battle booted before that renders once the engine starts (scene calls are guarded by `initialized`). */
 function startEngine() {
   if (initialized) return;
   scene.battle = battle;
-  new Phaser.Game({ type: Phaser.AUTO, parent: 'game-canvas', width: ARENA.width, height: ARENA.height, backgroundColor: '#0e1e19', pixelArt: true, roundPixels: true, antialias: false, scene: [scene], scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, input: { activePointers: 3 }, audio: { noAudio: true }, render: { preserveDrawingBuffer: true }, banner: false });
+  engine = new Phaser.Game({ type: Phaser.AUTO, parent: 'game-canvas', width: ARENA.width, height: ARENA.height, backgroundColor: '#0e1e19', pixelArt: true, roundPixels: true, antialias: false, scene: [scene], scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, input: { activePointers: 3 }, audio: { noAudio: true }, render: { preserveDrawingBuffer: true }, banner: false });
+  // The first frame creates the scene; a player still in town then lets the loop sleep until a battle boots.
+  engine.events.once(Phaser.Core.Events.POST_RENDER, () => engineAwake(!inTown));
   initialized = true;
 }
 // A stalled Commander lookup (IndexedDB that never answers) must not leave progress only in RAM: after 1.5 s the raw legacy save is backed up and the live profile is written to gridbound.v3 until a Commander activates.

@@ -15,7 +15,7 @@
 .star-row .star.on { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 9' shape-rendering='crispEdges'%3E%3Cpath fill='%23f6d27a' d='M4 0h1v1h-1zM3 1h3v2h-3zM0 3h9v1h-9zM1 4h7v1h-7zM2 5h5v2h-5zM1 7h3v1h-3zM5 7h3v1h-3zM1 8h2v1h-2zM6 8h2v1h-2z'/%3E%3Cpath fill='%23fff6c8' d='M4 1h1v1h-1z'/%3E%3C/svg%3E"); }
 .map-node-stars { display: flex; align-items: center; gap: 3px; margin-top: 1px; padding: 1px 4px; border-radius: 3px; background: #000a; }
 .map-node-stars .star-row .star { width: 12px; height: 12px; }
-.heroic-mark { font-style: normal; font-family: var(--pixel); font-size: 7px; padding: 1px 2px; border-radius: 2px; background: var(--danger-deep); color: #ffe2dc; }
+.heroic-mark { font-style: normal; font-family: var(--pixel); font-size: 10px; padding: 1px 2px; border-radius: 2px; background: var(--danger-deep); color: #ffe2dc; }
 .star-goals { display: flex; gap: 10px; align-items: flex-start; margin: 6px 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); }
 .star-goals .star-row { flex: none; padding-top: 2px; }
 .star-goals ul { margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--ink-dim); }
@@ -30,7 +30,7 @@
 .heroic-toggle { margin: 6px 0; }
 .heroic-toggle button[data-heroic="1"][aria-pressed="true"] { border-color: var(--danger); background: var(--danger-deep); color: #ffe2dc; }
 .heroic-note { margin: 6px 0; padding: 6px 8px; border: 1px solid var(--danger); border-radius: var(--radius); background: #2a1512; font-size: 12px; color: #f3d3cc; }
-.heroic-note b { font-family: var(--pixel); font-size: 9px; color: var(--danger); }
+.heroic-note b { font-family: var(--pixel); font-size: 10px; color: var(--danger); }
 .btn.primary.heroic-depart { background: #e89a84; border-color: #ffd3c6; box-shadow: 0 3px 0 #9a4a3a; }
 
 /* Next-step guide in town */
@@ -45,18 +45,18 @@
 .refine-row b { display: block; color: var(--gold); }
 .refine-row small { display: block; font-size: 12px; color: var(--ink-dim); }
 .refine-row .btn { flex: none; }
-.refine-tag { margin-left: 4px; font-family: var(--pixel); font-size: 8px; color: var(--hp); }
+.refine-tag { margin-left: 4px; font-family: var(--pixel); font-size: 10px; color: var(--hp); }
 
 /* Undercroft: depth picker. The scene is its route's scroll panel: rows keep their content height (no stretching when
    short, no squashing when long), so the mode tabs never collapse under the intro. */
 .dungeon-scene { display: grid; align-content: start; grid-auto-rows: max-content; gap: 10px; padding: 10px 12px 18px; }
 .dungeon-scene > .tabs { min-height: max-content; flex-shrink: 0; }
-.dungeon-intro small, .dungeon-hud small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
+.dungeon-intro small, .dungeon-hud small { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
 .dungeon-intro h2, .dungeon-hud h2, .dungeon-result h2 { margin: 6px 0; font-family: var(--pixel); font-size: 14px; line-height: 1.5; color: var(--gold); }
 .dungeon-intro p { margin: 6px 0; color: var(--ink-soft); }
 .dungeon-party { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .dungeon-party > img { width: 32px; height: 32px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); }
-.dungeon-party > span:not(.dungeon-hero) { margin-left: 6px; font-family: var(--pixel); font-size: 9px; color: var(--gold); }
+.dungeon-party > span:not(.dungeon-hero) { margin-left: 6px; font-family: var(--pixel); font-size: 10px; color: var(--gold); }
 .depth-list { display: grid; gap: 6px; }
 .depth-card { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 10px; min-height: 56px; padding: 6px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: linear-gradient(180deg, var(--win-top), var(--win-bot)); color: var(--ink); text-align: left; }
 .depth-card:hover:not(:disabled) { border-color: var(--gold-border); }
@@ -112,7 +112,7 @@
 .room-guardian { width: 52px; height: 52px; border-color: var(--danger); }
 .room-guardian img { width: 34px; height: 34px; }
 .room-panel { padding: 10px 12px; }
-.room-panel small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
+.room-panel small { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
 .room-panel h3 { margin: 6px 0; font-size: 16px; color: var(--ink); }
 .room-panel h3 span { font-size: 13px; color: var(--ink-dim); font-weight: 500; }
 .room-panel p { margin: 6px 0; color: var(--ink-soft); }
@@ -123,7 +123,7 @@
 /* The reason stays readable on the dimmed choice. */
 .choice-need { margin-left: 4px; padding: 1px 6px; border: 1px solid #a8483c; border-radius: var(--radius); background: #4a1f1a; font-style: normal; font-size: 11px; font-weight: 700; color: #ffd9cf; white-space: nowrap; }
 .dungeon-letter { margin: 6px 0; padding: 6px 10px; border-left: 3px solid var(--gold-border); background: var(--inset); }
-.dungeon-letter small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
+.dungeon-letter small { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
 .dungeon-letter p { margin: 4px 0 0 !important; font-style: italic; color: var(--ink) !important; }
 .dungeon-scene .departure-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .dungeon-scene .departure-actions small { flex: 1 1 180px; font-size: 12px; }
@@ -140,7 +140,7 @@
 .dungeon-hp-list img { width: 28px; height: 28px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); }
 .dungeon-hp-list b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dungeon-hp-list .gauge { height: 6px; }
-.dungeon-hp-list small { font-family: var(--pixel); font-size: 8px; color: var(--ink-soft); white-space: nowrap; }
+.dungeon-hp-list small { font-family: var(--pixel); font-size: 10px; color: var(--ink-soft); white-space: nowrap; }
 /* The pixel font has no arrow glyph: the body font draws it. */
 .dungeon-hp-list .hp-arrow { font-family: var(--text); font-size: 12px; line-height: 1; vertical-align: -1px; color: var(--gold); }
 .dungeon-hp-list li.low .gauge i { background: var(--hp-low); }
@@ -161,5 +161,5 @@
 
 /* Lore fragment on a guardian clear */
 .dungeon-lore { margin: 12px 0; padding: 8px 12px; border-left: 3px solid var(--gold-border); background: var(--inset); text-align: left; }
-.dungeon-lore small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
+.dungeon-lore small { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
 .dungeon-lore p { margin: 6px 0 0; font-style: italic; color: var(--ink-soft); }

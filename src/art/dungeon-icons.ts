@@ -18,7 +18,7 @@ export function dungeonIcon(kind: keyof typeof SHAPES): string {
   if (hit) return hit;
   const canvas = document.createElement('canvas');
   canvas.width = 12; canvas.height = 12;
-  const c = canvas.getContext('2d')!;
+  const c = canvas.getContext('2d', { willReadFrequently: true })!;
   const { rows, colors } = SHAPES[kind];
   rows.forEach((row, y) => [...row].forEach((ch, x) => { if (colors[ch]) { c.fillStyle = colors[ch]; c.fillRect(x, y, 1, 1); } }));
   const url = canvas.toDataURL();

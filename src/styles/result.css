@@ -16,7 +16,7 @@
 .xp-card { display: flex; flex-direction: column; align-items: center; gap: 1px; margin: 0; padding: 4px 2px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); text-align: center; }
 .xp-card img { width: 30px; height: 33px; }
 .xp-hero-name { font-weight: 600; font-size: 12px; line-height: 1.1; }
-.xp-points { font-family: var(--pixel); font-size: 8px; color: var(--mana); }
+.xp-points { font-family: var(--pixel); font-size: 10px; color: var(--mana); }
 .xp-catchup { font-family: var(--text); color: var(--ink-dim); }
 .xp-level-badge { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
 .xp-card.leveled-up { border-color: var(--gold-border); }
@@ -47,7 +47,7 @@
 .boon-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 12px 12px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: linear-gradient(180deg, var(--win-top), var(--win-bot)); box-shadow: 0 0 0 3px var(--win-shadow), 0 8px 24px #0008; color: var(--ink); text-align: center; }
 .boon-card:hover, .boon-card:focus-visible { border-color: var(--card-accent, var(--gold)); transform: translateY(-3px); box-shadow: 0 0 0 2px var(--win-shadow), 0 0 18px var(--card-accent, var(--gold)); }
 .boon-card-gem { width: 18px; height: 18px; transform: rotate(45deg); border: 1px solid var(--gold-bright); background: var(--card-accent, var(--gold)); box-shadow: 0 0 10px var(--card-accent, var(--gold)); margin-bottom: 4px; }
-.boon-patron-name { font-family: var(--pixel); font-size: 7px; color: var(--ink-dim); }
+.boon-patron-name { font-family: var(--pixel); font-size: 10px; color: var(--ink-dim); }
 .boon-name { font-size: 18px; color: var(--card-accent, var(--gold)); }
 .boon-desc { font-size: 14px; color: var(--ink-soft); margin: 0; }
 .boon-cta { margin-top: 6px; padding: 4px 14px; border-radius: var(--radius); background: #e6c88d; color: #263329; text-shadow: none; }
@@ -59,7 +59,7 @@
 .boon-tray-card { padding: 6px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); }
 .boon-tray-card h3 { margin: 2px 0 !important; font-size: 16px; }
 .boon-tray-card p { margin: 0; font-size: 13px; color: var(--ink-soft); }
-.boon-patron-badge { font-family: var(--pixel); font-size: 7px; color: var(--ink-dim); }
+.boon-patron-badge { font-family: var(--pixel); font-size: 10px; color: var(--ink-dim); }
 .boon-tray-footer { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .boon-tray-stats { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-soft); }
 .boon-tray-footer .btn { width: 100%; }
@@ -93,7 +93,7 @@
 .dialogue-text { margin: 0; font-size: 16px; line-height: 1.55; white-space: pre-line; }
 .dialogue-box .msg-caret { display: none; }
 .dialogue-box.ready .msg-caret { display: block; }
-.dialogue-count { position: absolute; left: 14px; bottom: 4px; font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); }
+.dialogue-count { position: absolute; left: 14px; bottom: 4px; font-family: var(--pixel); font-size: 10px; color: var(--ink-dim); }
 .dialogue-choices { margin: 10px 0 2px; cursor: default; }
 .dialogue-choices .menu-item { min-height: 44px; padding-left: 26px; text-align: left; border: 1px solid var(--line); background: #0f201acc; }
 .dialogue-choices .menu-item:focus::before { opacity: 1; }
@@ -117,7 +117,7 @@
 
 /* Unlock card (a mode the story just opened) */
 .unlock-card { display: flex; flex-direction: column; gap: 8px; }
-.unlock-kicker { font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); letter-spacing: 1px; }
+.unlock-kicker { font-family: var(--pixel); font-size: 10px; color: var(--ink-dim); letter-spacing: 1px; }
 .unlock-entry { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .unlock-entry p { margin: 4px 0 8px; color: var(--ink-soft); }
 .unlock-entry .btn { width: 100%; }

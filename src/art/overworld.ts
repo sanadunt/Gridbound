@@ -16,7 +16,7 @@ export const MAP_W = 200, MAP_H = 120;
 /** Pixel overworld for one act; nodes are given in percent so the HTML pins line up. */
 export function overworldCanvas(act: number, nodes: { x: number; y: number }[]) {
   const el = document.createElement('canvas'); el.width = MAP_W; el.height = MAP_H;
-  const c = el.getContext('2d')!; c.imageSmoothingEnabled = false;
+  const c = el.getContext('2d', { willReadFrequently: true })!; c.imageSmoothingEnabled = false;
   const b = BIOMES[act] ?? BIOMES[0], random = rng(97 + act * 131);
   for (let y = 0; y < MAP_H; y += 4) for (let x = 0; x < MAP_W; x += 4) rect(c, x, y, 4, 4, b.ground[Math.floor(random() * b.ground.length)]);
   // River across the map.

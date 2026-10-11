@@ -4,8 +4,12 @@ import { withBrowser } from './browser-harness.mjs';
 const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5180/';
 await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) => {
   await send('Page.navigate', { url });
-  await wait('window.gridbound?.scene?.textures?.exists("dragon-auric-0")', 25000);
-  const textures = await evaluate(`Object.keys(window.gridbound.scene.textures.list).filter(k=>/^(wolf|goblin|spider|shaman|golem|wraith|treant|dragon|moth|basilisk|crab|revenant)(-ash|-frost|-auric)?-0$/.test(k)).map(k=>window.gridbound.scene.textures.get(k).getSourceImage().toDataURL())`);
+  await wait('window.gridbound?.scene?.textures?.exists("dragon-0")', 25000);
+  // Enemy art is registered on first use: boot builds the opening boss only (WP11), not every enemy and variant.
+  const families = /^(wolf|goblin|spider|shaman|golem|wraith|treant|dragon|moth|basilisk|crab|revenant)(-ash|-frost|-auric)?-0$/;
+  const atBoot = await evaluate(`Object.keys(window.gridbound.scene.textures.list).filter(k=>${families}.test(k)&&!k.startsWith('dragon-0')).length`);
+  assert.ok(atBoot <= 1, `boot registers at most the opening boss, got ${atBoot}`);
+  const textures = await evaluate(`['wolf','goblin','spider','shaman','golem','wraith','treant','dragon','moth','basilisk','crab','revenant'].flatMap(id=>['','-ash','-frost','-auric'].map(v=>id+v)).map(id=>window.gridbound.scene.textures.get(window.gridbound.scene.enemyTexture(id,0)).getSourceImage().toDataURL())`);
   assert.equal(textures.length, 48);
   assert.equal(new Set(textures).size, 48, 'each monster variant is actually visually distinct');
   await click.nav('campaign');

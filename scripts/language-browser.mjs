@@ -10,11 +10,11 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
   const read = () => evaluate(`({ lang: document.documentElement.lang, spot: document.querySelector('.town-spot[data-facility="campaign"]').getAttribute('aria-label'),
     enemy: (window.gridbound.boot('adventure', 1), document.querySelector('#boss-title').textContent) })`);
   const english = await read();
-  assert.deepEqual(english, { lang: 'en', spot: 'Gate · Story', enemy: 'CINDER WOLF' }); // the building and its destination's one name
+  assert.deepEqual(english, { lang: 'en', spot: 'Gate · Story · the next chapter waits', enemy: 'CINDER WOLF' }); // the building, its destination's one name and its badge
   await send('Page.reload');
   await wait('Boolean(window.gridbound && document.querySelector(".camp-scene"))');
 
-  for (const [code, expected] of [['id', { lang: 'id', spot: 'Gerbang · Cerita', enemy: 'SERIGALA BARA' }], ['en', english]]) {
+  for (const [code, expected] of [['id', { lang: 'id', spot: 'Gerbang · Cerita · bab berikutnya menunggu', enemy: 'SERIGALA BARA' }], ['en', english]]) {
     await click('#settings');
     await wait(`Boolean(document.querySelector('#modal [data-lang="${code}"]'))`);
     await evaluate('window.__beforeSwitch = true');

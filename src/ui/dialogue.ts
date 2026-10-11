@@ -37,9 +37,17 @@ export function playDialogue(host: HTMLElement, options: DialogueOptions): Promi
     scene.innerHTML = `${options.backdrop ? `<img class="dialogue-backdrop" src="${options.backdrop}" alt=""/>` : ''}<div class="dialogue-shade"></div>
       <button class="btn dialogue-skip" type="button">${t('dialogue.skip')} ▶▶</button>
       ${options.title ? `<div class="dialogue-card"><small>${escape(options.kicker ?? '')}</small><h2>${escape(options.title)}</h2>${options.subtitle ? `<p>${escape(options.subtitle)}</p>` : ''}</div>` : ''}
-      <div class="dialogue-box msg-window" hidden><div class="dialogue-speaker" hidden><img alt=""/><span><b></b><small></small></span></div><p class="dialogue-text" aria-live="polite"></p><nav class="dialogue-choices menu-list" hidden></nav><span class="msg-caret" aria-hidden="true">▼</span><span class="dialogue-count"></span></div>
-      <div class="dialogue-card dialogue-end" hidden><small></small><h2></h2><p></p></div>`;
+      <div class="dialogue-box msg-window" hidden><div class="dialogue-speaker" hidden><img alt=""/><span><b></b><small></small></span></div><p class="dialogue-text" aria-hidden="true"></p><nav class="dialogue-choices menu-list" hidden></nav><span class="msg-caret" aria-hidden="true">▼</span><span class="dialogue-count"></span></div>
+      <div class="dialogue-card dialogue-end" hidden><small></small><h2></h2><p></p></div>
+      <p class="dialogue-live sr-only" role="status" aria-live="polite" aria-atomic="true"></p>`;
+    // The rest of the page is inert while the scene plays (no Tab or click into the town behind it); only what this scene made inert is restored.
+    // Status regions (the save status, the battle announcer) hold no controls and stay live, so a save warning is still spoken.
+    const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+    const behind = Array.from(host.children).filter((el): el is HTMLElement => el instanceof HTMLElement && !el.inert && el.getAttribute('role') !== 'status');
+    behind.forEach(el => { el.inert = true; el.dataset.dialogueInert = '1'; });
     host.append(scene);
+    /** Screen readers get each page once, whole (the typewriter text itself is aria-hidden). */
+    const live = scene.querySelector<HTMLElement>('.dialogue-live')!, speak = (...parts: (string | undefined)[]) => { live.textContent = parts.filter(Boolean).join('. '); };
     const box = scene.querySelector<HTMLElement>('.dialogue-box')!, card = scene.querySelector<HTMLElement>('.dialogue-card:not(.dialogue-end)');
     const speaker = scene.querySelector<HTMLElement>('.dialogue-speaker')!, text = scene.querySelector<HTMLElement>('.dialogue-text')!;
     const count = scene.querySelector<HTMLElement>('.dialogue-count')!, choices = scene.querySelector<HTMLElement>('.dialogue-choices')!, end = scene.querySelector<HTMLElement>('.dialogue-end')!;
@@ -51,7 +59,14 @@ export function playDialogue(host: HTMLElement, options: DialogueOptions): Promi
       clearInterval(timer);
       window.removeEventListener('keydown', onKey, true);
       scene.classList.add('closing');
-      window.setTimeout(() => { scene.remove(); resolve(picked); }, options.motion ? 220 : 0);
+      behind.forEach(el => { if (el.dataset.dialogueInert) { el.inert = false; delete el.dataset.dialogueInert; } });
+      window.setTimeout(() => {
+        const focusWasInside = scene.contains(document.activeElement) || document.activeElement === document.body;
+        scene.remove();
+        // Hand the focus back to whatever had it before the scene (when it is still there and nothing else took it).
+        if (focusWasInside && opener?.isConnected && !opener.closest('[hidden],[inert]')) opener.focus({ preventScroll: true });
+        resolve(picked);
+      }, options.motion ? 220 : 0);
     };
     const typing = () => shown < full.length;
     const choiceButtons = () => Array.from(choices.querySelectorAll<HTMLButtonElement>('.dialogue-choice'));
@@ -89,6 +104,7 @@ export function playDialogue(host: HTMLElement, options: DialogueOptions): Promi
         end.querySelector('small')!.textContent = page.card.kicker ?? '';
         end.querySelector('h2')!.textContent = page.card.title;
         end.querySelector('p')!.textContent = page.card.subtitle ?? '';
+        speak(page.card.kicker, page.card.title, page.card.subtitle);
         return;
       }
       box.hidden = false;
@@ -102,6 +118,7 @@ export function playDialogue(host: HTMLElement, options: DialogueOptions): Promi
       }
       full = page.text;
       count.textContent = `${index + 1}/${pages.length}`;
+      live.textContent = page.speaker ? `${page.speaker}: ${full}` : full;
       clearInterval(timer);
       if (!options.motion) { shown = full.length; text.textContent = full; ready(); return; }
       shown = 0; text.textContent = ''; box.classList.remove('ready');
@@ -140,6 +157,7 @@ export function playDialogue(host: HTMLElement, options: DialogueOptions): Promi
     if (!pages.length) { finish(); return; }
     // Focus Skip first: a question page rendered right away moves focus on to its first choice.
     scene.querySelector<HTMLElement>('.dialogue-skip')!.focus({ preventScroll: true });
+    if (card) speak(options.kicker, options.title, options.subtitle);
     render();
     if (card && options.motion) window.setTimeout(() => { if (!done && index < 0) advance(); }, 1800);
     else if (card) advance();

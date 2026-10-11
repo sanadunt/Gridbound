@@ -64,7 +64,7 @@ export function itemIcon(slot: ItemSlot, rarity = 'common', empty = false): stri
   if (hit) return hit;
   const canvas = document.createElement('canvas');
   canvas.width = 16; canvas.height = 16;
-  const c = canvas.getContext('2d')!;
+  const c = canvas.getContext('2d', { willReadFrequently: true })!;
   const main = empty ? '#3d5648' : RARITY_COLORS[rarity] ?? RARITY_COLORS.common;
   const palette: Record<string, string> = empty
     ? { h: '#4e6650', m: '#2d4538', g: '#3d5648', w: '#4e6650' }

@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import { Battle, ENRAGE_AT, type BattleEvent } from '../game/simulation';
 import { installArt, heroCanvas, heroKey } from '../art/pixels';
 import { monsterCanvas } from '../art/monsters';
-import { ENEMIES } from '../game/world';
 import { KITS, type ClassId } from '../game/content';
 import { Sound } from '../audio/sound';
 import { t, lang } from '../i18n';
@@ -55,7 +54,6 @@ export class BattleScene extends Phaser.Scene {
  }
  create(){
   installArt(this);
-  for(const id of Object.keys(ENEMIES).filter(id=>id!=='dragon'))for(let frame=0;frame<8;frame++)this.textures.addCanvas(`${id}-${frame}`,monsterCanvas(id,frame));
   this.bg=this.add.image(300,380,'ruins').setScale(2);this.floor=this.add.graphics().setDepth(2);
   this.dragon=this.add.image(300,200,'dragon-0').setScale(2.28).setDepth(5);
   this.threats=this.add.graphics().setDepth(7);this.fx=this.add.graphics().setDepth(20);this.flashRect=this.add.rectangle(300,380,600,760,0xffffff,0).setDepth(45);this.resetEnemyDeathAnimation();this.syncHeroes();
@@ -79,7 +77,7 @@ export class BattleScene extends Phaser.Scene {
  private resetEnemyDeathAnimation(){
   this.enemyDeathWaiters.splice(0).forEach(resolve=>resolve());
   this.enemyDeathElapsed=0;this.enemyDeathDuration=ENEMY_DEATH_ANIMATION_MS;this.enemyDeathEnemyId=this.battle.enemyId;this.enemyDeathStarted=false;this.enemyDeathComplete=true;
-  if(this.dragon?.active){const texture=`${this.battle.enemyId}-0`,scale=this.battle.enemyId==='dragon'?2.28:1.95;if(this.textures.exists(texture))this.dragon.setTexture(texture);this.dragon.setPosition(300,194).setScale(scale).setAlpha(1).setRotation(0).clearTint();}
+  if(this.dragon?.active){const scale=this.battle.enemyId==='dragon'?2.28:1.95;this.dragon.setTexture(this.enemyTexture(this.battle.enemyId,0));this.dragon.setPosition(300,194).setScale(scale).setAlpha(1).setRotation(0).clearTint();}
  }
 
  private ensureEnemyDeathAnimation(){
@@ -106,6 +104,8 @@ export class BattleScene extends Phaser.Scene {
 
  private deathProgress(){return Math.min(1,this.enemyDeathDuration>0?this.enemyDeathElapsed/this.enemyDeathDuration:1);}
 
+ /** An enemy's sprite frame (`${id}-${frame}`). Enemy art is registered on first use, all 8 frames at once so the idle loop never stalls mid-fight: boot no longer builds every enemy and variant. */
+ enemyTexture(id:string,frame:number){const key=`${id}-${frame}`;if(!this.textures.exists(key))for(let f=0;f<8;f++)if(!this.textures.exists(`${id}-${f}`))this.textures.addCanvas(`${id}-${f}`,monsterCanvas(id,f));return key;}
  /** A hero's sprite frame: roster heroes with accents get their own texture (made on first use); Roguelike recruits use the class sprite. */
  private heroTexture(h:{id:number;classId:ClassId},frame:number){const look=this.battle.mode==='endless'?undefined:h.id,key=`${heroKey(h.classId,look)}-${frame}`;if(!this.textures.exists(key))this.textures.addCanvas(key,heroCanvas(h.classId,frame,look));return key;}
  private syncHeroes(){if(!this.floor)return;for(const h of this.battle.heroes){if(this.heroes.has(h.id))continue;const p=center(h.slot);this.heroes.set(h.id,this.add.image(p.x,p.y-HERO_LIFT,this.heroTexture(h,0)).setScale(HERO_SCALE).setDepth(9));}}
@@ -126,7 +126,7 @@ export class BattleScene extends Phaser.Scene {
   if(this.introLeft>0)this.introLeft-=dt;if(this.bossKick>0)this.bossKick-=dt;if(b.status==='victory')this.victoryAge+=dt;else this.victoryAge=0;
   const intro=this.introLeft>0?this.introLeft/.45:0,kick=this.bossKick>0?this.bossKick/.14:0;
   const bossFrame=death&&this.enemyDeathComplete?0:this.reducedMotion?0:Math.floor(t*7)%8,idleBob=death||this.reducedMotion?0:Math.sin(t*1.8)*5,shakeScale=charging&&!this.reducedMotion?Math.sin(t*16)*.035:0;
-  this.dragon.setTexture(`${b.enemyId}-${bossFrame}`).setY(194+idleBob-intro*intro*70-kick*10+(death&&!this.reducedMotion?collapse*34:0)).setX(300+(kick>0?Math.sin(t*90)*4*kick:0)).setScale(baseScale*(1+(!this.reducedMotion?collapse*.08:0)+shakeScale),baseScale*(1-(death&&!this.reducedMotion?collapse*.72:0)));
+  this.dragon.setTexture(this.enemyTexture(b.enemyId,bossFrame)).setY(194+idleBob-intro*intro*70-kick*10+(death&&!this.reducedMotion?collapse*34:0)).setX(300+(kick>0?Math.sin(t*90)*4*kick:0)).setScale(baseScale*(1+(!this.reducedMotion?collapse*.08:0)+shakeScale),baseScale*(1-(death&&!this.reducedMotion?collapse*.72:0)));
   this.dragon.setAlpha(death?Math.max(0,1-progress):1).setRotation(death&&!this.reducedMotion?collapse*.18:0);if(this.pulse>0){this.pulse-=dt;this.dragon.setTintFill(0xffffff);}else if(death)this.dragon.setTint(0xf1c77f);else if(b.stageTime>ENRAGE_AT)this.dragon.setTint(0xffb0a4);else this.dragon.clearTint();
   if(this.shake>0&&!this.reducedMotion){this.shake-=dt;this.cameras.main.setScroll(Math.sin(t*80)*this.shake*9,Math.cos(t*70)*this.shake*7);}else this.cameras.main.setScroll(0,0);
   // Slot borders remain visible beneath effects and communicate the legal drop area.
@@ -158,7 +158,7 @@ export class BattleScene extends Phaser.Scene {
    if(danger.type==='target'){const marked=center(s);this.threats.lineStyle(3,0xffce91).strokeCircle(marked.x,marked.y-HERO_LIFT,33);this.threats.lineBetween(marked.x,marked.y-HERO_LIFT-42,marked.x,marked.y-HERO_LIFT-22);}
    if(b.status==='fighting'&&danger.type==='meteor'&&danger.left<.55&&!this.reducedMotion){const hit=center(s),yy=hit.y-230*(danger.left/.55);this.fx.fillStyle(0xfac589,.9).fillRect(hit.x-4,yy,8,13);this.fx.fillStyle(0xee9970,.5).fillRect(hit.x-2,yy-17,4,19);this.particle(hit.x,yy,0xfac589,3,.25,0,-20,0);}
   }}
-  for(const m of b.minions){let spr=this.enemies.get(m.id);if(!spr){spr=this.add.image(144+m.lane*156,320,`${m.enemyId??'goblin'}-0`).setScale(.42).setDepth(6);this.enemies.set(m.id,spr);}spr.y=321+(this.reducedMotion?0:Math.sin(t*4+m.lane)*3);this.threats.fillStyle(0x102621).fillRect(spr.x-23,348,46,3);this.threats.fillStyle(0xd6be78).fillRect(spr.x-23,348,46*m.hp/m.maxHp,3);}
+  for(const m of b.minions){let spr=this.enemies.get(m.id);if(!spr){spr=this.add.image(144+m.lane*156,320,this.enemyTexture(m.enemyId??'goblin',0)).setScale(.42).setDepth(6);this.enemies.set(m.id,spr);}spr.y=321+(this.reducedMotion?0:Math.sin(t*4+m.lane)*3);this.threats.fillStyle(0x102621).fillRect(spr.x-23,348,46,3);this.threats.fillStyle(0xd6be78).fillRect(spr.x-23,348,46*m.hp/m.maxHp,3);}
   for(const [id,spr] of this.enemies){if(!b.minions.some(m=>m.id===id)){spr.destroy();this.enemies.delete(id);}}
   // Turrets: a brass marker in their lane that fades as the 6 s run out.
   b.turrets.forEach((tur,i)=>{const n=b.turrets.slice(0,i).filter(o=>o.lane===tur.lane).length,x=144+tur.lane*156-26+n*18,y=356,a=.3+.7*Math.max(0,Math.min(1,tur.left/6));this.threats.fillStyle(0x2a2212,a).fillRect(x-7,y,14,8);this.threats.fillStyle(0xe0b860,a).fillRect(x-6,y+1,12,6).fillRect(x-1,y-6,3,7);this.threats.fillStyle(0xe0b860,a*.8).fillRect(x-7,y+10,14*Math.max(0,Math.min(1,tur.left/6)),2);});

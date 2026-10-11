@@ -64,7 +64,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await wait('window.gridbound.coachStep === "tap" && !document.querySelector("#coach").hidden');
   assert.match(await evaluate('document.querySelector("#coach .coach-text").textContent'), /^Tap Aldric/);
   await screenshot('artifacts/town-ux-coach-tap-390.png');
-  await click('#unit-layer [data-tap="0"]'); await click('#unit-layer [data-tap="0"]');
+  // Two taps on the same hero need 0.11 s of battle time between them (tap cooldown): step past it instead of relying on a slow page.
+  await click('#unit-layer [data-tap="0"]'); await evaluate('window.gridbound.step(0.12)'); await click('#unit-layer [data-tap="0"]');
   await evaluate('window.gridbound.step(0.05)');
   await wait('window.gridbound.coachStep !== "tap"');
   for (let i = 0; i < 120 && await evaluate('window.gridbound.coachStep') !== 'drag'; i++) await evaluate('window.gridbound.step(0.25)');

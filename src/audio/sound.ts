@@ -8,6 +8,23 @@ export class Sound {
   private ctx?: AudioContext;
   private last = -Infinity;
   private lastSupport = -Infinity;
+  /** One second of white noise per context, shared by every burst (a burst plays a random slice of it). */
+  private noise?: AudioBuffer;
+  /** The context was suspended because the page was hidden (so coming back resumes it, but never one the player muted or never unlocked). */
+  private hiddenSuspend = false;
+
+  constructor() {
+    // Phones keep a running AudioContext awake in the background: suspend it while the page is hidden.
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => this.visibility(document.hidden));
+  }
+
+  /** Suspend on hidden, resume on visible. Resuming needs an earlier user gesture; if the browser refuses, the next tap's unlock() resumes it. */
+  visibility(hidden: boolean) {
+    const c = this.ctx;
+    if (!c) return;
+    if (hidden) { if (c.state === 'running') { this.hiddenSuspend = true; void c.suspend().catch(() => {}); } return; }
+    if (this.hiddenSuspend) { this.hiddenSuspend = false; void c.resume().catch(() => {}); }
+  }
 
   private castCue(kind: string) {
     if (kind === 'heal' || kind === 'regen') {
@@ -184,17 +201,16 @@ export class Sound {
   private noiseBurst(duration = 0.1, volume = 0.02, filterFreq = 1200, filterType: BiquadFilterType = 'bandpass') {
     if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
     const c = this.ctx;
-    const bufferSize = Math.floor(c.sampleRate * duration);
-    if (bufferSize <= 0) return;
-
-    const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
+    if (duration <= 0) return;
+    if (!this.noise || this.noise.sampleRate !== c.sampleRate) {
+      this.noise = c.createBuffer(1, c.sampleRate, c.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
     }
+    const length = Math.min(duration, this.noise.duration);
 
     const noise = c.createBufferSource();
-    noise.buffer = buffer;
+    noise.buffer = this.noise;
 
     const filter = c.createBiquadFilter();
     filter.type = filterType;
@@ -208,7 +224,7 @@ export class Sound {
     filter.connect(gain);
     gain.connect(c.destination);
 
-    noise.start();
+    noise.start(c.currentTime, Math.random() * (this.noise.duration - length), length);
   }
 
   /** Tactile metallic coin clink for UI clicks and tabs */

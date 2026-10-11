@@ -1,10 +1,13 @@
 import { dragon } from './pixels';
 type C = CanvasRenderingContext2D;
-function canvas(w:number,h:number) {const el=document.createElement('canvas');el.width=w;el.height=h;const c=el.getContext('2d')!;c.imageSmoothingEnabled=false;return {el,c};}
+function canvas(w:number,h:number) {const el=document.createElement('canvas');el.width=w;el.height=h;const c=el.getContext('2d',{willReadFrequently:true})!;c.imageSmoothingEnabled=false;return {el,c};}
 const rect=(c:C,x:number,y:number,w:number,h:number,color:string)=>{c.fillStyle=color;c.fillRect(Math.round(x),Math.round(y),w,h);};
 const poly=(c:C,points:number[][],color:string)=>{c.fillStyle=color;c.beginPath();points.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();c.fill();};
 const ink='#102720';
 
+const portraits=new Map<string,string>();
+/** An enemy's first frame as a data URL, cached for the page (quarry tiles, the Bestiary, the chapter dossier). */
+export function monsterDataURL(id:string){let url=portraits.get(id);if(!url)portraits.set(id,url=monsterCanvas(id).toDataURL());return url;}
 export function monsterCanvas(id:string,frame=0) {
  if(id.includes('-')){const base=monsterCanvas(id.split('-')[0],frame),{el,c}=canvas(base.width,base.height);c.drawImage(base,0,0);c.globalCompositeOperation='source-atop';c.fillStyle=id.endsWith('frost')?'#8ccaff44':id.endsWith('auric')?'#ffbd6644':'#ff876644';c.fillRect(0,0,el.width,el.height);c.globalCompositeOperation='source-over';return el;}
   if(id==='dragon')return dragon(frame);

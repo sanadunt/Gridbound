@@ -4,7 +4,7 @@ import { type ClassId, KITS } from '../game/content';
 type C = CanvasRenderingContext2D;
 const rect=(c:C,x:number,y:number,w:number,h:number,color:string)=>{c.fillStyle=color;c.fillRect(Math.round(x),Math.round(y),w,h);};
 const poly=(c:C,points:number[][],color:string)=>{c.fillStyle=color;c.beginPath();points.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();c.fill();};
-function canvas(w:number,h:number){const el=document.createElement('canvas');el.width=w;el.height=h;const c=el.getContext('2d')!;c.imageSmoothingEnabled=false;return {el,c};}
+function canvas(w:number,h:number){const el=document.createElement('canvas');el.width=w;el.height=h;const c=el.getContext('2d',{willReadFrequently:true})!;c.imageSmoothingEnabled=false;return {el,c};}
 const ink='#111d25',SKIN='#e9bb89',SHADE='#ab7867';
 
 /** Per-hero accents keyed by roster id, so heroes who share a class look different: cloth and trim colours, skin, a hair fringe, a beard. */

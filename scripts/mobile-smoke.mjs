@@ -3,7 +3,7 @@ import { withBrowser } from './browser-harness.mjs';
 const url=process.env.GRIDBOUND_URL||'http://127.0.0.1:5180/';
 for(const width of [360,390])await withBrowser(async({send,evaluate,wait,click,key,screenshot,errors})=>{
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`localStorage.removeItem('gridbound.v3');localStorage.removeItem('gridbound.v2');`});
- await send('Page.navigate',{url});await wait('window.gridbound && window.gridbound.scene?.textures?.exists("dragon-auric-0")');
+ await send('Page.navigate',{url});await wait('window.gridbound && window.gridbound.scene?.textures?.exists("dragon-0")');
  const fits=async()=>assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),`No horizontal overflow ${width}`);
  await fits();await screenshot(`artifacts/town-${width}.png`);
  await click.nav('party');await click.nav('party-advanced');await click('[data-training-tab="jobs"]');await fits();

@@ -3,7 +3,7 @@ import { MAX_STARS, STARS_PER_CHEST, STAR_PAR_SECONDS, claimableChests, heroicRe
 import { CAMPAIGN, ENEMIES } from '../game/world';
 import { canEnterZone, chapterReward, replayFactor, type Profile } from '../game/profile';
 import { ROSTER } from '../game/content';
-import { monsterCanvas } from '../art/monsters';
+import { monsterDataURL } from '../art/monsters';
 import { overworldCanvas } from '../art/overworld';
 import { expeditionModes, type TownState } from './town';
 import { t, type StringKey } from '../i18n';
@@ -63,7 +63,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
   }).join('');
   const dossier = `<article class="win mission-brief world-map-dossier" aria-label="${t('map.dossier')}">
     <header class="dossier-header"><small>${escape(zone.speaker)}</small><h3>${escape(zone.name)}</h3><p class="zone-subtitle">${escape(zone.subtitle)}</p></header>
-    <div class="dossier-boss-card"><div class="boss-avatar-frame"><img src="${cached(`m-${finalStage.enemy}`, () => monsterCanvas(finalStage.enemy))}" alt="${escape(finalStage.enemyName ?? boss.name)}"/></div>
+    <div class="dossier-boss-card"><div class="boss-avatar-frame"><img src="${monsterDataURL(finalStage.enemy)}" alt="${escape(finalStage.enemyName ?? boss.name)}"/></div>
       <div class="boss-intel"><small>${t('map.boss')}</small><h4>${escape(finalStage.enemyName ?? boss.name)}</h4><small class="dossier-boss-title">${escape(finalStage.enemyTitle ?? boss.title)}</small>
         <div class="intent-row">${boss.patterns.map((intent, i) => `<span class="intent-chip intent-${intent}">${i + 1}. ${t(`intent.${intent}` as StringKey)}</span>`).join('')}</div></div></div>
     ${heroicOpen ? `<nav class="tabs heroic-toggle" aria-label="${t('heroic.heroic')}"><button data-heroic="0" aria-pressed="${!heroic}">${t('heroic.normal')}</button><button data-heroic="1" aria-pressed="${heroic}">${t('heroic.heroic')}${heroicDone ? ' ✓' : ''}</button></nav>` : ''}

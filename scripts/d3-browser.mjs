@@ -22,7 +22,7 @@ try {
   assert.equal((await fetch(url)).status,200);
   await withBrowser(async ({send,evaluate,wait,click,screenshot,errors})=>{
     await send('Page.navigate',{url});
-    await wait('window.gridbound?.scene?.textures?.exists("dragon-auric-0")');
+    await wait('window.gridbound?.scene?.textures?.exists("dragon-0")');
 
     assert.deepEqual(await evaluate('window.gridbound.profile().storyActive'),[0,4,3]);
     await click.nav('campaign');

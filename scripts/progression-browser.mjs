@@ -4,7 +4,7 @@ const url=process.env.GRIDBOUND_URL||'http://127.0.0.1:5180/';
 for(const width of [390,1440])await withBrowser(async({send,evaluate,wait,click,screenshot,errors})=>{
  const legacy=JSON.stringify({version:2,gold:20000,cleared:[0,1,2,3],wins:4,bestFloor:0,loadouts:{0:{skills:[0,1],talents:['focus','mastery','vigor'],gear:{},inventory:[],slot:0}}});
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`if(!localStorage.getItem('gridbound.v2'))localStorage.setItem('gridbound.v2',${JSON.stringify(legacy)})`});
- await send('Page.navigate',{url});await wait('window.gridbound?.scene?.textures?.exists("revenant-auric-0")');
+ await send('Page.navigate',{url});await wait('window.gridbound?.scene?.textures?.exists("dragon-0")');
  const fits=async()=>assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),`overflow at ${width}`);
  const select=async(selector,value)=>evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.value=${JSON.stringify(value)};el.dispatchEvent(new Event('change',{bubbles:true}));})()`);
  assert.equal(await evaluate("localStorage.getItem('gridbound.v2')"),legacy);
@@ -44,12 +44,12 @@ for(const width of [390,1440])await withBrowser(async({send,evaluate,wait,click,
  await click('#result-town');await wait('document.querySelector("#town-screen:not([hidden])")');await click.nav('more');await click.nav('quests');await select('[data-quest-filter]','all');
  await seek('hunt-moth');await click('[data-claim-quest="hunt-moth"]');
  assert.ok((await evaluate('window.gridbound.profile().claimedQuests')).includes('hunt-moth'));
- await send('Page.reload');await wait('window.gridbound?.scene?.textures?.exists("revenant-auric-0")');
+ await send('Page.reload');await wait('window.gridbound?.scene?.textures?.exists("dragon-0")');
  assert.ok(await evaluate('window.gridbound.profile().loadouts[0].xp')>=banked);
  assert.equal(await evaluate("localStorage.getItem('gridbound.v2')"),legacy);
  await click.nav('party');assert.ok((await evaluate('window.gridbound.profile().loadouts[0].talents')).includes('assault-root'));
  assert.equal(await evaluate('window.gridbound.profile().loadouts[0].gear.weapon'),'scout-weapon');await fits();
- await evaluate("localStorage.setItem('gridbound.v3','{invalid')");await send('Page.reload');await wait('window.gridbound?.scene?.textures?.exists("revenant-auric-0")');
+ await evaluate("localStorage.setItem('gridbound.v3','{invalid')");await send('Page.reload');await wait('window.gridbound?.scene?.textures?.exists("dragon-0")');
  assert.equal(await evaluate("localStorage.getItem('gridbound.v3')"),'{invalid');
  assert.match(await evaluate('document.querySelector("#storage-status").textContent'),/corrupted|protected|overwrit/);
  assert.deepEqual(errors,[]);console.log('PASS RPG browser',width,'v2 migration, 34-node tree/SP, set equipment, 30 quests/claims, hunt variant, XP settlement, reload and corrupt-save protection');

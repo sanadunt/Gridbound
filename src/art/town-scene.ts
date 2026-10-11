@@ -32,7 +32,7 @@ const F = ['#16282c', '#1b3233', '#223d3a', '#2c4c43', '#3b5f4c'];              
 function mk(w: number, h: number) {
   const el = document.createElement('canvas');
   el.width = w; el.height = h;
-  const c = el.getContext('2d')!;
+  const c = el.getContext('2d', { willReadFrequently: true })!;
   c.imageSmoothingEnabled = false;
   return { el, c };
 }
@@ -571,6 +571,10 @@ export function townSceneCanvas(): HTMLCanvasElement {
   shade(c, lights);
   return el;
 }
+
+let sceneURL = '';
+/** The town scene as a data URL, drawn once per page (the title backdrop and the camp share it: each draw runs a full-frame lighting pass). */
+export function townSceneDataURL(): string { return sceneURL ||= townSceneCanvas().toDataURL(); }
 
 /** Animated flames for the plaza campfire: 16×24, transparent, frame % 4. */
 export function campfireCanvas(frame: number): HTMLCanvasElement {

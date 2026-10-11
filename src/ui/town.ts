@@ -13,8 +13,8 @@ import { questBoard } from './quests';
 import { heroCanvas, heroKey } from '../art/pixels';
 import { itemIcon, type ItemSlot } from '../art/items';
 import { dungeonIcon } from '../art/dungeon-icons';
-import { monsterCanvas } from '../art/monsters';
-import { townSceneCanvas, campfireCanvas, smokeCanvas, TOWN_HOTSPOTS, TOWN_W, TOWN_H, PLAZA, CAMPFIRE, CHIMNEYS, SMOKE_SIZE } from '../art/town-scene';
+import { monsterCanvas, monsterDataURL } from '../art/monsters';
+import { townSceneDataURL, campfireCanvas, smokeCanvas, TOWN_HOTSPOTS, TOWN_W, TOWN_H, PLAZA, CAMPFIRE, CHIMNEYS, SMOKE_SIZE } from '../art/town-scene';
 import { renderWorldMap } from './world-map';
 import { dungeonScene } from './dungeon';
 import { heroPower, partyPower, powerVerdict, recommendedPower } from '../game/power';
@@ -59,22 +59,17 @@ export type TownState = {
 };
 
 const portraits = new Map<string, string>();
-let townImage = '', fireStrip = '', smokeStrip = '';
+let fireStrip = '', smokeStrip = '';
 /** A hero portrait, cached by look: pass the roster id so heroes who share a class keep their own colours. */
 export function portrait(classId: keyof typeof KITS, frame = 0, hero?: number) {
   const key = `${heroKey(classId, hero)}-${frame}`;
   if (!portraits.has(key)) portraits.set(key, heroCanvas(classId, frame, hero).toDataURL());
   return portraits.get(key)!;
 }
-function monster(id: string) {
-  const key = `enemy-${id}`;
-  if (!portraits.has(key)) portraits.set(key, monsterCanvas(id).toDataURL());
-  return portraits.get(key)!;
-}
 function strip(frames: HTMLCanvasElement[]) {
   const out = document.createElement('canvas');
   out.width = frames[0].width * frames.length; out.height = frames[0].height;
-  const c = out.getContext('2d')!; c.imageSmoothingEnabled = false;
+  const c = out.getContext('2d', { willReadFrequently: true })!; c.imageSmoothingEnabled = false;
   frames.forEach((frame, i) => c.drawImage(frame, i * frame.width, 0));
   return out.toDataURL();
 }
@@ -126,7 +121,7 @@ export function storyNext(p: Profile) {
 const SPOT_FEATURE: Partial<Record<string, Feature>> = { chapel: 'dungeon', lodge: 'raid', well: 'endless' };
 
 function campScene(p: Profile) {
-  townImage ||= townSceneCanvas().toDataURL();
+  const townImage = townSceneDataURL();
   fireStrip ||= strip([0, 1, 2, 3].map(frame => campfireCanvas(frame)));
   smokeStrip ||= strip([0, 1, 2, 3].map(frame => smokeCanvas(frame)));
   const party = (p.storyActive.length ? p.storyActive : p.roster.slice(0, 3)).slice(0, 4);
@@ -138,13 +133,14 @@ function campScene(p: Profile) {
     // on a narrow map (small phones) only the first line shows (town.css), the destination stays in the button's label.
     const name = t(SPOT_LABELS[spot.id] ?? 'town.name'), dest = 'facility' in spot.target ? routeTitle(spot.target.facility as TownTab) : t('menu.save'), role = locked ? t('unlock.clear', { n: UNLOCKS[feature!] }) : dest;
     const target = locked ? `data-locked="${feature}"` : 'facility' in spot.target ? `data-facility="${spot.target.facility}"` : `data-open-action="${spot.target.action}"`;
-    const flag = locked ? ''
-      : feature && isNew(p, feature) ? `<i class="spot-flag spot-new" aria-hidden="true">${t('unlock.new')}</i>`
-      : spot.id === 'gate' && p.cleared.length < CAMPAIGN.length ? '<i class="spot-flag" aria-hidden="true">!</i>'
-      : spot.id === 'guild' && questsReady ? `<i class="spot-flag" aria-hidden="true">${questsReady}</i>`
-      : spot.id === 'hall' && training ? `<i class="spot-flag" aria-hidden="true">${training}</i>`
-      : spot.id === 'chapel' && below ? '<i class="spot-flag" aria-hidden="true">!</i>' : '';
-    return `<button class="town-spot ${locked ? 'locked' : ''}" data-spot="${spot.id}" ${target} style="left:${spot.x}%;top:${spot.y}%;width:${spot.w}%;height:${spot.h}%" aria-label="${escape(locked ? `${name} · ${dest} · ${role}` : `${name} · ${dest}`)}"><span class="town-sign" style="left:${(spot.signX - spot.x) / spot.w * 100}%;top:${(spot.signY - spot.y) / spot.h * 100}%;--anchor:-${Math.min(85, Math.max(15, spot.signX))}%"><b>${locked ? '<i class="spot-lock" aria-hidden="true"></i>' : ''}${escape(name)}${flag}</b><small>${escape(role)}</small></span></button>`;
+    // The flag is drawn for the eye; its meaning goes into the button's label for screen readers.
+    const [flag, state] = locked ? ['', '']
+      : feature && isNew(p, feature) ? [`<i class="spot-flag spot-new" aria-hidden="true">${t('unlock.new')}</i>`, t('town.spot.state.new')]
+      : spot.id === 'gate' && p.cleared.length < CAMPAIGN.length ? ['<i class="spot-flag" aria-hidden="true">!</i>', t('town.spot.state.story')]
+      : spot.id === 'guild' && questsReady ? [`<i class="spot-flag" aria-hidden="true">${questsReady}</i>`, t(questsReady === 1 ? 'town.spot.state.quests.one' : 'town.spot.state.quests', { n: questsReady })]
+      : spot.id === 'hall' && training ? [`<i class="spot-flag" aria-hidden="true">${training}</i>`, t(training === 1 ? 'town.spot.state.training.one' : 'town.spot.state.training', { n: training })]
+      : spot.id === 'chapel' && below ? ['<i class="spot-flag" aria-hidden="true">!</i>', t('town.spot.state.depth')] : ['', ''];
+    return `<button class="town-spot ${locked ? 'locked' : ''}" data-spot="${spot.id}" ${target} style="left:${spot.x}%;top:${spot.y}%;width:${spot.w}%;height:${spot.h}%" aria-label="${escape([name, dest, locked ? role : state].filter(Boolean).join(' · '))}"><span class="town-sign" style="left:${(spot.signX - spot.x) / spot.w * 100}%;top:${(spot.signY - spot.y) / spot.h * 100}%;--anchor:-${Math.min(85, Math.max(15, spot.signX))}%"><b>${locked ? '<i class="spot-lock" aria-hidden="true"></i>' : ''}${escape(name)}${flag}</b><small>${escape(role)}</small></span></button>`;
   }).join('');
   const heroes = party.map((id, i) => {
     const offset = (i - (party.length - 1) / 2) * 7;
@@ -384,7 +380,7 @@ function silhouette(id: string) {
   if (!portraits.has(key)) {
     const art = monsterCanvas(id), out = document.createElement('canvas');
     out.width = art.width; out.height = art.height;
-    const c = out.getContext('2d')!; c.imageSmoothingEnabled = false; c.drawImage(art, 0, 0); c.globalCompositeOperation = 'source-in'; c.fillStyle = '#0b1714'; c.fillRect(0, 0, out.width, out.height);
+    const c = out.getContext('2d', { willReadFrequently: true })!; c.imageSmoothingEnabled = false; c.drawImage(art, 0, 0); c.globalCompositeOperation = 'source-in'; c.fillStyle = '#0b1714'; c.fillRect(0, 0, out.width, out.height);
     portraits.set(key, out.toDataURL());
   }
   return portraits.get(key)!;
@@ -395,9 +391,9 @@ function bestiary(p: Profile, pick?: string) {
   const chosen = ENEMIES[pick ?? ''] ?? fallback, family = chosen.archetype ?? chosen.id, seen = seenFamily(p, family);
   const variants = Object.values(ENEMIES).filter(e => (e.archetype ?? e.id) === family);
   const detail = seen
-    ? `<article class="win bestiary-detail" data-bestiary-entry="${chosen.id}"><div class="bestiary-art"><img src="${monster(chosen.id)}" alt="${escape(chosen.name)}"/></div><div><small>${escape(chosen.title)} · ${t('bestiary.tier', { n: chosen.tier ?? 1 })}</small><h3>${escape(chosen.name)}</h3><div class="bestiary-variants" role="group" aria-label="${t('bestiary.variants')}">${variants.map(v => `<button class="raid-variant-chip ${v.id === chosen.id ? 'chosen' : ''}" data-bestiary-pick="${v.id}" aria-pressed="${v.id === chosen.id}">T${v.tier ?? 1}</button>`).join('')}</div><p>${escape(chosen.description)}</p><p class="intent-row">${chosen.patterns.map((intent, i) => `<span class="intent-chip intent-${intent}">${i + 1}. ${t(`intent.${intent}` as StringKey)}</span>`).join('')}</p><p class="counter-note"><b>${t('bestiary.counter')}</b> ${escape(chosen.counter)}</p></div></article>`
+    ? `<article class="win bestiary-detail" data-bestiary-entry="${chosen.id}"><div class="bestiary-art"><img src="${monsterDataURL(chosen.id)}" alt="${escape(chosen.name)}"/></div><div><small>${escape(chosen.title)} · ${t('bestiary.tier', { n: chosen.tier ?? 1 })}</small><h3>${escape(chosen.name)}</h3><div class="bestiary-variants" role="group" aria-label="${t('bestiary.variants')}">${variants.map(v => `<button class="raid-variant-chip ${v.id === chosen.id ? 'chosen' : ''}" data-bestiary-pick="${v.id}" aria-pressed="${v.id === chosen.id}">T${v.tier ?? 1}</button>`).join('')}</div><p>${escape(chosen.description)}</p><p class="intent-row">${chosen.patterns.map((intent, i) => `<span class="intent-chip intent-${intent}">${i + 1}. ${t(`intent.${intent}` as StringKey)}</span>`).join('')}</p><p class="counter-note"><b>${t('bestiary.counter')}</b> ${escape(chosen.counter)}</p></div></article>`
     : `<article class="win bestiary-detail unseen" data-bestiary-entry="${family}"><div class="bestiary-art"><img src="${silhouette(family)}" alt=""/></div><div><h3>???</h3><p class="hint">${t('bestiary.unseen')}</p></div></article>`;
-  const grid = FAMILIES.map(e => { const known = seenFamily(p, e.id); return `<button class="bestiary-cell ${known ? '' : 'unseen'} ${family === e.id ? 'chosen' : ''}" data-bestiary-pick="${e.id}" aria-pressed="${family === e.id}" aria-label="${known ? escape(e.name) : t('bestiary.unknown')}"><img src="${known ? monster(e.id) : silhouette(e.id)}" alt=""/><b>${known ? escape(e.name) : '???'}</b></button>`; }).join('');
+  const grid = FAMILIES.map(e => { const known = seenFamily(p, e.id); return `<button class="bestiary-cell ${known ? '' : 'unseen'} ${family === e.id ? 'chosen' : ''}" data-bestiary-pick="${e.id}" aria-pressed="${family === e.id}" aria-label="${known ? escape(e.name) : t('bestiary.unknown')}"><img src="${known ? monsterDataURL(e.id) : silhouette(e.id)}" alt=""/><b>${known ? escape(e.name) : '???'}</b></button>`; }).join('');
   return `<div class="bestiary-list" data-seen="${FAMILIES.filter(e => seenFamily(p, e.id)).length}"><p class="bestiary-count">${t('bestiary.seen', { n: FAMILIES.filter(e => seenFamily(p, e.id)).length, total: FAMILIES.length })}</p>${detail}<div class="win bestiary-grid" role="group" aria-label="${t('bestiary.grid')}">${grid}</div><p class="hint">${t('bestiary.hint')}</p></div>`;
 }
 
@@ -424,10 +420,10 @@ function raids(p: Profile, state: TownState) {
   const status = contract && !sandbox ? t('raid.contract', { n: raidReward(contract, quarry) }) : t('raid.sandbox.short');
   const total = contract && !sandbox ? t('raid.total', { tier: t(`raid.tier.${contract.tier}` as StringKey), pacts: contract.modifiers.length, n: raidReward(contract, quarry) }) : t('raid.total.practice');
   const quarries = RAID_QUARRIES.map(id => raidQuarryUnlocked(p, id)
-    ? `<button data-raid="${id}" class="${base === id ? 'chosen' : ''}" aria-pressed="${base === id}"><img src="${monster(id)}" alt=""/><b>${escape(ENEMIES[id].name)}</b></button>`
+    ? `<button data-raid="${id}" class="${base === id ? 'chosen' : ''}" aria-pressed="${base === id}"><img src="${monsterDataURL(id)}" alt=""/><b>${escape(ENEMIES[id].name)}</b></button>`
     : `<button data-raid="${id}" class="locked" disabled aria-label="${t('raid.locked', { n: raidQuarryUnlockAt(id) })}"><span class="raid-lock" aria-hidden="true">?</span><b>???</b><small>${t('raid.locked', { n: raidQuarryUnlockAt(id) })}</small></button>`).join('');
   const variants = Object.values(ENEMIES).filter(e => e.archetype === base).map(e => `<button class="raid-variant-chip ${quarry === e.id ? 'chosen' : ''}" data-raid-variant="${e.id}" aria-pressed="${quarry === e.id}">T${e.tier ?? 1} · ${escape(e.name)}</button>`).join('');
-  return `<article class="win mission-brief raid-departure"><img class="brief-art" src="${monster(selected.id)}" alt=""/><div><small>${status}</small><h3>${escape(selected.name)}</h3><p>${escape(selected.title)}</p><p class="counter-note">${escape(selected.counter)}</p></div></article>
+  return `<article class="win mission-brief raid-departure"><img class="brief-art" src="${monsterDataURL(selected.id)}" alt=""/><div><small>${status}</small><h3>${escape(selected.name)}</h3><p>${escape(selected.title)}</p><p class="counter-note">${escape(selected.counter)}</p></div></article>
   <div class="win raid-pick"><h3 class="subheading">${t('raid.quarry')}</h3><div class="raid-roster">${quarries}</div>
   <div class="raid-variants" role="group" aria-label="${t('raid.variant')}">${variants}</div>
   <label class="raid-tier">${t('raid.reward')}<select data-raid-tier aria-label="${t('raid.reward')}">${tiers}</select></label><p class="raid-total" data-raid-total>${total}</p></div>
