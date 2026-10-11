@@ -194,7 +194,15 @@ Setiap hero yang direkrut memutar adegan singkat "Sekutu baru" (kartu judul, pot
 
 ### Title dan hub
 
-Title screen memuat empat aksi: **Enter Emberhollow**, **Commander Profiles**, **Story Journal**, dan **Camp Settings**. Camp menampilkan party aktif serta jalan pintas **Plan expedition** dan **Prepare the party**. Navigasi Town utama adalah **Camp**, **Expeditions**, **Party**, dan **More**. More memuat Quest Ledger, Field Bestiary, Challenge Shop, Story Journal, Commander Profiles, dan settings.
+Title screen memuat empat aksi: **Enter Emberhollow**, **Commander Profiles**, **Story Journal**, dan **Camp Settings**. Camp adalah desa pixel: setiap bangunan adalah tombol, dan papan namanya memuat nama bangunan serta, di bawahnya, satu nama tujuan yang sama persis dengan judul HUD, MENU, dan tab gerbang: Gerbang · Cerita, Menara Lonceng · Undercroft, Arsip · Bestiary, Aula Latihan · Party, Serikat · Quest, Pedagang · Bursa Crystal, Sumur Tua · Ujian Lonceng, Penginapan · Save, Pondok Pemburu · Raid. Di ponsel kecil (peta lebih sempit dari 300px) papan nama hanya menampilkan baris pertama (nama bangunan, gembok, badge ringkas) agar sembilan papan tidak saling menutupi; tujuan tetap terbaca lewat label aksesibilitas tombol dan judul HUD. Mode roguelike (kode `endless`) bernama **Ujian Lonceng** (EN *Bell Trials*) di semua tempat. Badge kecil pada papan nama menunjukkan hal yang bisa dilakukan: jumlah quest siap klaim (Serikat), jumlah hero party yang bisa mempelajari talent, mengambil job, atau membeli/memasang gear yang lebih baik sekarang (Aula Latihan; roster Party memberi titik merah pada hero tersebut), depth Undercroft baru atau run yang menunggu (Menara Lonceng), dan BARU pada mode yang baru terbuka sampai dikunjungi; tombol MENU di HUD menghitung quest siap klaim dan star chest. Jendela **Langkah berikutnya** di bawah peta selalu terlihat utuh (peta mengecil untuk memberi ruang) dan menyertakan tombol utama **Lanjut: CH n · nama**, yang membuka dossier chapter berikutnya dengan satu ketukan. Tombol ◀ di HUD kembali ke rute sebelumnya (MENU → Quest → ◀ kembali ke MENU; tab gerbang menggantikan semua rute gerbang di atasnya — peta → dossier → Raid menyisakan Raid — dossier kembali ke peta, camp adalah dasar tumpukan); di camp judul HUD membuka MENU, dan layar judul dicapai lewat MENU → Judul. MENU memuat Party, Job, Quest, Bestiary, Bursa Crystal, Jurnal, Save, Pengaturan, dan Judul; di ponsel daftar perintah tampil lebih dulu, party menjadi satu baris potret, dan ringkasan (Hero n/15) di bawahnya.
+
+### Mode yang terbuka bertahap
+
+Mode dibuka oleh cerita (tabel di sisi UI, `src/ui/unlocks.ts`, bukan aturan game): Undercroft setelah Chapter 1, Raid setelah Chapter 2, Ujian Lonceng setelah Chapter 4, Heroic per chapter yang sudah tuntas. Save yang sudah pernah memakai mode itu (raid tercatat di ledger, floor Ujian Lonceng, depth atau run Undercroft) atau Commander yang masih menyimpan run di mode itu (run Ujian Lonceng yang ditangguhkan, raid yang belum selesai) tetap membukanya. Bangunan dan tab gerbang yang terkunci menampilkan gembok dan "Tuntaskan Chapter n"; mengetuknya hanya memunculkan pemberitahuan. Saat sebuah mode terbuka, camp menampilkan kartu perkenalan satu kali (Ke sana / Nanti) dan tanda BARU sampai mode itu dikunjungi; status kartu dan kunjungan disimpan per browser di `localStorage` (`gridbound.ui.unlocks`). Bestiary dan quarry Raid hanya menyebut musuh yang sudah ditemui.
+
+### Panduan pertempuran pertama
+
+Selama Chapter 1 belum tuntas, pertempuran memberi empat tip, masing-masing satu kali: ketuk hero untuk mengisi skill, seret hero keluar dari petak merah saat telegraph ground pertama mengenai hero (pertempuran diperlambat menjadi 30% kecepatan normal sampai hero berpindah: setiap frame memberi dt × 0,3 ke loop tick tetap 1/60 detik, jadi determinisme tidak berubah), tekan Guard saat ritual all-grid pertama masuk jendela GUARD NOW, dan tekan Ninefold Dawn saat Resolve penuh. Gelembung tip menunjuk kontrolnya, tidak menghalangi ketukan atau seretan, dan punya tombol **Lewati tips**. Pengaturan → **Tips pertempuran** mematikannya (menyalakannya lagi memutar ulang semua tip); status tip disimpan di `localStorage` (`gridbound.coach`).
 
 ### Expedition map dan dossier
 
@@ -203,7 +211,7 @@ World Map menampilkan empat act dengan route pins, status chapter terkunci/terse
 ### Progres yang terlihat
 
 - **Party power** merangkum level, gear, refine, talent, job, dan skill yang sedang dipakai setiap hero menjadi satu angka. Offense dihitung dari skill stance (nilai per detik, termasuk efek job dan perk) dibandingkan skill pertama class-nya pada party tiga hero (`REF_PARTY`); skill pendukung (heal, shield, partyshield, buff, haste, delay) dinilai menurut ukuran party, sehingga satu party shield bernilai lebih besar untuk party delapan hero, dan power seorang hero tidak pernah turun ketika party bertambah. Defense adalah HP efektif (HP maksimum, reduksi damage, Fortitude, barrier awal). Skill job serangan bernilai lebih tinggi dari skill dasar class-nya; skill job kontrol atau pendukung dinilai dari apa yang diberikannya kepada party, sehingga sebagian (misalnya Ember Mine milik Sapper, Silence Between Bells milik Bell Oracle) bernilai lebih rendah dari skill pertama class. World Map, dossier, dan daftar depth Undercroft membandingkannya dengan **recommended power** per chapter (power pemain casual hasil simulasi balance di awal chapter tersebut, `npm run power-curve`; tidak pernah turun dari chapter ke chapter) dengan status Ready / Close / Under. Saat Heroic dipilih, dossier memakai rekomendasi Heroic tersendiri (`recommendedHeroicPower` = recommended power × `HEROIC_POWER_FACTOR` 1,29, median power yang dibutuhkan pemain casual untuk memenangkan separuh percobaan Heroic) beserta status-nya.
-- **Chapter stars:** ★ untuk clear, ★ jika semua hero masih berdiri, ★ jika boss kalah dalam 80 detik atau kurang. Setiap 8 bintang membuka **star chest** (Gold + material); setelah peti keenam (48/48 bintang) bar bintang menulis "Semua peti bintang sudah dibuka".
+- **Chapter stars** (digambar sebagai ikon bintang pixel, karena font pixel tidak memiliki glyph bintang)**:** ★ untuk clear, ★ jika semua hero masih berdiri, ★ jika boss kalah dalam 80 detik atau kurang. Setiap 8 bintang membuka **star chest** (Gold + material); setelah peti keenam (48/48 bintang) bar bintang menulis "Semua peti bintang sudah dibuka".
 - **Next step** di Camp selalu menunjuk satu tujuan berikutnya (dungeon yang sedang berjalan, slot party kosong yang bisa diisi hero bench, chest, quest siap klaim, pilihan cerita yang ditunda (Go membuka Jurnal), point yang belum dipakai, chapter berikutnya, Undercroft saat party under-power, atau Heroic setelah campaign tamat) dengan tombol Go. Untuk slot kosong, Go membuka tab Formation dengan panel party Story sudah terbuka.
 
 ### Core loop Story
@@ -212,7 +220,7 @@ Chapter → XP, Gold, recruit, bintang → bila power kurang: Undercroft untuk X
 
 ## 6. Mode permainan
 
-| Aspek | Story / Campaign | Raid | Roguelike / The Sunken Bell |
+| Aspek | Story / Campaign | Raid | Roguelike / Ujian Lonceng (Bell Trials) |
 |---|---|---|---|
 | Tujuan | Menyelesaikan campaign dan memulihkan Emberhollow tanpa mengulang pengorbanan sanctuary. | Mengalahkan boss yang dipilih dalam kontrak dan konfigurasi party pilihan. | Bertahan melewati floor, mengembangkan build run, memilih boon, dan mencapai act milestone. |
 | Party | Roster lima belas hero. Party aktif mulai tiga, lalu cap bertambah sampai delapan seiring progres chapter berurutan; satu dari sembilan tile selalu kosong agar telegraph tanah tetap bisa dihindari. | Satu sampai enam slot; setiap slot memilih hero yang direkrut (unik) dan salah satu dari sembilan basic job. Hero membawa level, gear, refine, dan talent Story. | Tepat tiga recruit dengan basic job pilihan; job duplikat diizinkan. |
@@ -476,13 +484,15 @@ Settlement memeriksa status victory, stage/floor, contract, dan receipt. Story f
 | Layar | Fungsi |
 |---|---|
 | Title | Masuk Emberhollow, kelola Commander Profiles, buka Story Journal, dan atur Camp Settings. |
-| Camp | Ringkasan party dan progres, lalu pintasan ke expedition atau persiapan party. |
-| Expeditions | Campaign route map, pemilihan chapter, dossier, serta pintasan Raid dan Roguelike. |
-| Party | Pilih hero, susun formation, pilih dua active skills, beli/pasang gear. |
-| Progression | Overview, jobs, talent branches, skill points, dan respec. |
-| More | Quest ledger, Field Bestiary, Challenge Shop, Story Journal, Commander Profiles, settings. |
+| Camp | Desa pixel dengan bangunan sebagai menu, badge, mode terkunci/BARU, Langkah berikutnya, dan Lanjut: CH n. |
+| Cerita (gerbang) | Peta act, pemilihan chapter, dossier, serta tab Undercroft, Raid, dan Ujian Lonceng (terkunci sampai chapter pembukanya). Nama chapter di peta boleh dua baris dan selalu berada di dalam peta. |
+| Party | Pilih hero, susun formation, pilih dua active skills, beli/pasang gear. Di ponsel (≤480 px) seluruh rute bergulir: hero menjadi header satu baris yang menempel (potret, nama, LV, Power, SP) bersama tab, dan Depart tetap di bawah. |
+| Job | Status, job, cabang talent, skill point, dan respec. Mengetuk talent membawa inspector dan tombol Pelajari ke layar. |
+| MENU | Party, Job, Quest, Bestiary, Bursa Crystal, Jurnal, Save, Pengaturan, Judul. |
+| Quest | Satu daftar kartu ringkas yang dikelompokkan menurut status: siap diklaim lebih dulu, lalu dilacak, berjalan, terkunci, dan sudah diklaim (urutan QUESTS di dalam kelompok), dengan tombol **Klaim semua (n)** untuk hero masing-masing quest atau penerima EXP yang dipilih. |
+| Bestiary | Grid 18 jenis musuh (siluet "???" sampai jenis itu ditemui, menurut ledger akun) dengan lembar detail: varian T1–T4, deskripsi, urutan intent, dan counter. |
 | Battle | Arena, Hero inspector, Log, party health, lane targets, Guard, potion, ultimate, pause. |
-| Result / boon draft | Menampilkan victory/defeat, continuation atau return; Roguelike memilih boon sebelum descent berikutnya. |
+| Result / boon draft | Victory/defeat dengan tombol aksi yang selalu terlihat di bawah layar, EXP party sebagai grid potret (+EXP, LV lama→baru) dan cadangan dalam satu baris; Detail berisi damage, heal, blok, dodge, ketukan, pindah tile, dan target bintang yang tercapai. Kekalahan Story menampilkan power party vs rekomendasi, hero yang tumbang pertama dan penyebabnya, "Cara mengalahkan {musuh}" (counter musuh yang menang), serta hingga dua perbaikan satu ketukan (Undercroft bila under-power, talent/job, atau upgrade gear yang terjangkau). Roguelike memilih boon sebelum descent berikutnya. |
 
 ### Kontrol
 
@@ -511,7 +521,7 @@ Ini bukan klaim WCAG atau screen-reader certification. Catatan UI masih membatas
 
 ## 12. Arah visual dan audio
 
-- Presentasi menggunakan pixel art dan Canvas-generated hero, monster, serta town imagery yang dibundel lokal.
+- Presentasi menggunakan pixel art dan Canvas-generated hero, monster, serta town imagery yang dibundel lokal. Hero dengan class yang sama dibedakan oleh aksen per hero (`HERO_LOOKS`: warna pakaian dan trim, warna kulit, poni rambut, janggut): Bran, Kestrel, Nyx, Mira, Ilse, dan Hale berbeda dari Aldric, Rowan, Sable, Lyra, Tamsin, dan Pell di camp, menu, Party, Undercroft, hasil, dan grid battle (juga saat Raid menukar class-nya); recruit Ujian Lonceng memakai sprite class.
 - Phaser menggambar arena, sprite, intent tiles, countdown, projectile, damage/heal feedback, phase cue, dan victory/defeat presentation. Crit bersifat relatif (`src/render/hit-feedback.ts`): hit di atas persentil ke-90 dari 40 hit terakhir encounter (setelah 12 hit) atau di atas 2× rata-rata sumbernya; crit memakai cue suara crit. Guncangan dan flash berskala dengan porsi HP yang diambil, guncangan dibatasi anggaran per detik, dan hit-stop hanya untuk crit, armor break, KO, ultimate, dan kemenangan. Biaya Hollow Pact tampil sebagai teks PAKTA ungu tanpa flash. Hero yang tumbang mendapat banner "{nama} TUMBANG", ledakan abu-abu, sting suara, kilat merah pada kartunya, dan baris log; kartu hero di bawah 35% HP berdenyut.
 - HUD battle: panel intent selalu terlihat (di antara ancaman ia mengajarkan tap dan seret); pada ponsel tinggi panel intent dan chip status boss menempati ruang di atas arena (arena ditempatkan di bawah slotnya). Banner tipis dan tembus klik berada di area boss, selalu di bawah strip status dan panel intent (yang pada ponsel pendek menutupi bagian atas arena) dan di atas row depan; nama stage hanya tampil di jendela ready dan log. Pada layar sentuh, petunjuk "(G)" dihapus dari counter text. Kartu hero membawa tag nama, angka battle memakai minimal 10 px, dan huruf tombol (G/H/R) disembunyikan pada layar sentuh. Log battle menyimpan 30 baris: impact telegraph (siapa terkena dan berapa), KO beserta penyebabnya, interrupt yang berhasil, hasil stun/Lullaby, armor break, dan potion. Panel Run boons dan Journey shop hanya tampil di Roguelike.
 - DOM menampung navigasi, panel party, lane control, HUD, dialog, dan status save.

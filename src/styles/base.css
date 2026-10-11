@@ -187,8 +187,11 @@ details > summary::-webkit-details-marker { display: none; }
 }
 .brand { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: var(--touch); padding: 4px 6px; border: 0; background: none; color: var(--ink); font-family: var(--pixel); font-size: 10px; white-space: nowrap; }
 #hud-title { overflow: hidden; text-overflow: ellipsis; }
-body[data-screen="camp"] .brand { cursor: default; }
 body[data-screen="camp"] .brand-back { display: none; }
+/* Long destination names switch to the text font so the HUD never truncates them. */
+.brand[data-long="true"] #hud-title { font-family: var(--text); font-size: 15px; font-weight: 700; color: var(--gold-bright); }
+.menu-button { position: relative; }
+.menu-button[data-badge]:not([data-badge=""])::after { content: attr(data-badge); position: absolute; top: -4px; right: -4px; min-width: 18px; padding: 0 4px; border: 1px solid #fff; border-radius: 9px; background: var(--danger-deep); color: #fff; font-size: 8px; line-height: 16px; text-align: center; box-shadow: 0 1px 0 #000a; }
 .brand-back { color: var(--gold); }
 .header-tools { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .header-tools .icon-button { min-width: 44px; min-height: 44px; padding: 4px; }

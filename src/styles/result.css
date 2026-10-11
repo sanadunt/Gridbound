@@ -10,17 +10,33 @@
 .result-stats { grid-template-columns: repeat(3, 1fr); }
 .result-stats .stat-plaque { flex-direction: column; align-items: center; border: 0; }
 .result-stats dd { font-size: 12px; }
-.xp-results { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
-.xp-card { display: grid; grid-template-columns: 30px 1fr auto auto; align-items: center; gap: 8px; margin: 0; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.xp-results { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+/* The party's EXP as a compact portrait grid (+EXP, level arrow); the bench is one line. */
+.xp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 4px; }
+.xp-card { display: flex; flex-direction: column; align-items: center; gap: 1px; margin: 0; padding: 4px 2px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); text-align: center; }
 .xp-card img { width: 30px; height: 33px; }
-.xp-hero-info b { display: block; font-weight: 600; }
-.xp-role-badge { font-family: var(--pixel); font-size: 7px; color: var(--ink-dim); }
-.xp-points { font-family: var(--pixel); font-size: 9px; color: var(--mana); }
+.xp-hero-name { font-weight: 600; font-size: 12px; line-height: 1.1; }
+.xp-points { font-family: var(--pixel); font-size: 8px; color: var(--mana); }
 .xp-catchup { font-family: var(--text); color: var(--ink-dim); }
-.xp-level-badge { font-family: var(--pixel); font-size: 8px; color: var(--ink-soft); }
+.xp-level-badge { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.xp-card.leveled-up { border-color: var(--gold-border); }
 .xp-card.leveled-up .xp-level-badge { color: var(--gold); animation: blink 0.5s steps(2) 6; }
-.ceremony-actions { display: flex; flex-direction: column; gap: 8px; }
+.xp-bench { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.xp-bench b { color: var(--gold); font-weight: 600; }
+/* Return/Retry stay on screen however long the result is. */
+.ceremony-actions { position: sticky; bottom: 0; z-index: 3; display: flex; flex-direction: column; gap: 8px; margin: 0 -10px -24px; padding: 10px 10px 16px; background: linear-gradient(180deg, transparent, #08110ff2 22%); }
 .ceremony-actions .btn { width: 100%; }
+@media (min-width: 480px) { .ceremony-actions { flex-flow: row wrap; } .ceremony-actions .btn { flex: 1 1 40%; } }
+/* Defeat help: power vs the recommendation, the first to fall, the counter, one-tap fixes. */
+.defeat-help p { margin: 4px 0; font-size: 14px; }
+.defeat-first { color: var(--ink-soft); }
+.defeat-fixes { display: flex; flex-direction: column; gap: 6px; }
+.defeat-fixes .btn { width: 100%; text-align: left; }
+.result-star-goals { margin: 4px 0 8px; padding: 0; list-style: none; font-size: 13px; color: var(--ink-dim); }
+.result-star-goals li::before { content: '☆ '; color: var(--faint); }
+.result-star-goals li.met { color: var(--ink); }
+.result-star-goals li.met::before { content: '★ '; color: var(--gold); }
+.result-stars { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; }
 .result-input-hint { position: sticky; bottom: 0; margin-top: 10px; text-align: center; font-size: 13px; color: var(--ink-dim); }
 
 .boon-modal-header { text-align: center; }
@@ -51,8 +67,7 @@
 @media (max-height: 700px) {
   .result-banner { margin: 6px 0 2px; font-size: clamp(22px, 8vw, 30px); }
   .ceremony-desc { -webkit-line-clamp: 3; font-size: 14px; }
-  .xp-results { display: none; }
-  .result-screen[data-details-open="true"] .xp-results { display: flex; }
+  .xp-grid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
   .ceremony-actions { gap: 6px; }
 }
 
@@ -99,3 +114,10 @@
 .rogue-promote-row b { display: block; }
 .rogue-promote-row small { display: block; font-size: 12px; color: var(--ink-dim); }
 .rogue-promote-options { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Unlock card (a mode the story just opened) */
+.unlock-card { display: flex; flex-direction: column; gap: 8px; }
+.unlock-kicker { font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); letter-spacing: 1px; }
+.unlock-entry { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.unlock-entry p { margin: 4px 0 8px; color: var(--ink-soft); }
+.unlock-entry .btn { width: 100%; }

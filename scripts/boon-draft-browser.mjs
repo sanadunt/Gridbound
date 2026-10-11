@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { withBrowser } from './browser-harness.mjs';
+import { withBrowser, seedSave } from './browser-harness.mjs';
 
 const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5173/';
 
@@ -7,6 +7,7 @@ console.log('--- TESTING HADES 3-CARD BOON DRAFT ---');
 
 // 1. Desktop Viewport (1440x900)
 await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
+  await seedSave(send); // the Bell Trials open with Chapter 4
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
@@ -78,6 +79,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
 
 // 2. Mobile Viewport (390x844)
 await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
+  await seedSave(send); // the Bell Trials open with Chapter 4
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("#town-screen")');
 

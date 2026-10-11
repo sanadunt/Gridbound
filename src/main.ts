@@ -17,12 +17,19 @@ import { townSceneCanvas } from './art/town-scene';
 import { Battle, GUARD_DURATION, ENRAGE_WARN, ENRAGE_AT, ENRAGE_DMG, BREAK_SECONDS, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
-import { CAMPAIGN, BOONS, boonChoices } from './game/world';
+import { CAMPAIGN, BOONS, ENEMIES, boonChoices } from './game/world';
 import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, ownsChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult, chapterReward } from './game/profile';
 import { startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fleeFight, interruptFight, noteFight, dungeonBattleOptions, type Outcome, type Pouch } from './game/dungeon';
-import { chapterStars } from './game/journey';
+import { chapterStars, STAR_PAR_SECONDS } from './game/journey';
 import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
-import { actArt } from './ui/world-map';
+import { partyPower, powerVerdict, recommendedHeroicPower, recommendedPower } from './game/power';
+import { claimAllQuests } from './ui/quests';
+import { UNLOCKS, isFeature, markIntro, markVisited, noteModesInUse, pendingIntros, routeLocked, type Feature } from './ui/unlocks';
+import { menuBadge } from './ui/badges';
+import { pushRoute, backRoute } from './ui/route-stack';
+import { defeatFixes, xpSummary } from './ui/result-help';
+import { COACH_STEPS, Coach, coachEnabled, coachDone, markCoach, resetCoach, setCoachEnabled, skipCoach, type CoachStep } from './ui/coach';
+import { actArt, starRow } from './ui/world-map';
 import { playDialogue, paginate, type DialoguePage } from './ui/dialogue';
 import { BattleScene, ARENA, cell } from './render/BattleScene';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
@@ -54,6 +61,8 @@ if (matchMedia('(prefers-reduced-motion: reduce)').matches) profile.motion = fal
 let storageFailed = false;
 const heroName = (h: { name: string }) => eventText(h.name, lang());
 const stageLabel = () => eventText(battle.stageName, lang());
+/** A battle hero's portrait: roster heroes keep their own look (also on a Raid class swap); Roguelike recruits use the class sprite. */
+const face = (h: { id: number; classId: keyof typeof KITS }) => portrait(h.classId, 0, battle.mode === 'endless' ? undefined : h.id);
 const modeName = (mode: CommanderMode) => t(mode === 'story' ? 'mode.campaign' : mode === 'raid' ? 'mode.raid' : 'mode.endless');
 function updateTitleStatus() {
   const nameEl = $('title-commander-name');
@@ -207,8 +216,15 @@ const partyHealthViews = new Map<number, PartyHealthView[]>();
 let resultGeneration: ResultGateGeneration | undefined;
 const townState: TownState = {
   tab: 'camp', hero: 0, zone: Math.min(profile.cleared.length, CAMPAIGN.length - 1), raid: 'golem', raidTier: 'bronze', raidModifiers: [], raidBuild: defaultRaidBuild(profile), notice: '',
-  trainingTab: 'formation', campaignPage: 0, questPage: 0, bestiaryPage: 0,
+  trainingTab: 'formation', campaignPage: 0,
 };
+/** Town routes visited since the camp, for the HUD ◀ (see ui/route-stack). */
+let routeStack: TownTab[] = ['camp'];
+/** First-battle coach state (see coachFrame). */
+let coachForced = false, coachThreat = -1, coachHero = -1, coachUntil = 0;
+const coach = new Coach(document.body, () => { skipCoach(); endCoachStep(); });
+/** The first hero to fall in the current battle and stage, for the defeat screen. */
+let firstFall: { battle: Battle; stage: number; name: string; cause: string } | undefined;
 /** Selecting another chapter drops the Heroic toggle: Heroic is chosen per chapter, never carried over. */
 function selectZone(zone: number) { if (zone !== townState.zone) townState.heroic = false; townState.zone = zone; }
 
@@ -308,6 +324,10 @@ function modeForTownTab(tab: TownTab, fallback = commander.mode): CommanderMode 
 }
 
 function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
+  // A mode the story has not reached yet is never shown (a restored Raid/Trials mode, a stale link): the camp explains when it opens.
+  // A Commander with a run in that mode (an older file, a suspended run) keeps it reachable.
+  noteModesInUse(commander.document);
+  if (routeLocked(profile, tab)) { notice = lockNotice(tab as Feature); tab = 'camp'; }
   const routeChanged = tab !== townState.tab;
   const nextMode = modeForTownTab(tab);
   // Re-materialize the target mode's profile; persisting the previous mode's profile under the new mode would write challenge zeros into Story (or Story's 0 Crystal into the bank).
@@ -318,6 +338,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   inTown = true;
   pauseForDetails = false;
   if (battle.status === 'fighting') battle.pause();
+  if (coach.step) endCoachStep();
   townState.tab = tab;
   townState.notice = notice;
   // A locked quarry (unseen boss, chapter not cleared) is never offered: fall back to the first open one.
@@ -325,14 +346,23 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   $('town-screen').hidden = false;
   $('battle-screen').hidden = true;
   document.body.dataset.screen = tab === 'camp' ? 'camp' : 'town';
-  $('hud-title').textContent = routeTitle(tab);
-  $('home').setAttribute('aria-label', tab === 'camp' ? t('menu.title.sub') : t('hud.home'));
-  // Keep the scroll position when a panel re-renders in place (equipping, inspecting, learning).
+  routeStack = pushRoute(routeStack, tab);
+  if (isFeature(tab)) markVisited(tab);
+  const title = routeTitle(tab);
+  $('hud-title').textContent = title;
+  $('home').dataset.long = String(title.length > 10);
+  // ◀ goes back one route; on the camp the title opens the MENU (the Title screen is MENU → Title).
+  $('home').setAttribute('aria-label', tab === 'camp' ? t('route.menu') : t('hud.home'));
+  const waiting = menuBadge(profile), menuButton = $('menu-button');
+  menuButton.dataset.badge = waiting ? String(waiting) : '';
+  menuButton.setAttribute('aria-label', waiting ? t('hud.menu.waiting', { n: waiting }) : t('route.menu'));
+  // Keep the scroll position when a screen re-renders in place (equipping, inspecting, learning, claiming).
+  const scrollers = '[data-training-panel], .party-scene, .secondary-content, .more-scene, .world-map-wrapper';
   const oldPanel = $('town-screen').querySelector<HTMLElement>('[data-training-panel]');
-  const keptScroll = !routeChanged && oldPanel ? { panel: oldPanel.dataset.trainingPanel, top: oldPanel.scrollTop } : undefined;
+  const kept = routeChanged ? [] : Array.from($('town-screen').querySelectorAll<HTMLElement>(scrollers), el => ({ key: el.dataset.trainingPanel ?? el.className, top: el.scrollTop }));
+  const keptPanel = oldPanel?.dataset.trainingPanel;
   renderTown($('town-screen'), profile, townState);
-  const newPanel = $('town-screen').querySelector<HTMLElement>('[data-training-panel]');
-  if (newPanel && keptScroll && newPanel.dataset.trainingPanel === keptScroll.panel) newPanel.scrollTop = keptScroll.top;
+  $('town-screen').querySelectorAll<HTMLElement>(scrollers).forEach(el => { const old = kept.find(k => k.key === (el.dataset.trainingPanel ?? el.className)); if (old && (!el.dataset.trainingPanel || el.dataset.trainingPanel === keptPanel)) el.scrollTop = old.top; });
   if (routeChanged) {
     const scene = $('town-screen').querySelector<HTMLElement>('.town-scene');
     const heading = scene?.querySelector<HTMLElement>('h1') ?? scene;
@@ -357,7 +387,20 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
     else if (tab === 'raid') animatePactRaid();
     else if (tab === 'endless') animateSunkenDescent();
   }
-  if (tab === 'camp') void playCampScenes();
+  if (tab === 'camp') void playCampScenes().then(() => unlockIntro());
+}
+const lockNotice = (feature: Feature) => t('unlock.locked', { name: routeTitle(feature), n: UNLOCKS[feature] });
+let unlockShowing = false;
+/** A one-time card when the story opens a mode (Undercroft, Raids, Bell Trials); skipped under automation like the camp scenes. */
+function unlockIntro(force = false) {
+  if (unlockShowing || (!force && navigator.webdriver) || !commanderChecked || !inTown || townState.tab !== 'camp' || playingScene || campScenesRunning || modal.open || commander.stale || pendingSettlement || $('title-screen')?.hidden === false) return;
+  const features = pendingIntros(profile);
+  if (!features.length) return;
+  features.forEach(markIntro);
+  unlockShowing = true;
+  openModal(`<div class="unlock-card"><small class="unlock-kicker">${t('unlock.kicker')}</small>${features.map((f, i) => `<section class="unlock-entry" data-unlock="${f}"><h2 ${i ? '' : 'id="modal-title"'}>${t(`unlock.${f}.title` as never)}</h2><p>${t(`unlock.${f}.body` as never)}</p><button class="btn primary" data-unlock-go="${f}">${t('unlock.go')} ▶</button></section>`).join('')}<button class="btn" data-close>${t('unlock.later')}</button></div>`);
+  modal.querySelectorAll<HTMLButtonElement>('[data-unlock-go]').forEach(button => button.addEventListener('click', () => { modal.close(); void navigateTown(button.dataset.unlockGo as TownTab); }));
+  modal.addEventListener('close', () => { unlockShowing = false; }, { once: true });
 }
 $('town-screen').addEventListener('click', event => {
   if (modal.open) modal.close();
@@ -432,6 +475,23 @@ $('town-screen').addEventListener('click', event => {
     if (ok) celebrate(`[data-gear-open], .hero-sheet`);
     return;
   }
+  // A locked hotspot or gate tab explains which chapter opens it.
+  if (button.dataset.locked) { sound.play('cursor'); showTown(townState.tab, lockNotice(button.dataset.locked as Feature)); return; }
+  // Camp → the next chapter's dossier in one tap.
+  if (button.dataset.continueStory !== undefined) {
+    const zone = Number(button.dataset.continueStory);
+    if (!canEnterZone(profile, zone)) return;
+    selectZone(zone); townState.campaignPage = zone; sound.play('confirm');
+    void navigateTown('mission');
+    return;
+  }
+  if (button.hasAttribute('data-claim-all')) {
+    const { claimed, gold, gear } = claimAllQuests(profile, townState.hero);
+    if (claimed.length) sound.play('coin');
+    showTown('quests', claimed.length ? t(gear ? 'notice.quest.all.gear' : 'notice.quest.all', { n: claimed.length, gold }) : t('notice.quest.fail'), true);
+    $('town-screen').querySelector('.secondary-content')?.scrollTo({ top: 0 });
+    return;
+  }
   if (button.dataset.facility) {
     townState.pendingGear = undefined;
     if (button.dataset.trainingTab) townState.trainingTab = button.dataset.trainingTab as TownState['trainingTab'];
@@ -470,6 +530,8 @@ $('town-screen').addEventListener('click', event => {
   if (button.dataset.inspectTalent) {
     townState.selectedTalent = button.dataset.inspectTalent;
     showTown('party-advanced');
+    // The inspector (with its Learn button) sits below the tree: bring it on screen, as gear selection does with its preview.
+    document.querySelector('.talent-inspector-section')?.scrollIntoView({ block: 'nearest' });
     return;
   }
   if (button.dataset.branch) { townState.talentBranch = button.dataset.branch; townState.selectedTalent = undefined; showTown('party-advanced', '', true); return; }
@@ -486,15 +548,12 @@ $('town-screen').addEventListener('click', event => {
     showTown('campaign', '', true);
     return;
   }
-  if (button.dataset.questPage) {
-    townState.questPage = Math.max(0, townState.questPage + Number(button.dataset.questPage));
-    showTown('quests', '', true);
-    animateProphecies();
-  }
-  if (button.dataset.bestiaryPage) {
-    townState.bestiaryPage = Math.max(0, townState.bestiaryPage + Number(button.dataset.bestiaryPage));
-    showTown('bestiary', '', true);
-    animateCodexEntry();
+  if (button.dataset.bestiaryPick) {
+    townState.bestiaryPick = button.dataset.bestiaryPick;
+    sound.play('cursor');
+    showTown('bestiary');
+    document.querySelector('.bestiary-detail')?.scrollIntoView({ block: 'nearest' });
+    return;
   }
   if (button.dataset.townHero) {
     townState.hero = Number(button.dataset.townHero);
@@ -582,7 +641,7 @@ $('town-screen').addEventListener('click', event => {
 $('town-screen').addEventListener('change', event => {
   const el = event.target as HTMLSelectElement;
   if (!inTown || commander.stale || pendingSettlement) return;
-  if(el.matches('[data-quest-filter]')){townState.questPage=0;townState.questFilter=el.value as 'available'|'all'|'claimed';showTown('quests');return;}
+  if(el.matches('[data-quest-filter]')){townState.questFilter=el.value as 'available'|'all'|'claimed';showTown('quests');return;}
   if(el.matches('[data-quest-recipient]')){townState.hero=Number(el.value);showTown('quests');return;}
   if(el.matches('[data-rogue-slot]')){
     const build=townState.rogueSetup??createRogueBuild();
@@ -775,7 +834,7 @@ function markIntroSeen(zone: number) { try { const seen = JSON.parse(localStorag
 /** A story page: narration gets the CHRONICLE nameplate; only quoted speech shows the chapter speaker (and their portrait when they are a hero). */
 function storyPage(text: string, speaker: string | undefined, place: string | undefined): DialoguePage {
   const hero = ROSTER.find(r => r.name.toUpperCase() === speaker?.toUpperCase());
-  return /^[“"]/.test(text) && speaker ? { speaker, place, portrait: hero ? portrait(hero.classId) : undefined, text } : { speaker: t('story.chronicle'), place, text };
+  return /^[“"]/.test(text) && speaker ? { speaker, place, portrait: hero ? portrait(hero.classId, 0, ROSTER.indexOf(hero)) : undefined, text } : { speaker: t('story.chronicle'), place, text };
 }
 /** Chapter intro as a JRPG scene: title card, then the chronicle in a message box. */
 function chapterIntro(zoneIndex: number) {
@@ -794,7 +853,7 @@ function recruitScene(id: number, force = false) {
   // Skipped under automation like the title screen and chapter intros; QA plays it through window.gridbound.recruitScene.
   if (!hero || (!force && navigator.webdriver)) return Promise.resolve();
   playingScene = true;
-  return playDialogue($('app'), { kicker: t('recruit.kicker'), title: t('recruit.title', { name: hero.name }), subtitle: KITS[hero.classId].name, backdrop: actArt(Math.min(3, Math.floor(hero.recruitChapter / 4))), pages: [{ speaker: hero.name, portrait: portrait(hero.classId), text: hero.joinLine }], motion: profile.motion, onBlip: () => sound.play('text') })
+  return playDialogue($('app'), { kicker: t('recruit.kicker'), title: t('recruit.title', { name: hero.name }), subtitle: KITS[hero.classId].name, backdrop: actArt(Math.min(3, Math.floor(hero.recruitChapter / 4))), pages: [{ speaker: hero.name, portrait: portrait(hero.classId, 0, id), text: hero.joinLine }], motion: profile.motion, onBlip: () => sound.play('text') })
     .finally(() => { playingScene = false; });
 }
 /** A story choice as a scene: its question, its options and 'Decide later' (which leaves it open in the Journal). */
@@ -813,7 +872,7 @@ function endingScene() {
   const chronicle = (place: string | undefined, text: string): DialoguePage => ({ speaker: t('story.chronicle'), place, text });
   const pages: DialoguePage[] = [
     ...paginate(storyOutro(last, state)).map(text => chronicle(zone.speaker.split(' · ')[1]?.trim(), text)),
-    ...[...profile.roster].sort((a, b) => a - b).map(id => ({ speaker: CHARACTERS[id].name, place: t('ending.fate'), portrait: portrait(CHARACTERS[id].classId), text: CHARACTERS[id].fateLine })),
+    ...[...profile.roster].sort((a, b) => a - b).map(id => ({ speaker: CHARACTERS[id].name, place: t('ending.fate'), portrait: portrait(CHARACTERS[id].classId, 0, id), text: CHARACTERS[id].fateLine })),
     chronicle(t('journal.epilogue'), t('journal.epilogue.lead')),
     ...STORY_CHOICES.filter(s => Object.hasOwn(state, s.id)).map(s => chronicle(s.title, s.options.find(o => o.id === state[s.id])!.outcome)),
     { text: '', card: { kicker: t('ending.card.kicker'), title: t('town.name'), subtitle: t('ending.card.subtitle') } },
@@ -918,7 +977,8 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   $('battle-detail-pause-note').hidden = true;
   battle = next;
   recorded = false;
-  chapterResult = undefined; resultReward = undefined; stageStart = undefined;
+  chapterResult = undefined; resultReward = undefined; stageStart = undefined; firstFall = undefined;
+  if (coach.step) endCoachStep();
   experienceRewards=[];
   offeredBoons = [];
   lastStatus = 'ready';
@@ -1025,7 +1085,7 @@ function renderPartyHealthTray() {
     const host = $(trayId);
     host.dataset.count = String(battle.heroes.length);
     host.innerHTML = battle.heroes.map(h => `<button type="button" class="party-health-card" data-party-hero="${h.id}" aria-pressed="false" aria-label="${heroName(h)}">
-      <img class="party-face" src="${portrait(h.classId)}" alt=""/>
+      <img class="party-face" src="${face(h)}" alt=""/>
       <span class="party-hero-name">${heroName(h)}</span>
       <span class="party-health-values"><span class="party-hp"><small>HP</small> <b class="party-hp-value">${Math.ceil(h.hp)}</b><small>/${h.maxHp}</small></span><span class="party-sh">SH <b class="party-shield-value">${Math.round(h.shield)}</b></span></span>
       <span class="party-health-meter" aria-hidden="true"><i></i><em></em></span>
@@ -1181,9 +1241,9 @@ function updateFocusBar() {
   const ratio = h.maxHp > 0 ? h.hp / h.maxHp : 0;
   const skill = KITS[h.classId].skills[h.stance];
   const status = h.hp <= 0 ? t('battle.down') : h.remaining > 0 ? `${Math.max(.1, h.remaining).toFixed(1)}s` : t('battle.ready');
-  const face = bar.querySelector<HTMLImageElement>('.focus-face')!;
-  const src = portrait(h.classId);
-  if (face.getAttribute('src') !== src) face.setAttribute('src', src);
+  const img = bar.querySelector<HTMLImageElement>('.focus-face')!;
+  const src = face(h);
+  if (img.getAttribute('src') !== src) img.setAttribute('src', src);
   bar.querySelector('.focus-name')!.textContent = `${heroName(h)} · LV ${h.level}`;
   bar.querySelector('.focus-skill')!.textContent = skill.name;
   bar.querySelector('.focus-hp b')!.textContent = `${Math.ceil(Math.max(0, h.hp))}/${h.maxHp}${h.shield > 0 ? ` +${Math.round(h.shield)}` : ''}`;
@@ -1305,7 +1365,7 @@ function renderInspector() {
   const key = `${h.id}-${h.stance}-${moveMode}-${battle.status}`;
   if (key === selectedKey) return;
   selectedKey = key;
-  $('inspector').innerHTML = `<div class="hero-identity"><div class="portrait-frame"><img src="${portrait(h.classId)}" alt="${heroName(h)}"/><span>LV ${h.level}</span></div><div><small class="hero-class">${k.name}</small><h2>${heroName(h)}</h2><p>${k.role}</p></div></div><div class="hero-stats"><span>HP <b id="selected-hp"></b></span><span>SH <b id="selected-shield"></b></span></div><h4 class="subheading stance-label">${t('battle.skills')} <span>${t('battle.autocast')}</span></h4><div class="stance-options">${battle.availableSkills(h.id).map(i => { const s = k.skills[i]; return `<button data-select-stance="${i}" class="stance-option ${h.stance === i ? 'chosen' : ''}" aria-pressed="${h.stance === i}" ${!['ready', 'fighting'].includes(battle.status) || h.hp <= 0 ? 'disabled' : ''}><span><b>${s.name}</b><small>${s.label} · ${s.cooldown.toFixed(1)}s</small></span><i>${h.stance === i ? '●' : '○'}</i></button>`; }).join('')}</div><p class="skill-description">${k.skills[h.stance].description}</p><div class="focus-meter"><div><span>${t('battle.fatigue')}</span><span id="fatigue-label"></span></div><span class="gauge"><i id="fatigue-fill"></i></span></div><button id="move-selected" class="btn move-button">${moveMode ? t('battle.move.pick') : t('battle.move')}<small>+0.9s</small></button><div class="move-grid" ${moveMode ? '' : 'hidden'}>${Array.from({ length: 9 }, (_, i) => `<button data-move-slot="${i}" aria-label="${t('formation.tile', { n: i + 1 })}" ${i === h.slot ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>`;
+  $('inspector').innerHTML = `<div class="hero-identity"><div class="portrait-frame"><img src="${face(h)}" alt="${heroName(h)}"/><span>LV ${h.level}</span></div><div><small class="hero-class">${k.name}</small><h2>${heroName(h)}</h2><p>${k.role}</p></div></div><div class="hero-stats"><span>HP <b id="selected-hp"></b></span><span>SH <b id="selected-shield"></b></span></div><h4 class="subheading stance-label">${t('battle.skills')} <span>${t('battle.autocast')}</span></h4><div class="stance-options">${battle.availableSkills(h.id).map(i => { const s = k.skills[i]; return `<button data-select-stance="${i}" class="stance-option ${h.stance === i ? 'chosen' : ''}" aria-pressed="${h.stance === i}" ${!['ready', 'fighting'].includes(battle.status) || h.hp <= 0 ? 'disabled' : ''}><span><b>${s.name}</b><small>${s.label} · ${s.cooldown.toFixed(1)}s</small></span><i>${h.stance === i ? '●' : '○'}</i></button>`; }).join('')}</div><p class="skill-description">${k.skills[h.stance].description}</p><div class="focus-meter"><div><span>${t('battle.fatigue')}</span><span id="fatigue-label"></span></div><span class="gauge"><i id="fatigue-fill"></i></span></div><button id="move-selected" class="btn move-button">${moveMode ? t('battle.move.pick') : t('battle.move')}<small>+0.9s</small></button><div class="move-grid" ${moveMode ? '' : 'hidden'}>${Array.from({ length: 9 }, (_, i) => `<button data-move-slot="${i}" aria-label="${t('formation.tile', { n: i + 1 })}" ${i === h.slot ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>`;
   $('inspector').querySelectorAll<HTMLButtonElement>('[data-select-stance]').forEach(el => {
     el.disabled = !canModify || h.hp <= 0;
     el.addEventListener('click', () => {
@@ -1373,6 +1433,7 @@ function frame(dt: number) {
   $('guard').classList.toggle('ready-window', guardWindow);
   $('guard-label').textContent = guardWindow ? t('battle.guard.now') : battle.guardLeft > 0 ? t('battle.guard.active', { s: battle.guardLeft.toFixed(1) }) : battle.guardCooldown > 0 ? t('battle.guard.cd', { s: battle.guardCooldown.toFixed(1) }) : t('battle.guard.ready');
   $('guard').classList.toggle('guarding', battle.guardLeft > 0);
+  coachFrame(guardWindow);
   $('lane-targets-hint')?.remove();
   document.querySelector('.lane-targets')?.classList.toggle('has-minions', battle.minions.length > 0);
   for (const h of battle.heroes) {
@@ -1397,6 +1458,43 @@ function frame(dt: number) {
     $('fatigue-label').textContent = h.fatigue > 70 ? t('battle.fatigue.tired') : h.fatigue > 40 ? t('battle.fatigue.warm') : t('battle.fatigue.fresh');
     $('fatigue-fill').style.width = `${h.fatigue}%`;
   }
+}
+/**
+ * The first-battle coach: Chapter 1 until it is cleared, each tip once (stored in localStorage), Config → Battle tips turns it off.
+ * Driven by the battle state the HUD already reads (threats, Guard window, resolve); while a drag is explained it slows the fight to 30%
+ * (BattleScene.timeScale: fewer fixed 1/60 s ticks per frame, never a different tick). Skipped under automation unless QA forces it
+ * with window.gridbound.coach(true).
+ */
+function endCoachStep(step?: CoachStep) { if (step) markCoach(step); coach.hide(); if (initialized) scene.timeScale = 1; }
+const coachOn = () => battle.mode === 'adventure' && battle.floor === 1 && !battle.heroic && battle.status === 'fighting' && !COACH_STEPS.every(coachDone) && (coachForced || (!navigator.webdriver && coachEnabled() && !profile.cleared.includes(0)));
+function coachFrame(guardWindow: boolean) {
+  if (!coachOn()) { if (coach.step) endCoachStep(); return; }
+  const card = (id: number) => () => unitViews.get(id)?.card ?? null;
+  // Finish the current tip once the player did it (or the moment passed).
+  if (coach.step === 'tap' && (battle.taps >= 2 || battle.time > coachUntil)) endCoachStep('tap');
+  else if (coach.step === 'drag') { const threat = battle.threats.find(v => v.id === coachThreat), h = battle.hero(coachHero); if (!threat || !h || h.hp <= 0 || !threat.slots.includes(h.slot)) endCoachStep('drag'); }
+  else if (coach.step === 'guard' && (battle.guardLeft > 0 || !battle.threats.some(v => v.type === 'all'))) endCoachStep('guard');
+  else if (coach.step === 'ult' && (battle.resolve < 100 || battle.time > coachUntil)) endCoachStep('ult');
+  // A telegraph to dodge or a ritual to Guard takes over from the calmer tips.
+  const calm = coach.step !== 'drag' && coach.step !== 'guard';
+  const ground = calm && !coachDone('drag') ? battle.threats.find(v => (v.type === 'front' || v.type === 'breath' || v.type === 'meteor') && v.left > .6 && battle.living().some(h => v.slots.includes(h.slot))) : undefined;
+  const victim = ground && battle.living().find(h => ground.slots.includes(h.slot));
+  if (ground && victim) {
+    if (coach.step) endCoachStep(coach.step);
+    coachThreat = ground.id; coachHero = victim.id;
+    coach.show('drag', t('coach.drag', { name: heroName(victim) }), card(victim.id));
+    if (initialized) scene.timeScale = .3;
+  } else if (calm && !coachDone('guard') && guardWindow) {
+    if (coach.step) endCoachStep(coach.step);
+    coach.show('guard', t('coach.guard'), () => $('guard'));
+  } else if (!coach.step && !coachDone('ult') && battle.resolve >= 100) {
+    coachUntil = battle.time + 8;
+    coach.show('ult', t('coach.ult', { name: t('battle.ultimate') }), () => $('ultimate'));
+  } else if (!coach.step && !coachDone('tap') && battle.stage === 0 && battle.stageTime < 15) {
+    const first = battle.living()[0];
+    if (first) { coachUntil = battle.time + 8; coach.show('tap', t('coach.tap', { name: heroName(first) }), card(first.id)); }
+  }
+  coach.place();
 }
 /** Boss status chips (Mark, Weaken, Curse, the last stun's DELAYED/RESISTED note and the soft enrage) with a countdown fill.
  *  They live in the intel band, which is never covered, instead of the crowded stagger row or the canvas above the boss. */
@@ -1440,6 +1538,8 @@ function addLog(text: string) {
   while ($('combat-log').children.length > 30) $('combat-log').lastElementChild?.remove();
 }
 const heroLabel = (id?: number) => { const h = battle.hero(id ?? -1); return h ? heroName(h) : '?'; };
+/** What downed a hero (the claw, a minion, or the named attack), for the log and the defeat screen. */
+const downCause = (e: BattleEvent) => e.kind === 'claw' ? t('log.cause.claw') : e.kind === 'minion' ? t('log.cause.minion') : e.name ? eventText(e.name, lang()) : '';
 window.addEventListener('battle-banner', event => {
   if (inTown) return;
   const e = (event as CustomEvent<BattleEvent>).detail;
@@ -1456,7 +1556,8 @@ window.addEventListener('battle-banner', event => {
     }, 1800);
   }
   if (e.type === 'down') {
-    const cause = e.kind === 'claw' ? t('log.cause.claw') : e.kind === 'minion' ? t('log.cause.minion') : e.name ? eventText(e.name, lang()) : '';
+    const cause = downCause(e);
+    if (!(firstFall?.battle === battle && firstFall.stage === battle.stage)) firstFall = { battle, stage: battle.stage, name: heroLabel(e.source), cause };
     addLog(cause ? t('log.ko', { name: heroLabel(e.source), cause }) : t('log.ko.plain', { name: heroLabel(e.source) }));
     const card = unitViews.get(e.source ?? -1)?.card;
     if (card) { card.classList.remove('ko-flash'); void card.offsetWidth; card.classList.add('ko-flash'); }
@@ -1506,9 +1607,11 @@ function settings() {
     <div class="setting-row" role="group" aria-label="${t('settings.language')}"><span><b>${t('settings.language')}</b><small>${inTown ? t('settings.language.sub') : t('settings.language.town')}</small></span><span class="lang-switch">${(['en', 'id'] as Lang[]).map(code => `<button type="button" class="btn" data-lang="${code}" aria-pressed="${lang() === code}" ${inTown ? '' : 'disabled'}>${code === 'en' ? 'English' : 'Indonesia'}</button>`).join('')}</span></div>
     <label class="setting-row"><span><b>${t('settings.sound')}</b><small>${t('settings.sound.sub')}</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.motion')}</b><small>${t('settings.motion.sub')}</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label>
+    <label class="setting-row"><span><b>${t('settings.coach')}</b><small>${t('settings.coach.sub')}</small></span><input id="setting-coach" type="checkbox" ${coachEnabled() ? 'checked' : ''}></label>
     <p class="hint">${t('settings.save.note')}</p><button id="export-save" class="btn">${t('settings.export')}</button><button class="btn primary" data-close>${t('common.back')}</button>`);
   $('export-save').addEventListener('click',exportCommander);
   $('setting-sound').addEventListener('change', e => { profile.sound = (e.target as HTMLInputElement).checked; updateSound(); });
+  $('setting-coach').addEventListener('change', e => { setCoachEnabled((e.target as HTMLInputElement).checked); if (coach.step) endCoachStep(); });
   $('setting-motion').addEventListener('change', e => { profile.motion = (e.target as HTMLInputElement).checked; scene.reducedMotion = !profile.motion; document.body.classList.toggle('reduced-motion', !profile.motion); persist(); });
 }
 function updateSound() { sound.enabled = profile.sound; if (profile.sound) sound.unlock(); $('sound').setAttribute('aria-pressed', String(profile.sound)); persist(); }
@@ -1535,6 +1638,9 @@ function showBoonTray() {
     <div class="boon-tray-footer"><div class="boon-tray-stats"><span>${t('boons.purse', { n: runWallet.crystal })}</span><span>${t('battle.standing', { n: battle.heroes.filter(h => h.hp > 0).length, total: battle.heroes.length })}</span></div><button class="btn primary" data-close>${t('boons.resume')}</button></div></div>`);
 }
 async function navigateTown(tab: TownTab = 'camp') {
+  // A mode the story has not opened yet stays shut (the notice says which chapter opens it).
+  noteModesInUse(commander.document);
+  if (inTown && routeLocked(profile, tab)) { showTown(townState.tab, lockNotice(tab as Feature)); return; }
   const activateTargetMode = () => {
     const activeCommander = commander.document;
     if (!activeCommander) return;
@@ -1852,11 +1958,23 @@ async function presentResult() {
     const credited = !won ? 0 : resultReward ? (battle.mode === 'adventure' ? resultReward.gold : resultReward.crystal) : undefined;
     const rewardPlaque = moreWaves ? [t('result.carried'), `${battle.gold}G`] : battle.mode === 'adventure' ? [t('result.gold'), credited === undefined ? '—' : `${credited}G`] : [t('currency.crystal'), credited === undefined ? '—' : `+${credited}`];
     const retryBattle = !won && battle.mode === 'adventure' && battle.stage > 0 && stageStart?.battle.stage === battle.stage && stageStart.battle.floor === battle.floor;
-    const xpRows = experienceRewards.map(r => {
-      const isLevelUp = r.after > r.before;
-      const hero = ROSTER[r.id];
-      return `<p class="xp-card ${isLevelUp ? 'leveled-up' : ''}" data-xp-kind="${r.kind}"><img src="${portrait(hero.classId)}" alt=""/><span class="xp-hero-info"><b class="xp-hero-name">${hero.name}</b><small class="xp-role-badge ${r.kind}">${r.kind === 'bench' ? t('result.bench') : t('result.active')}</small></span><span class="xp-points">+${r.xp} EXP${r.bonus ? ` <small class="xp-catchup">(+${r.bonus})</small>` : ''}</span><span class="xp-level-badge ${isLevelUp ? 'lvl-glow' : ''}">${isLevelUp ? t('result.levelup', { from: r.before, to: r.after }) : `LV ${r.after}`}</span></p>`;
-    }).join('');
+    // A Raid hero keeps the class the slot fielded (its colours stay its own); everyone else shows their roster class.
+    const xpRows = xpSummary(experienceRewards, id => { const h = battle.mode === 'raid' ? battle.hero(id) : undefined; return h ? face(h) : portrait(ROSTER[id].classId, 0, id); });
+    // A Story defeat says why and what to do: power vs the recommendation, who fell first, the enemy's counter, up to two one-tap fixes.
+    // The first fall of this battle (a KO still queued for the scene counts too: the result can open before the scene drains it).
+    const queuedDown = battle.events.find(e => e.type === 'down');
+    const enemy = ENEMIES[battle.enemyId], fall = firstFall?.battle === battle && firstFall.stage === battle.stage ? firstFall : queuedDown ? { name: heroLabel(queuedDown.source), cause: downCause(queuedDown) } : undefined;
+    const fixes = !won && battle.mode === 'adventure' ? defeatFixes(profile, battle.floor - 1, battle.heroic) : [];
+    const rec = battle.heroic ? recommendedHeroicPower(battle.floor - 1) : recommendedPower(battle.floor - 1), power = partyPower(profile), verdict = powerVerdict(power, rec);
+    const fixLabel = (fix: typeof fixes[number]) => fix.kind === 'dungeon' ? t('result.fix.dungeon') : t(fix.kind === 'jobs' ? 'result.fix.jobs' : 'result.fix.gear', { name: ROSTER[fix.hero!].name });
+    const defeatHelp = won ? '' : `<section class="win defeat-help" aria-label="${t('result.fix.title')}">
+        ${battle.mode === 'adventure' ? `<p class="power-line power-${verdict}" data-defeat-power>${t('result.defeat.power', { n: power, rec })} <em>${t(`power.verdict.${verdict}` as never)}</em></p>` : ''}
+        ${fall ? `<p class="defeat-first">${escapeUI(fall.cause ? t('result.defeat.first', { name: fall.name, cause: fall.cause }) : t('result.defeat.first.plain', { name: fall.name }))}</p>` : ''}
+        ${enemy?.counter ? `<p class="counter-note defeat-tip"><b>${escapeUI(t('result.defeat.tip', { name: eventText(battle.enemyName, lang()) }))}:</b> ${escapeUI(enemy.counter)}</p>` : ''}
+        ${fixes.length ? `<h3 class="subheading">${t('result.fix.title')}</h3><div class="defeat-fixes">${fixes.map(fix => `<button class="btn" data-defeat-fix="${fix.kind}" ${fix.hero !== undefined ? `data-fix-hero="${fix.hero}"` : ''}>${escapeUI(fixLabel(fix))} ▶</button>`).join('')}</div>` : ''}
+      </section>`;
+    // Details: the real breakdown (the fight's numbers and which star goals this clear met).
+    const starGoals = won && !moreWaves && battle.mode === 'adventure' && !battle.heroic ? ([['stars.goal.clear', true], ['stars.goal.standing', battle.living().length === battle.heroes.length], ['stars.goal.par', battle.stageTime <= STAR_PAR_SECONDS]] as const) : [];
     const readyQuests = QUESTS.filter(q => questProgress(profile, q).ready).length;
     showResultScreen(`<div class="result-ceremony-modal ${outcomeClass}">
       <p class="result-banner" aria-hidden="true">${banner}</p>
@@ -1866,18 +1984,20 @@ async function presentResult() {
         ${([['result.recruited', true], ['result.recruited.bench', false]] as const).map(([key, deployed]) => { const names = recruitedIds.filter(id => profile.storyActive.includes(id) === deployed).map(id => ROSTER[id].name); return names.length ? `<p class="recruit-notice">${t(key, { names: names.join(' & ') })}</p>` : ''; }).join('')}
         ${won && !moreWaves && battle.mode === 'adventure' && battle.floor === CAMPAIGN.length && resultReward?.firstClear ? `<p class="recruit-notice campaign-complete">${t('result.campaign.complete')}</p>` : ''}
         ${resultReward?.partyCap && won && !moreWaves ? `<p class="recruit-notice party-grew">${t('notice.party.grew', { n: resultReward.partyCap })}</p>` : ''}
-        ${won && !moreWaves && battle.heroic ? `<p class="result-stars heroic-stars">${t('stars.heroic')}</p>` : chapterResult && won && !moreWaves ? `<p class="result-stars"><span>${t('result.stars')}</span> <b class="star-row">${'★'.repeat(chapterResult.stars)}${'☆'.repeat(3 - chapterResult.stars)}</b>${chapterResult.improved ? ` <em>${t('result.stars.new')}</em>` : ''}</p>` : ''}
+        ${won && !moreWaves && battle.heroic ? `<p class="result-stars heroic-stars">${t('stars.heroic')}</p>` : chapterResult && won && !moreWaves ? `<p class="result-stars"><span>${t('result.stars')}</span> ${starRow(chapterResult.stars)}${chapterResult.improved ? ` <em>${t('result.stars.new')}</em>` : ''}</p>` : ''}
         ${chapterResult?.heroic ? `<p class="recruit-notice">${t('result.heroic', { gold: chapterResult.heroic.gold, mat: materialList(chapterResult.heroic.materials) })}</p>` : ''}
       </header>
       <section class="win result-summary" aria-label="${t('result.summary')}">
         <dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque gold"><dt>${rewardPlaque[0]}</dt><dd data-result-reward>${rewardPlaque[1]}</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>
-        ${xpRows ? `<div class="xp-results">${xpRows}</div>` : ''}
+        ${xpRows}
         ${readyQuests && !moreWaves && won ? `<p class="hint">${t('result.quests', { n: readyQuests })}</p>` : ''}
         ${retryBattle ? `<p class="hint retry-battle-hint">${t('result.retry.battle.hint')}</p>` : ''}
       </section>
+      ${defeatHelp}
       <section class="win result-details" id="result-details" aria-label="${t('result.details')}" hidden>
+        <dl class="stat-table"><div><dt>${t('battle.stat.damage')}</dt><dd>${Math.round(battle.damage).toLocaleString()}</dd></div><div><dt>${t('result.detail.healed')}</dt><dd>${Math.round(battle.healed).toLocaleString()}</dd></div><div><dt>${t('battle.stat.blocked')}</dt><dd>${Math.round(battle.blocked).toLocaleString()}</dd></div><div><dt>${t('result.detail.dodged')}</dt><dd>${battle.dodged}</dd></div><div><dt>${t('result.detail.taps')}</dt><dd>${battle.taps}</dd></div><div><dt>${t('result.detail.moves')}</dt><dd>${battle.relocations}</dd></div></dl>
+        ${starGoals.length ? `<h3 class="subheading">${t('result.detail.stars')}</h3><ul class="result-star-goals">${starGoals.map(([key, met]) => `<li class="${met ? 'met' : ''}">${t(key, { s: STAR_PAR_SECONDS })}</li>`).join('')}</ul>` : ''}
         <p class="hint">${t('result.xp.note')}</p>
-        <dl class="stat-table"><div><dt>${t('battle.stat.damage')}</dt><dd>${Math.round(battle.damage).toLocaleString()}</dd></div><div><dt>${t('battle.stat.blocked')}</dt><dd>${Math.round(battle.blocked).toLocaleString()}</dd></div></dl>
       </section>
       <div class="ceremony-actions">
         ${retryBattle ? `<button id="retry-battle" class="btn primary" title="${escapeUI(t('result.retry.battle.hint'))}">${t('result.retry.battle')}</button>` : ''}
@@ -1939,19 +2059,31 @@ async function presentResult() {
     resumeEncounter(saved);
     void checkpoint();
   });
-  $('result-town').addEventListener('click', () => {
-    if (moreWaves || won && battle.mode === 'endless') {
-      navigateTown('camp');
-      return;
-    }
+  // Leave the settled result for a town route (the camp plays the scenes a clear queued: join scenes, a story choice, the finale).
+  const leaveResult = (tab: TownTab) => {
     runBoons = [];
     if (battle.mode === 'adventure' && commander.document) activateCommander(commander.document, 'story');
     closeWithoutResume();
     inTown = true;
     recruitedIds = [];
-    // Opening the camp plays the scenes this clear queued (join scenes, a story choice, the finale).
-    showTown('camp', '', true);
+    routeStack = ['camp'];
+    showTown(tab, '', true);
+  };
+  $('result-town').addEventListener('click', () => {
+    if (moreWaves || won && battle.mode === 'endless') {
+      navigateTown('camp');
+      return;
+    }
+    leaveResult('camp');
   });
+  resultScreen.querySelectorAll<HTMLButtonElement>('[data-defeat-fix]').forEach(button => button.addEventListener('click', () => {
+    const kind = button.dataset.defeatFix, hero = Number(button.dataset.fixHero);
+    if (Number.isInteger(hero) && profile.roster.includes(hero)) townState.hero = hero;
+    townState.pendingGear = undefined;
+    if (kind === 'jobs') townState.trainingTab = 'talents';
+    if (kind === 'gear') townState.trainingTab = 'gear';
+    leaveResult(kind === 'dungeon' ? 'dungeon' : kind === 'jobs' ? 'party-advanced' : 'party');
+  }));
 }
 
 /** Result of one Undercroft room: XP, carried HP and the pouch update, then back to the map. */
@@ -1980,17 +2112,17 @@ async function presentDungeonResult() {
   }
   loot = dungeonLoot;
   const run = profile.journey.run, cleared = run?.status === 'cleared';
-  const xpRows = experienceRewards.map(r => { const hero = ROSTER[r.id], up = r.after > r.before; return `<p class="xp-card ${up ? 'leveled-up' : ''}"><img src="${portrait(hero.classId)}" alt=""/><span class="xp-hero-info"><b class="xp-hero-name">${hero.name}</b></span><span class="xp-points">+${r.xp} EXP</span><span class="xp-level-badge">${up ? t('result.levelup', { from: r.before, to: r.after }) : `LV ${r.after}`}</span></p>`; }).join('');
+  const xpRows = xpSummary(experienceRewards, id => portrait(ROSTER[id].classId, 0, id));
   const desc = !won ? t('dungeon.end.wiped') : cleared ? t('dungeon.end.cleared') : loot ? `${t('dungeon.out.gold', { n: loot.gold })} ${Object.entries(loot.materials).map(([id, n]) => t('dungeon.out.material', { n, name: t(`material.${id}` as never) })).join(' ')}` : '';
   // A wipe names what the pouch held; with an empty pouch there is nothing to lose and nothing to say.
   const before = dungeonBefore, lost = !won && before && (before.pouch.gold > 0 || Object.values(before.pouch.materials).some(n => n > 0)) ? before.pouch : undefined;
   const pct = (ratio: number) => `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
-  const hpRows = run && before ? run.party.filter(id => ROSTER[id]).map(id => { const from = before.hp[id] ?? 0, to = run.hp[id] ?? 0; return `<li class="${to <= 0 ? 'down' : to < .35 ? 'low' : ''}"><img src="${portrait(ROSTER[id].classId)}" alt=""/><b>${ROSTER[id].name}</b><span class="gauge" aria-hidden="true"><i style="width:${pct(to)}"></i></span><small>${pct(from)} <span class="hp-arrow">→</span> ${pct(to)}</small></li>`; }).join('') : '';
+  const hpRows = run && before ? run.party.filter(id => ROSTER[id]).map(id => { const from = before.hp[id] ?? 0, to = run.hp[id] ?? 0; return `<li class="${to <= 0 ? 'down' : to < .35 ? 'low' : ''}"><img src="${portrait(ROSTER[id].classId, 0, id)}" alt=""/><b>${ROSTER[id].name}</b><span class="gauge" aria-hidden="true"><i style="width:${pct(to)}"></i></span><small>${pct(from)} <span class="hp-arrow">→</span> ${pct(to)}</small></li>`; }).join('') : '';
   $('start-overlay').hidden = false;
   showResultScreen(`<div class="result-ceremony-modal ${won ? 'victory' : 'defeat'}">
     <p class="result-banner" aria-hidden="true">${won ? cleared ? t('dungeon.end.cleared.banner') : t('result.banner.win') : t('dungeon.end.wiped.banner')}</p>
     <header class="win ceremony-header"><h2 id="result-title" class="ceremony-title">${t('route.dungeon')} · ${t('dungeon.depth.label', { n: run?.depth ?? 1 })}</h2><p class="ceremony-desc">${escapeUI(desc)}</p></header>
-    <section class="win result-summary"><dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque"><dt>${t('dungeon.pouch')}</dt><dd>${lost ? `−${lost.gold}G` : `${run?.pouch.gold ?? 0}G`}</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>${lost ? `<p class="dungeon-lost">${escapeUI(t('dungeon.lost', { lost: lostText(lost) }))}</p>` : ''}${hpRows ? `<h3 class="subheading">${t('dungeon.result.hp')}</h3><ul class="dungeon-hp-list">${hpRows}</ul>` : ''}${xpRows ? `<div class="xp-results">${xpRows}</div>` : ''}</section>
+    <section class="win result-summary"><dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque"><dt>${t('dungeon.pouch')}</dt><dd>${lost ? `−${lost.gold}G` : `${run?.pouch.gold ?? 0}G`}</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>${lost ? `<p class="dungeon-lost">${escapeUI(t('dungeon.lost', { lost: lostText(lost) }))}</p>` : ''}${hpRows ? `<h3 class="subheading">${t('dungeon.result.hp')}</h3><ul class="dungeon-hp-list">${hpRows}</ul>` : ''}${xpRows}</section>
     <div class="ceremony-actions"><button id="result-dungeon" class="btn primary">${t('dungeon.result.back')} ▶</button></div>
   </div>`);
   sound.play(won ? 'fanfare' : 'defeat');
@@ -2284,8 +2416,9 @@ if (typeof navigator !== 'undefined' && !navigator.webdriver) {
   window.addEventListener('beforeunload', event => { if (commander.busy || commander.dirty || pendingSettlement) event.preventDefault(); });
 }
  $('home').addEventListener('click', () => {
-  if (inTown && townState.tab === 'camp') showTitleScreen();
-  else void navigateTown('camp');
+  if (!inTown) { void navigateTown('camp'); return; }
+  sound.play('cursor');
+  void navigateTown(townState.tab === 'camp' ? 'more' : backRoute(routeStack));
 });
 $('title-enter').addEventListener('click', enterEmberhollow);
 $('title-profiles').addEventListener('click', () => { void profilesMenu(); });
@@ -2408,6 +2541,9 @@ const exposeQaHook = () => { if (import.meta.env.DEV) Object.assign(window, { gr
   setRunBoons: (b: string[]) => { runBoons = [...b]; battle.boons = [...b]; updateExpedition(); },
   step: (seconds: number) => { for (let t = 0; t < Math.min(600, Math.max(0, seconds)); t += 1 / 60) battle.tick(1 / 60); frame(1); },
   boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro, recruitScene: (id: number) => recruitScene(id, true), campScenes: () => playCampScenes(true), endingScene,
+  /** Force the first-battle coach on (tips replay from the start) or off, regardless of automation and Config. */
+  coach: (force = true) => { coachForced = force; if (force) resetCoach(); else if (coach.step) endCoachStep(); return { step: coach.step ?? null, done: COACH_STEPS.filter(coachDone) }; },
+  get coachStep() { return coach.step ?? null; }, unlockIntro: () => unlockIntro(true),
 } }); };
 // Every player gets a Commander: the latest one, or one migrated from the legacy save (backed up first). The dev QA hook appears once that has settled, so tests never race the migration.
 void ensureCommander().finally(() => { commanderChecked = true; storageStatus(); window.clearTimeout(saveFallback); window.clearTimeout(engineFallback); startEngine(); exposeQaHook(); if (inTown && townState.tab === 'camp') void playCampScenes(); });

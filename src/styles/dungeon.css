@@ -3,15 +3,18 @@
 /* Party power vs recommendation */
 .power-line { margin: 6px 0; font-size: 13px; color: var(--ink-soft); }
 .power-line b { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
-.power-line em { margin-left: 4px; padding: 1px 6px; border-radius: var(--radius); font-style: normal; font-weight: 700; font-size: 12px; }
+.power-line em { margin-left: 4px; padding: 1px 6px; border-radius: var(--radius); font-style: normal; font-weight: 700; font-size: 12px; white-space: nowrap; }
 .power-ready em, em.power-ready { background: #1f3d2b; color: var(--hp); }
 .power-close em, em.power-close { background: #3a3519; color: var(--hp-low); }
 .power-under em, em.power-under { background: #3d1f1b; color: var(--danger); }
 
 /* Chapter stars */
-.star-row { font-family: var(--pixel); font-size: 10px; letter-spacing: 1px; color: var(--gold-bright); text-shadow: 1px 1px 0 #000; }
-.map-node-stars { display: flex; align-items: center; gap: 3px; margin-top: 1px; padding: 0 4px; border-radius: 3px; background: #000a; }
-.map-node-stars .star-row { font-size: 8px; }
+/* Pixel stars (the pixel font has no star glyph): 9×9 icons drawn as crisp SVG, filled or dim. */
+.star-row { display: inline-flex; gap: 2px; vertical-align: middle; }
+.star-row .star { display: block; width: 15px; height: 15px; background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 9' shape-rendering='crispEdges'%3E%3Cpath fill='%23566e60' d='M4 0h1v1h-1zM3 1h3v2h-3zM0 3h9v1h-9zM1 4h7v1h-7zM2 5h5v2h-5zM1 7h3v1h-3zM5 7h3v1h-3zM1 8h2v1h-2zM6 8h2v1h-2z'/%3E%3C/svg%3E"); image-rendering: pixelated; filter: drop-shadow(1px 1px 0 #000); }
+.star-row .star.on { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 9' shape-rendering='crispEdges'%3E%3Cpath fill='%23f6d27a' d='M4 0h1v1h-1zM3 1h3v2h-3zM0 3h9v1h-9zM1 4h7v1h-7zM2 5h5v2h-5zM1 7h3v1h-3zM5 7h3v1h-3zM1 8h2v1h-2zM6 8h2v1h-2z'/%3E%3Cpath fill='%23fff6c8' d='M4 1h1v1h-1z'/%3E%3C/svg%3E"); }
+.map-node-stars { display: flex; align-items: center; gap: 3px; margin-top: 1px; padding: 1px 4px; border-radius: 3px; background: #000a; }
+.map-node-stars .star-row .star { width: 12px; height: 12px; }
 .heroic-mark { font-style: normal; font-family: var(--pixel); font-size: 7px; padding: 1px 2px; border-radius: 2px; background: var(--danger-deep); color: #ffe2dc; }
 .star-goals { display: flex; gap: 10px; align-items: flex-start; margin: 6px 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); }
 .star-goals .star-row { flex: none; padding-top: 2px; }
@@ -32,7 +35,7 @@
 
 /* Next-step guide in town */
 .guide-label { color: var(--gold); }
-.guide-go { margin-top: 4px; }
+.guide-go { margin-top: 4px; white-space: nowrap; }
 
 /* Forge refinement */
 .mat-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }

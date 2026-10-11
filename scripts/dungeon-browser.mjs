@@ -25,12 +25,19 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     await send('Page.addScriptToEvaluateOnNewDocument', { source: `{ const put = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function (...args) { if (localStorage.getItem('qa.failPut')) throw new DOMException('QA quota exceeded', 'QuotaExceededError'); return put.apply(this, args); }; }` });
     await send('Page.navigate', { url });
     await wait('window.gridbound && document.querySelector("canvas")');
-    // The mode tabs on the depth picker keep their height whatever the content: a fresh save (short) here, a mid-game one below.
+    // A fresh save has not opened the Undercroft yet (it opens with Chapter 1): the Bell Tower is locked and says why.
+    assert.equal(await evaluate('document.querySelector(\'.town-spot[data-spot="chapel"]\')?.dataset.locked'), 'dungeon', 'the Undercroft is locked on a fresh save');
+    await click('.town-spot[data-spot="chapel"]');
+    await wait('document.querySelector("#town-notice:not([hidden])")?.textContent.includes("Chapter 1")');
+    // The mode tabs on the depth picker keep their height whatever the content: a save that just opened it (short) here, a mid-game one below.
+    await evaluate(`indexedDB.deleteDatabase('gridbound.commanders.r1'); localStorage.clear(); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify({ ...qaProfile, cleared: [0], journey: { stars: { 0: 1 }, chests: 0, heroic: [], depth: 0 } })}))`);
+    await send('Page.reload');
+    await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")');
     const navHeight = 'document.querySelector(".dungeon-scene .expedition-mode-nav")?.getBoundingClientRect().height ?? 0';
     await click.nav('dungeon');
     await wait('Boolean(document.querySelector(".dungeon-scene .expedition-mode-nav"))');
-    assert.ok(await evaluate(navHeight) >= 40, `fresh save: mode tabs ${await evaluate(navHeight)}px tall`);
-    assert.ok(await evaluate('Math.max(...[...document.querySelectorAll(".dungeon-scene .expedition-mode-nav button")].map(b => b.getBoundingClientRect().height))') < 70, 'fresh save: mode tabs are not stretched');
+    assert.ok(await evaluate(navHeight) >= 40, `short save: mode tabs ${await evaluate(navHeight)}px tall`);
+    assert.ok(await evaluate('Math.max(...[...document.querySelectorAll(".dungeon-scene .expedition-mode-nav button")].map(b => b.getBoundingClientRect().height))') < 70, 'short save: mode tabs are not stretched');
     await evaluate(`indexedDB.deleteDatabase('gridbound.commanders.r1'); localStorage.clear(); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(qaProfile)}))`);
     await send('Page.reload');
     await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")');
@@ -39,7 +46,7 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     const guide = await evaluate('document.querySelector(".camp-copy .guide-label")?.parentElement.textContent ?? ""');
     assert.ok(guide.length > 20, 'camp shows a next-step guide');
     assert.equal(await evaluate('Boolean(document.querySelector(".camp-copy .guide-go[data-facility]"))'), true, 'guide has a Go button');
-    assert.equal(await evaluate('document.querySelector(\'.town-spot[data-facility="dungeon"] .town-sign\')?.textContent'), 'Undercroft');
+    assert.equal(await evaluate('document.querySelector(\'.town-spot[data-facility="dungeon"] .town-sign small\')?.textContent'), 'Undercroft', 'the sign names the destination as the HUD and the gate tab do');
     await screenshot(`artifacts/progress-camp-${viewport.tag}.png`);
 
     // World map: party power vs recommendation, stars on cleared nodes, star bar, Heroic toggle on a cleared chapter.

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { withBrowser } from './browser-harness.mjs';
+import { withBrowser, seedSave } from './browser-harness.mjs';
 const url='http://127.0.0.1:5184/'; let server; let output='';
 try {
   server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5184','--strictPort'],{stdio:['ignore','pipe','pipe']});
@@ -9,6 +9,7 @@ try {
   const deadline=Date.now()+15000; while(!output.includes(url)){if(server.exitCode!==null)throw Error(output);if(Date.now()>deadline)throw Error('server timeout');await new Promise(r=>setTimeout(r,50));}
   assert.equal((await fetch(url)).status,200);
   await withBrowser(async({send,wait,evaluate,click,errors})=>{
+    await seedSave(send); // Raids and the Bell Trials open with Chapters 2 and 4
     await send('Page.navigate',{url}); await wait('window.gridbound?.profile?.()');
     const gold = await evaluate(`(() => {
       const amount = document.querySelector("#wallet .currency-amount");

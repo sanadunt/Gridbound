@@ -4,6 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
 
+/** A save that reached Act II: the Undercroft, Raids and the Bell Trials (opened by Chapters 1, 2 and 4) are open. */
+export const ACT_TWO_SAVE = { version: 3, gold: 500, claimedQuests: [], ledger: { raids: 0, victories: 4, enemies: { wolf: 1 } }, roster: [0, 4, 3], cleared: [0, 1, 2, 3], storyActive: [0, 4, 3], loadouts: { 0: { skills: [0, 1], talents: [], xp: 0, slot: 1 }, 4: { skills: [0, 1], talents: [], xp: 0, slot: 7 }, 3: { skills: [0, 1], talents: [], xp: 0, slot: 6 } }, bestFloor: 0, wins: 4, sound: false, motion: true };
+/** Start the tab on a seeded legacy save (migrated into a new Commander on the first boot; reloads keep that Commander). Call before Page.navigate.
+ *  `profile: null` starts a fresh save; `lang` ('en' | 'id') picks the language after the storage is cleared. */
+export const seedSave = (send, profile = ACT_TWO_SAVE, lang) => send('Page.addScriptToEvaluateOnNewDocument', { source: `if (!sessionStorage.getItem('qa.seeded')) { sessionStorage.setItem('qa.seeded', '1'); localStorage.clear();${lang ? ` localStorage.setItem('gridbound.lang', ${JSON.stringify(lang)});` : ''}${profile ? ` localStorage.setItem('gridbound.v3', ${JSON.stringify(JSON.stringify(profile))});` : ''} }` });
+
 export async function withBrowser(run, { width = 1440, height = 1000, mobile = false } = {}) {
   let child, socket, profile;
   const pending = new Map();
@@ -68,8 +74,9 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
     // Navigate the way a player does: town buildings, the MENU screen, and the gate's mode tabs.
     click.nav = async facility => {
       const route = () => evaluate('document.querySelector(".town-game-shell")?.dataset.townRoute ?? ""');
+      // ◀ walks back one route at a time (MENU → Quests → ◀ is MENU), so a deep stack needs a few presses.
       const toCamp = async () => {
-        for (let attempt = 0; attempt < 3 && await route() !== 'camp'; attempt++) {
+        for (let attempt = 0; attempt < 8 && await route() !== 'camp'; attempt++) {
           await click('#home');
           try { await wait('Boolean(document.querySelector(".town-spot"))', 2000); } catch { /* a click landing mid-transition is retried */ }
         }

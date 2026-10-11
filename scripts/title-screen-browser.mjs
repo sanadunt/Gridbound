@@ -29,11 +29,14 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   assert.equal(await evaluate('Boolean(document.querySelector("#town-screen:not([hidden])"))'), true);
   console.log('PASS: Enter Emberhollow dismissed title screen into town');
 
-  // Test clicking #home from town re-opens Title Screen
+  // On the camp the HUD title opens the MENU (it is no hidden Title button); the Title screen is MENU → Title.
   await click('#home');
+  await wait('document.querySelector(".town-game-shell")?.dataset.townRoute === "more"');
+  assert.equal(await evaluate('document.querySelector("#title-screen").hidden'), true, 'the camp title does not leave for the Title screen');
+  await click('.more-scene [data-open-action="title"]');
   await wait('!document.querySelector("#title-screen").hidden');
   assert.equal(await evaluate('Boolean(document.querySelector("#title-screen:not([hidden])"))'), true);
-  console.log('PASS: Brand button (#home) returns to Title Screen');
+  console.log('PASS: Camp title opens MENU, MENU → Title returns to the Title Screen');
 
   // Test clicking "COMMANDER PROFILES" opens profile modal
   console.log('STEP: clicking #title-profiles');

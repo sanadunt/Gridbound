@@ -59,7 +59,7 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
   await click(`[data-town-hero="${alternateHero}"]`);
   await wait(`Number(document.querySelector(".party-roster .active")?.dataset.townHero) === ${alternateHero}`);
   await click('.party-advanced-link');
-  await wait('document.querySelector(".party-scene h1")?.textContent.trim() === "Jobs & Talents"');
+  await wait('document.querySelector(".party-scene h1")?.textContent.trim() === "Jobs"');
   assert.equal(await evaluate('Number(document.querySelector(".party-roster .active")?.dataset.townHero)'), alternateHero,
     'Opening Jobs & talents preserves the selected hero');
   await click('.party-advanced-link');

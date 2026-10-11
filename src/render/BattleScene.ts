@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { Battle, ENRAGE_AT, type BattleEvent } from '../game/simulation';
-import { installArt } from '../art/pixels';
+import { installArt, heroCanvas, heroKey } from '../art/pixels';
 import { monsterCanvas } from '../art/monsters';
 import { ENEMIES } from '../game/world';
-import { KITS } from '../game/content';
+import { KITS, type ClassId } from '../game/content';
 import { Sound } from '../audio/sound';
 import { t, lang } from '../i18n';
 import { eventText } from '../i18n/content';
@@ -22,7 +22,7 @@ export class BattleScene extends Phaser.Scene {
  battle:Battle; soundBox:Sound; onFrame:(dt:number)=>void;
  reducedMotion=false;hoverSlot=-1;dragId=-1;dragPoint?:{x:number;y:number};
  private heroes=new Map<number,Phaser.GameObjects.Image>();private enemies=new Map<number,Phaser.GameObjects.Image>();
- private particles:Particle[]=[];private age=0;private accumulator=0;private pulse=0;private shake=0;private bossCue?:BossCue;
+ private particles:Particle[]=[];private age=0;private accumulator=0;/** Battle speed against the wall clock (the first-battle coach slows the fight to 0.3 while it explains a move): each frame feeds dt × timeScale into the fixed 1/60 s tick loop, so determinism is unchanged. */public timeScale=1;private pulse=0;private shake=0;private bossCue?:BossCue;
  private flashes=new Map<number,number>();private attacks=new Map<number,number>();private bg!:Phaser.GameObjects.Image;
  private floor!:Phaser.GameObjects.Graphics;
  private dragon!:Phaser.GameObjects.Image;
@@ -60,7 +60,7 @@ export class BattleScene extends Phaser.Scene {
   this.dragon=this.add.image(300,200,'dragon-0').setScale(2.28).setDepth(5);
   this.threats=this.add.graphics().setDepth(7);this.fx=this.add.graphics().setDepth(20);this.flashRect=this.add.rectangle(300,380,600,760,0xffffff,0).setDepth(45);this.resetEnemyDeathAnimation();this.syncHeroes();
  }
- replace(battle:Battle){this.tweens.killAll();for(const child of [...this.children.list])if('depth' in child && Number(child.depth)>=17)child.destroy();this.fx=this.add.graphics().setDepth(20);this.flashRect=this.add.rectangle(300,380,600,760,0xffffff,0).setDepth(45);this.hitStop=0;this.bossKick=0;this.introLeft=0;this.victoryAge=0;this.pulse=0;this.shake=0;this.bossCue=undefined;this.dragId=-1;this.dragPoint=undefined;this.hoverSlot=-1;this.battle=battle;this.heroes.forEach(s=>s.destroy());this.heroes.clear();this.enemies.forEach(s=>s.destroy());this.enemies.clear();this.particles=[];this.flashes.clear();this.attacks.clear();this.accumulator=0;this.resetHitStats();this.resetEnemyDeathAnimation();this.syncHeroes();}
+ replace(battle:Battle){this.tweens.killAll();for(const child of [...this.children.list])if('depth' in child && Number(child.depth)>=17)child.destroy();this.fx=this.add.graphics().setDepth(20);this.flashRect=this.add.rectangle(300,380,600,760,0xffffff,0).setDepth(45);this.hitStop=0;this.bossKick=0;this.introLeft=0;this.victoryAge=0;this.pulse=0;this.shake=0;this.bossCue=undefined;this.dragId=-1;this.dragPoint=undefined;this.hoverSlot=-1;this.battle=battle;this.heroes.forEach(s=>s.destroy());this.heroes.clear();this.enemies.forEach(s=>s.destroy());this.enemies.clear();this.particles=[];this.flashes.clear();this.attacks.clear();this.accumulator=0;this.timeScale=1;this.resetHitStats();this.resetEnemyDeathAnimation();this.syncHeroes();}
  private resetHitStats(){this.hits.reset();this.shakeUsed=0;this.lastStop=-9;}
  /** Add screen shake within a per-second budget so dense fights do not shake constantly; `force` (ultimate, KO, break) ignores the budget. */
  private addShake(amount:number,force=false){const use=allowedShake(amount,this.shakeUsed,force);if(use<=0)return;this.shake=Math.max(this.shake,use);this.shakeUsed+=use;}
@@ -106,12 +106,14 @@ export class BattleScene extends Phaser.Scene {
 
  private deathProgress(){return Math.min(1,this.enemyDeathDuration>0?this.enemyDeathElapsed/this.enemyDeathDuration:1);}
 
- private syncHeroes(){if(!this.floor)return;for(const h of this.battle.heroes){if(this.heroes.has(h.id))continue;const p=center(h.slot);this.heroes.set(h.id,this.add.image(p.x,p.y-HERO_LIFT,`${h.classId}-0`).setScale(HERO_SCALE).setDepth(9));}}
+ /** A hero's sprite frame: roster heroes with accents get their own texture (made on first use); Roguelike recruits use the class sprite. */
+ private heroTexture(h:{id:number;classId:ClassId},frame:number){const look=this.battle.mode==='endless'?undefined:h.id,key=`${heroKey(h.classId,look)}-${frame}`;if(!this.textures.exists(key))this.textures.addCanvas(key,heroCanvas(h.classId,frame,look));return key;}
+ private syncHeroes(){if(!this.floor)return;for(const h of this.battle.heroes){if(this.heroes.has(h.id))continue;const p=center(h.slot);this.heroes.set(h.id,this.add.image(p.x,p.y-HERO_LIFT,this.heroTexture(h,0)).setScale(HERO_SCALE).setDepth(9));}}
  update(_time:number,delta:number){
   let dt=Math.min(delta/1000,.1);
   if(this.hitStop>0){this.hitStop-=dt;dt*=.08;}
   this.age+=dt;
-  if(this.battle.status==='fighting'){this.accumulator+=dt;while(this.accumulator>=1/60){this.battle.tick(1/60);this.accumulator-=1/60;}}
+  if(this.battle.status==='fighting'){this.accumulator+=dt*this.timeScale;while(this.accumulator>=1/60){this.battle.tick(1/60);this.accumulator-=1/60;}}
   this.shakeUsed=Math.max(0,this.shakeUsed-dt*SHAKE_PER_SECOND);
   const events=this.battle.drain();events.forEach(e=>{const cue=this.event(e)??this.soundKind(e);if(cue)this.soundBox.play(cue);});
   this.advanceEnemyDeathAnimation(dt);
@@ -139,7 +141,7 @@ export class BattleScene extends Phaser.Scene {
     const attack=this.attacks.get(h.id)??0;if(attack>0){this.attacks.set(h.id,attack-dt);if(!this.reducedMotion)y-=Math.sin(Math.min(1,attack/.34)*Math.PI)*26;}
     if(this.victoryAge>0&&h.hp>0&&!this.reducedMotion)y-=Math.abs(Math.sin((this.victoryAge*2.6+h.id*.37)*Math.PI))*18;
     if(this.dragId===h.id&&this.dragPoint){x=this.dragPoint.x;y=this.dragPoint.y;image.setDepth(30);}else image.setDepth(9);
-    image.x=Phaser.Math.Linear(image.x,x,Math.min(1,dt*18));image.y=Phaser.Math.Linear(image.y,y,Math.min(1,dt*18));image.setTexture(`${h.classId}-${Math.floor(t*4+h.id)%4}`);
+    image.x=Phaser.Math.Linear(image.x,x,Math.min(1,dt*18));image.y=Phaser.Math.Linear(image.y,y,Math.min(1,dt*18));image.setTexture(this.heroTexture(h,Math.floor(t*4+h.id)%4));
     image.setAlpha(h.hp<=0?.2:1);const flash=this.flashes.get(h.id)??0;if(flash>0){this.flashes.set(h.id,flash-dt);image.setTint(0xff857e);}else image.clearTint();
     this.floor.fillStyle(0x050818,.55).fillEllipse(pos.x,pos.y+17,62,12);
     if(h.shield>0||b.guardLeft>0){const shieldAlpha=this.reducedMotion?.6:.6+Math.sin(t*3)*.15;this.threats.lineStyle(2,0x9bd8ef,shieldAlpha);this.threats.strokeEllipse(pos.x,pos.y-HERO_LIFT,72,74);this.threats.fillStyle(0x8acee8,.04).fillEllipse(pos.x,pos.y-HERO_LIFT,72,74);}

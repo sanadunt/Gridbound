@@ -278,3 +278,16 @@
 .focus-bar.low-health .focus-hp b { color: var(--hp-low); }
 .focus-bar.downed .focus-hp b { color: var(--danger); }
 .focus-status { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+
+/* First-battle coach: a tip bubble with an arrow at the control it is about; it never blocks taps or drags (only Skip is clickable). */
+.coach-bubble { position: fixed; z-index: 35; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 10px; border: 2px solid var(--gold); border-radius: var(--radius); background: #12231ef2; box-shadow: 0 0 0 3px #000a, 0 8px 22px #000c; color: var(--ink); pointer-events: none; animation: coach-in .2s ease-out; }
+.coach-bubble[hidden] { display: none; }
+.coach-bubble small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
+.coach-text { order: 2; flex: 1 1 100%; font-size: 15px; font-weight: 700; line-height: 1.25; color: var(--gold-bright); }
+.coach-skip { order: 1; pointer-events: auto; margin-left: auto; min-height: 30px; padding: 2px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink-soft); font-size: 12px; }
+.coach-arrow { position: absolute; left: calc(var(--arrow-x, 50%) - 9px); top: 100%; width: 0; height: 0; border: 9px solid transparent; border-top-color: var(--gold); }
+.coach-bubble.below .coach-arrow { top: auto; bottom: 100%; border-top-color: transparent !important; border-bottom-color: var(--gold); }
+.coach-bubble[data-step="drag"], .coach-bubble[data-step="guard"] { border-color: #ff8a80; }
+.coach-bubble[data-step="drag"] .coach-arrow { border-top-color: #ff8a80; }
+.coach-bubble[data-step="guard"] .coach-arrow { border-top-color: #ff8a80; }
+@keyframes coach-in { from { opacity: 0; transform: translateY(6px); } }

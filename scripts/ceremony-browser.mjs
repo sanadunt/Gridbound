@@ -55,6 +55,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key }) => {
   await screenshot('artifacts/victory-hades-desktop.png');
   console.log('✓ Captured artifacts/victory-hades-desktop.png');
   await send('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
+  // The result screen fills the viewport (its actions stick to the bottom), so measure once the layout has the new height.
+  await wait('document.querySelector("#result-screen").clientHeight <= innerHeight');
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
   const mobileBounds = JSON.parse(await evaluate('JSON.stringify([...document.querySelectorAll("#result-screen .ceremony-actions button, #result-details-toggle")].map(button => { const box = button.getBoundingClientRect(); return {top:box.top,bottom:box.bottom,height:box.height}; }))'));
   const mobileHeight = await evaluate('innerHeight');
@@ -119,10 +121,11 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   console.log('✓ Wave clear ceremony flow passed');
 }, { width: 390, height: 844, mobile: true });
 
-// 3. Defeat Ceremony (Desktop 1440x900)
+// 3. Defeat Ceremony (Desktop 1440x900), in the Bell Trials (they open with Chapter 4, so the save has reached Act II)
 await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
+  const trials = { version: 3, gold: 500, claimedQuests: [], ledger: { raids: 0, victories: 4, enemies: {} }, roster: [0, 4, 3], cleared: [0, 1, 2, 3], storyActive: [0, 4, 3], loadouts: { 0: { skills: [0, 1], talents: [], xp: 0, slot: 1 }, 4: { skills: [0, 1], talents: [], xp: 0, slot: 7 }, 3: { skills: [0, 1], talents: [], xp: 0, slot: 6 } }, bestFloor: 0, wins: 4, sound: false, motion: true };
   await send('Page.addScriptToEvaluateOnNewDocument', {
-    source: `localStorage.removeItem('gridbound.v3'); localStorage.removeItem('gridbound.v2');`
+    source: `if (!sessionStorage.getItem('qa.seeded')) { sessionStorage.setItem('qa.seeded', '1'); localStorage.clear(); localStorage.setItem('gridbound.v3', ${JSON.stringify(JSON.stringify(trials))}); }`
   });
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("#town-screen")');
@@ -148,6 +151,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await screenshot('artifacts/defeat-hades-desktop.png');
   console.log('✓ Captured artifacts/defeat-hades-desktop.png');
   await send('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
+  // The result screen fills the viewport (its actions stick to the bottom), so measure once the layout has the new height.
+  await wait('document.querySelector("#result-screen").clientHeight <= innerHeight');
   const defeatBounds = JSON.parse(await evaluate('JSON.stringify([...document.querySelectorAll("#result-screen .ceremony-actions button, #result-details-toggle")].map(button => { const box = button.getBoundingClientRect(); return {top:box.top,bottom:box.bottom,height:box.height}; }))'));
   const defeatHeight = await evaluate('innerHeight');
   assert.ok(defeatBounds.length >= 3 && defeatBounds.every(box => box.top >= 0 && box.bottom <= defeatHeight && box.height >= 44), 'Defeat actions and Details must fit 360×640 with 44px targets');
@@ -195,10 +200,13 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   assert.ok(actions.length === 4 && actions.every(box => box.top >= 0 && box.bottom <= height && box.height >= 44), 'all four defeat actions are visible 44px targets');
   await screenshot('artifacts/defeat-retry-battle-desktop.png');
   await send('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
+  // The result screen fills the viewport (its actions stick to the bottom), so measure once the layout has the new height.
+  await wait('document.querySelector("#result-screen").clientHeight <= innerHeight');
   const mobile = JSON.parse(await evaluate('JSON.stringify([...document.querySelectorAll("#result-screen .ceremony-actions button")].map(button => { const box = button.getBoundingClientRect(); return { top: box.top, bottom: box.bottom, height: box.height }; }))'));
   assert.ok(mobile.every(box => box.top >= 0 && box.bottom <= 640 && box.height >= 44) && await evaluate('document.documentElement.scrollHeight <= innerHeight + 1'), 'the four defeat actions fit 360×640 without document scrolling');
   await screenshot('artifacts/defeat-retry-battle-mobile-360x640.png');
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await wait('document.querySelector("#result-screen").clientHeight === innerHeight');
   await click('#retry-battle');
   await wait('window.gridbound.battle.status === "ready" && document.querySelector("#result-screen").hidden');
   assert.deepEqual(JSON.parse(await evaluate('JSON.stringify({ stage: window.gridbound.battle.stage, heroic: window.gridbound.battle.heroic, potions: window.gridbound.battle.potions, hp: window.gridbound.battle.heroes.map(h => Math.round(h.hp)) })')), { stage: 1, heroic: true, potions: 0, hp: JSON.parse(atStart) }, 'Retry this battle: same battle, Heroic, the HP and potions it began with (no refill)');

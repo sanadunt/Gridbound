@@ -7,30 +7,40 @@ console.log('--- TESTING UNDERWORLD ARCHIVES & FATED PROPHECIES ---');
 
 // 1. Desktop Viewport (1440x900)
 await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
-  await send('Page.addScriptToEvaluateOnNewDocument', {
+  const fresh = await send('Page.addScriptToEvaluateOnNewDocument', {
     source: `localStorage.removeItem('gridbound.v3'); localStorage.removeItem('gridbound.v2');`
   });
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("#town-screen")');
 
-  // A. Field Bestiary (Codex of the Underworld)
+  // A. Field Bestiary: a grid of every enemy family with a detail sheet; a fresh save has met nobody, so every entry is a '???' silhouette.
   await click.nav('bestiary');
   await wait('Boolean(document.querySelector(".bestiary-list"))');
+  assert.equal(await evaluate('document.querySelectorAll(".bestiary-grid .bestiary-cell").length'), 18, 'one cell per enemy family');
+  assert.equal(await evaluate('document.querySelectorAll(".bestiary-cell.unseen").length'), 18, 'a fresh save shows only silhouettes');
+  assert.equal(await evaluate('document.querySelector(".bestiary-detail h3").textContent'), '???', 'the unseen detail names nobody');
+  assert.equal(await evaluate('Boolean(document.querySelector(".bestiary-list .counter-note"))'), false, 'no counter (or Act IV spoiler) before the enemy is met');
+  assert.equal(await evaluate('document.querySelector(".bestiary-list").textContent.includes("Hollow Choir")'), false, 'late bosses stay hidden');
+  assert.equal(await evaluate('Boolean(document.querySelector(".page-controls"))'), false, 'no pager');
 
+  // Meet two families (the ledger records kills per family), then the entries fill in.
+  await evaluate(`(() => { indexedDB.deleteDatabase('gridbound.commanders.r1'); const p = { version: 3, gold: 60, claimedQuests: [], ledger: { raids: 0, victories: 2, enemies: { wolf: 1, goblin: 2 } }, roster: [0, 4, 3], cleared: [0], loadouts: { 0: { skills: [0, 1], talents: [], xp: 0, slot: 1 }, 4: { skills: [0, 1], talents: [], xp: 0, slot: 7 }, 3: { skills: [0, 1], talents: [], xp: 0, slot: 6 } }, bestFloor: 0, wins: 2, sound: false, motion: true }; localStorage.setItem('gridbound.v3', JSON.stringify(p)); })()`);
+  await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fresh.identifier });
+  await send('Page.reload');
+  await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")');
+  await wait('window.gridbound.profile().ledger.enemies.wolf === 1');
+  await click.nav('bestiary');
+  await wait('Boolean(document.querySelector(".bestiary-detail:not(.unseen)"))');
+  assert.equal(await evaluate('document.querySelectorAll(".bestiary-cell:not(.unseen)").length'), 2, 'met families show their portrait and name');
   assert.equal(await evaluate('Boolean(document.querySelector(".bestiary-list article img"))'), true, 'Monster reliquary image must exist');
-  assert.equal(await evaluate('Boolean(document.querySelector(".bestiary-list article h3"))'), true, 'Monster name must exist');
   assert.equal(await evaluate('Boolean(document.querySelector(".bestiary-list .counter-note"))'), true, 'Tactical counter note must exist');
-
-  // Test pagination forward
   const initialMonster = await evaluate('document.querySelector(".bestiary-list article h3").textContent');
-  await click('[data-bestiary-page="1"]');
-  await wait('Boolean(document.querySelector(".bestiary-list article h3"))');
-  const nextMonster = await evaluate('document.querySelector(".bestiary-list article h3").textContent');
-  assert.notEqual(initialMonster, nextMonster, 'Pagination must load next monster record');
-
-  // Page back
-  await click('[data-bestiary-page="-1"]');
-  await wait('Boolean(document.querySelector(".bestiary-list article h3"))');
+  await click('.bestiary-cell[data-bestiary-pick="goblin"]');
+  await wait(`document.querySelector(".bestiary-list article h3").textContent !== ${JSON.stringify(initialMonster)}`);
+  await click('.bestiary-variants [data-bestiary-pick="goblin-ash"]');
+  await wait('document.querySelector(".bestiary-detail").dataset.bestiaryEntry === "goblin-ash"');
+  await click('.bestiary-cell.unseen');
+  await wait('Boolean(document.querySelector(".bestiary-detail.unseen"))');
 
   await new Promise(resolve => setTimeout(resolve, 300));
   await screenshot('artifacts/bestiary-hades-desktop.png');
@@ -38,7 +48,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
 
   // B. Quest Ledger (The Fated List of Minor Prophecies)
   await click.nav('quests');
-  await wait('Boolean(document.querySelector(".quest-pages"))');
+  await wait('Boolean(document.querySelector(".quest-board"))');
 
   assert.equal(await evaluate('Boolean(document.querySelector("[data-quest-filter]"))'), true, 'Quest filter must exist');
   assert.equal(await evaluate('Boolean(document.querySelector("[data-quest-recipient]"))'), true, 'Quest recipient select must exist');
@@ -76,8 +86,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await wait('Boolean(document.querySelector(".bestiary-list"))');
 
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), true, 'Bestiary must have zero horizontal overflow on mobile');
-  const bestiaryBtnHeights = await evaluate(`[...document.querySelectorAll('.bestiary-list .page-controls button:not(:disabled)')].map(b => b.getBoundingClientRect().height)`);
-  assert.ok(bestiaryBtnHeights.every(h => h >= 40), 'Bestiary pager buttons must have accessible touch heights');
+  const cells = await evaluate(`[...document.querySelectorAll('.bestiary-cell')].map(b => { const r = b.getBoundingClientRect(); return [r.width, r.height]; })`);
+  assert.ok(cells.length === 18 && cells.every(([w, h]) => w >= 44 && h >= 44), `Bestiary cells keep 44px touch targets: ${JSON.stringify(cells.slice(0, 3))}`);
 
   await new Promise(resolve => setTimeout(resolve, 300));
   await screenshot('artifacts/bestiary-hades-mobile-390.png');
@@ -85,7 +95,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
 
   // Quest Ledger on Mobile
   await click.nav('quests');
-  await wait('Boolean(document.querySelector(".quest-pages"))');
+  await wait('Boolean(document.querySelector(".quest-board"))');
 
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), true, 'Quest Ledger must have zero horizontal overflow on mobile');
   const questBtnHeights = await evaluate(`[...document.querySelectorAll('.quest-actions button:not(:disabled)')].map(b => b.getBoundingClientRect().height)`);

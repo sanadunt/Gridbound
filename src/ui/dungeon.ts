@@ -6,12 +6,12 @@ import type { Profile } from '../game/profile';
 import { normalizeStoryParty } from '../game/story-party';
 import { partyPower, powerVerdict, recommendedPower } from '../game/power';
 import { dungeonIcon } from '../art/dungeon-icons';
-import { heroCanvas } from '../art/pixels';
+import { heroCanvas, heroKey } from '../art/pixels';
 import { t, type StringKey } from '../i18n';
 
 const escape = (text: string) => text.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
 const faces = new Map<string, string>();
-const face = (classId: keyof typeof KITS) => { if (!faces.has(classId)) faces.set(classId, heroCanvas(classId, 0).toDataURL()); return faces.get(classId)!; };
+const face = (classId: keyof typeof KITS, hero?: number) => { const key = heroKey(classId, hero); if (!faces.has(key)) faces.set(key, heroCanvas(classId, 0, hero).toDataURL()); return faces.get(key)!; };
 const materialName = (id: string) => t(`material.${id}` as StringKey);
 const pouchLine = (pouch: { gold: number; materials: Record<string, number> }) => [`<span class="pouch-gold">${pouch.gold}G</span>`, ...Object.entries(pouch.materials).filter(([, n]) => n > 0).map(([id, n]) => `<span class="pouch-mat"><img src="${dungeonIcon(id as 'ember-shard')}" alt=""/>${escape(materialName(id))} ×${n}</span>`)].join(' ');
 
@@ -37,7 +37,7 @@ function depthPicker(p: Profile): string {
   }).join('');
   // The rules come before the depths (open until the first guardian falls), so nobody descends without knowing a wipe loses the pouch.
   return `<article class="win dungeon-intro"><small>${t('dungeon.kicker')}</small><h2>${t('route.dungeon')}</h2><p>${t('dungeon.intro')}</p>
-    <div class="dungeon-party">${party.map(id => `<img src="${face(ROSTER[id].classId)}" alt="${escape(ROSTER[id].name)}" title="${escape(ROSTER[id].name)}"/>`).join('')}<span>${t('power.party', { n: power })}</span></div></article>
+    <div class="dungeon-party">${party.map(id => `<img src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}" title="${escape(ROSTER[id].name)}"/>`).join('')}<span>${t('power.party', { n: power })}</span></div></article>
     <details class="win dungeon-rules" ${p.journey.depth ? '' : 'open'}><summary>${t('dungeon.howto')}</summary><p><b>${t('dungeon.rule.map.title')}</b> ${t('dungeon.rule.map')}</p><p><b>${t('dungeon.rule.hp.title')}</b> ${t('dungeon.rule.hp')}</p><p><b>${t('dungeon.rule.pouch.title')}</b> ${t('dungeon.rule.pouch')}</p>${legend()}</details>
     ${open ? `<div class="depth-list">${cards}</div>` : `<p class="win hint">${t('dungeon.locked')}</p>`}`;
 }
@@ -96,7 +96,7 @@ function activeRun(p: Profile, run: DungeonRun, outcome?: string, letter?: strin
   const def = depthDef(run.depth);
   const party = run.party.filter(id => ROSTER[id]).map(id => {
     const ratio = run.hp[id] ?? 0;
-    return `<span class="dungeon-hero ${ratio <= 0 ? 'down' : ratio < .35 ? 'low' : ''}" title="${escape(ROSTER[id].name)}"><img src="${face(ROSTER[id].classId)}" alt="${escape(ROSTER[id].name)}"/><span class="gauge"><i style="width:${Math.round(ratio * 100)}%"></i></span></span>`;
+    return `<span class="dungeon-hero ${ratio <= 0 ? 'down' : ratio < .35 ? 'low' : ''}" title="${escape(ROSTER[id].name)}"><img src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}"/><span class="gauge"><i style="width:${Math.round(ratio * 100)}%"></i></span></span>`;
   }).join('');
   const blessing = run.blessing.power > 1 || run.blessing.vitality > 1 ? `<span class="dungeon-blessing">${t('dungeon.blessing', { p: Math.round((run.blessing.power - 1) * 100), v: Math.round((run.blessing.vitality - 1) * 100) })}</span>` : '';
   return `<header class="win dungeon-hud"><div><small>${t('route.dungeon')} · ${t('dungeon.depth.label', { n: run.depth })}</small><h2>${t(`dungeon.depth.${run.depth}` as StringKey)}</h2></div>

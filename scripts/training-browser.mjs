@@ -109,6 +109,16 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await wait('Boolean(document.querySelector(".talent-workspace"))');
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), true, 'Talent workspace must fit 390px mobile');
 
+  // On a phone the whole Party route scrolls under a one-line hero header; tapping a talent brings its inspector and Learn button on screen.
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".party-sticky")).position'), 'sticky', 'the hero header is sticky on phones');
+  assert.ok(await evaluate('document.querySelector(".party-sticky .hero-sheet").getBoundingClientRect().height') <= 70, 'the hero sheet collapses to one line');
+  const last = await evaluate('[...document.querySelectorAll("[data-inspect-talent]")].at(-1).dataset.inspectTalent');
+  await click(`[data-inspect-talent="${last}"]`);
+  await wait(`document.querySelector(".talent-inspector-section [data-talent]")?.dataset.talent === ${JSON.stringify(last)}`);
+  await new Promise(resolve => setTimeout(resolve, 200));
+  const inspector = await evaluate(`(() => { const b = document.querySelector('.talent-inspector-section [data-talent]'), r = b.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.bottom - 12); return { top: r.top, bottom: r.bottom, height: innerHeight, visible: Boolean(hit?.closest('[data-talent]')) }; })()`);
+  assert.ok(inspector.top >= 0 && inspector.bottom <= inspector.height && inspector.visible, `the inspector's action button is on screen after a tap: ${JSON.stringify(inspector)}`);
+
   await new Promise(resolve => setTimeout(resolve, 300));
   await screenshot('artifacts/training-talents-hades-mobile-390.png');
   console.log('✓ Captured artifacts/training-talents-hades-mobile-390.png');

@@ -3,13 +3,16 @@ import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { withBrowser } from './browser-harness.mjs';
+import { withBrowser, seedSave, ACT_TWO_SAVE } from './browser-harness.mjs';
 
-const port = 5185;
+const port = Number(process.env.D4_PORT) || 5185;
 const url = `http://127.0.0.1:${port}/`;
 const artifactPath = join(process.cwd(), 'artifacts', 'd4-browser-report.json');
 const basicJobs = ['warrior', 'rogue', 'archer', 'healer', 'wizard', 'bard', 'hexer', 'monk', 'engineer'];
+// Raids and the Bell Trials open after Chapters 2 and 4, so the tab starts on a save that cleared Act I's first four chapters
+// (ACT_TWO_SAVE: Aldric, Lyra and Rowan deployed; recruits the save predates join the bench).
 const freshBaseline = {
+  cleared: ACT_TWO_SAVE.cleared,
   storyIds: [0, 4, 3],
   storyNames: ['Aldric', 'Lyra', 'Rowan'],
   storyClasses: ['warrior', 'healer', 'archer'],
@@ -35,7 +38,7 @@ const report = {
   },
   browser: {
     isolated: true,
-    localStorageSeeded: false,
+    localStorageSeeded: true,
   },
   checks: [],
   actions: [],
@@ -149,7 +152,8 @@ async function runBrowserScenario() {
     const { send, evaluate, wait, click, errors } = context;
 
     try {
-      const opened = await action('open fresh town in isolated browser', async () => {
+      const opened = await action('open seeded town in isolated browser', async () => {
+        await seedSave(send);
         await send('Page.navigate', { url });
         await wait(townReady(), 15000);
         return await evaluate('({ origin: location.origin, inTown: window.gridbound.inTown })');
@@ -157,10 +161,10 @@ async function runBrowserScenario() {
       if (!opened) return;
 
       const initialProfile = await evaluate('window.gridbound.profile()');
-      await check('fresh profile has the expected three-hero Story baseline', async () => {
-        requireEqual(initialProfile.roster, freshBaseline.storyIds, 'profile roster');
+      await check('seeded profile has the expected three-hero Story baseline', async () => {
+        requireTrue(freshBaseline.storyIds.every(id => initialProfile.roster.includes(id)), `profile roster holds the Story party: ${jsonText(initialProfile.roster)}`);
         requireEqual(initialProfile.storyActive, freshBaseline.storyIds, 'profile Story party');
-        requireEqual(initialProfile.cleared, [], 'profile cleared chapters');
+        requireEqual(initialProfile.cleared, freshBaseline.cleared, 'profile cleared chapters');
         return {
           roster: initialProfile.roster,
           storyActive: initialProfile.storyActive,
@@ -200,7 +204,7 @@ async function runBrowserScenario() {
       const storyStarted = await action('depart Story baseline', async () => {
         await click.nav('campaign');
         await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
-        await click('[data-zone="0"]');
+        await click(`[data-zone="${freshBaseline.cleared.length}"]`); // the map opens on the next chapter's act
         await click('[data-depart="adventure"]');
         await wait(battleReady('adventure'), 10000);
       });
@@ -423,7 +427,7 @@ async function runBrowserScenario() {
       const postRogueStory = await action('recheck Story after abandoning Roguelike', async () => {
         await click.nav('campaign');
         await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
-        await click('[data-zone="0"]');
+        await click(`[data-zone="${freshBaseline.cleared.length}"]`); // the map opens on the next chapter's act
         await click('[data-depart="adventure"]');
         await wait(battleReady('adventure'), 10000);
       });

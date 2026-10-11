@@ -106,7 +106,16 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   assert.equal(await evaluate('window.gridbound.profile().sound'), false, 'Sound-off setting survives reload');
   assert.equal(await evaluate('window.gridbound.profile().motion'), false, 'Reduced-motion setting survives reload');
 
+  // The Bell Trials open with Chapter 4: after one clear the gate tab is locked and says which chapter opens it.
   await click.nav('campaign');
+  assert.match(await evaluate('document.querySelector(\'.expedition-mode-nav [data-locked="endless"]\')?.textContent ?? ""'), /CH 4/);
+  await click('.expedition-mode-nav [data-locked="endless"]');
+  await wait('document.querySelector("#town-notice:not([hidden])")?.textContent.includes("Chapter 4")');
+  assert.equal(await evaluate('document.querySelector(".town-game-shell").dataset.townRoute'), 'campaign', 'a locked tab stays on the map');
+  // Continue on a save that reached Act II.
+  await evaluate(`indexedDB.deleteDatabase('gridbound.commanders.r1'); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify({ ...qaProfile, cleared: [0, 1, 2, 3], sound: false, motion: false })}))`);
+  await send('Page.reload');
+  await wait('window.gridbound && window.gridbound.profile().cleared.length === 4');
   await click.nav('endless');
   await click('[data-depart="endless"]');
   await click('#start');

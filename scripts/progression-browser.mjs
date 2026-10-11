@@ -21,10 +21,11 @@ for(const width of [390,1440])await withBrowser(async({send,evaluate,wait,click,
  await screenshot(`artifacts/rpg-tree-${width}.png`);
  await click.nav('more');
  await click.nav('quests');await fits();
- const seek=async(id)=>{for(let i=0;i<30;i++){if(await evaluate(`Boolean(document.querySelector('[data-quest="${id}"]'))`))return;await click('[data-quest-page="1"]');}throw Error('Missing quest '+id);};await seek('first-road');const before=await evaluate('window.gridbound.profile().loadouts[0].xp');
+ // One list (no pages): every quest of the filter is on the board, ready rewards first.
+ const seek=async(id)=>{if(!await evaluate(`Boolean(document.querySelector('[data-quest="${id}"]'))`))throw Error('Missing quest '+id);};await seek('first-road');const before=await evaluate('window.gridbound.profile().loadouts[0].xp');
  await click('[data-claim-quest="first-road"]');
  assert.ok(await evaluate('window.gridbound.profile().loadouts[0].xp')>before);
- await select('[data-quest-filter]','all');assert.equal(await evaluate('document.querySelectorAll("[data-quest]").length'),1);
+ await select('[data-quest-filter]','all');assert.equal(await evaluate('document.querySelectorAll("[data-quest]").length'),30);
  await seek('hunt-moth');
  await click('[data-track-quest="hunt-moth"]');
  await screenshot(`artifacts/rpg-quests-${width}.png`);

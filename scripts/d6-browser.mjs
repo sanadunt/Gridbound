@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { withBrowser } from './browser-harness.mjs';
-const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5186','--strictPort'],{stdio:'pipe'});
+const port=Number(process.env.D6_PORT)||5186,url=`http://127.0.0.1:${port}/`;
+const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port',String(port),'--strictPort'],{stdio:'pipe'});
 let output='';server.stdout.on('data',d=>output+=d);server.stderr.on('data',d=>output+=d);
 try {
  const deadline=Date.now()+15000;
- while(!output.includes('http://127.0.0.1:5186/')){if(server.exitCode!==null||Date.now()>deadline)throw Error(output);await new Promise(r=>setTimeout(r,100));}
+ while(!output.includes(url)){if(server.exitCode!==null||Date.now()>deadline)throw Error(output);await new Promise(r=>setTimeout(r,100));}
  await withBrowser(async({send,evaluate,wait,click,errors,screenshot})=>{
-  await send('Page.navigate',{url:'http://127.0.0.1:5186/'});
+  await send('Page.navigate',{url});
   await wait('window.gridbound && (document.querySelector(".town-game-shell") || document.querySelector("#title-screen"))',15000);
   const openProfiles=async()=>{
    if(await evaluate('Boolean(document.querySelector("dialog[open] #new-commander"))')) return;
@@ -50,6 +51,16 @@ try {
   assert.equal(await evaluate('document.documentElement.scrollWidth<=window.innerWidth && document.documentElement.scrollHeight<=window.innerHeight+1'),true,'short profile viewport document overflow');
   await screenshot('artifacts/d6-profiles-short-viewport.png');
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+  // Raids and the Bell Trials open after Chapters 2 and 4: give the brand-new Alpha that Story progress (its auto slot) before the challenge checks below.
+  await evaluate(`(async()=>{
+   const {openCommanderRepository}=await import('/src/game/commander.ts');
+   const repo=await openCommanderRepository();
+   try{
+    const doc=(await repo.list()).find(d=>d.name==='Smoke Alpha'),next=structuredClone(doc);
+    next.story.slots.find(slot=>slot.slotId==='auto').state.cleared=[0,1,2,3];
+    await repo.commit(next,doc.revision);
+   }finally{repo.close();}
+  })()`);
   await evaluate('window.__d6BeforeReload=true');
   await send('Page.reload');
   await wait('window.__d6BeforeReload===undefined && !document.querySelector("dialog[open]")',15000);

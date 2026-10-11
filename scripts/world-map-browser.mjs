@@ -139,6 +139,13 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   const innerH = await evaluate('window.innerHeight');
   assert.ok(scrollH <= innerH + 1, `Mobile scrollHeight (${scrollH}) must fit innerHeight (${innerH})`);
 
+  // Chapter names wrap inside the map instead of truncating; stars are pixel icons (the pixel font has no star glyph).
+  const plates = await evaluate(`(() => { const m = document.querySelector('.map-chart-viewport').getBoundingClientRect(); return [...document.querySelectorAll('.map-node-plate')].map(p => { const r = p.getBoundingClientRect(); return { name: p.textContent, inside: r.left >= m.left - 1 && r.right <= m.right + 1, whole: p.scrollWidth <= p.clientWidth + 1 }; }); })()`);
+  assert.ok(plates.length === 4 && plates.every(p => p.inside && p.whole), `Map plates stay whole and inside the map at 390px: ${JSON.stringify(plates)}`);
+  const star = await evaluate(`(() => { const s = document.querySelector('.map-node-stars .star'), r = s.getBoundingClientRect(); return { w: r.width, h: r.height, icon: getComputedStyle(s).backgroundImage.startsWith('url('), label: s.parentElement.getAttribute('aria-label') }; })()`);
+  assert.ok(star.w >= 12 && star.h >= 12 && star.icon && /Stars 1\/3/.test(star.label), `Stars render as readable icons: ${JSON.stringify(star)}`);
+  assert.equal(await evaluate('document.querySelector(".map-act-tab:nth-child(3) .act-tab-name").textContent'), 'Frozen Archive', 'Act III has one name on the map');
+
   await screenshot('artifacts/world-map-mobile-390.png');
 
   // Switch acts on mobile

@@ -4,16 +4,16 @@ import { once } from 'node:events';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { withBrowser } from './browser-harness.mjs';
 
-const url='http://127.0.0.1:5183/';
+const port=Number(process.env.D3_PORT)||5183,url=`http://127.0.0.1:${port}/`;
 const report={checks:[],consoleErrors:[],serverStopped:false};
 let server;
 try {
-  server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5183','--strictPort'],{stdio:['ignore','pipe','pipe']});
+  server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port',String(port),'--strictPort'],{stdio:['ignore','pipe','pipe']});
   let output='';let launchError;
   server.on('error',error=>{launchError=error;});
   server.stdout.on('data',data=>{output+=data;});server.stderr.on('data',data=>{output+=data;});
   const deadline=Date.now()+15000;
-  while(!output.includes('http://127.0.0.1:5183/')) {
+  while(!output.includes(url)) {
     if(launchError)throw launchError;
     if(server.exitCode!==null)throw Error(`Vite exited: ${output}`);
     if(Date.now()>deadline)throw Error(`Vite readiness timeout: ${output}`);
@@ -95,7 +95,8 @@ try {
     await click('#result-details-toggle');
     assert.equal(await evaluate('!document.querySelector("#result-details").hidden'), true);
     assert.equal(await evaluate('document.querySelectorAll("[data-xp-kind=active]").length'),6);
-    assert.equal(await evaluate('document.querySelectorAll("[data-xp-kind=bench]").length'),3);
+    // The bench is summarized in one line (ui/result-help xpSummary): 'Bench (3): +n EXP each'.
+    assert.match(await evaluate('document.querySelector("[data-xp-kind=bench]")?.textContent ?? ""'),/^Bench \(3\)/);
     const after=await evaluate('window.gridbound.profile()');
     const deltas=after.roster.map(id=>({id,kind:selected.includes(id)?'active':'bench',xp:after.loadouts[id].xp-before.loadouts[id].xp}));
     assert.ok(deltas.every(row=>row.xp>0));

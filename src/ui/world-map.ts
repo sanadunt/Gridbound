@@ -22,7 +22,8 @@ const escape = (text: string) => text.replace(/[&<>"']/g, char => ({ '&': '&amp;
 /** Cached pixel overworld for an act, also used as the chapter-intro backdrop. */
 export const actArt = (act: number) => cached(`act-${act}`, () => overworldCanvas(act, NODES));
 
-const starRow = (n: number) => `<span class="star-row" aria-label="${t('stars.total', { n, max: 3 })}">${'★'.repeat(n)}${'☆'.repeat(3 - n)}</span>`;
+/** Chapter stars as pixel icons (the pixel font has no star glyph); the label carries the count. */
+export const starRow = (n: number) => `<span class="star-row" role="img" aria-label="${t('stars.total', { n, max: 3 })}" data-stars="${n}">${[0, 1, 2].map(i => `<i class="star ${i < n ? 'on' : ''}"></i>`).join('')}</span>`;
 const matLabel = (pouch: { materials: Record<string, number> }) => Object.entries(pouch.materials).map(([id, n]) => `${t(`material.${id}` as StringKey)} ×${n}`).join(', ');
 
 export function renderWorldMap(p: Profile, state: TownState): string {
@@ -77,7 +78,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
     <div class="departure-actions"><button class="btn primary ${heroic ? 'heroic-depart' : ''}" data-depart="adventure" ${canEnter ? '' : 'disabled'}>${heroic ? `${t('heroic.badge')} · ` : ''}${t('map.depart', { name: escape(zone.name) })} ▶</button><button class="btn" data-facility="party">${t('map.prepare')}</button></div>
   </article>`;
   return `<div class="world-map-wrapper ${act.biomeClass} ${mission ? 'mission-view' : 'map-view'}" aria-label="${t('route.campaign')}">
-    ${expeditionModes('campaign')}
+    ${expeditionModes('campaign', p)}
     ${mission ? `<button class="btn mission-map-return" data-facility="campaign">◀ ${t('map.back')}</button>` : `
     <div class="win map-top-bar"><div class="map-title-block"><small>${t('map.act', { n: act.roman })} · ${t(`act.${actId}.territory` as StringKey)}</small><h2>${t(`act.${actId}.title` as StringKey)}</h2></div>
       <div class="map-stepper-wrap"><button class="btn map-stepper-btn" data-campaign-page="-1" ${state.zone <= 0 ? 'disabled' : ''} aria-label="${t('map.prevch')}">◀</button><span class="chapter-counter">CH ${state.zone + 1}/${CAMPAIGN.length}</span><button class="btn map-stepper-btn" data-campaign-page="1" ${state.zone >= CAMPAIGN.length - 1 ? 'disabled' : ''} aria-label="${t('map.nextch')}">▶</button></div></div>

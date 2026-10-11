@@ -5,18 +5,35 @@ type C = CanvasRenderingContext2D;
 const rect=(c:C,x:number,y:number,w:number,h:number,color:string)=>{c.fillStyle=color;c.fillRect(Math.round(x),Math.round(y),w,h);};
 const poly=(c:C,points:number[][],color:string)=>{c.fillStyle=color;c.beginPath();points.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();c.fill();};
 function canvas(w:number,h:number){const el=document.createElement('canvas');el.width=w;el.height=h;const c=el.getContext('2d')!;c.imageSmoothingEnabled=false;return {el,c};}
-const ink='#111d25',skin='#e9bb89',skinShade='#ab7867';
+const ink='#111d25',SKIN='#e9bb89',SHADE='#ab7867';
 
-export function heroCanvas(cls:ClassId,frame=0){
+/** Per-hero accents keyed by roster id, so heroes who share a class look different: cloth and trim colours, skin, a hair fringe, a beard. */
+export type HeroLook={cloth?:string;dark?:string;skin?:string;shade?:string;hair?:string;beard?:string;trim?:string};
+export const HERO_LOOKS:Readonly<Record<number,HeroLook>>={
+ 1:{cloth:'#c0533f',dark:'#5e2f2a',skin:'#c98b5e',shade:'#8d5a40',beard:'#5a3a22',trim:'#3c3f52'}, // Bran: red tabard, dark beard (Aldric keeps the gold)
+ 5:{cloth:'#d99a4e',dark:'#6b4226',skin:'#b97a52',shade:'#7e5139',hair:'#c2502c',trim:'#3f2a1c'}, // Kestrel: rust cloak, red hair (Rowan keeps the green)
+ 6:{cloth:'#d0545e',dark:'#2b1d33',skin:'#f2d2b6',shade:'#b88f84',hair:'#e8e6f0'}, // Nyx: crimson and black, white hair (Sable keeps the violet)
+ 8:{cloth:'#e6a1b8',dark:'#7d3f58',skin:'#8d5a3c',shade:'#5f3b28',hair:'#2a1a14',trim:'#f3e1a8'}, // Mira: rose robes (Lyra keeps the teal)
+ 13:{cloth:'#8fc3ea',dark:'#34557a',skin:'#f3d6b8',shade:'#bf977f',hair:'#f2d27a',trim:'#e8e2c8'}, // Ilse: sky blue, blonde (Tamsin keeps the pink)
+ 14:{cloth:'#86b26a',dark:'#3f5531',skin:'#a9714d',shade:'#744b33',beard:'#a3a3a3',trim:'#2f3a2a'}, // Hale: olive coat, grey beard (Pell keeps the brown)
+};
+/** Texture/cache identity of a hero sprite: heroes without accents share their class sprite. */
+export const heroKey=(cls:ClassId,hero?:number)=>hero!==undefined&&HERO_LOOKS[hero]?`${cls}-h${hero}`:cls;
+
+export function heroCanvas(cls:ClassId,frame=0,hero?:number){
  const {el,c}=canvas(40,44);const bob=frame===1?-1:frame===3?1:0;c.translate(0,bob);
- const color=KITS[cls].color;const palette:Record<ClassId,string>={warrior:'#786143',rogue:'#514669',archer:'#4e6548',healer:'#347876',wizard:'#425a8b',bard:'#7a4660',hexer:'#4a2a45',monk:'#8a5a24',engineer:'#5e4433'};const dark=palette[cls];
+ const look:HeroLook=hero===undefined?{}:HERO_LOOKS[hero]??{};
+ const color=look.cloth??KITS[cls].color;const palette:Record<ClassId,string>={warrior:'#786143',rogue:'#514669',archer:'#4e6548',healer:'#347876',wizard:'#425a8b',bard:'#7a4660',hexer:'#4a2a45',monk:'#8a5a24',engineer:'#5e4433'};const dark=look.dark??palette[cls];
+ const skin=look.skin??SKIN,skinShade=look.shade??SHADE,trim=look.trim;
  // Each silhouette is authored in pixel coordinates; palette highlights share the same light direction.
  rect(c,12,34,6,6,ink);rect(c,23,34,6,6,ink);rect(c,13,34,4,4,dark);rect(c,24,34,4,4,dark);
  rect(c,11,39,7,2,'#736852');rect(c,23,39,7,2,'#736852');
- if(cls==='healer'||cls==='wizard'||cls==='hexer'){poly(c,[[13,20],[27,20],[31,37],[9,37]],ink);poly(c,[[14,21],[26,21],[29,35],[11,35]],dark);poly(c,[[17,21],[23,21],[25,35],[14,35]],color);rect(c,18,23,3,12,'#d8d7ad');}
- else {rect(c,11,20,18,15,ink);rect(c,13,21,14,12,dark);rect(c,14,21,11,7,color);rect(c,13,30,14,3,'#695245');rect(c,19,30,3,3,'#e3b976');}
+ if(cls==='healer'||cls==='wizard'||cls==='hexer'){poly(c,[[13,20],[27,20],[31,37],[9,37]],ink);poly(c,[[14,21],[26,21],[29,35],[11,35]],dark);poly(c,[[17,21],[23,21],[25,35],[14,35]],color);rect(c,18,23,3,12,trim??'#d8d7ad');}
+ else {rect(c,11,20,18,15,ink);rect(c,13,21,14,12,dark);rect(c,14,21,11,7,color);rect(c,13,30,14,3,trim??'#695245');rect(c,19,30,3,3,'#e3b976');}
  rect(c,10,22,4,10,ink);rect(c,26,22,4,10,ink);rect(c,10,23,3,6,dark);rect(c,27,23,3,6,color);rect(c,10,29,3,3,skin);rect(c,27,29,3,3,skin);
  rect(c,12,6,16,16,ink);rect(c,14,8,12,13,skinShade);rect(c,14,8,11,10,skin);rect(c,14,17,10,3,skinShade);rect(c,15,13,2,2,ink);rect(c,22,13,2,2,ink);rect(c,17,18,5,1,'#e3a578');
+ // A fringe and side locks under the headgear (drawn next, so it covers whatever the hat hides).
+ if(look.hair){rect(c,14,10,12,2,look.hair);rect(c,14,12,1,4,look.hair);rect(c,25,12,1,4,look.hair);}
  if(cls==='warrior'){
   poly(c,[[11,6],[14,3],[25,3],[29,7],[29,16],[25,16],[25,8],[15,8],[15,16],[11,16]],ink);
   rect(c,13,6,14,5,'#829ba0');rect(c,15,4,10,4,'#b5c6bf');rect(c,17,3,4,7,'#f0d899');rect(c,11,9,4,7,'#596f78');rect(c,26,8,3,8,'#596f78');
@@ -63,6 +80,7 @@ export function heroCanvas(cls:ClassId,frame=0){
   rect(c,4,23,7,9,ink);rect(c,5,24,5,7,'#8a6a45');rect(c,5,26,5,1,'#c9a66d');
   rect(c,32,14,3,22,ink);rect(c,33,15,1,20,'#c3c9c9');poly(c,[[29,10],[38,10],[38,15],[35,13],[32,13],[29,15]],ink);rect(c,30,11,7,2,'#d7dede');rect(c,33,8,2,3,'#ffd36b');
  }
+ if(look.beard&&cls!=='rogue'){rect(c,14,17,12,4,look.beard);rect(c,15,21,10,1,look.beard);rect(c,17,18,5,1,ink);}
  return el;
 }
 

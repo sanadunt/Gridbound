@@ -7,6 +7,9 @@ const viewports = [[360, 640], [360, 740], [390, 844], [430, 932], [768, 1024], 
 const layoutIssues = [];
 for (const [width, height] of viewports) {
   await withBrowser(async ({ send, wait, click, evaluate, screenshot, errors }) => {
+    // A save that reached Act II, so Raids and the Bell Trials (opened by Chapters 2 and 4) are measured too.
+    const actTwo = { version: 3, gold: 500, claimedQuests: [], ledger: { raids: 0, victories: 4, enemies: { wolf: 1 } }, roster: [0, 4, 3, 2], cleared: [0, 1, 2, 3], storyActive: [0, 4, 3, 2], loadouts: { 0: { skills: [0, 1], talents: [], xp: 0, slot: 1 }, 4: { skills: [0, 1], talents: [], xp: 0, slot: 7 }, 3: { skills: [0, 1], talents: [], xp: 0, slot: 6 }, 2: { skills: [0, 1], talents: [], xp: 0, slot: 4 } }, bestFloor: 0, wins: 4, sound: false, motion: true };
+    await send('Page.addScriptToEvaluateOnNewDocument', { source: `if (!sessionStorage.getItem('qa.seeded')) { sessionStorage.setItem('qa.seeded', '1'); localStorage.clear(); localStorage.setItem('gridbound.v3', ${JSON.stringify(JSON.stringify(actTwo))}); }` });
     await send('Page.navigate', { url });
     await wait('window.gridbound?.scene && document.querySelector("#town-screen:not([hidden])")');
     const rows = [];
@@ -122,8 +125,8 @@ for (const [width, height] of viewports) {
 
     await measure('camp', '.town-spot[data-facility="campaign"]');
     await click.nav('campaign');
-    await measure('expedition-map', '[data-zone="0"]');
-    await click('[data-zone="0"]');
+    await measure('expedition-map', '[data-zone="4"]'); // the Act II save opens the map on Chapter 5
+    await click('[data-zone="4"]');
     await measure('mission-dossier', '.mission-brief [data-depart="adventure"]');
     await click('.mission-map-return');
     await click('.expedition-mode-nav [data-facility="raid"]');

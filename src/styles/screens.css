@@ -9,6 +9,8 @@
 .party-roster button small { font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); }
 .party-roster button.active { border-color: var(--gold); background: var(--gold-bg); }
 .party-roster button.active span { color: var(--gold); }
+.party-roster button { position: relative; }
+.hero-dot { position: absolute; top: 3px; right: 3px; width: 9px; height: 9px; border: 1px solid #fff; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 1px #000; }
 
 .training-identity { display: flex; gap: 12px; align-items: center; }
 .training-identity img { width: 64px; height: 70px; flex-shrink: 0; }
@@ -93,12 +95,25 @@
 .gear-preview-actions .btn { flex: 1; }
 .gear-set-status { margin-top: 10px; font-size: 14px; }
 
-/* Bestiary */
-.bestiary-list article { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: left; }
-.bestiary-art { display: grid; place-items: center; width: 100%; padding: 8px; border-radius: var(--radius); background: radial-gradient(ellipse at 50% 70%, #24443a, #08110f 70%); }
-.bestiary-art img { width: min(60vw, 200px); height: auto; }
+/* Bestiary: the picked entry's sheet over a grid of every enemy family (silhouettes until met). */
+.bestiary-list { display: flex; flex-direction: column; gap: 10px; }
+.bestiary-count { margin: 0; font-family: var(--pixel); font-size: 9px; color: var(--gold); }
+.bestiary-list article { display: grid; grid-template-columns: minmax(96px, 34%) minmax(0, 1fr); align-items: start; gap: 10px; text-align: left; }
+.bestiary-art { display: grid; place-items: center; width: 100%; padding: 6px; border-radius: var(--radius); background: radial-gradient(ellipse at 50% 70%, #24443a, #08110f 70%); }
+.bestiary-art img { width: 100%; max-width: 160px; height: auto; image-rendering: pixelated; }
 .bestiary-list article small { color: var(--ink-dim); }
-.bestiary-list article h3 { font-family: var(--pixel); font-size: 14px; color: var(--gold); margin: 4px 0 8px; }
+.bestiary-list article h3 { font-family: var(--pixel); font-size: 13px; color: var(--gold); margin: 4px 0 6px; line-height: 1.5; }
+.bestiary-list article p { margin: 4px 0; font-size: 14px; }
+.bestiary-detail.unseen h3 { color: var(--ink-dim); }
+.bestiary-variants { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.bestiary-variants .raid-variant-chip { flex: 0 0 auto; min-width: 44px; min-height: 36px; padding: 2px 8px; font-family: var(--pixel); font-size: 9px; }
+.bestiary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.bestiary-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 88px; padding: 4px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink); }
+.bestiary-cell img { width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; }
+.bestiary-cell b { font-weight: 600; font-size: 11px; line-height: 1.15; text-align: center; }
+.bestiary-cell.unseen b { color: var(--ink-dim); font-family: var(--pixel); font-size: 9px; }
+.bestiary-cell.chosen { border-color: var(--gold); background: var(--gold-bg); box-shadow: inset 0 -2px 0 var(--gold); }
+@media (max-width: 380px) { .bestiary-list article { grid-template-columns: 1fr; } .bestiary-art img { max-width: 140px; } }
 
 /* Raid */
 .mission-brief { display: flex; gap: 12px; align-items: center; }
@@ -149,8 +164,25 @@
 .endless-kit [data-relics] { margin: 0 0 4px; color: var(--gold); }
 .endless-kit .bell-tonic:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
 
-/* Quests */
+/* Quests: one list of compact cards, ready rewards on top. */
 .quest-head p { margin: 0 0 8px; }
+.quest-head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.quest-head-row p { margin: 0; }
+.quest-head-row .btn { flex: 0 0 auto; }
+.quest-head .quest-filters { margin-top: 8px; }
+.quest-board { display: flex; flex-direction: column; gap: 10px; }
+.quest-section .subheading span { color: var(--ink-dim); }
+.quest-list { display: flex; flex-direction: column; gap: 6px; }
+.quest-entry { padding: 8px 10px; gap: 4px !important; }
+.quest-entry > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: center; }
+.quest-entry > div > small, .quest-entry > div > h3, .quest-entry > div > .quest-story, .quest-entry > div > b { grid-column: 1 / -1; }
+.quest-entry > div > .gauge { margin: 2px 0 !important; }
+.quest-entry > div > span:last-child { font-size: 12px; color: var(--ink-dim); }
+.quest-entry h3 { font-size: 16px !important; margin: 2px 0 !important; }
+.quest-story { margin: 0; font-size: 13px; color: var(--ink-soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.quest-entry footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; }
+.quest-entry footer .quest-reward { margin: 0; }
+.quest-entry .quest-actions .btn { min-height: 40px; padding: 4px 10px; font-size: 13px; }
 .quest-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .quest-recipient { font-size: 14px; color: var(--ink-soft); }
 .quest-entry { display: flex; flex-direction: column; gap: 8px; }
@@ -163,6 +195,15 @@
 .quest-reward { font-size: 14px; color: var(--ink-soft); }
 .quest-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .quest-actions .btn { flex: 1 1 auto; }
+/* Gate tabs a chapter still has to open. */
+.expedition-mode-nav button.locked { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; opacity: .6; border-style: dashed; color: var(--ink-dim); }
+.expedition-mode-nav button.locked small { font-family: var(--pixel); font-size: 7px; }
+.tab-lock { display: inline-block; width: 8px; height: 7px; margin-right: 4px; border: 1px solid currentColor; border-radius: 1px; vertical-align: -1px; position: relative; }
+.tab-lock::before { content: ''; position: absolute; left: 1px; bottom: 100%; width: 4px; height: 4px; border: 1px solid currentColor; border-bottom: 0; border-radius: 3px 3px 0 0; }
+.tab-new { position: absolute; top: -6px; right: -4px; font-style: normal; font-family: var(--pixel); font-size: 7px; padding: 2px 3px; border: 1px solid #fff6c8; border-radius: 3px; background: var(--gold); color: #2b1600; box-shadow: 0 1px 0 #000a; }
+/* The four gate tabs share one row on a phone: they shrink and long names wrap instead of scrolling away. */
+.expedition-mode-nav { overflow: visible; padding-top: 8px; }
+.expedition-mode-nav > button { position: relative; flex: 1 1 0; min-width: 0; padding: 4px 4px; line-height: 1.15; white-space: normal; overflow-wrap: anywhere; }
 
 /* Screens with a Depart footer: header rows stay put, the middle scrolls, the footer never covers content. */
 .town-scene > .party-scene, .town-scene > .secondary-scene { overflow: hidden; }
@@ -171,6 +212,22 @@
 .party-scene > .deploy-bar, .secondary-scene > .deploy-bar { position: static; padding: 0; background: none; }
 .party-scene > *, .secondary-scene > * { flex-shrink: 0; }
 .party-scene > .training-panel, .secondary-scene > .secondary-content { flex-shrink: 1; }
+/* Phones: the whole Party route scrolls (no nested panel); the hero collapses to a one-line sticky header with the tabs, and Depart stays at the bottom. */
+.sheet-line { display: none; }
+@media (max-width: 480px) {
+  .town-scene > .party-scene { overflow-y: auto; scroll-padding-top: 120px; scroll-padding-bottom: 80px; gap: 8px; }
+  .party-scene > .training-panel { flex: none; min-height: 0; overflow: visible; }
+  .party-sticky { position: sticky; top: -10px; z-index: 5; margin: -10px -10px 0; padding: 10px 10px 2px; background: linear-gradient(180deg, var(--night) 85%, transparent); }
+  .party-sticky .hero-sheet { grid-template-columns: auto minmax(0, 1fr); gap: 8px; padding: 6px 8px; }
+  .party-sticky .sheet-portrait { width: 40px; height: 44px; }
+  .party-sticky .sheet-portrait img { width: 36px; height: 40px; }
+  .party-sticky .sheet-portrait span, .party-sticky .sheet-body > small, .party-sticky .sheet-exp, .party-sticky .sheet-stats, .party-sticky .sheet-gear { display: none; }
+  .party-sticky .sheet-body h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin: 0; font-size: 12px; }
+  .party-sticky .sheet-line { display: inline; font-family: var(--text); font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .party-sticky .training-tabs { margin-top: 6px; padding-bottom: 4px; }
+  .party-scene > .deploy-bar { position: sticky; bottom: -10px; z-index: 5; margin: 0 -10px -10px; padding: 8px 10px 10px; background: linear-gradient(180deg, transparent, var(--night) 30%); }
+  .party-roster button img { width: 28px; height: 30px; }
+}
 @media (max-height: 700px) {
   .training-identity img { width: 44px; height: 48px; }
   .training-identity p { display: none; }
