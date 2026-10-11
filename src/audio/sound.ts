@@ -26,7 +26,18 @@ export class Sound {
       this.synthNote(784, 0.2, { type: 'triangle', volume: 0.012, attack: 0.02 });
       return;
     }
-    const frequency = kind === 'interrupt' ? 190 : kind === 'aoe' ? 330 : kind === 'steal' ? 720 : 420;
+    if (kind === 'haste') { [988, 1319].forEach((n, i) => setTimeout(() => this.synthNote(n, 0.12, { type: 'sine', volume: 0.012, attack: 0.004 }), i * 50)); return; }
+    if (kind === 'weaken') { this.synthNote(520, 0.18, { type: 'triangle', volume: 0.016, slide: -260 }); return; }
+    if (kind === 'curse') { this.synthNote(82, 0.32, { type: 'sawtooth', volume: 0.016, slide: -12, filterFreq: 420 }); this.synthNote(123, 0.3, { type: 'sine', volume: 0.01, attack: 0.04 }); return; }
+    if (kind === 'delay' || kind === 'stun') { [660, 440].forEach((n, i) => setTimeout(() => this.synthNote(n, 0.06, { type: 'square', volume: 0.01 }), i * 70)); return; }
+    if (kind === 'counter') { this.synthNote(196, 0.3, { type: 'triangle', volume: 0.02, attack: 0.004 }); this.synthNote(392, 0.24, { type: 'sine', volume: 0.012 }); return; }
+    if (kind === 'turret') { this.synthNote(1200, 0.03, { type: 'square', volume: 0.012 }); setTimeout(() => this.synthNote(900, 0.04, { type: 'square', volume: 0.012 }), 45); this.noiseBurst(0.04, 0.01, 3000, 'highpass'); return; }
+    if (kind === 'drain') { this.synthNote(300, 0.2, { type: 'sine', volume: 0.016, slide: -140 }); this.noiseBurst(0.12, 0.008, 700, 'lowpass'); return; }
+    if (kind === 'sacrifice') { this.synthNote(147, 0.24, { type: 'sawtooth', volume: 0.016, slide: -40, filterFreq: 600 }); return; }
+    if (kind === 'repair') { [700, 820, 940].forEach((n, i) => setTimeout(() => this.synthNote(n, 0.04, { type: 'square', volume: 0.009 }), i * 40)); return; }
+    if (kind === 'selfheal') { this.synthNote(440, 0.2, { type: 'sine', volume: 0.014, attack: 0.02, slide: 80 }); return; }
+    if (kind === 'resolve') { this.synthNote(330, 0.18, { type: 'triangle', volume: 0.014, slide: 220 }); return; }
+    const frequency = kind === 'interrupt' ? 190 : kind === 'aoe' ? 330 : kind === 'steal' ? 720 : kind === 'combo' || kind === 'flurry' ? 470 : 420;
     this.synthNote(frequency, 0.1, { type: 'triangle', volume: 0.018, slide: 120 });
     this.noiseBurst(0.06, 0.009, kind === 'interrupt' ? 500 : 1500, 'bandpass');
   }
@@ -294,7 +305,60 @@ export class Sound {
       case 'cast-mark':
       case 'cast-partyshield':
       case 'cast-regen':
+      case 'cast-haste':
+      case 'cast-weaken':
+      case 'cast-curse':
+      case 'cast-delay':
+      case 'cast-stun':
+      case 'cast-counter':
+      case 'cast-turret':
+      case 'cast-drain':
+      case 'cast-sacrifice':
+      case 'cast-repair':
+      case 'cast-combo':
+      case 'cast-flurry':
+      case 'cast-selfheal':
+      case 'cast-resolve':
         this.castCue(kind.slice(5));
+        break;
+
+      case 'down':
+        // KO sting: a falling minor third over a low thud.
+        this.synthNote(392, 0.22, { type: 'square', volume: 0.014, slide: -180 });
+        setTimeout(() => this.synthNote(233, 0.36, { type: 'triangle', volume: 0.022, slide: -120 }), 120);
+        this.noiseBurst(0.14, 0.02, 420, 'lowpass');
+        break;
+
+      case 'stun':
+        this.synthNote(880, 0.08, { type: 'square', volume: 0.01, slide: -300 });
+        setTimeout(() => this.synthNote(587, 0.12, { type: 'triangle', volume: 0.012 }), 60);
+        break;
+
+      case 'interrupt':
+        this.synthNote(1175, 0.12, { type: 'triangle', volume: 0.018, slide: -500 });
+        this.noiseBurst(0.12, 0.018, 2600, 'highpass');
+        break;
+
+      case 'enrage':
+        this.synthNote(73, 0.5, { type: 'sawtooth', volume: 0.024, slide: 20, filterFreq: 500 });
+        setTimeout(() => this.synthNote(110, 0.4, { type: 'sawtooth', volume: 0.018, filterFreq: 600 }), 140);
+        break;
+
+      case 'pact':
+        this.synthNote(196, 0.18, { type: 'sine', volume: 0.016, slide: -60 });
+        break;
+
+      case 'move':
+        this.noiseBurst(0.08, 0.008, 1800, 'bandpass');
+        break;
+
+      case 'minion-attack':
+        this.synthNote(260, 0.06, { type: 'square', volume: 0.009, slide: -80 });
+        break;
+
+      case 'minion-down':
+        this.synthNote(330, 0.1, { type: 'triangle', volume: 0.014, slide: -200 });
+        this.noiseBurst(0.06, 0.01, 1200, 'bandpass');
         break;
 
       case 'guard':
@@ -424,6 +488,8 @@ export class Sound {
         break;
 
       default:
+        // An unmapped cue is a missing sound design entry, not a feature: say so in dev builds.
+        if (import.meta.env?.DEV) console.debug(`[sound] no cue for "${kind}"`);
         this.tone(300, 0.1, 'triangle', 0.02);
         break;
     }

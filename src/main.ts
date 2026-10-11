@@ -14,7 +14,7 @@ import './styles/result.css';
 import './styles/dungeon.css';
 import { currencyAmount } from './ui/currency';
 import { townSceneCanvas } from './art/town-scene';
-import { Battle, type BattleEvent, type BattleOptions } from './game/simulation';
+import { Battle, GUARD_DURATION, ENRAGE_WARN, ENRAGE_AT, ENRAGE_DMG, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
 import { CAMPAIGN, BOONS, boonChoices } from './game/world';
@@ -250,10 +250,14 @@ $('app').innerHTML = `
         </div>
       </div>
       <div class="arena-slot">
+      <div class="arena-intel">
+        <div id="boss-status" class="boss-status" aria-label="${t('battle.status.aria')}"></div>
+        <div id="intent" class="intent-panel msg-window" role="status" aria-live="polite"><b></b><span></span></div>
+      </div>
       <div id="arena" class="arena">
         <div id="game-canvas"></div>
-        <div id="intent" class="intent-panel msg-window" role="status" aria-live="polite"><b></b><span></span></div>
         <div id="banner" class="battle-banner" aria-live="polite"></div>
+        <div id="skill-toast" class="skill-toast" role="status" aria-live="polite" hidden></div>
         <div class="lane-targets" aria-label="${t('battle.lanes')}">${[0, 1, 2].map(i => `<button data-lane="${i}" aria-label="${t('battle.lane', { n: i + 1 })}" aria-pressed="false"><span>${['I', 'II', 'III'][i]}</span></button>`).join('')}</div>
         <div id="unit-layer"></div>
         <div id="skill-picker" class="win skill-picker" role="dialog" hidden></div>
@@ -270,9 +274,9 @@ $('app').innerHTML = `
       </div>
       <button id="focus-bar" type="button" class="win focus-bar" aria-label="${t('battle.focus.aria')}"><img class="focus-face" alt=""/><span class="focus-id"><b class="focus-name"></b><small class="focus-skill"></small></span><span class="focus-stats"><span class="focus-hp">HP <b></b></span><span class="focus-status"></span></span></button>
       <div class="action-bar">
-        <button id="guard" class="cmd guard-button"><span>${t('battle.guard')}<small id="guard-label"></small></span></button>
-        <button id="potion" class="cmd potion-button"><span>${t('battle.potion')}<small id="potions"></small></span><b>2</b></button>
-        <button id="ultimate" class="cmd ultimate-button" disabled><i id="resolve-fill"></i><span>${t('battle.ultimate')}<small id="resolve-label"></small></span></button>
+        <button id="guard" class="cmd guard-button"><span>${t('battle.guard')}<small><kbd class="key-hint">G</kbd><span id="guard-label"></span></small></span></button>
+        <button id="potion" class="cmd potion-button"><span>${t('battle.potion')}<small><kbd class="key-hint">H</kbd><span id="potions"></span></small></span><b>2</b></button>
+        <button id="ultimate" class="cmd ultimate-button" disabled><i id="resolve-fill"></i><span>${t('battle.ultimate')}<small><kbd class="key-hint">R</kbd><span id="resolve-label"></span></small></span></button>
       </div>
     </section>
     <aside id="battle-details-panel" class="right-sidebar">
@@ -908,6 +912,8 @@ function updateExpedition() {
   $('journey-title').textContent = battle.mode === 'adventure' ? c.name : battle.mode === 'endless' ? t('route.endless') : battle.enemyName;
   $('journey-copy').textContent = battle.mode === 'adventure' ? c.subtitle : t('battle.journey.copy');
   $('stage-list').innerHTML = battle.mode === 'adventure' ? c.stages.map((s, i) => `<li class="${i === battle.stage ? 'current' : i < battle.stage ? 'completed' : ''}"><small>${t('map.wave', { n: i + 1 })}</small> <span>${s.name}</span></li>`).join('') : '';
+  // Run boons and the Journey shop only exist in a Roguelike run.
+  document.querySelectorAll<HTMLElement>('#battle-screen .run-boons, #battle-screen .run-shop-panel').forEach(panel => { panel.hidden = battle.mode !== 'endless'; });
   $('boon-list').innerHTML = runBoons.length ? runBoons.map(id => { const b = BOONS.find(b => b.id === id)!; return `<p><b>${b.name}</b><small>${b.description}</small></p>`; }).join('') : `<p class="hint">${t('battle.noboons')}</p>`;
   const boonBadge = $('boon-count-badge');
   if (boonBadge) {
@@ -1010,9 +1016,11 @@ function makeUnits() {
     const card = document.querySelector<HTMLElement>(`#unit-layer [data-hero="${h.id}"]`)!;
     const skill = card.querySelector<HTMLButtonElement>('.unit-skill')!;
     unitViews.set(h.id, { card, hp: card.querySelector('.unit-hp i')!, shield: card.querySelector('.unit-hp em')!, skill, fill: skill.querySelector('.unit-skill-fill')!, name: skill.querySelector('.unit-skill-name')!, icon: skill.querySelector('.unit-skill-icon')!, key: '' });
-    skill.addEventListener('click', event => { event.stopPropagation(); switchSkill(h.id); });
+    // A chip tap right after a tap on the same hero is a mash that slipped, not a skill change.
+    skill.addEventListener('click', event => { event.stopPropagation(); if (performance.now() - (lastHeroTap.get(h.id) ?? -Infinity) < CHIP_GUARD_MS) return; switchSkill(h.id); });
   }
   closeSkillPicker();
+  $('skill-toast').hidden = true; lastHeroTap.clear();
   $('unit-layer').querySelectorAll<HTMLElement>('[data-tap]').forEach(el => bindPointer(el, Number(el.dataset.tap)));
   renderPartyHealthTray();
   $('party-size').textContent = `${battle.heroes.length}`;
@@ -1021,6 +1029,11 @@ function makeUnits() {
 }
 // A unit card spans its 112px cell plus most of the row gap, so the skill chip sits under the portrait.
 const UNIT_H = 122;
+const CHIP_GUARD_MS = 300, GUARD_MARGIN = 0.05;
+/** Touch players have no G key: counter texts drop their '(G)' hints there, like the action bar drops its key letters. */
+const coarsePointer = window.matchMedia('(pointer: coarse)');
+const touchText = (text: string) => coarsePointer.matches ? text.replace(/ \(G\)/g, '') : text;
+const lastHeroTap = new Map<number, number>();
 type UnitView = { card: HTMLElement; hp: HTMLElement; shield: HTMLElement; skill: HTMLButtonElement; fill: HTMLElement; name: HTMLElement; icon: HTMLElement; key: string };
 const unitViews = new Map<number, UnitView>();
 function updateUnitView(h: PartyHero) {
@@ -1035,6 +1048,8 @@ function updateUnitView(h: PartyHero) {
   view.fill.style.width = `${h.hp > 0 ? charge * 100 : 0}%`;
   view.card.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
   view.card.classList.toggle('charged', h.hp > 0 && charge > .97);
+  // An interrupt in hand glows while a ritual or channel can still be cut.
+  view.card.classList.toggle('interrupt-ready', h.hp > 0 && KITS[h.classId].skills[h.stance].kind === 'interrupt' && battle.threats.some(v => v.type === 'all' || v.type === 'channel'));
   const key = `${h.stance}-${skills.length}-${canSwitch}-${h.hp > 0}`;
   if (key === view.key) return;
   if (view.key && view.key.split('-')[0] !== String(h.stance)) { view.card.classList.remove('switched'); void view.card.offsetWidth; view.card.classList.add('switched'); }
@@ -1120,6 +1135,7 @@ function slotAt(p: { x: number; y: number }) {
 }
 function tapHero(id: number, sync = false) {
   if (inTown) return;
+  lastHeroTap.set(id, performance.now());
   battle.selected = id;
   if (battle.tap(id, sync)) {
     const el = document.querySelector<HTMLElement>(`[data-tap="${id}"]`)!;
@@ -1137,6 +1153,7 @@ function bindPointer(el: HTMLElement, id: number) {
     if (!h || h.hp <= 0) return;
     sound.unlock();
     if (moveMode) { battle.move(battle.selected, h.slot); moveMode = false; renderInspector(); return; }
+    lastHeroTap.set(id, performance.now());
     battle.selected = id;
     renderInspector();
     el.setPointerCapture(e.pointerId);
@@ -1188,10 +1205,19 @@ function cycleSkill(id: number, direction = 1) {
   if (!h) return;
   const skills = battle.availableSkills(id);
   battle.selected = id;
-  withDetailsPausedAction(() => battle.stance(id, skills[(skills.indexOf(h.stance) + direction + skills.length) % skills.length]));
+  if (withDetailsPausedAction(() => battle.stance(id, skills[(skills.indexOf(h.stance) + direction + skills.length) % skills.length]))) skillToast(h);
   sound.unlock();
   renderInspector();
   frame(1);
+}
+/** A short 'Skill: X (tap again to undo)' note after a one-tap switch, so a stray tap is noticed and undone. */
+let skillToastTimer = 0;
+function skillToast(h: PartyHero) {
+  const toast = $('skill-toast');
+  toast.textContent = `${heroName(h)} · ${t('battle.skill.toast', { skill: KITS[h.classId].skills[h.stance].name })}`;
+  toast.hidden = false;
+  window.clearTimeout(skillToastTimer);
+  skillToastTimer = window.setTimeout(() => { toast.hidden = true; }, 1800);
 }
 function withDetailsPausedAction<T>(action: () => T): T {
   const restorePause = pauseForDetails && battle.status === 'paused';
@@ -1246,6 +1272,7 @@ function frame(dt: number) {
   $('stagger-label').textContent = battle.breakLeft > 0 ? t('battle.break') : t('battle.armor');
   $('battle-screen').classList.toggle('boss-broken', battle.breakLeft > 0);
   $('clock').textContent = formatTime(battle.time);
+  renderBossStatus();
   const threat = [...battle.threats].sort((a, b) => a.left - b.left)[0];
   const isDanger = Boolean(threat);
   const intent = $('intent');
@@ -1255,8 +1282,9 @@ function frame(dt: number) {
   if (isDanger && !wasDanger && profile.motion) {
     gsap.fromTo('#intent', { scale: 1.08 }, { scale: 1, duration: 0.25, ease: 'back.out(2)', clearProps: 'transform' });
   }
-  intent.querySelector('b')!.textContent = threat ? `${eventText(threat.name, lang())} · ${Math.max(0, threat.left).toFixed(1)}s${threat.targetId !== undefined ? ` → ${battle.hero(threat.targetId)?.name ?? '?'}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: battle.guardLeft.toFixed(1) }) : t('battle.watch');
-  intent.querySelector('span')!.textContent = threat ? `${threat.counter ? eventText(threat.counter, lang()) : t('battle.counter.default')}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.hint');
+  intent.querySelector('b')!.textContent = threat ? `${t('battle.intent.time', { name: eventText(threat.name, lang()), s: Math.max(0, threat.left).toFixed(1) })}${threat.targetId !== undefined ? ` → ${battle.hero(threat.targetId)?.name ?? '?'}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: battle.guardLeft.toFixed(1) }) : t('battle.watch');
+  intent.querySelector('span')!.textContent = threat ? `${threat.counter ? touchText(eventText(threat.counter, lang())) : t('battle.counter.default')}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.hint');
+  placeBanner();
   $('damage').textContent = Math.round(battle.damage).toLocaleString();
   $('blocked').textContent = Math.round(battle.blocked).toLocaleString();
   $('loot').textContent = battle.mode === 'endless' ? `${runWallet.crystal} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${battle.gold}G`;
@@ -1271,7 +1299,11 @@ function frame(dt: number) {
   $('potions').textContent = t('battle.potion.left', { n: battle.potions });
   $('potion').querySelector('b')!.textContent = String(battle.potions);
   $<HTMLButtonElement>('guard').disabled = battle.guardCooldown > 0 || battle.status !== 'fighting';
-  $('guard-label').textContent = battle.guardLeft > 0 ? t('battle.guard.active', { s: battle.guardLeft.toFixed(1) }) : battle.guardCooldown > 0 ? t('battle.guard.cd', { s: battle.guardCooldown.toFixed(1) }) : t('battle.guard.ready');
+  // Guard only helps if it is still up at impact: cue the window once an all-grid hit is within GUARD_DURATION
+  // (minus a few frames, since guardLeft ticks down before the impact resolves).
+  const guardWindow = battle.status === 'fighting' && battle.guardCooldown <= 0 && battle.guardLeft <= 0 && battle.threats.some(v => v.type === 'all' && v.left <= GUARD_DURATION - GUARD_MARGIN);
+  $('guard').classList.toggle('ready-window', guardWindow);
+  $('guard-label').textContent = guardWindow ? t('battle.guard.now') : battle.guardLeft > 0 ? t('battle.guard.active', { s: battle.guardLeft.toFixed(1) }) : battle.guardCooldown > 0 ? t('battle.guard.cd', { s: battle.guardCooldown.toFixed(1) }) : t('battle.guard.ready');
   $('guard').classList.toggle('guarding', battle.guardLeft > 0);
   $('lane-targets-hint')?.remove();
   document.querySelector('.lane-targets')?.classList.toggle('has-minions', battle.minions.length > 0);
@@ -1281,6 +1313,7 @@ function frame(dt: number) {
     const p = cell(h.slot);
     el.style.left = `${p.x / 6}%`;
     el.style.top = `${p.y / 7.6}%`;
+    el.style.setProperty('--row', String(3 - Math.floor(h.slot / 3))); // upper rows on top: a chip's tap area reaches into the card below
     el.classList.toggle('selected', h.id === battle.selected);
     el.classList.toggle('downed', h.hp <= 0);
     el.classList.toggle('buffed', h.buff > 0);
@@ -1297,6 +1330,38 @@ function frame(dt: number) {
     $('fatigue-fill').style.width = `${h.fatigue}%`;
   }
 }
+/** Boss status chips (Mark, Weaken, Curse, the last stun's DELAYED/RESISTED note and the soft enrage) with a countdown fill.
+ *  They live in the intel band, which is never covered, instead of the crowded stagger row or the canvas above the boss. */
+let bossStatusKey = '';
+let stunNote: { battle: Battle; text: string; until: number } | undefined;
+const STUN_NOTE_S = 1.6;
+function renderBossStatus() {
+  const curse = battle.curses.reduce((left, c) => Math.max(left, c.left), 0);
+  const chips: [string, string, number][] = [];
+  if (battle.markLeft > 0) chips.push(['mark', t('battle.status.mark'), battle.markLeft / 4]);
+  if (battle.weakenLeft > 0) chips.push(['weaken', t('battle.status.weaken'), battle.weakenLeft / 5]);
+  if (curse > 0) chips.push(['curse', `${t('battle.status.curse')}${battle.curses.length > 1 ? ` ×${battle.curses.length}` : ''}`, curse / 6]);
+  const stunLeft = stunNote?.battle === battle ? stunNote.until - battle.time : 0;
+  if (stunNote && stunLeft > 0 && stunLeft <= STUN_NOTE_S) chips.push(['delay', stunNote.text, stunLeft / STUN_NOTE_S]);
+  // Soft enrage: a countdown from ENRAGE_WARN, then ENRAGED for the rest of the stage.
+  if (battle.stageTime >= ENRAGE_WARN) chips.push(battle.enraged() ? ['enrage on', t('battle.enraged'), 0] : ['enrage', t('battle.enrage.in', { s: Math.ceil(ENRAGE_AT - battle.stageTime) }), (ENRAGE_AT - battle.stageTime) / (ENRAGE_AT - ENRAGE_WARN)]);
+  const host = $('boss-status'), key = chips.map(([id]) => id).join('|');
+  if (key !== bossStatusKey) { bossStatusKey = key; host.innerHTML = chips.map(([id]) => `<span class="status-chip ${id}" data-status="${id.split(' ')[0]}"><i></i><b></b></span>`).join(''); }
+  chips.forEach(([, label, ratio], i) => {
+    const chip = host.children[i] as HTMLElement, text = chip.querySelector('b')!;
+    if (text.textContent !== label) text.textContent = label;
+    chip.querySelector<HTMLElement>('i')!.style.width = `${Math.max(0, Math.min(1, ratio)) * 100}%`;
+  });
+}
+/** Banners belong in the boss area, but on short phones the intel band (statuses + intent) overlays the arena top and its
+ *  counter text matters most while a warning banner shows: keep the banner just below the band and above the front row. */
+function placeBanner() {
+  const banner = $('banner');
+  if (!banner.classList.contains('visible')) return;
+  const arena = $('arena').getBoundingClientRect(), intel = document.querySelector('.arena-intel')!.getBoundingClientRect();
+  const frontRow = arena.height * ARENA.y / ARENA.height, top = Math.max(arena.height * .27, intel.bottom - arena.top + 4);
+  banner.style.top = `${Math.round(Math.min(top, frontRow - banner.offsetHeight - 2))}px`;
+}
 function addLog(text: string) {
   const p = document.createElement('p');
   p.className = 'log-entry';
@@ -1304,21 +1369,48 @@ function addLog(text: string) {
   time.textContent = formatTime(battle.time);
   p.append(time, document.createTextNode(text));
   $('combat-log').prepend(p);
-  while ($('combat-log').children.length > 8) $('combat-log').lastElementChild?.remove();
+  while ($('combat-log').children.length > 30) $('combat-log').lastElementChild?.remove();
 }
+const heroLabel = (id?: number) => { const h = battle.hero(id ?? -1); return h ? heroName(h) : '?'; };
 window.addEventListener('battle-banner', event => {
   if (inTown) return;
   const e = (event as CustomEvent<BattleEvent>).detail;
-  const text = e.text ? eventText(e.text, lang()) : '';
-  $('banner').textContent = text;
-  $('banner').className = `battle-banner visible ${e.type === 'warning' ? 'danger' : e.type === 'ultimate' ? 'ultimate' : e.type === 'break' ? 'break' : ''}`;
-  clearTimeout(bannerTimer);
-  bannerTimer = window.setTimeout(() => {
-    const banner = $('banner');
-    banner.className = 'battle-banner';
-    banner.textContent = '';
-  }, 1800);
-  if (text) addLog(text);
+  const text = e.type === 'down' ? t('battle.ko', { name: heroLabel(e.source) }) : e.text ? eventText(e.text, lang()) : '';
+  // The stage name already headlines the ready window: log it, but keep the arena clear for the FIGHT! cue.
+  if (e.kind !== 'stage') {
+    $('banner').textContent = text;
+    $('banner').className = `battle-banner visible ${['warning', 'down', 'enrage'].includes(e.type) ? 'danger' : e.type === 'ultimate' ? 'ultimate' : e.type === 'break' ? 'break' : e.type === 'interrupt' ? 'interrupt' : ''}`;
+    clearTimeout(bannerTimer);
+    bannerTimer = window.setTimeout(() => {
+      const banner = $('banner');
+      banner.className = 'battle-banner';
+      banner.textContent = '';
+    }, 1800);
+  }
+  if (e.type === 'down') {
+    const cause = e.kind === 'claw' ? t('log.cause.claw') : e.kind === 'minion' ? t('log.cause.minion') : e.name ? eventText(e.name, lang()) : '';
+    addLog(cause ? t('log.ko', { name: heroLabel(e.source), cause }) : t('log.ko.plain', { name: heroLabel(e.source) }));
+    const card = unitViews.get(e.source ?? -1)?.card;
+    if (card) { card.classList.remove('ko-flash'); void card.offsetWidth; card.classList.add('ko-flash'); }
+  } else if (e.type === 'interrupt') {
+    const h = battle.hero(e.source ?? -1);
+    addLog(t('log.interrupt', { hero: heroLabel(e.source), skill: h ? KITS[h.classId].skills[h.stance].name : '?', name: (e.name ?? '').split(' · ').map(name => eventText(name, lang())).join(' · ') }));
+  } else if (e.kind === 'potion') addLog(t('log.potion', { n: battle.potions }));
+  else if (text) addLog(text);
+});
+// Telegraph impacts go to the log only: who was hit and for how much. A finished channel hits nobody by design (its heal has its own banner).
+// Stuns put their DELAYED/RESISTED note in the boss status strip (never covered, unlike the canvas above the boss) and the log.
+window.addEventListener('battle-log', event => {
+  if (inTown) return;
+  const e = (event as CustomEvent<BattleEvent>).detail, name = eventText(e.name ?? '', lang());
+  if (e.type === 'stun') {
+    const text = eventText(e.text ?? '', lang()), h = battle.hero(e.source ?? -1);
+    stunNote = { battle, text, until: battle.time + STUN_NOTE_S };
+    addLog(t('log.stun', { hero: heroLabel(e.source), skill: h ? KITS[h.classId].skills[h.stance].name : '?', text }));
+    return;
+  }
+  if (e.kind === 'channel') return;
+  addLog(e.hit?.length ? t('log.impact', { name, heroes: e.hit.map(id => heroLabel(id)).join(', '), n: Math.round(e.amount ?? 0).toLocaleString() }) : t('log.dodged', { name }));
 });
 
 function openModal(content: string, pause = true) {
@@ -1337,8 +1429,9 @@ function openModal(content: string, pause = true) {
 modal.addEventListener('close', () => { if (resumeOnClose && !inTown && battle.status === 'paused') battle.pause(); resumeOnClose = false; });
 function closeWithoutResume() { resumeOnClose = false; clearResultState(); if (modal.open) modal.close(); }
 function help() {
-  const rows: [string, string][] = [['help.tap.title', 'help.tap'], ['help.skill.title', 'help.skill'], ['help.drag.title', 'help.drag'], ['help.guard.title', 'help.guard'], ['help.items.title', 'help.items'], ['help.lanes.title', 'help.lanes']];
-  openModal(`<h2 id="modal-title">${t('help.title')}</h2><div class="help-rows">${rows.map(([title, body]) => `<p><b>${t(title as never)}</b><br>${t(body as never)}</p>`).join('')}</div><button class="btn primary" data-close>${t('help.close')}</button>`);
+  const rows: [string, string][] = [['help.tap.title', 'help.tap'], ['help.skill.title', 'help.skill'], ['help.drag.title', 'help.drag'], ['help.guard.title', 'help.guard'], ['help.items.title', 'help.items'], ['help.lanes.title', 'help.lanes'], ['help.enrage.title', 'help.enrage']];
+  const vars = { t: formatTime(ENRAGE_AT), pct: Math.round((ENRAGE_DMG - 1) * 100), s: ENRAGE_AT - ENRAGE_WARN };
+  openModal(`<h2 id="modal-title">${t('help.title')}</h2><div class="help-rows">${rows.map(([title, body]) => `<p><b>${t(title as never, vars)}</b><br>${t(body as never, vars)}</p>`).join('')}</div><button class="btn primary" data-close>${t('help.close')}</button>`);
 }
 function settings() {
   openModal(`<h2 id="modal-title">${t('settings.title')}</h2>

@@ -10,7 +10,7 @@ import { getRaidContractForEnemy, normalizeRaidSandbox, sandboxRaidContract, val
 export type Hero = { offensiveActs:number; level:number; perks:ReturnType<typeof talentStats>; equipment:ReturnType<typeof gearStats>; id:number; name:string; classId:ClassId; slot:number; hp:number; maxHp:number; shield:number; stance:number; remaining:number; total:number; fatigue:number; lastTap:number; moveLock:number; buff:number; acts:number; talents:string[]; skills:number[]; regen:number; regenPower:number; regenSource:number; rescued:boolean; combo:number; counterLeft:number; counterPower:number; job?:string; gear:Record<string,string>; gearPower:number; gearTempo:number };
 export type Telegraph = { id:number; name:string; type:'front'|'meteor'|'breath'|'target'|'all'|'channel'; slots:number[]; effect?:'silence'|'mend'; left:number; total:number; targetId?:number; counter?:string; damage?:number };
 export type Minion = { id:number; lane:number; hp:number; maxHp:number; timer:number; enemyId?:string };
-export type BattleEvent = { type:string; source?:number; slot?:number; lane?:number; amount?:number; color?:string; text?:string; targets?:number[]; kind?:string };
+export type BattleEvent = { type:string; source?:number; slot?:number; lane?:number; amount?:number; color?:string; text?:string; targets?:number[]; kind?:string; name?:string; hit?:number[] };
 export type Status = 'ready'|'fighting'|'paused'|'victory'|'defeat';
 export type BattleOptions = { rogueBuild?:RogueBuild; raidBuild?:RaidBuild; raidSandbox?:RaidSandbox; roster?:number[]; storyCleared?:number[]; storyRecruited?:number[]; loadouts?:Record<number,{skills:number[];talents:string[];xp?:number;slot?:number;job?:string;gear?:Record<string,string>;refine?:Record<string,number>}>; boons?:string[]; enemyId?:string; stage?:number; settlementId?:string; raidContract?:RaidContract; runWallet?:RunWallet; runAct?:1|2|3; runActClear?:boolean; runFinalClear?:boolean; heroic?:boolean; relics?:string[]; extraPotions?:number; dungeon?:{chapter:number;hp:number;damage:number;xp:number;startHp?:Record<number,number>;potions?:number;power?:number;vitality?:number} };
 const defaultUpgrades = {power:1,vitality:1,tempo:1};
@@ -34,6 +34,10 @@ export const TELEGRAPH_SHARE=.5,CLAW_BASE=24,CLAW_EVERY=4.2,MINION_HIT=22;
 export const SUPPORT_KINDS:readonly string[]=['shield','partyshield','heal','regen','buff','haste','delay','stun','resolve','selfheal','repair','counter'];
 // Control budget: delay/stun/frost/intent-delay add at most max(CONTROL_MIN, CONTROL_SHARE × intent interval) seconds per intent cycle.
 export const CONTROL_MIN=3,CONTROL_SHARE=.4,CHORUS_BUFF=1,CHORUS_EVERY=4;
+// Party Guard lasts GUARD_DURATION seconds; the soft enrage multiplies enemy damage by ENRAGE_DMG after ENRAGE_AT seconds of a stage (warned at ENRAGE_WARN).
+export const GUARD_DURATION=2.8,ENRAGE_WARN=135,ENRAGE_AT=150,ENRAGE_DMG=1.7;
+/** Counter text for a ground telegraph when every unmarked tile already holds a living hero. */
+export const NO_SAFE_TILE='GROUND: tidak ada tile aman. Tukar tank atau hero ber-shield ke tanda, atau Guard (G).';
 const chapterHp=(floor:number)=>CHAPTER_HP[Math.min(CHAPTER_HP.length,floor)-1];
 const chapterDmg=(floor:number)=>CHAPTER_DMG[Math.min(CHAPTER_DMG.length,floor)-1];
 export class Battle {
@@ -170,7 +174,7 @@ export class Battle {
   living() { return this.heroes.filter(h=>h.hp>0); }
   hero(id:number) { return this.heroes.find(h=>h.id===id); }
   availableSkills(id:number) { return [...(this.hero(id)?.skills??[])]; }
-  start() { if(this.status==='ready') {this.status='fighting';this.emit({type:'banner',text:this.stageName.toUpperCase()});} }
+  start() { if(this.status==='ready') {this.status='fighting';this.emit({type:'banner',kind:'stage',text:this.stageName.toUpperCase()});} }
   pause() { if(this.status==='fighting')this.status='paused';else if(this.status==='paused')this.status='fighting'; }
   private gainResolve(amount:number) { this.resolve=Math.min(100,this.resolve+amount*(this.boons.includes('resolve')?1.6:1)); }
   private cooldown(h:Hero) { return KITS[h.classId].skills[h.stance].cooldown/(this.tempo*h.gearTempo*(h.talents.includes('focus')?1.1:1)*(h.talents.includes('focus-2')?1.08:1)*(JOBS[h.job??'']?.effect==='time'?1.15:1)); }
@@ -199,8 +203,8 @@ export class Battle {
     if(this.status==='fighting') for(const ally of [h,other])if(ally&&ally.hp>0){ally.remaining+=ally.talents.includes('evasive')?Math.min(.45,penalty):penalty;ally.moveLock=.65;if(this.boons.includes('fleet'))this.shield(ally,30);}
     this.relocations++;this.emit({type:'move',source:id,slot,targets:other?[other.id]:[],text:this.status==='fighting'?`+${penalty}s`:'FORMATION'});return true;
   }
-  potion() { if(this.status!=='fighting'||this.potions<=0)return false;this.potions--;for(const h of this.living())this.heal(h,130*this.vitality);this.emit({type:'banner',text:'MENDING MIST'});return true; }
-  guard() { if(this.status!=='fighting'||this.guardCooldown>0)return false;this.guardLeft=2.8;this.guardCooldown=this.boons.includes('bell')?15:18;if(this.boons.includes('bell'))this.gainResolve(18);this.emit({type:'shield',text:'PARTY GUARD · 65% REDUCTION',targets:this.living().map(h=>h.slot)});return true; }
+  potion() { if(this.status!=='fighting'||this.potions<=0)return false;this.potions--;for(const h of this.living())this.heal(h,130*this.vitality);this.emit({type:'banner',kind:'potion',text:'MENDING MIST'});return true; }
+  guard() { if(this.status!=='fighting'||this.guardCooldown>0)return false;this.guardLeft=GUARD_DURATION;this.guardCooldown=this.boons.includes('bell')?15:18;if(this.boons.includes('bell'))this.gainResolve(18);this.emit({type:'shield',text:'PARTY GUARD · 65% REDUCTION',targets:this.living().map(h=>h.slot)});return true; }
   ultimate() {
     if(this.status!=='fighting'||this.resolve<100)return false;this.resolve=0;
     this.living().forEach(h=>{this.heal(h,90*this.power);this.shield(h,65);});
@@ -212,7 +216,9 @@ export class Battle {
     if(this.status!=='fighting'||!Number.isFinite(dt)||dt<=0)return;
     if(dt>.05){for(let remaining=Math.min(dt,30);remaining>1e-9;remaining-=.05)this.tick(Math.min(.05,remaining));return;}
     if(this.finish())return;
-    this.time+=dt;this.stageTime+=dt;
+    const before=this.stageTime;this.time+=dt;this.stageTime+=dt;
+    if(before<ENRAGE_WARN&&this.stageTime>=ENRAGE_WARN)this.emit({type:'enrage',kind:'warn',text:`ENRAGE IN ${ENRAGE_AT-ENRAGE_WARN}s`});
+    if(before<=ENRAGE_AT&&this.stageTime>ENRAGE_AT)this.emit({type:'enrage',kind:'on',text:'ENRAGED'});
     const oldPhase=this.phase;this.phase=this.bossHp/this.bossMax>.65?1:this.bossHp/this.bossMax>.3?2:3;
     if(this.phase!==oldPhase)this.emit({type:'phase',text:`${this.enemyName.toUpperCase()} · PHASE ${this.phase}`});
     if(this.phase>oldPhase&&this.pact('RM05'))this.summon();
@@ -233,16 +239,17 @@ export class Battle {
     if(this.finish())return;
     this.attackIn-=dt;this.clawIn-=dt;this.summonIn-=dt;
     if(this.attackIn<=0&&this.breakLeft<=0){this.telegraph();this.attackIn=this.intentInterval();}
-    if(this.clawIn<=0&&this.breakLeft<=0){const h=this.living().sort((a,b)=>a.slot-b.slot)[0];if(h){this.hurt(h,(CLAW_BASE+this.phase*6)*this.enemyScale());this.emit({type:'claw',slot:h.slot});}this.clawIn=CLAW_EVERY*(this.raidSandbox?.intervalScale??1);}
+    if(this.clawIn<=0&&this.breakLeft<=0){const h=this.living().sort((a,b)=>a.slot-b.slot)[0];if(h){this.hurt(h,(CLAW_BASE+this.phase*6)*this.enemyScale(),{kind:'claw'});this.emit({type:'claw',slot:h.slot});}this.clawIn=CLAW_EVERY*(this.raidSandbox?.intervalScale??1);}
     if(this.summonIn<=0){this.summon();this.summonIn=25*(this.raidSandbox?.intervalScale??1);}
     for(const t of [...this.threats]){
       if(t.targetId!==undefined){const target=this.hero(t.targetId);t.slots=target&&target.hp>0?[target.slot]:[];}
       t.left-=dt;
       if(t.left<=0){if(t.effect==='mend'&&this.bossHp>0){this.bossHp=Math.min(this.bossMax,this.bossHp+Math.round(this.bossMax*MEND_HEAL));this.emit({type:'banner',text:'THE WOUND CLOSES'});}
-        for(const slot of t.slots){const h=this.heroes.find(a=>a.slot===slot&&a.hp>0);if(h){this.hurt(h,(t.damage??83)*this.enemyScale());h.combo=0;if(t.effect==='silence'&&this.guardLeft<=0)h.remaining=Math.min(h.total,h.remaining+1.5);}else this.dodged++;}this.emit({type:'impact',targets:t.slots,kind:t.type});this.threats.splice(this.threats.indexOf(t),1);
+        const hit:number[]=[];let total=0;
+        for(const slot of t.slots){const h=this.heroes.find(a=>a.slot===slot&&a.hp>0);if(h){total+=this.hurt(h,(t.damage??83)*this.enemyScale(),{kind:'impact',name:t.name});hit.push(h.id);h.combo=0;if(t.effect==='silence'&&this.guardLeft<=0)h.remaining=Math.min(h.total,h.remaining+1.5);}else this.dodged++;}this.emit({type:'impact',targets:t.slots,kind:t.type,name:t.name,hit,amount:total});this.threats.splice(this.threats.indexOf(t),1);
         if(t.type==='all'&&this.pact('RM03')){const slot=this.aftershock(this.living());if(slot!==undefined)this.emit({type:'warning',text:'AFTERSHOCK',targets:[slot]});}}
     }
-    for(const m of this.minions){if(m.hp<=0)continue;m.timer-=dt;if(m.timer<=0){const h=this.living().filter(a=>a.slot%3===m.lane).sort((a,b)=>a.slot-b.slot)[0]??this.living().sort((a,b)=>a.hp-b.hp)[0];if(h){this.hurt(h,MINION_HIT*this.enemyScale());this.emit({type:'minionAttack',slot:h.slot,lane:m.lane});}m.timer=5.5;}}
+    for(const m of this.minions){if(m.hp<=0)continue;m.timer-=dt;if(m.timer<=0){const h=this.living().filter(a=>a.slot%3===m.lane).sort((a,b)=>a.slot-b.slot)[0]??this.living().sort((a,b)=>a.hp-b.hp)[0];if(h){this.hurt(h,MINION_HIT*this.enemyScale(),{kind:'minion'});this.emit({type:'minionAttack',slot:h.slot,lane:m.lane});}m.timer=5.5;}}
     this.minions=this.minions.filter(m=>m.hp>0);this.finish();
   }
   private finish() {
@@ -251,7 +258,9 @@ export class Battle {
     if(!this.living().length){this.status='defeat';this.abandonRogue();this.emit({type:'defeat'});return true;}
     return false;
   }
-  enemyScale() { return (this.mode==='adventure'?chapterDmg(this.floor)*(this.heroic?HEROIC_DMG:1):this.mode==='dungeon'?chapterDmg(this.dungeon?.chapter??this.floor)*(this.dungeon?.damage??1):this.mode==='endless'?.82*Math.pow(ENDLESS_DMG_GROWTH,this.floor-1):RAID_DMG*chapterDmg(this.floor)*Math.pow(1.06,Math.max(0,this.floor-CAMPAIGN.length)))*(this.stageTime>150?1.7:1)*(this.mode==='raid'?(this.raidSandbox?.damageScale??1)*(this.raidTier()?.dmg??1)*Math.pow(Math.min(1,this.raidParty),RAID_PARTY_DMG):1); }
+  enemyScale() { return (this.mode==='adventure'?chapterDmg(this.floor)*(this.heroic?HEROIC_DMG:1):this.mode==='dungeon'?chapterDmg(this.dungeon?.chapter??this.floor)*(this.dungeon?.damage??1):this.mode==='endless'?.82*Math.pow(ENDLESS_DMG_GROWTH,this.floor-1):RAID_DMG*chapterDmg(this.floor)*Math.pow(1.06,Math.max(0,this.floor-CAMPAIGN.length)))*(this.enraged()?ENRAGE_DMG:1)*(this.mode==='raid'?(this.raidSandbox?.damageScale??1)*(this.raidTier()?.dmg??1)*Math.pow(Math.min(1,this.raidParty),RAID_PARTY_DMG):1); }
+  /** Past ENRAGE_AT seconds of the stage enemy hits land ENRAGE_DMG times harder. */
+  enraged() { return this.stageTime>ENRAGE_AT; }
   /** The certified contract tier's scale; undefined outside rewarded raids (sandbox practice uses its sliders). */
   raidTier() { const c=this.mode==='raid'?this.raidContract:undefined;return c&&!c.sandbox?RAID_TIER_SCALE[c.tier]:undefined; }
   /** Seconds between two telegraphs at the current phase. */
@@ -274,7 +283,7 @@ export class Battle {
     }else if(intent==='breath'){
       const counts=[0,1,2].map(lane=>alive.filter(h=>h.slot%3===lane).length);const lane=counts.indexOf(Math.max(...counts));slots=[lane,lane+3,lane+6];type='breath';name='LANE ERUPTION';counter='GROUND: pindah ke lane lain. Lokasi impact tidak mengikuti hero.';
     }else if(intent==='silence'){
-      slots=Array.from({length:9},(_,i)=>i);type='all';effect='silence';name='TOLLING SILENCE';counter='ALL GRID: interrupt atau Guard. Tanpa itu, semua cooldown hero mundur 1,5 detik.';
+      slots=Array.from({length:9},(_,i)=>i);type='all';effect='silence';name='TOLLING SILENCE';counter='ALL GRID: Guard menjelang impact (G) atau cast skill interrupt. Tanpa itu, semua cooldown hero mundur 1,5 detik.';
     }else if(intent==='mend'){
       slots=[];type='channel';effect='mend';name='MENDING RITE';counter='CHANNEL: putus dengan skill interrupt sebelum selesai, atau boss pulih 5% HP.';
     }else if(intent==='all'){
@@ -282,6 +291,8 @@ export class Battle {
     }else{
       const candidates=[...alive];while(slots.length<Math.min(3,alive.length)){const i=Math.floor(this.random()*candidates.length);slots.push(candidates.splice(i,1)[0].slot);}type='meteor';name=this.enemyId==='spider'?'VENOM WEB':'FALLING SHARDS';counter='GROUND: pindahkan hero ke tile aman. Tanda tetap di tanah.';
     }
+    // A full grid leaves nowhere to step: point at the counters that still work (WP8 changes the rule itself).
+    if((type==='front'||type==='breath'||type==='meteor')&&Array.from({length:9},(_,i)=>i).every(i=>slots.includes(i)||alive.some(h=>h.slot===i)))counter=NO_SAFE_TILE;
     const total=type==='all'||type==='channel'?4.2:3.2;
     this.threats.push({id:this.eventId++,name,type,slots,left:total,total,targetId,counter,effect,damage:enemy.damage*TELEGRAPH_SHARE*(effect==='silence'?.5:type==='all'?.85:1)*(1+(this.phase-1)*.1)});
     this.emit({type:'warning',text:name,targets:slots});
@@ -341,9 +352,10 @@ export class Battle {
       const seconds=s.power*Math.min(1.5,1+(this.skillPower(h)-1)*.2);
       this.living().forEach(a=>{if(a!==h)a.remaining=Math.max(0,a.remaining-seconds);this.emit({type:'buff',source:a.id,slot:a.slot});});
     }else if(s.kind==='delay'||s.kind==='stun'){
-      this.delayIntent(s.power);
+      // The boss's next intent is pushed back (claws and live telegraphs keep going): say so, and keep BREAK for real armour breaks.
+      const added=this.delayIntent(s.power);
       if(s.kind==='stun')this.addStagger(120*this.skillPower(h));
-      this.emit({type:'break',text:s.kind==='stun'?'STUNNED':'LULLED'});
+      this.emit({type:'stun',source:h.id,kind:s.kind,amount:added,text:added>=.05?`DELAYED +${added.toFixed(1)}s`:'RESISTED'});
     }else if(s.kind==='resolve'){
       this.gainResolve(s.power);
     }else if(s.kind==='selfheal'){
@@ -351,19 +363,19 @@ export class Battle {
     }else if(s.kind==='repair'){
       if(!this.repairUsed&&this.potions<3){this.potions++;this.repairUsed=true;this.emit({type:'buff',source:h.id,slot:h.slot,text:'+1 POTION'});}
     }else if(s.kind==='counter'){
-      h.counterLeft=3.5;h.counterPower=p;
+      h.counterLeft=3.5;h.counterPower=p;this.emit({type:'buff',source:h.id,slot:h.slot,kind:'counter',text:'COUNTER'});
     }else{
       if(s.kind==='interrupt'){
         const active=this.threats.filter(t=>t.type==='all'||t.type==='channel');this.threats=this.threats.filter(t=>t.type!=='all'&&t.type!=='channel');
-        if(active.length)this.emit({type:'break',text:'RITUAL INTERRUPTED'});
+        if(active.length)this.emit({type:'interrupt',source:h.id,name:active.map(t=>t.name).join(' · '),text:'RITUAL INTERRUPTED'});
         this.hitBoss(p,h.id,'magic');
       }else if(s.kind==='mark'){
-        this.hitBoss(p,h.id,'slash');this.markLeft=4;
+        this.hitBoss(p,h.id,'slash');this.markLeft=4;this.emit({type:'buff',kind:'mark',text:'MARK +20%'});
       }else if(s.kind==='weaken'){
-        this.hitBoss(p,h.id,'magic');this.weakenLeft=5;
+        this.hitBoss(p,h.id,'magic');this.weakenLeft=5;this.emit({type:'buff',kind:'weaken',text:'WEAKEN -25%'});
       }else if(s.kind==='curse'){
         // One curse per hexer: a recast refreshes only that caster's curse and keeps its tick phase.
-        const old=this.curses.find(c=>c.source===h.id);this.curses=this.curses.filter(c=>c!==old);this.curses.push({source:h.id,left:6,power:p,tick:old?Math.min(1,old.tick):1});
+        const old=this.curses.find(c=>c.source===h.id);this.curses=this.curses.filter(c=>c!==old);this.curses.push({source:h.id,left:6,power:p,tick:old?Math.min(1,old.tick):1});this.emit({type:'buff',kind:'curse',text:'CURSE'});
       }else if(s.kind==='drain'){
         this.attack(h.id,lane,p,'magic');const lowest=this.living().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(lowest)this.heal(lowest,p*.5*heals,h);
       }else if(s.kind==='sacrifice'){
@@ -373,7 +385,7 @@ export class Battle {
       }else if(s.kind==='flurry'){
         this.attack(h.id,lane,p,'slash');this.addStagger(p);
       }else if(s.kind==='turret'){
-        this.turrets=this.turrets.filter(t=>t.source!==h.id);this.turrets.push({lane,left:6,power:p,source:h.id,tick:1});
+        this.turrets=this.turrets.filter(t=>t.source!==h.id);this.turrets.push({lane,left:6,power:p,source:h.id,tick:1});this.emit({type:'buff',source:h.id,slot:h.slot,kind:'turret',text:'TURRET'});
       }else if(s.kind==='steal'){
         this.attack(h.id,lane,p,'steal');const amount=Math.min(8,this.purse);this.purse-=amount;this.gold+=amount;if(amount)this.emit({type:'coin',source:h.id,slot:h.slot,amount});
       }else if(s.kind==='aoe'){
@@ -423,22 +435,26 @@ export class Battle {
     if(this.boons.includes('tide'))this.shield(h,over*.35);
     if(value>1)this.emit({type:'heal',source:h.id,slot:h.slot,amount:value});
   }
-  hurt(h:Hero,amount:number) {
-    if(h.hp<=0||!Number.isFinite(amount)||amount<=0)return;
+  /** Damage a hero; `cause` names the source for the KO log. Returns the HP actually lost. */
+  hurt(h:Hero,amount:number,cause?:{kind:string;name?:string}) {
+    if(h.hp<=0||!Number.isFinite(amount)||amount<=0)return 0;
     if(h.talents.includes('fortitude'))amount*=.9;
     if(this.weakenLeft>0)amount*=.75;
     if(h.counterLeft>0){amount*=.5;this.hitBoss(h.counterPower,h.id,'slash');}
     amount*=1-Math.min(.45,h.perks.reduction+(h.equipment.reduction??0));
     const guard=this.guardLeft>0?amount*.65:0;amount-=guard;
     const absorbed=Math.min(h.shield,amount);h.shield-=absorbed;this.blocked+=absorbed+guard;
-    const dmg=Math.round(amount-absorbed);h.hp=Math.max(0,h.hp-dmg);this.gainResolve(amount*.028);
+    const dmg=Math.round(amount-absorbed),lost=Math.min(h.hp,dmg);h.hp=Math.max(0,h.hp-dmg);this.gainResolve(amount*.028);
     if(this.boons.includes('thorn'))this.hitBoss((absorbed+guard)*.35,h.id,'thorn');
     if(h.perks.thorns)this.hitBoss((absorbed+guard)*h.perks.thorns,h.id,'thorn');
     // Nobody is downed once the boss has fallen: a counter or thorn kill on this hit leaves the hero standing at 1 HP.
     if(h.hp===0&&this.bossHp<=0)h.hp=1;
     this.emit({type:'hurt',source:h.id,slot:h.slot,amount:dmg,text:absorbed+guard>0?'BLOCK':''});
     if(h.hp===0&&this.boons.includes('lifeline')&&!h.rescued){h.rescued=true;h.hp=Math.round(h.maxHp*.2);this.emit({type:'heal',source:h.id,slot:h.slot,amount:h.hp,text:'NOT YET'});}
-    else if(h.hp===0)this.emit({type:'down',source:h.id,slot:h.slot});
+    else if(h.hp===0)this.emit({type:'down',source:h.id,slot:h.slot,kind:cause?.kind,name:cause?.name});
+    return lost;
   }
-  snapshot() { return {rogueBuild:this.rogueBuild?normalizeRogueBuild(this.rogueBuild):undefined,status:this.status,mode:this.mode,floor:this.floor,stage:this.stage,stageCount:this.stageCount,enemyId:this.enemyId,time:this.time,bossHp:this.bossHp,bossMax:this.bossMax,phase:this.phase,resolve:this.resolve,gold:this.gold,taps:this.taps,relocations:this.relocations,potions:this.potions,guardLeft:this.guardLeft,guardCooldown:this.guardCooldown,boons:[...this.boons],curses:this.curses.map(c=>({...c})),heroes:this.heroes.map(h=>({...h,skills:[...h.skills],talents:[...h.talents]})),threats:this.threats.map(t=>({...t,slots:[...t.slots]})),minions:this.minions.map(m=>({...m}))}; }
+  /** The live channel telegraph (Mending Rite) and how far it has run, 0..1. */
+  channel() { const t=this.threats.find(t=>t.type==='channel');return t?{name:t.name,left:t.left,total:t.total,progress:Math.max(0,Math.min(1,1-t.left/t.total))}:undefined; }
+  snapshot() { return {rogueBuild:this.rogueBuild?normalizeRogueBuild(this.rogueBuild):undefined,status:this.status,mode:this.mode,floor:this.floor,stage:this.stage,stageCount:this.stageCount,enemyId:this.enemyId,time:this.time,bossHp:this.bossHp,bossMax:this.bossMax,phase:this.phase,resolve:this.resolve,gold:this.gold,taps:this.taps,relocations:this.relocations,potions:this.potions,guardLeft:this.guardLeft,guardCooldown:this.guardCooldown,stageTime:this.stageTime,enraged:this.enraged(),breakLeft:this.breakLeft,markLeft:this.markLeft,weakenLeft:this.weakenLeft,boons:[...this.boons],curses:this.curses.map(c=>({...c})),turrets:this.turrets.map(t=>({lane:t.lane,left:t.left,source:t.source})),channel:this.channel(),heroes:this.heroes.map(h=>({...h,skills:[...h.skills],talents:[...h.talents]})),threats:this.threats.map(t=>({...t,slots:[...t.slots]})),minions:this.minions.map(m=>({...m}))}; }
 }

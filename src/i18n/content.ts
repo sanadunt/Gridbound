@@ -176,6 +176,14 @@ const EVENT_TEXT: ContentText[] = [
   { en: 'ARMOR BREAK · +60% DMG', id: 'ZIRAH HANCUR · +60% DMG' },
   { en: 'BLOCK', id: 'TANGKIS' },
   { en: 'NOT YET', id: 'BELUM SAATNYA' },
+  // Status casts, enrage and the full-grid counter (WP7 readability events).
+  { en: 'MARK +20%', id: 'TANDA +20%' },
+  { en: 'WEAKEN -25%', id: 'LEMAH -25%' },
+  { en: 'CURSE', id: 'KUTUKAN' },
+  { en: 'TURRET', id: 'MENARA' },
+  { en: 'COUNTER', id: 'BALASAN' },
+  { en: 'ENRAGED', id: 'MURKA' },
+  { en: 'GROUND: no safe tile. Swap a tank or shielded hero onto the mark, or Guard (G).', id: 'GROUND: tidak ada tile aman. Tukar tank atau hero ber-shield ke tanda, atau Guard (G).' },
   // Battle.stageName outside the campaign (shown raw and upper-cased as the start banner).
   { en: 'Practice arena · no Crystal', id: 'Arena latihan · tanpa Crystal' },
   { en: 'Raid contract', id: 'Kontrak raid' },
@@ -196,6 +204,8 @@ const EVENT_TEXT: ContentText[] = [
 type EventPattern = { en: RegExp; id: RegExp; text: Record<ContentLang, (...groups: string[]) => string> };
 const EVENT_PATTERNS: EventPattern[] = [
   { en: /^(.+) · PHASE (\d+)$/i, id: /^(.+) · FASE (\d+)$/i, text: { en: (name, n) => `${name} · PHASE ${n}`, id: (name, n) => `${name} · FASE ${n}` } },
+  { en: /^DELAYED \+([\d.]+)s$/, id: /^TERTUNDA \+([\d.]+)d$/, text: { en: n => `DELAYED +${n}s`, id: n => `TERTUNDA +${n}d` } },
+  { en: /^ENRAGE IN (\d+)s$/, id: /^MURKA DALAM (\d+)d$/, text: { en: n => `ENRAGE IN ${n}s`, id: n => `MURKA DALAM ${n}d` } },
   { en: /^Descent (\d+)$/i, id: /^Kedalaman (\d+)$/i, text: { en: n => `Descent ${n}`, id: n => `Kedalaman ${n}` } },
   { en: /^Recruit (\d+)$/i, id: /^Rekrutan (\d+)$/i, text: { en: n => `Recruit ${n}`, id: n => `Rekrutan ${n}` } },
   { en: /^Requires hero Lv\.(\d+)$/, id: /^Perlu hero Lv\.(\d+)$/, text: { en: n => `Requires hero Lv.${n}`, id: n => `Perlu hero Lv.${n}` } },

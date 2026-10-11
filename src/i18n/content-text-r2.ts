@@ -127,11 +127,10 @@ export const R2_TEXT: Record<string, ContentText> = {
 export const R2_EVENT_TEXT: ContentText[] = [
   t('TOLLING SILENCE', 'LONCENG SENYAP'),
   t('MENDING RITE', 'RITUS PEMULIHAN'),
-  t('ALL GRID: interrupt or Guard. Without either, every hero’s cooldown slips back 1.5 seconds.', 'ALL GRID: interrupt atau Guard. Tanpa itu, semua cooldown hero mundur 1,5 detik.'),
+  t('ALL GRID: Guard just before impact (G) or cast an interrupt skill. Without either, every hero’s cooldown slips back 1.5 seconds.', 'ALL GRID: Guard menjelang impact (G) atau cast skill interrupt. Tanpa itu, semua cooldown hero mundur 1,5 detik.'),
   t('CHANNEL: break it with an interrupt before it finishes, or the boss recovers 5% HP.', 'CHANNEL: putus dengan skill interrupt sebelum selesai, atau boss pulih 5% HP.'),
   t('THE WOUND CLOSES', 'LUKANYA MENUTUP'),
-  t('STUNNED', 'TERKUNCI'),
-  t('LULLED', 'TERLELAP'),
+  t('RESISTED', 'DITEPIS'),
   t('+1 POTION', '+1 RAMUAN'),
   t('PACT', 'PAKTA'),
 ];
