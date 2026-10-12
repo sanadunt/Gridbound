@@ -46,9 +46,9 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
 
   await click('#pause');
   await wait('window.gridbound.battle.status === "paused"');
-  assert.equal(await evaluate(`['Resume', 'Controls', 'Config', 'Retreat to town'].every(label =>
+  assert.equal(await evaluate(`['Resume', 'Controls', 'Config', 'Leave battle…'].every(label =>
     [...document.querySelectorAll('#modal button')].some(button => button.textContent.trim() === label))`), true,
-  'Pause menu exposes Resume, Controls, Config, and Retreat to town');
+  'Pause menu exposes Resume, Controls, Config, and Leave battle…');
   const time = await evaluate('window.gridbound.battle.time');
   await evaluate('window.gridbound.step(5)');
   assert.equal(await evaluate('window.gridbound.battle.time'), time);
@@ -63,14 +63,18 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors 
   assert.equal(await evaluate(`!window.gridbound.profile().sound && !window.gridbound.profile().motion
     && document.body.classList.contains('reduced-motion') && document.querySelector('#intent').textContent.trim().length > 0`), true,
   'Sound-off and reduced-motion settings preserve battle cues and a readable threat');
-  await click('#modal [data-close]');
+  // Config opened from the pause menu returns there (the fight stays paused); Resume resumes it.
+  await click('#modal [data-nav-parent]:not(.modal-close)');
+  await wait('document.querySelector("#modal-title")?.textContent === "PAUSE" && window.gridbound.battle.status === "paused"');
+  await click('#modal [data-close]:not(.modal-close)');
   await wait('window.gridbound.battle.status === "fighting"');
   await click('#pause');
   await wait('window.gridbound.battle.status === "paused"');
   await click('#pause-retreat');
   await wait('document.querySelector("#modal #abandon-run")');
-  assert.equal(await evaluate(`document.querySelector('#modal').textContent.includes('Leave this battle?')`), true,
-    'Retreat opens a confirmation instead of abandoning the run immediately');
+  assert.match(await evaluate(`document.querySelector('#modal-title').textContent`), /^Leave CH \d+\?$/,
+    'Leave battle… opens a confirmation instead of abandoning the run immediately');
+  assert.equal(await evaluate('document.activeElement?.id'), 'suspend-run', 'the confirmation focuses the safe option');
   await click('#modal [data-close]');
   await wait('window.gridbound.battle.status === "fighting"');
 

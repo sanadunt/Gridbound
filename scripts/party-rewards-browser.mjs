@@ -120,14 +120,16 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   assert.equal(await evaluate(text('.result-stars')), 'Stars come from Normal clears.');
   assert.equal(await evaluate('window.gridbound.profile().journey.stars[1]'), 2, 'Heroic leaves Normal stars alone');
   await screenshot('artifacts/result-heroic-reward.png');
+  // Return leads back to the dossier the chapter departed from (a replay queues no camp scenes), and says so.
+  assert.equal(await evaluate(text('#result-town')), 'Return to Story');
   await click('#result-town');
-  await wait('Boolean(document.querySelector(".camp-scene"))');
+  await wait('document.querySelector(".town-game-shell")?.dataset.townRoute === "mission"');
   // Normal replay: battle gold + 30% of the chapter reward.
   const replay = await winChapter(0, false);
   assert.equal(replay.shown, replay.credited, 'replay: the result shows the gold actually credited');
   assert.equal(replay.shown, replay.battleGold + 29);
   await click('#result-town');
-  await wait('Boolean(document.querySelector(".camp-scene"))');
+  await wait('document.querySelector(".town-game-shell")?.dataset.townRoute === "mission"');
   // First clear of chapter 4 raises the cap to 6: the recruits deploy and the result says the party grew.
   const first = await winChapter(3, false);
   assert.equal(first.shown, first.credited);
@@ -135,6 +137,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   assert.equal(await evaluate(text('.party-grew')), 'Party grew to 6!');
   assert.equal(await evaluate('window.gridbound.profile().storyActive.length'), 6, 'the new slots are filled');
   await screenshot('artifacts/result-party-grew.png');
+  // A first clear queues camp scenes (recruits, a story choice): Return goes to the camp.
+  assert.equal(await evaluate(text('#result-town')), 'Return to Emberhollow');
   await click('#result-town');
   await wait('Boolean(document.querySelector(".camp-scene"))');
   assert.doesNotMatch(await evaluate(text('.camp-copy p')), /Party slots free/);
@@ -153,7 +157,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   assert.equal(await evaluate(text('.stat-plaque.gold dt')), 'Crystal');
   assert.equal(await evaluate(text('[data-result-reward]')), `+${gained}`);
   await click('#result-town');
-  await wait('Boolean(document.querySelector(".camp-scene"))');
+  await wait('document.querySelector(".town-game-shell")?.dataset.townRoute === "raid"');
   assert.deepEqual(errors, [], 'no page errors');
   console.log('✓ party, skill book, gear, dossier and result rewards');
 }, { width: 1280, height: 900 });

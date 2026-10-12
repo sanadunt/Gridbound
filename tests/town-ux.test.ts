@@ -97,6 +97,20 @@ test('WP10 the HUD back button walks a route stack: MENU → Quests → ◀ retu
   assert.equal(deep[0], 'camp'); assert.ok(deep.length <= 8);
   assert.equal(backRoute([]), 'camp');
 });
+test('NAV the route stack follows the navigation contract: the MENU is a hub, Back never replays routes from before it', () => {
+  const walk = (...tabs: Parameters<typeof pushRoute>[1][]) => tabs.reduce((stack, tab) => pushRoute(stack, tab), ['camp'] as ReturnType<typeof pushRoute>);
+  /** The routes Back visits from the end of `tabs` down to the camp. */
+  const backs = (...tabs: Parameters<typeof pushRoute>[1][]) => { let stack = walk(...tabs); const seen: string[] = []; while (stack.length > 1) { const to = backRoute(stack); seen.push(to); stack = pushRoute(stack, to); } return seen; };
+  assert.deepEqual(backs('more', 'quests'), ['more', 'camp']);
+  assert.deepEqual(backs('campaign', 'mission'), ['campaign', 'camp']);
+  assert.deepEqual(backs('mission'), ['camp'], 'Next: CH n → the dossier → Back is the camp');
+  assert.deepEqual(backs('campaign', 'mission', 'party'), ['mission', 'campaign', 'camp'], 'Prepare party → Back is the dossier');
+  assert.deepEqual(backs('more', 'bestiary', 'more', 'challenge-shop'), ['more', 'camp'], 'the Bestiary is never replayed');
+  assert.deepEqual(backs('campaign', 'raid'), ['camp'], 'a departure from Raids returns there; Back is the camp');
+  assert.deepEqual(walk('campaign', 'mission', 'more'), ['camp', 'more'], 'opening the MENU always gives camp → MENU');
+  assert.deepEqual(backs('party'), ['camp'], 'a MENU child opened from a camp sign returns to the camp');
+  assert.deepEqual(backs('more', 'party', 'party-advanced'), ['more', 'camp'], 'Party and Jobs swap in place');
+});
 
 test('WP10 heroes who share a class get their own look, cached by look', () => {
   const pairs = Object.entries(ROSTER.reduce<Record<string, number[]>>((map, r, id) => { (map[r.classId] ??= []).push(id); return map; }, {})).filter(([, ids]) => ids.length > 1);

@@ -302,7 +302,7 @@ await withBrowser(async ({ send, wait, evaluate, click }) => {
   await evaluate("localStorage.removeItem('qa.failPut')");
   await click('#retry-save');
   await wait('Boolean(document.querySelector("dialog[open] #suspend-run"))');
-  await click('dialog[open] [data-close].menu-item');
+  await click('dialog[open] .leave-actions [data-close]');
   await wait('!document.querySelector("dialog[open]") && window.gridbound.battle.status === "fighting"');
   await click.retreat();
   await wait('Boolean(document.querySelector("dialog[open] #suspend-run"))');

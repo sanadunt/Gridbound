@@ -84,6 +84,8 @@ try {
    await wait('document.querySelector("#storage-status")?.textContent.startsWith("Saved")');
    await click(`[data-depart="${mode}"]`);try { await wait(`window.gridbound?.battle?.mode===${JSON.stringify(mode)} && window.gridbound?.inTown===false`); } catch(e) { console.log(await evaluate('document.body.innerText'),JSON.stringify(errors));throw e; }
    const before=await evaluate('window.gridbound.battle.snapshot()');
+   // Nothing is played before FIGHT! (its Back is free): suspending needs a fight under way; it keeps the battle-start checkpoint.
+   await click('#start');await wait('window.gridbound.battle.status==="fighting"');
    await click('#pause');await wait('Boolean(document.querySelector("#modal #pause-retreat"))');
    await click('#pause-retreat');await wait('Boolean(document.querySelector("#suspend-run"))');
    await click('#suspend-run');await wait('window.gridbound.inTown===true');

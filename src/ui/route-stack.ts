@@ -3,9 +3,11 @@ import type { TownTab } from './town';
 /** Routes that replace each other on the stack instead of piling up: the gate's mode tabs (and the chapter dossier) and the two Party screens. */
 const GROUP: Partial<Record<TownTab, string>> = { campaign: 'gate', mission: 'gate', dungeon: 'gate', raid: 'gate', endless: 'gate', party: 'party', 'party-advanced': 'party' };
 const DEPTH = 8;
-/** The stack after opening `tab`: the camp is the root, a route already on the stack pops back to it, siblings swap, others push. */
+/** The stack after opening `tab`: the camp is the root, the MENU is a hub one step above it (Back never replays routes from before the MENU),
+ *  a route already on the stack pops back to it, siblings swap, others push. */
 export function pushRoute(stack: readonly TownTab[], tab: TownTab): TownTab[] {
   if (tab === 'camp') return ['camp'];
+  if (tab === 'more') return ['camp', 'more'];
   const base: TownTab[] = stack[0] === 'camp' ? [...stack] : ['camp', ...stack];
   const at = base.lastIndexOf(tab);
   if (at >= 0) return base.slice(0, at + 1);
@@ -18,5 +20,5 @@ export function pushRoute(stack: readonly TownTab[], tab: TownTab): TownTab[] {
   const next = [...keep, tab];
   return next.length > DEPTH ? ['camp', ...next.slice(-(DEPTH - 1))] : next;
 }
-/** Where the HUD ◀ leads: the route before the current one (the camp at the bottom). */
+/** Where the HUD Back leads: the route before the current one (the camp at the bottom). */
 export const backRoute = (stack: readonly TownTab[]): TownTab => stack.length > 1 ? stack[stack.length - 2] : 'camp';

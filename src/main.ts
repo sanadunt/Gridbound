@@ -24,9 +24,11 @@ import { chapterStars, STAR_PAR_SECONDS } from './game/journey';
 import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
 import { partyPower, powerVerdict, recommendedHeroicPower, recommendedPower } from './game/power';
 import { claimAllQuests, questGearText } from './ui/quests';
-import { UNLOCKS, isFeature, markIntro, markVisited, noteModesInUse, pendingIntros, routeLocked, type Feature } from './ui/unlocks';
+import { UNLOCKS, isFeature, markIntro, markVisited, noteModesInUse, pendingIntros, resetUnlockFlags, routeLocked, type Feature } from './ui/unlocks';
 import { menuBadge } from './ui/badges';
 import { pushRoute, backRoute } from './ui/route-stack';
+import { backAction, type BackSource, type NavSnapshot } from './ui/back';
+import { installBackGuard, type BackGuard } from './ui/history';
 import { defeatFixes, xpSummary } from './ui/result-help';
 import { COACH_STEPS, Coach, coachEnabled, coachDone, markCoach, resetCoach, setCoachEnabled, skipCoach, type CoachStep } from './ui/coach';
 import { actArt, starRow } from './ui/world-map';
@@ -45,7 +47,7 @@ import { createRogueBuild, setRogueJobs, rogueUpgrades } from './game/roguelike-
 import { JOBS, GEAR } from './game/jobs';
 import { defaultRaidBuild, setRaidJob, setRaidHero, setRaidPartySize, normalizeRaidBuild, openRaidQuarry, raidQuarryUnlocked } from './game/raid-build';
 import { QUESTS, questProgress } from './game/quests';
-import { BELL_TONIC, CHALLENGE_SHOP, RELIC_IDS, bankShopItem, createRunWallet, resetRunWallet, getRaidContractForEnemy, sandboxRaidContract, roguelikeMilestoneForFloor, buyRunItem, buyBellTonic, boonDraftSize, raidModifierAvailable, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
+import { BELL_TONIC, CHALLENGE_SHOP, RELIC_IDS, bankShopItem, createRunWallet, resetRunWallet, getRaidContractForEnemy, sandboxRaidContract, roguelikeMilestoneForFloor, buyRunItem, buyBellTonic, refundBellTonic, boonDraftSize, raidModifierAvailable, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
 import { t, lang, setLang, errorText, fmtInt, fmtDec, fmtSec, fmtDateTime, type Lang } from './i18n';
 import { localizeContent, eventText } from './i18n/content';
 import { version } from '../package.json';
@@ -286,8 +288,20 @@ const townState: TownState = {
   tab: 'camp', hero: 0, zone: Math.min(profile.cleared.length, CAMPAIGN.length - 1), raid: 'golem', raidTier: 'bronze', raidModifiers: [], raidBuild: defaultRaidBuild(profile), notice: '',
   trainingTab: 'formation', campaignPage: 0,
 };
-/** Town routes visited since the camp, for the HUD ◀ (see ui/route-stack). */
+/** Town routes visited since the camp, for the HUD Back (see ui/route-stack). */
 let routeStack: TownTab[] = ['camp'];
+/** The route stack when the current battle departed (Depart, an Undercroft room): leaving the battle or its result returns there (navigation contract §4.5). */
+let departStack: TownTab[] | undefined;
+/** The ready window's Back is free: nothing of this departure has been played yet (a fresh departure's first battle, a Retry, an Undercroft room). */
+let freeBack = false;
+/** A Bell Tonic paid for this departure: a free Back returns it. */
+let tonicPaid: 'raid' | 'roguelike' | undefined;
+/** The departure's ready checkpoint save; a free Back waits for it before dropping the checkpoint. */
+let departureSave: Promise<unknown> = Promise.resolve();
+/** Town navigations and battle transitions in flight: a Back step meanwhile does nothing (contract §7, row 0). */
+let navBusy = 0;
+/** The browser/phone Back guard (ui/history), installed once the boot step has settled. */
+let backGuard: BackGuard | undefined;
 /** First-battle coach state (see coachFrame). */
 let coachForced = false, coachThreat = -1, coachHero = -1, coachUntil = 0;
 const coach = new Coach(document.body, () => { skipCoach(); endCoachStep(); });
@@ -299,8 +313,8 @@ function selectZone(zone: number) { if (zone !== townState.zone) townState.heroi
 $('app').innerHTML = `
 <section id="title-screen" class="title-screen" hidden>${titleMarkup()}</section>
 <header class="site-header hud-bar">
-  <button class="brand" id="home" aria-label="${t('hud.home')}"><span class="brand-back" aria-hidden="true">◀</span><span id="hud-title">${t('town.name')}</span></button>
-  <div class="header-tools"><b id="wallet" class="wallet">${currencyAmount('gold', walletAmounts().gold)}</b><b id="bank-wallet" class="wallet bank-wallet">${currencyAmount('crystal', walletAmounts().crystal)}</b><button id="sound" class="icon-button" aria-label="${t('hud.sound')}" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="${t('hud.settings')}">⚙</button><button id="menu-button" class="icon-button menu-button" data-facility="more" aria-label="${t('route.menu')}">${t('hud.menu')}</button></div>
+  <div class="hud-nav"><button id="home" class="btn hud-back" type="button" data-nav-exit="back" hidden><span aria-hidden="true">◀</span> <span>${t('hud.back')}</span></button><span id="hud-title" class="hud-title">${t('town.name')}</span></div>
+  <div class="header-tools"><b id="wallet" class="wallet">${currencyAmount('gold', walletAmounts().gold)}</b><b id="bank-wallet" class="wallet bank-wallet">${currencyAmount('crystal', walletAmounts().crystal)}</b><button id="sound" class="icon-button" aria-label="${t('hud.sound')}" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="${t('hud.settings')}">⚙</button><button id="menu-button" class="icon-button menu-button" aria-pressed="false" aria-label="${t('route.menu')}">${t('hud.menu')}</button></div>
 </header>
   <main id="town-screen" class="town-screen"></main>
   <main id="battle-screen" class="game-layout" data-battle-view="arena" hidden>
@@ -313,7 +327,7 @@ $('app').innerHTML = `
       </nav>
       <div class="arena-heading-controls">
         <button id="combat-boons" class="icon-button combat-boons-btn" aria-label="${t('battle.boons')}" title="${t('battle.boons')} [B]">✦<span id="boon-count-badge" class="boon-count-badge" style="display:none">0</span></button>
-        <button id="pause" class="icon-button" aria-label="${t('battle.pause')}">Ⅱ</button>
+        <button id="pause" class="btn battle-menu" type="button" data-nav-exit="menu" aria-label="${t('battle.pause')}" title="${t('battle.pause.keys')}"><span aria-hidden="true">Ⅱ</span> <span>${t('battle.menu')}</span></button>
       </div>
     </div>
     <aside class="left-sidebar">
@@ -323,7 +337,7 @@ $('app').innerHTML = `
       <ol id="stage-list" class="expedition-stages"></ol>
       <section class="run-boons"><h3>${t('battle.runboons')}</h3><div id="boon-list"></div></section>
       <section class="run-shop-panel"><h3>${t('shop.journey')}</h3><div id="run-shop-host"></div><small>${t('shop.journey.hint')}</small></section>
-      <section class="field-guide"><button id="howto" class="btn">${t('battle.guide')}</button><button id="retreat" class="btn">${t('battle.retreat')}</button></section>
+      <section class="field-guide"><button id="howto" class="btn">${t('battle.guide')}</button><button id="retreat" class="btn" data-nav-exit="leave">${t('battle.retreat')}</button></section>
     </aside>
     <section id="battle-arena-panel" class="arena-column" aria-label="${t('battle.arena')}">
       <div class="threat-band" aria-label="${t('battle.enemy')}">
@@ -354,7 +368,8 @@ $('app').innerHTML = `
             <h3 id="ready-title"></h3>
             <p id="ready-copy"></p>
             <p id="ready-tip" class="ready-tip" hidden>${t('ready.copy.story')}</p>
-            <button id="start" class="btn primary">${t('battle.begin')}</button>
+            <div class="ready-actions"><button id="ready-back" class="btn" type="button" data-nav-exit="back"></button><button id="start" class="btn primary">${t('battle.begin')}</button></div>
+            <p id="ready-back-hint" class="ready-back-hint" hidden></p>
           </div>
         </section>
       </div>
@@ -445,12 +460,16 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   document.body.dataset.screen = tab === 'camp' ? 'camp' : 'town';
   routeStack = pushRoute(routeStack, tab);
   if (isFeature(tab)) markVisited(tab);
-  const title = routeTitle(tab);
-  $('hud-title').textContent = title;
-  $('home').dataset.long = String(title.length > 10);
-  // ◀ goes back one route; on the camp the title opens the MENU (the Title screen is MENU → Title).
-  $('home').setAttribute('aria-label', tab === 'camp' ? t('route.menu') : t('hud.home'));
+  const title = routeTitle(tab), hudTitle = $('hud-title'), home = $<HTMLButtonElement>('home');
+  hudTitle.textContent = title;
+  hudTitle.dataset.long = String(title.length > 10);
+  // Back goes one route down the stack (the camp is the root and has none; Escape or the phone's Back there shows the title screen).
+  const backTo = backRoute(routeStack), backLabel = t('hud.back.to', { name: routeTitle(backTo) });
+  home.hidden = tab === 'camp';
+  home.dataset.backTo = backTo; home.setAttribute('aria-label', backLabel); home.title = backLabel;
   const waiting = menuBadge(profile), menuButton = $('menu-button');
+  // On the MENU the button is pressed: a second press closes the MENU (one Back step).
+  menuButton.setAttribute('aria-pressed', String(tab === 'more'));
   menuButton.dataset.badge = waiting ? String(waiting) : '';
   menuButton.setAttribute('aria-label', waiting ? t('hud.menu.waiting', { n: waiting }) : t('route.menu'));
   // Keep the scroll position when a screen re-renders in place (equipping, inspecting, learning, claiming).
@@ -508,7 +527,7 @@ $('town-screen').addEventListener('click', event => {
     if (button.dataset.openAction === 'journal') void storyJournal();
     else if (button.dataset.openAction === 'profiles') void profilesMenu();
     else if (button.dataset.openAction === 'settings') settings();
-    else if (button.dataset.openAction === 'title') showTitleScreen();
+    else if (button.dataset.openAction === 'title') void toTitle();
     return;
   }
   if (button.dataset.storyToggle !== undefined) {
@@ -554,7 +573,7 @@ $('town-screen').addEventListener('click', event => {
     return;
   }
   if (button.hasAttribute('data-dungeon-leave')) {
-    openModal(`<h2 id="modal-title">${t('dungeon.leave.title')}</h2><p>${t('dungeon.leave.copy')}</p><button id="dungeon-abandon" class="btn danger">${t('dungeon.leave.yes')}</button><button class="btn" data-close>${t('common.cancel')}</button>`);
+    openModal(`<h2 id="modal-title">${t('dungeon.leave.title')}</h2><p>${t('dungeon.leave.copy')}</p><button id="dungeon-abandon" class="btn danger">${t('dungeon.leave.yes')}</button><button class="btn" data-close data-autofocus>${t('common.cancel')}</button>`);
     $('dungeon-abandon').addEventListener('click', () => { modal.close(); delete profile.journey.run; showTown('dungeon'); });
     return;
   }
@@ -740,7 +759,7 @@ $('town-screen').addEventListener('click', event => {
 /** Abandon a suspended Raid or Bell Trials run from its setup (confirmed): it ends with no reward and the setup opens again. */
 function abandonSuspended(mode: 'raid' | 'roguelike') {
   const tab: TownTab = mode === 'raid' ? 'raid' : 'endless';
-  openModal(`<h2 id="modal-title">${t('run.abandon.title')}</h2><p>${t('run.abandon.copy')}</p><button id="abandon-suspended" class="btn danger">${t('run.abandon')}</button><button class="btn" data-close>${t('common.cancel')}</button>`);
+  openModal(`<h2 id="modal-title">${t('run.abandon.title')}</h2><p>${t('run.abandon.copy')}</p><button id="abandon-suspended" class="btn danger">${t('run.abandon')}</button><button class="btn" data-close data-autofocus>${t('common.cancel')}</button>`);
   $('abandon-suspended').addEventListener('click', () => {
     modal.close();
     if (!ensureMode(mode, () => abandonSuspended(mode))) return;
@@ -858,17 +877,21 @@ function startDungeonFight() {
   if (settleInterruptedFight()) { showTown('dungeon'); return; }
   const options = dungeonBattleOptions(profile, run)!;
   runBoons = [];
+  departStack = [...routeStack];
   boot('dungeon', options.dungeon!.chapter, options);
+  // Nothing of a room is played before FIGHT!: its ready window's Back returns to the map for free.
+  freeBack = true; updateReadyBack();
 }
 /** Flee a dungeon fight in progress: wounds and potions used carry over, the room's fight waits and half the pouch is lost. */
 function fleeDungeonModal() {
-  openModal(`<h2 id="modal-title">${t('dungeon.flee.title')}</h2><p>${t('dungeon.flee.copy')}</p><button id="dungeon-flee" class="btn danger">${t('dungeon.flee.yes')}</button><button class="btn" data-close>${t('common.cancel')}</button>`);
+  openModal(`<h2 id="modal-title">${t('dungeon.flee.title')}</h2><p>${t('dungeon.flee.copy')}</p><button id="dungeon-flee" class="btn danger">${t('dungeon.flee.yes')}</button><button class="btn" data-close data-autofocus>${t('common.cancel')}</button>`);
   $('dungeon-flee').addEventListener('click', () => {
     const run = profile.journey.run;
     if (!dungeonFightLive() || !run || pendingSettlement || commander.stale) { modal.close(); return; }
     const lost = fleeFight(run, heroRatios(), battle.potions);
     closeWithoutResume(); inTown = true; townState.dungeonOutcome = townState.dungeonLetter = undefined;
     sound.play('hurt');
+    routeStack = originStack();
     showTown('dungeon', lost ? t('dungeon.fled', { lost: lostText(lost) }) : '', true);
   });
 }
@@ -1041,6 +1064,8 @@ function ensureMode(target: CommanderMode, retry: () => void) {
 function depart(mode: Mode) {
   if (playingScene || campScenesRunning) return;
   if (!ensureMode(mode === 'raid' ? 'raid' : mode === 'endless' ? 'roguelike' : 'story', () => depart(mode))) return;
+  // Leaving this battle or its result comes back here (the dossier, the Party screen, the Raids or Bell Trials setup).
+  if (inTown) departStack = [...routeStack];
   if (commander.document) commander.document.activeMode = commander.mode;
   if (mode === 'adventure' && !canEnterZone(profile, townState.zone)) return;
   const existing = commander.document?.encounters?.[commander.mode];
@@ -1060,11 +1085,14 @@ function startDeparture(mode: Mode) {
   const tonic = (mode === 'raid' || mode === 'endless') && townState.tonic === true && profile.economy.commanderCrystal >= bankShopItem(BELL_TONIC)!.cost;
   townState.tonic = false;
   boot(mode, mode === 'adventure' ? townState.zone + 1 : mode === 'raid' ? profile.cleared.length+1 : 1, { ...(mode === 'endless' ? { rogueBuild: structuredClone(townState.rogueSetup ?? createRogueBuild()) } : heroic ? { heroic: true } : {}), ...(tonic ? { extraPotions: 1 } : {}) });
-  if (tonic) { if (buyBellTonic(profile.economy, mode === 'raid' ? 'raid' : 'roguelike')) syncProfileEconomy(profile); else battle.potions = Math.max(0, battle.potions - 1); }
-  void ensureCommander().then(() => {
+  if (tonic) { if (buyBellTonic(profile.economy, mode === 'raid' ? 'raid' : 'roguelike')) { syncProfileEconomy(profile); tonicPaid = mode === 'raid' ? 'raid' : 'roguelike'; } else battle.potions = Math.max(0, battle.potions - 1); }
+  // A fresh departure: until FIGHT! its ready window's Back costs nothing.
+  freeBack = true; updateReadyBack();
+  const departed = battle;
+  departureSave = ensureCommander().then(() => {
     if (commander.document) {
       commander.document.activeMode = commander.mode;
-      if (!commander.stale && battle.status === 'ready') void checkpoint();
+      if (!commander.stale && battle === departed && battle.status === 'ready') return checkpoint();
     }
   });
 }
@@ -1104,6 +1132,8 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   battle = next;
   recorded = false;
   chapterResult = undefined; resultReward = undefined; stageStart = undefined; firstFall = undefined;
+  // A booted battle starts guarded; fresh departures, Retry and Undercroft rooms make their ready window's Back free (callers set it after).
+  freeBack = false; tonicPaid = undefined;
   if (coach.step) endCoachStep();
   experienceRewards=[];
   offeredBoons = [];
@@ -1187,9 +1217,88 @@ function showReady() {
   // The very first wave keeps its how-to-play tip under the story beat.
   $('ready-tip').hidden = !(beat && battle.floor === 1 && battle.stage === 0 && !battle.heroic);
   $('start').textContent = t('battle.begin');
+  updateReadyBack();
   if (motionOn()) {
     gsap.fromTo('#start-overlay .start-window', { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
   }
+}
+/** The ready window's Back, before FIGHT!: free ('◀ Back', nothing spent) or guarded ('◀ Leave…', the leave dialog). Also the Log view's exit label. */
+function updateReadyBack() {
+  const free = readyBackFree(), back = $<HTMLButtonElement>('ready-back'), hint = $('ready-back-hint');
+  back.hidden = battle.status !== 'ready';
+  setText(back, `◀ ${t(free ? 'ready.back' : 'ready.leave')}`);
+  back.dataset.navExit = free ? 'back' : 'leave';
+  setText(hint, t('ready.back.hint', { begin: t('battle.begin') }));
+  hint.hidden = !free || back.hidden;
+  setText($('retreat'), leaveLabel());
+  $('retreat').dataset.navExit = free ? 'back' : 'leave';
+}
+/** The window over the arena once the battle has ended: hidden under the result sheet, it offers 'Results' when the sheet is not up
+ *  (a blocked or unsaved outcome), so the arena is never a dead end. */
+function showAfterOverlay(visible = true) {
+  const won = battle.status === 'victory', moreWaves = won && battle.mode === 'adventure' && battle.stage + 1 < battle.stageCount;
+  $('start-overlay').hidden = !visible;
+  $('ready-label').textContent = '';
+  $('ready-title').textContent = won ? moreWaves ? t('ready.after.wave') : t('ready.after.win') : t('ready.after.lose');
+  $('ready-copy').textContent = t('ready.after.copy');
+  $('ready-tip').hidden = true;
+  $('start').textContent = t('ready.after.button');
+  updateReadyBack();
+}
+/** The ready window's Back (also Escape, the phone's Back and the pause menu's exit before FIGHT!). Free: back to where the departure was
+ *  made, the departure's start checkpoint dropped (no 'abandoned' record, no penalty, no flee) and a tonic paid for it refunded, so the
+ *  next Depart builds a fresh battle from the current party. Guarded (a later battle, a resumed one): the leave dialog. */
+async function readyBack() {
+  if (inTown || battle.status !== 'ready') return;
+  if (!readyBackFree()) { void leaveSafely(goOrigin); return; }
+  if (pendingSettlement || commander.stale) { storageStatus(); return; }
+  const current = battle;
+  navBusy++;
+  try {
+    // A room of the Undercroft holds no checkpoint before FIGHT!: the map simply opens again.
+    if (battle.mode !== 'dungeon') {
+      await departureSave;
+      if (battle !== current || inTown) return;
+      // The refund rides on the save that drops the checkpoint; if that save fails the tonic stays paid (its potion is still in this battle).
+      const refund = tonicPaid && refundBellTonic(profile.economy, tonicPaid) ? tonicPaid : undefined;
+      if (refund) syncProfileEconomy(profile);
+      if (commander.document && !(await clearEncounter(false))) {
+        if (refund) { buyBellTonic(profile.economy, refund); syncProfileEconomy(profile); }
+        if (!commander.stale) unsavedTownModal(() => readyBack(), 'storage.unsaved.leave'); else storageStatus();
+        return;
+      }
+      if (refund) townState.tonic = true;
+      tonicPaid = undefined;
+      encounter = undefined; runBoons = []; offeredBoons = []; resetRunWallet(runWallet);
+    }
+    if (battle !== current || inTown) return;
+    stageStart = undefined;
+    closeWithoutResume(); inTown = true;
+    sound.play('cursor');
+    goOrigin();
+  } finally { navBusy--; }
+}
+/** The route stack a battle returns to: the one saved when it departed, or its mode's own route (a battle resumed from the Save menu,
+ *  or a saved stack that belongs to another mode's departure). */
+function originStack(): TownTab[] {
+  const route: TownTab = battle.mode === 'dungeon' ? 'dungeon' : battle.mode === 'raid' ? 'raid' : battle.mode === 'endless' ? 'endless' : 'mission', top = departStack?.at(-1);
+  const fits = top !== undefined && (battle.mode === 'adventure' ? !['dungeon', 'raid', 'endless'].includes(top) : top === route);
+  return fits ? [...departStack!] : ['camp', route];
+}
+/** Where a result's Return leads: the departure's route, or the camp when a Story clear queued scenes there (first clear, recruit, choice, finale). */
+function resultDestination(cleared: boolean): TownTab {
+  const scenes = Boolean(profile.journey.pendingRecruitScenes?.length || profile.journey.pendingChapterScenes?.length);
+  return battle.mode === 'adventure' && cleared && (scenes || resultReward?.firstClear) ? 'camp' : originStack().at(-1)!;
+}
+/** Leave a battle for the route it departed from (contract §4.5); Back from there walks the same stack as before the departure. */
+function goOrigin() {
+  const stack = originStack(), tab = stack[stack.length - 1];
+  // The dossier shows the chapter this battle belongs to (a battle resumed from the Save menu may not be the selected one).
+  if (battle.mode === 'adventure' && tab === 'mission' && canEnterZone(profile, battle.floor - 1)) selectZone(battle.floor - 1);
+  routeStack = stack;
+  const mode = modeForTownTab(tab);
+  if (commander.document && mode !== commander.mode) activateCommander(commander.document, mode, false);
+  showTown(tab, '', true);
 }
 /** The battle-start checkpoint save; leaving the battle waits for it, so an abandoned run is never written back afterwards. */
 let startCheckpoint: Promise<unknown> = Promise.resolve();
@@ -1199,11 +1308,14 @@ async function begin() {
   if (['victory', 'defeat'].includes(battle.status)) { result(); return; }
   encounter = makeEncounter();
   stageStart = battle.mode === 'adventure' ? structuredClone(encounter) : undefined;
+  // From FIGHT! on, leaving this departure goes through the leave dialog (or the flee dialog in the Undercroft).
+  freeBack = false; tonicPaid = undefined;
   // From here a dungeon fight counts: leaving is a flee, and the saved flag makes a reload one too.
   if (battle.mode === 'dungeon' && profile.journey.run?.pendingFight) { profile.journey.run.pendingFight.started = true; fightNote = fightNoteKey(); }
   sound.unlock();
   battle.start();
   $('start-overlay').hidden = true;
+  updateReadyBack();
   if (initialized) scene.encounterStart();
   addLog(t('log.begin'));
   startCheckpoint = ensureCommander().then(() => commander.flush()).then(() => checkpoint(true));
@@ -1530,7 +1642,7 @@ function frame(dt: number) {
   if (drawIn > 0) return;
   drawIn = .06;
   if (battle.status !== lastStatus) {
-    lastStatus = battle.status; renderInspector();
+    lastStatus = battle.status; renderInspector(); updateReadyBack();
     if (battle.status === 'victory' || battle.status === 'defeat') { announce(t(battle.status === 'victory' ? 'a11y.victory' : 'a11y.defeat', { name: battle.enemyName }), true); result(); }
   }
   for (const h of battle.heroes) { if (h.hp <= 0) downed.add(h.id); else if (downed.delete(h.id)) announce(t('a11y.revived', { name: heroName(h) })); }
@@ -1544,7 +1656,8 @@ function frame(dt: number) {
   $('stagger').style.width = `${Math.min(100, battle.breakLeft > 0 ? battle.breakLeft / BREAK_SECONDS * 100 : battle.stagger / battle.staggerThreshold() * 100)}%`;
   $('stagger-label').textContent = battle.breakLeft > 0 ? t('battle.break') : t('battle.armor');
   $('battle-screen').classList.toggle('boss-broken', battle.breakLeft > 0);
-  $('clock').textContent = formatTime(battle.time);
+  // The boss clock counts this battle (its enrage reads the same time); the result's Time is the whole chapter.
+  setText($('clock'), formatTime(battle.stageTime));
   renderBossStatus();
   const threat = [...battle.threats].sort((a, b) => a.left - b.left)[0];
   const isDanger = Boolean(threat);
@@ -1732,43 +1845,79 @@ window.addEventListener('battle-log', event => {
 
 /** The control that opened the modal: focus returns to it on close when nothing else took the focus (a re-render, a route change). */
 let modalReturn: HTMLElement | null = null;
-function openModal(content: string, pause = true) {
+/** A sub-view's parent (Pause → Controls, Save files → Load, Config → backup text): its Back, ×, Escape and the phone's Back re-render it instead of closing. */
+let modalParent: (() => void) | undefined;
+/** `pause`: a fight under it pauses (and resumes on close). `dismissable: false`: no ×, Escape and Back keep it open; its buttons are the way out
+ *  (only where leaving would lose data). `parent`: this content replaced another dialog's, which Back puts back (contract §5.2). */
+type ModalOptions = { pause?: boolean; dismissable?: boolean; parent?: () => void };
+function openModal(content: string, options: boolean | ModalOptions = true) {
+  const { pause = true, dismissable = true, parent } = typeof options === 'boolean' ? { pause: options } : options;
   const alreadyOpen = modal.open;
   if (!alreadyOpen) { resumeOnClose = !inTown && pause && battle.status === 'fighting'; modalReturn = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null; }
   if (!inTown && pause && battle.status === 'fighting') { resumeOnClose = true; battle.pause(); }
-  modal.innerHTML = `${content}<button data-close class="modal-close icon-button" aria-label="${t('common.close')}">×</button>`;
+  modalParent = parent;
+  modal.dataset.blocking = dismissable ? '' : '1';
+  modal.innerHTML = `${content}${dismissable ? `<button ${parent ? 'data-nav-parent' : 'data-close'} class="modal-close icon-button" aria-label="${t(parent ? 'common.back' : 'common.close')}">×</button>` : ''}`;
+  // Text exits are tagged for the navigation checks: a close/cancel closes, a parent link goes back.
+  modal.querySelectorAll<HTMLElement>('[data-close]:not(.modal-close):not([data-nav-exit])').forEach(el => { el.dataset.navExit = 'close'; });
+  modal.querySelectorAll<HTMLElement>('[data-nav-parent]:not(.modal-close):not([data-nav-exit])').forEach(el => { el.dataset.navExit = 'back'; });
+  // A long dialog (Save files, the Journal, Config on a phone) keeps its closing text exit on screen: the last one sticks to the bottom.
+  Array.from(modal.querySelectorAll<HTMLElement>(':scope > [data-nav-exit]:not(.modal-close)')).at(-1)?.classList.add('modal-exit');
   modal.scrollTop = 0;
   if (!alreadyOpen) {
     try { modal.showModal(); } catch { modal.show(); }
+    // The safe choice of a confirmation (Cancel, Save & suspend, Resume) takes the focus. Not the autofocus attribute: inside a
+    // cross-origin frame (itch.io) Chrome blocks it with a console error.
+    modal.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
     sound.modalReveal();
     if (motionOn()) gsap.fromTo(modal, { opacity: 0 }, { opacity: 1, duration: 0.15, ease: 'power2.out', clearProps: 'opacity' });
   } else {
-    // New content in an open modal (Pause → Settings) destroyed the focused button: move the focus to the new title, or its first control.
-    const title = modal.querySelector<HTMLElement>('#modal-title');
-    if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
+    // New content in an open modal (Pause → Settings) destroyed the focused button: move the focus to its safe choice, the new title, or its first control.
+    const safe = modal.querySelector<HTMLElement>('[data-autofocus]'), title = modal.querySelector<HTMLElement>('#modal-title');
+    if (safe) safe.focus({ preventScroll: true });
+    else if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
     else modal.querySelector<HTMLElement>('button:not([disabled]), input, select, textarea, [href]')?.focus({ preventScroll: true });
   }
   modal.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => modal.close()));
+  modal.querySelectorAll('[data-nav-parent]').forEach(el => el.addEventListener('click', modalBack));
 }
+/** One step back inside the modal: its parent content, or close. */
+function modalBack() { const parent = modalParent; if (parent) parent(); else modal.close(); }
+/** Escape and Android's Back close a <dialog> natively: every such request runs the Back step instead (a sub-view returns to its parent, a
+ *  blocking dialog stays). A browser that refuses to keep it open (repeated requests without a user activation) closes it; a blocking one is shown again. */
+let escapeHandled = false, reopenBlocking = false;
+modal.addEventListener('cancel', event => {
+  event.preventDefault();
+  if (!event.cancelable && modal.dataset.blocking === '1') reopenBlocking = true;
+  if (!escapeHandled) goBack('escape');
+});
+document.addEventListener('close', event => {
+  if (event.target !== modal || !reopenBlocking) return;
+  reopenBlocking = false; event.stopImmediatePropagation();
+  try { modal.showModal(); } catch { modal.show(); }
+  modal.querySelector<HTMLElement>('button:not([disabled])')?.focus({ preventScroll: true });
+}, true);
 modal.addEventListener('close', () => {
+  modalParent = undefined; modal.dataset.blocking = '';
   if (resumeOnClose && !inTown && battle.status === 'paused') battle.pause(); resumeOnClose = false;
   const back = modalReturn; modalReturn = null;
   if (back?.isConnected && !back.closest('[hidden],[inert]') && (document.activeElement === document.body || modal.contains(document.activeElement))) back.focus({ preventScroll: true });
 });
 function closeWithoutResume() { resumeOnClose = false; clearResultState(); if (modal.open) modal.close(); }
-function help() {
-  const rows: [string, string][] = [['help.tap.title', 'help.tap'], ['help.skill.title', 'help.skill'], ['help.drag.title', 'help.drag'], ['help.guard.title', 'help.guard'], ['help.items.title', 'help.items'], ['help.lanes.title', 'help.lanes'], ['help.enrage.title', 'help.enrage']];
+/** Controls; opened from the pause menu (`fromPause`) it is a sub-view whose Back returns to the pause menu, the fight still paused. */
+function help(fromPause = false) {
+  const rows: [string, string][] = [['help.tap.title', 'help.tap'], ['help.skill.title', 'help.skill'], ['help.drag.title', 'help.drag'], ['help.guard.title', 'help.guard'], ['help.items.title', 'help.items'], ['help.lanes.title', 'help.lanes'], ['help.enrage.title', 'help.enrage'], ['help.pause.title', 'help.pause'], ['help.back.title', 'help.back']];
   const vars = { t: formatTime(ENRAGE_AT), pct: Math.round((ENRAGE_DMG - 1) * 100), s: ENRAGE_AT - ENRAGE_WARN, move: fmtSec(MOVE_PENALTY) };
-  openModal(`<h2 id="modal-title">${t('help.title')}</h2><div class="help-rows">${rows.map(([title, body]) => `<p><b>${t(title as never, vars)}</b><br>${t(body as never, vars)}</p>`).join('')}</div><button class="btn primary" data-close>${t('help.close')}</button>`);
+  openModal(`<h2 id="modal-title">${t('help.title')}</h2><div class="help-rows">${rows.map(([title, body]) => `<p><b>${t(title as never, vars)}</b><br>${t(body as never, vars)}</p>`).join('')}</div>${fromPause ? `<button class="btn primary" data-nav-parent>${t('common.back')}</button>` : `<button class="btn primary" data-close>${t('help.close')}</button>`}`, { parent: fromPause ? renderPause : undefined });
 }
-function settings() {
+function settings(fromPause = false) {
   openModal(`<h2 id="modal-title">${t('settings.title')}</h2>
     <div class="setting-row" role="group" aria-label="${t('settings.language')}"><span><b>${t('settings.language')}</b><small>${inTown ? t('settings.language.sub') : t('settings.language.town')}</small></span><span class="lang-switch">${(['en', 'id'] as Lang[]).map(code => `<button type="button" class="btn" data-lang="${code}" aria-pressed="${lang() === code}" ${inTown ? '' : 'disabled'}>${code === 'en' ? 'English' : 'Indonesia'}</button>`).join('')}</span></div>
     <label class="setting-row"><span><b>${t('settings.sound')}</b><small>${t('settings.sound.sub')}</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.motion')}</b><small>${reduceMotionQuery.matches ? t('settings.motion.device') : t('settings.motion.sub')}</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.coach')}</b><small>${t('settings.coach.sub')}</small></span><input id="setting-coach" type="checkbox" ${coachEnabled() ? 'checked' : ''}></label>
     ${embedded && fullscreenAvailable() ? `<label class="setting-row"><span><b>${t('settings.fullscreen')}</b><small>${t('settings.fullscreen.sub')}</small></span><input id="setting-fullscreen" type="checkbox" ${fullscreenOn() ? 'checked' : ''}></label>` : ''}
-    <p class="hint">${t('settings.save.note')}</p><button id="export-save" class="btn">${t('settings.export')}</button><button class="btn primary" data-close>${t('common.back')}</button>`);
+    <p class="hint">${t('settings.save.note')}</p><button id="export-save" class="btn">${t('settings.export')}</button><button class="btn primary" ${fromPause ? 'data-nav-parent' : 'data-close'}>${t('common.back')}</button>`, { parent: fromPause ? renderPause : undefined });
   $('export-save').addEventListener('click',exportCommander);
   $('setting-sound').addEventListener('change', e => { profile.sound = (e.target as HTMLInputElement).checked; updateSound(); });
   $('setting-coach').addEventListener('change', e => { setCoachEnabled((e.target as HTMLInputElement).checked); if (coach.step) endCoachStep(); });
@@ -1781,10 +1930,30 @@ function pauseMenu() {
   if (inTown) return;
   if (['victory', 'defeat'].includes(battle.status)) { result(); return; }
   if (modal.open) { modal.close(); return; }
-  openModal(`<h2 id="modal-title">${t('pause.title')}</h2><p class="hint">${t('pause.copy')}</p><nav class="menu-list"><button class="menu-item" data-close>${t('pause.resume')}</button><button id="pause-help" class="menu-item">${t('pause.controls')}</button><button id="pause-settings" class="menu-item">${t('pause.settings')}</button><button id="pause-retreat" class="menu-item">${battle.mode === 'dungeon' ? t('dungeon.flee.label') : t('pause.retreat')}</button></nav>`);
-  $('pause-help').addEventListener('click', help);
-  $('pause-settings').addEventListener('click', settings);
-  $('pause-retreat').addEventListener('click', () => navigateTown(battle.mode === 'dungeon' ? 'dungeon' : 'camp'));
+  renderPause();
+}
+/** The pause menu (also the parent of its Controls and Config views): Resume first and focused, the exit last, labelled with what it does. */
+function renderPause() {
+  if (inTown) return;
+  const free = readyBackFree();
+  openModal(`<h2 id="modal-title">${t('pause.title')}</h2><p class="hint">${t('pause.copy')}</p><nav class="menu-list"><button class="menu-item" data-close data-autofocus>${t('pause.resume')}</button><button id="pause-help" class="menu-item">${t('pause.controls')}</button><button id="pause-settings" class="menu-item">${t('pause.settings')}</button><button id="pause-retreat" class="menu-item menu-exit" data-nav-exit="${free ? 'back' : 'leave'}">${escapeUI(leaveLabel())}</button></nav>`);
+  $('pause-help').addEventListener('click', () => help(true));
+  $('pause-settings').addEventListener('click', () => settings(true));
+  $('pause-retreat').addEventListener('click', leaveBattle);
+}
+/** Nothing of this departure has been played: leaving from the ready window costs nothing (an Undercroft room is free until FIGHT!). */
+const readyBackFree = () => !inTown && battle.status === 'ready' && (freeBack || battle.mode === 'dungeon');
+/** What leaving the battle does now, as the pause menu, the Log view and the ready window name it (contract §4.3). */
+function leaveLabel() {
+  if (readyBackFree()) return `◀ ${battle.mode === 'dungeon' ? t('dungeon.back.map') : t('ready.back')}`;
+  return battle.mode === 'dungeon' ? t('dungeon.flee.label') : t('battle.retreat');
+}
+/** The one handler behind every battle exit (pause menu, Log view, ready window): a free Back, the flee dialog or the leave dialog. Nothing in a battle navigates the town directly. */
+function leaveBattle() {
+  if (inTown) return;
+  if (battle.status === 'victory' || battle.status === 'defeat') { result(); return; }
+  if (readyBackFree()) { void readyBack(); return; }
+  void leaveSafely(goOrigin);
 }
 const escapeUI = (value: string) => value.replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]!));
 function showBoonTray() {
@@ -1811,8 +1980,11 @@ async function navigateTown(tab: TownTab = 'camp') {
   };
   if (inTown) {
     if (commander.document) {
-      // A failed save gets the retry/export prompt instead of a dead button.
-      if (!(await commander.flush())) { if (!commander.stale) unsavedTownModal(() => navigateTown(tab), 'storage.unsaved.leave'); else storageStatus(); return; }
+      // A failed save gets the retry/export prompt instead of a dead button. A Back pressed meanwhile waits (navBusy) instead of skipping a screen.
+      navBusy++;
+      const saved = await commander.flush().finally(() => { navBusy--; });
+      if (!saved) { if (!commander.stale) unsavedTownModal(() => navigateTown(tab), 'storage.unsaved.leave'); else storageStatus(); return; }
+      if (!inTown) return;
       activateTargetMode();
     }
     showTown(tab, '', true);
@@ -1994,9 +2166,11 @@ function result() {
     else show();
   } else show();
 }
-/** The outcome could not be saved: navigation stays locked until a retry succeeds; the outcome can be exported meanwhile. */
+/** The outcome could not be saved: navigation stays locked until a retry succeeds; the outcome can be exported meanwhile. The dialog is
+ *  blocking (no ×; Escape and Back keep it), so the battle behind it is never left without a way on (contract §5.3). */
 function unsavedResultModal() {
-  openModal(`<h2 id="modal-title">${t('result.unsaved.title')}</h2><p>${t('result.unsaved.copy')}</p><button id="retry-save" class="btn primary">${t('result.unsaved.retry')}</button><button id="pending-export" class="btn">${t('result.unsaved.export')}</button>`);
+  showAfterOverlay();
+  openModal(`<h2 id="modal-title">${t('result.unsaved.title')}</h2><p>${t('result.unsaved.copy')}</p><button id="retry-save" class="btn primary">${t('result.unsaved.retry')}</button><button id="pending-export" class="btn">${t('result.unsaved.export')}</button>`, { dismissable: false });
   // A retry closes this dialog first (a failure opens it again), so a saved result is never left under a 'Not saved' dialog.
   $('retry-save').onclick = retryResultSave;
   $('pending-export').onclick = exportCommander;
@@ -2017,7 +2191,8 @@ async function presentResult() {
       if (rewards === null) {
         commander.error = 'settlement';
         storageStatus();
-        openModal(`<h2 id="modal-title">${t('result.blocked.title')}</h2><p>${t('result.blocked.copy')}</p>`);
+        showAfterOverlay();
+        openModal(`<h2 id="modal-title">${t('result.blocked.title')}</h2><p>${t('result.blocked.copy')}</p><button class="btn" data-close>${t('common.close')}</button>`);
         return false;
       }
       // The credited amounts are computed once here and the ceremony shows exactly these.
@@ -2046,12 +2221,8 @@ async function presentResult() {
     recorded = true;
   }
   if (won && battle.mode === 'endless') { offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 7919 + boonReroll * 104729, boonDraftSize(profile.challengeUnlocks)); boonReroll = 0; }
-  $('start-overlay').hidden = false;
-  $('ready-label').textContent = '';
-  $('ready-title').textContent = won ? moreWaves ? t('ready.after.wave') : t('ready.after.win') : t('ready.after.lose');
-  $('ready-copy').textContent = t('ready.after.copy');
-  $('ready-tip').hidden = true;
-  $('start').textContent = t('ready.after.button');
+  // The after-battle window stays hidden under the result sheet (it would show through); it only offers 'Results' if the sheet is not up.
+  showAfterOverlay(false);
   const description = moreWaves ? t('result.desc.wave') : won && battle.mode === 'adventure' ? storyOutro(battle.floor - 1, profile.narrative ?? {}) : won && battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('result.desc.sandbox') : t('result.desc.raid', { tier: t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never) })) : won ? t('result.desc.room', { n: runWallet.crystal }) : t('result.desc.defeat');
   if (won && battle.mode === 'endless') {
     const cardsHtml = offeredBoons.map(b => {
@@ -2074,7 +2245,7 @@ async function presentResult() {
       <section class="win rogue-promote" id="rogue-promote" aria-live="polite"></section>
       ${!offeredBoons.length ? `<button id="next-floor" class="btn primary">${t('boon.allcollected')}</button>` : ''}
       <div class="boon-draft-grid" data-cards="${offeredBoons.length}">${cardsHtml}</div>
-      <footer class="boon-modal-footer"><button id="result-town" class="btn">${t('boon.abandon')}</button></footer>
+      <footer class="boon-modal-footer"><button id="result-town" class="btn" data-nav-exit="return">${t('boon.leave')}</button></footer>
     </div>`);
     renderRoguePromote();
     animateBoonDraft();
@@ -2133,10 +2304,10 @@ async function presentResult() {
         <p class="hint">${t('result.xp.note', { n: Math.round(FALLEN_XP * 100) })}</p>
       </section>
       <div class="ceremony-actions">
+        <button id="result-town" class="btn ${won && !moreWaves ? 'primary' : ''}" data-nav-exit="return">${moreWaves ? t('result.abandon') : t('result.town', { name: routeTitle(resultDestination(won && !moreWaves)) })}</button>
         ${weakStart ? `<button id="retry" class="btn primary">${t('result.restart')}</button>` : ''}
         ${retryBattle ? `<button id="retry-battle" class="btn ${weakStart ? '' : 'primary'}" title="${escapeUI(t('result.retry.battle.hint'))}">${t('result.retry.battle')}</button>` : ''}
-        ${moreWaves ? `<button id="next-wave" class="btn primary">${t('result.next')} ▶</button>` : weakStart ? '' : `<button id="retry" class="btn">${!won && battle.stage > 0 ? t('result.restart') : t('result.retry')}</button>`}
-        <button id="result-town" class="btn ${moreWaves || retryBattle ? '' : 'primary'}">${moreWaves ? t('result.abandon') : t('result.town')}</button>
+        ${moreWaves ? `<button id="next-wave" class="btn primary">${t('result.next')} ▶</button>` : weakStart ? '' : `<button id="retry" class="btn ${won || retryBattle ? '' : 'primary'}">${!won && battle.stage > 0 ? t('result.restart') : t('result.retry')}</button>`}
         <button id="result-details-toggle" class="btn result-details-toggle" type="button" aria-controls="result-details" aria-expanded="false">${t('result.details')}</button>
       </div>
     </div>`);
@@ -2183,6 +2354,8 @@ async function presentResult() {
     runBoons = [];
     closeWithoutResume();
     boot(mode, floor, mode === 'adventure' && heroic ? { heroic: true } : {});
+    // A Retry is a fresh start: its ready window's Back is free again.
+    freeBack = true; updateReadyBack();
     void clearEncounter();
   });
   // Retry only the lost battle from its start checkpoint: HP and potions as they were then, no refill.
@@ -2193,25 +2366,27 @@ async function presentResult() {
     resumeEncounter(saved);
     void checkpoint();
   });
-  // Leave the settled result for a town route (the camp plays the scenes a clear queued: join scenes, a story choice, the finale).
-  const leaveResult = (tab: TownTab, prepare?: () => void) => {
+  // Leave the settled result for a town route: where the departure was made (contract §4.5), or the camp when the clear queued scenes there
+  // (join scenes, a story choice, the finale). A defeat fix is a cross link: Back from it returns to where the departure was made.
+  const leaveResult = (tab: TownTab | undefined, prepare?: () => void) => {
     runBoons = [];
+    const destination = resultDestination(won && !moreWaves);
     // The selected hero and chapter stay (activateCommander keeps them in the same file); a first clear moves on to the next chapter.
     if (battle.mode === 'adventure' && commander.document) activateCommander(commander.document, 'story');
     if (battle.mode === 'adventure' && won && !moreWaves && resultReward?.firstClear) selectZone(Math.min(profile.cleared.length, CAMPAIGN.length - 1));
+    else if (battle.mode === 'adventure' && destination === 'mission' && canEnterZone(profile, battle.floor - 1)) selectZone(battle.floor - 1);
     prepare?.();
     closeWithoutResume();
     inTown = true;
     recruitedIds = [];
-    routeStack = ['camp'];
-    showTown(tab, '', true);
+    routeStack = destination === 'camp' ? ['camp'] : originStack();
+    showTown(tab ?? destination, '', true);
   };
   $('result-town').addEventListener('click', () => {
-    if (moreWaves || won && battle.mode === 'endless') {
-      navigateTown('camp');
-      return;
-    }
-    leaveResult('camp');
+    // A won wave is mid-chapter: its leave dialog offers Save & suspend. The Bell Trials boon draft can only be abandoned (see leaveSafely).
+    if (moreWaves) { void leaveSafely(goOrigin, { wave: { n: battle.stage + 1, total: battle.stageCount, next: battle.stage + 2, gold: battle.gold } }); return; }
+    if (won && battle.mode === 'endless') { void leaveSafely(goOrigin, { draft: true }); return; }
+    leaveResult(undefined);
   });
   resultScreen.querySelectorAll<HTMLButtonElement>('[data-defeat-fix]').forEach(button => button.addEventListener('click', () => {
     const kind = button.dataset.defeatFix, hero = Number(button.dataset.fixHero), slot = button.dataset.fixSlot as TownState['gearSlot'] | undefined, gearId = button.dataset.fixGear;
@@ -2262,17 +2437,17 @@ async function presentDungeonResult() {
   const before = dungeonBefore, lost = !won && before && (before.pouch.gold > 0 || Object.values(before.pouch.materials).some(n => n > 0)) ? before.pouch : undefined;
   const pct = (ratio: number) => `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
   const hpRows = run && before ? run.party.filter(id => ROSTER[id]).map(id => { const from = before.hp[id] ?? 0, to = run.hp[id] ?? 0; return `<li class="${to <= 0 ? 'down' : to < .35 ? 'low' : ''}"><img src="${portrait(ROSTER[id].classId, 0, id)}" alt=""/><b>${ROSTER[id].name}</b><span class="gauge" aria-hidden="true"><i style="width:${pct(to)}"></i></span><small>${pct(from)} <span class="hp-arrow">→</span> ${pct(to)}</small></li>`; }).join('') : '';
-  $('start-overlay').hidden = false;
+  showAfterOverlay(false);
   showResultScreen(`<div class="result-ceremony-modal ${won ? 'victory' : 'defeat'}">
     <p class="result-banner" aria-hidden="true">${won ? cleared ? t('dungeon.end.cleared.banner') : t('result.banner.win') : t('dungeon.end.wiped.banner')}</p>
     <header class="win ceremony-header"><h2 id="result-title" class="ceremony-title">${t('route.dungeon')} · ${t('dungeon.depth.label', { n: run?.depth ?? 1 })}</h2><p class="ceremony-desc">${escapeUI(desc)}</p></header>
     <section class="win result-summary"><dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque"><dt>${t('dungeon.pouch')}</dt><dd>${lost ? `−${fmtInt(lost.gold)}G` : `${fmtInt(run?.pouch.gold ?? 0)}G`}</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>${lost ? `<p class="dungeon-lost">${escapeUI(t('dungeon.lost', { lost: lostText(lost) }))}</p>` : ''}${hpRows ? `<h3 class="subheading">${t('dungeon.result.hp')}</h3><ul class="dungeon-hp-list">${hpRows}</ul>` : ''}${xpRows}</section>
-    <div class="ceremony-actions"><button id="result-dungeon" class="btn primary">${t('dungeon.result.back')} ▶</button></div>
+    <div class="ceremony-actions"><button id="result-dungeon" class="btn primary" data-nav-exit="return">${t('dungeon.result.back')} ▶</button></div>
   </div>`);
   sound.play(won ? 'fanfare' : 'defeat');
   if (experienceRewards.some(r => r.after > r.before)) window.setTimeout(() => sound.play('levelup'), 1300);
   animateCeremony();
-  $('result-dungeon').addEventListener('click', () => { closeWithoutResume(); inTown = true; townState.dungeonOutcome = townState.dungeonLetter = undefined; showTown('dungeon', '', true); });
+  $('result-dungeon').addEventListener('click', () => { closeWithoutResume(); inTown = true; townState.dungeonOutcome = townState.dungeonLetter = undefined; routeStack = originStack(); showTown('dungeon', '', true); });
   return true;
 }
 let dungeonLoot: { gold: number; materials: Record<string, number> } | undefined;
@@ -2340,13 +2515,14 @@ function unsavedTownModal(next: () => unknown, copy: 'storage.unsaved.copy' | 's
   $('retry-save').onclick = () => { void (inTown ? persist() : checkpoint()).then(ok => { if (ok) { if (inTown) closeWithoutResume(); void next(); } else unsavedTownModal(next, copy); }); };
   $('pending-export').onclick = exportCommander;
 }
-async function clearEncounter() {
+/** Drop the current mode's encounter checkpoint. `record`: a challenge run ends as 'abandoned' (a free ready-window Back records nothing). */
+async function clearEncounter(record = true) {
   const ok = await persist('auto', document => {
     if (document.encounters) delete document.encounters[commander.mode];
     if (commander.mode === 'story' && document.story.slots[3].state) delete document.story.slots[3].state.encounter;
     if (commander.mode !== 'story') {
       const state = commander.mode === 'raid' ? document.raid : document.rogue;
-      if (state.activeRun) state.lastRun = terminalRun(state.activeRun, 'abandoned');
+      if (state.activeRun && record) state.lastRun = terminalRun(state.activeRun, 'abandoned');
       state.activeRun = undefined;
     }
   });
@@ -2400,17 +2576,21 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
   updateTitleStatus();
   if (inTown && renderTownAfterActivation) showTown(mode === 'story' ? 'camp' : mode === 'raid' ? 'raid' : 'endless');
 }
-async function leaveSafely(action: () => void | Promise<void>) {
+/** Leave a battle (or switch files) through the mode's leave dialog: Save & suspend (focused), a destructive option that says what is lost,
+ *  and Cancel (contract §4.4). `wave`: a won Story battle with more to come (its own copy: nothing is lost by suspending). */
+async function leaveSafely(action: () => void | Promise<void>, context: { wave?: { n: number; total: number; next: number; gold: number }; draft?: boolean } = {}) {
   if (pendingSettlement || presentingResult || commander.stale) { storageStatus(); return; }
   // A failed save gets the same retry/export prompt as town navigation (its Retry runs this again), never a silent dead button.
-  if (!(await commander.flush())) { if (!commander.stale) unsavedTownModal(() => leaveSafely(action), 'storage.unsaved.leave'); else storageStatus(); return; }
+  if (!(await commander.flush())) { if (!commander.stale) unsavedTownModal(() => leaveSafely(action, context), 'storage.unsaved.leave'); else storageStatus(); return; }
   // A dungeon fight under way can only be left by fleeing (wounds kept, half the pouch lost); before Begin or after the result it just closes.
   if (dungeonFightLive() && battle.status !== 'ready') { fleeDungeonModal(); return; }
   if (inTown || battle.mode === 'dungeon') { closeWithoutResume(); inTown = true; await action(); return; }
-  const hasCommander = Boolean(commander.document);
-  openModal(hasCommander
-    ? `<h2 id="modal-title">${t('leave.title')}</h2><p>${t('leave.copy')}</p><nav class="menu-list"><button id="suspend-run" class="menu-item">${t('leave.suspend')}</button><button id="abandon-run" class="menu-item">${t('leave.abandon')}</button><button data-close class="menu-item">${t('common.cancel')}</button></nav>`
-    : `<h2 id="modal-title">${t('leave.title')}</h2><p>${t('leave.copy.none')}</p><nav class="menu-list"><button id="abandon-run" class="menu-item">${t('leave.abandon')}</button><button data-close class="menu-item">${t('common.cancel')}</button></nav>`);
+  // The Bell Trials boon draft cannot be suspended yet (its encounter is already settled, so Depart would start a new run): it only offers the abandon.
+  const { wave, draft } = context, hasCommander = Boolean(commander.document), canSuspend = hasCommander && !draft;
+  const title = wave ? t('leave.wave.title') : battle.mode === 'adventure' ? t('leave.story.title', { n: battle.floor }) : battle.mode === 'raid' ? t('leave.raid.title') : t('leave.trials.title');
+  const copy = draft ? t('leave.draft.copy') : !hasCommander ? t('leave.copy.none') : wave ? t('leave.wave.copy', wave) : battle.mode === 'adventure' ? t('leave.story.copy', { k: battle.stage + 1, total: battle.stageCount }) : t('leave.copy');
+  const abandon = battle.mode === 'adventure' ? t('leave.story.abandon') : battle.mode === 'raid' ? t('leave.raid.abandon') : t('leave.trials.abandon');
+  openModal(`<h2 id="modal-title">${title}</h2><p>${copy}</p><div class="leave-actions">${canSuspend ? `<button id="suspend-run" class="btn primary" data-autofocus>${t('leave.suspend')}</button>` : ''}<button id="abandon-run" class="btn danger">${abandon}</button><button data-close class="btn" ${canSuspend ? '' : 'data-autofocus'}>${t('common.cancel')}</button></div>`);
   // A save already in flight (the battle-start checkpoint) is queued behind, not a reason to drop the click; `leaving` only stops a double tap.
   let leaving = false;
   $('suspend-run')?.addEventListener('click', async () => {
@@ -2450,7 +2630,14 @@ function download(data: unknown, filename: string) {
  *  for a manual copy. Opened over another dialog (Config, Save files, a 'Not saved' prompt), Back puts that dialog back as it was, controls included. */
 function backupText(text: string, filename: string) {
   const previous = modal.open ? Array.from(modal.childNodes) : [], opener = document.activeElement instanceof HTMLElement && modal.contains(document.activeElement) ? document.activeElement : null;
-  openModal(`<h2 id="modal-title">${t('export.text.title')}</h2><p class="hint">${t('export.text.copy', { file: escapeUI(filename) })}</p><textarea id="backup-text" class="backup-text" readonly rows="8" spellcheck="false" aria-label="${t('export.text.label')}">${escapeUI(text)}</textarea><div class="departure-actions backup-actions"><button id="backup-select" class="btn">${t('export.text.select')}</button><button id="backup-copy" class="btn primary">${t('export.text.clipboard')}</button></div><p id="backup-note" role="status"></p>${previous.length ? `<button id="backup-back" class="btn">${t('common.back')}</button>` : `<button data-close class="btn">${t('common.close')}</button>`}`, false);
+  const previousParent = modalParent, previousBlocking = modal.dataset.blocking ?? '';
+  // Back (its button, ×, Escape, the phone's Back) puts the dialog underneath back as it was: its nodes, listeners, parent and blocking state.
+  const restore = () => {
+    modal.replaceChildren(...previous); modal.scrollTop = 0; modalParent = previousParent; modal.dataset.blocking = previousBlocking;
+    const title = modal.querySelector<HTMLElement>('#modal-title');
+    if (opener?.isConnected) opener.focus(); else if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
+  };
+  openModal(`<h2 id="modal-title">${t('export.text.title')}</h2><p class="hint">${t('export.text.copy', { file: escapeUI(filename) })}</p><textarea id="backup-text" class="backup-text" readonly rows="8" spellcheck="false" aria-label="${t('export.text.label')}">${escapeUI(text)}</textarea><div class="departure-actions backup-actions"><button id="backup-select" class="btn">${t('export.text.select')}</button><button id="backup-copy" class="btn primary">${t('export.text.clipboard')}</button></div><p id="backup-note" role="status"></p>${previous.length ? `<button id="backup-back" class="btn" data-nav-parent>${t('common.back')}</button>` : `<button data-close class="btn">${t('common.close')}</button>`}`, { pause: false, parent: previous.length ? restore : undefined });
   const area = $<HTMLTextAreaElement>('backup-text'), note = $('backup-note'), select = () => { area.focus({ preventScroll: true }); area.select(); area.setSelectionRange(0, text.length); };
   $('backup-select').onclick = select;
   $('backup-copy').onclick = async () => {
@@ -2464,11 +2651,6 @@ function backupText(text: string, filename: string) {
     if (!copied) select();
     note.textContent = t(copied ? 'export.text.copied' : 'export.text.manual');
   };
-  document.getElementById('backup-back')?.addEventListener('click', () => {
-    modal.replaceChildren(...previous); modal.scrollTop = 0;
-    const title = modal.querySelector<HTMLElement>('#modal-title');
-    if (opener?.isConnected) opener.focus(); else if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
-  });
 }
 /** gridbound.v3 as written, when it is a complete save that holds the latest progress; the live profile otherwise (corrupt or blocked key, a failed write, or a boot that has not written it yet). */
 function legacyProfile() {
@@ -2484,12 +2666,13 @@ function exportCommander() {
 import { STORY_CHOICES, narrativeChoice, epilogue, storyOutro, choiceOpen, pendingChoices } from './game/narrative';
 function chapterChronicle() {
   if (!profile.cleared.length) return '';
-  return `<section class="journal-chronicle"><h3>${t('journal.chronicle', { n: profile.cleared.length })}</h3>${[...profile.cleared].sort((a, b) => a - b).map(i => `<details class="journal-entry-card"><summary>CH ${i + 1} · ${escapeUI(CAMPAIGN[i].name)}</summary><button class="btn journal-replay" data-replay-chapter="${i}">▶ ${t('journal.watch')}</button><p>${escapeUI(CAMPAIGN[i].intro).replace(/\n/g, '<br>')}</p><p>${escapeUI(storyOutro(i, profile.narrative ?? {})).replace(/\n/g, '<br>')}</p></details>`).join('')}</section>`;
+  return `<section class="journal-chronicle"><h3>${t('journal.chronicle', { n: profile.cleared.length })}</h3>${[...profile.cleared].sort((a, b) => a - b).map(i => `<details class="journal-entry-card" data-chapter="${i}"><summary>CH ${i + 1} · ${escapeUI(CAMPAIGN[i].name)}</summary><button class="btn journal-replay" data-replay-chapter="${i}">▶ ${t('journal.watch')}</button><p>${escapeUI(CAMPAIGN[i].intro).replace(/\n/g, '<br>')}</p><p>${escapeUI(storyOutro(i, profile.narrative ?? {})).replace(/\n/g, '<br>')}</p></details>`).join('')}</section>`;
 }
-async function storyJournal() {
+/** The Journal; `restore` reopens it as a replay left it (the same chapters expanded, the same scroll). */
+async function storyJournal(restore?: { open: number[]; scroll: number }) {
   if (!inTown) return;
   // A failed save gets the retry/export prompt; the Journal opens once it is saved.
-  if (!(await commander.flush())) { if (!commander.stale) unsavedTownModal(() => storyJournal(), 'storage.unsaved.leave'); else storageStatus(); return; }
+  if (!(await commander.flush())) { if (!commander.stale) unsavedTownModal(() => storyJournal(restore), 'storage.unsaved.leave'); else storageStatus(); return; }
   if (!inTown) return;
   // The Journal is Story: from a Raid or Bell Trials route (or the title screen over one) it switches to Story properly, so the profile, the
   // mode and the visible route agree (a Story profile left in a challenge mode would be saved over the Crystal bank at the next departure).
@@ -2505,9 +2688,12 @@ async function storyJournal() {
  const recruits=companions.length?`<section class="journal-companions-list"><h3>${t('journal.companions')}</h3><div class="journal-companions">${companions.map(id=>`<button class="btn" data-replay-recruit="${id}" title="${escapeUI(t('journal.recruit',{name:CHARACTERS[id].name}))}" aria-label="${escapeUI(t('journal.recruit',{name:CHARACTERS[id].name}))}">▶ ${escapeUI(CHARACTERS[id].name)}</button>`).join('')}</div></section>`:'';
  const ending=finished?`<section class="journal-epilogue"><h3>${t('journal.epilogue')}</h3><p>${escapeUI(t('journal.epilogue.lead'))}</p>${epilogue(state,profile.cleared).map(text=>`<p>${escapeUI(text)}</p>`).join('')}<button class="btn journal-replay" data-replay-ending>▶ ${t('journal.ending')}</button></section>`:'';
  openModal(`<h2 id="modal-title">${t('journal.title')}</h2><p class="hint">${t('journal.intro')}</p>${scenes.length?'':`<p>${t('journal.locked',{n:Math.min(...STORY_CHOICES.map(s=>s.chapter))})}</p>`}${scenes.map(choice).join('')}${recruits}${chapterChronicle()}${ending}<button class="btn primary" data-close>${t('common.back')}</button>`);
- modal.querySelectorAll<HTMLElement>('[data-replay-chapter]').forEach(button=>button.onclick=()=>{ closeWithoutResume(); void chapterIntro(Number(button.dataset.replayChapter)); });
- modal.querySelectorAll<HTMLElement>('[data-replay-recruit]').forEach(button=>button.onclick=()=>{ closeWithoutResume(); void recruitScene(Number(button.dataset.replayRecruit),true); });
- modal.querySelector<HTMLElement>('[data-replay-ending]')?.addEventListener('click',()=>{ closeWithoutResume(); void endingScene(); });
+ if (restore) { modal.querySelectorAll<HTMLDetailsElement>('.journal-entry-card').forEach(card => { card.open = restore.open.includes(Number(card.dataset.chapter)); }); modal.scrollTop = restore.scroll; }
+ // A replay returns to the Journal as it was (the player came to read it, not to land on the MENU).
+ const replay = (scene: () => Promise<unknown>) => { const state = { open: Array.from(modal.querySelectorAll<HTMLDetailsElement>('.journal-entry-card[open]'), card => Number(card.dataset.chapter)), scroll: modal.scrollTop }; closeWithoutResume(); void scene().then(() => storyJournal(state)); };
+ modal.querySelectorAll<HTMLElement>('[data-replay-chapter]').forEach(button=>button.onclick=()=>replay(() => chapterIntro(Number(button.dataset.replayChapter))));
+ modal.querySelectorAll<HTMLElement>('[data-replay-recruit]').forEach(button=>button.onclick=()=>replay(() => recruitScene(Number(button.dataset.replayRecruit),true)));
+ modal.querySelector<HTMLElement>('[data-replay-ending]')?.addEventListener('click',()=>replay(endingScene));
  modal.querySelectorAll<HTMLElement>('[data-story-choice]').forEach(button=>button.onclick=async()=>{
   if(commander.stale)return;
   profile.narrative??={};
@@ -2591,62 +2777,114 @@ async function profilesMenu() {
     $('new-commander').onclick = () => {
       const name = typedName(), create = () => void leaveSafely(() => creatingCommander(async () => { activateCommander(await commander.create(name)); }));
       if (!hasProgress(profile)) { create(); return; }
-      openModal(`<h2 id="modal-title">${t('profiles.new.confirm.title')}</h2><p>${t('profiles.new.confirm.copy')}</p><p class="hint">${current ? t('profiles.new.confirm.kept', { name: escapeUI(current.name) }) : t('profiles.new.confirm.unheld')}</p><button id="new-confirm" class="btn danger">${t('profiles.new.confirm')}</button><button id="new-cancel" class="btn primary">${t('common.cancel')}</button><p id="profile-error" role="status"></p>`);
+      openModal(`<h2 id="modal-title">${t('profiles.new.confirm.title')}</h2><p>${t('profiles.new.confirm.copy')}</p><p class="hint">${current ? t('profiles.new.confirm.kept', { name: escapeUI(current.name) }) : t('profiles.new.confirm.unheld')}</p><button id="new-confirm" class="btn danger">${t('profiles.new.confirm')}</button><button id="new-cancel" class="btn primary" data-nav-parent data-autofocus>${t('common.cancel')}</button><p id="profile-error" role="status"></p>`, { parent: backToProfiles });
       $('new-confirm').onclick = create;
-      $('new-cancel').onclick = () => { void profilesMenu(); };
     };
     $('import-save-button').onclick = () => $<HTMLInputElement>('import-save').click();
     $('import-save').onchange = () => { const file = $<HTMLInputElement>('import-save').files?.[0]; if (file) void attempt(async () => importSave(await file.text().catch(() => ''), documents)); };
     // Where a file picker is awkward or a download was blocked (an embedded page), the backup text can be pasted instead.
     document.getElementById('import-text-button')?.addEventListener('click', () => {
-      openModal(`<h2 id="modal-title">${t('profiles.import.paste.title')}</h2><p class="hint">${t('profiles.import.paste.hint')}</p><textarea id="import-text" class="backup-text" rows="8" spellcheck="false" aria-label="${t('export.text.label')}"></textarea><p id="profile-error" role="status"></p><div class="departure-actions backup-actions"><button id="import-text-confirm" class="btn primary" disabled>${t('profiles.import.paste.confirm')}</button><button id="import-text-back" class="btn">${t('common.back')}</button></div>`);
+      openModal(`<h2 id="modal-title">${t('profiles.import.paste.title')}</h2><p class="hint">${t('profiles.import.paste.hint')}</p><textarea id="import-text" class="backup-text" rows="8" spellcheck="false" aria-label="${t('export.text.label')}"></textarea><p id="profile-error" role="status"></p><div class="departure-actions backup-actions"><button id="import-text-confirm" class="btn primary" disabled>${t('profiles.import.paste.confirm')}</button><button id="import-text-back" class="btn" data-nav-parent>${t('common.back')}</button></div>`, { parent: backToProfiles });
       const area = $<HTMLTextAreaElement>('import-text');
       area.oninput = () => { $<HTMLButtonElement>('import-text-confirm').disabled = !area.value.trim(); };
       area.focus({ preventScroll: true });
       $('import-text-confirm').onclick = () => { void attempt(() => importSave(area.value.trim(), documents)); };
-      $('import-text-back').onclick = () => { void profilesMenu(); };
     });
     $('rename-commander')?.addEventListener('click', () => { const name = $<HTMLInputElement>('commander-name').value.trim().slice(0,32); void attempt(async () => { if (!name) throw new CommanderError('name-required', 'Enter a name.'); if (await persist('auto', doc => { doc.name=name; })) await profilesMenu(); }); });
     $('export-commander')?.addEventListener('click',exportCommander);
     $('save-retry')?.addEventListener('click', () => { if (pendingSettlement) retryResultSave(); else void persist().then(() => profilesMenu()); });
     $('delete-commander')?.addEventListener('click', () => {
-      openModal(`<h2 id="modal-title">${t('profiles.delete.title', { name: escapeUI(current!.name) })}</h2><p>${t('profiles.delete.copy', { crystal: current!.shared.bankCrystal, receipts: current!.shared.settlementReceipts.length })}</p><input id="delete-word" aria-label="DELETE"><button id="delete-confirm" class="btn danger" disabled>${t('profiles.delete.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
+      openModal(`<h2 id="modal-title">${t('profiles.delete.title', { name: escapeUI(current!.name) })}</h2><p>${t('profiles.delete.copy', { crystal: current!.shared.bankCrystal, receipts: current!.shared.settlementReceipts.length })}</p><input id="delete-word" aria-label="DELETE"><button id="delete-confirm" class="btn danger" disabled>${t('profiles.delete.confirm')}</button><button data-nav-parent class="btn">${t('common.cancel')}</button>`, { parent: backToProfiles });
       $('delete-word').oninput = () => { $<HTMLButtonElement>('delete-confirm').disabled = $<HTMLInputElement>('delete-word').value !== 'DELETE'; };
       // Always-on Commander: the next file takes over, or a fresh one when the last is deleted (gridbound.v3 is never overwritten with a fresh profile).
       $('delete-confirm').onclick = async () => { if (!inTown || pendingSettlement || commander.stale) return; try { await commander.flush(); await commander.repository!.remove(current!.commanderId,commander.document!.revision); commander.document=undefined; profile=createProfile(); const rest=(await commander.open()).sort((a,b)=>b.lastPlayed-a.lastPlayed); activateCommander(rest[0] ?? await commander.create(t('profiles.default.name'), createCommanderDocument(createProfile(), t('profiles.default.name')))); await profilesMenu(); } catch(error) { storageError(error); } };
     });
     if (legacyHere) $('legacy-preview').onclick = () => {
       const old = loadSave(store), raw = rawV3();
-      openModal(`<h2 id="modal-title">${t('profiles.legacy.title')}</h2><p>${t('profiles.legacy.copy', { ch: old.profile.cleared.length, gold: old.profile.gold, roster: old.profile.roster.length })}</p><p>${old.warning ? escapeUI(errorText(old.warning)) : ''}</p><button id="legacy-export" class="btn" ${raw ? '' : 'disabled'}>${t('profiles.legacy.export')}</button><button id="legacy-confirm" class="btn primary" ${!raw || old.readOnly || full ? 'disabled' : ''}>${t('profiles.legacy.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button>`);
+      openModal(`<h2 id="modal-title">${t('profiles.legacy.title')}</h2><p>${t('profiles.legacy.copy', { ch: old.profile.cleared.length, gold: old.profile.gold, roster: old.profile.roster.length })}</p><p>${old.warning ? escapeUI(errorText(old.warning)) : ''}</p><button id="legacy-export" class="btn" ${raw ? '' : 'disabled'}>${t('profiles.legacy.export')}</button><button id="legacy-confirm" class="btn primary" ${!raw || old.readOnly || full ? 'disabled' : ''}>${t('profiles.legacy.confirm')}</button><button data-nav-parent class="btn">${t('common.cancel')}</button>`, { parent: backToProfiles });
       $('legacy-export').onclick = () => download(rawV3() ?? '', 'Gridbound-original-v3.json');
       $('legacy-confirm').onclick = () => { void leaveSafely(() => creatingCommander(async () => { const source=loadSave(store), raw=rawV3(); if (!raw || source.readOnly) return; backupLegacyNow(); const name=t('profiles.legacy.name'), candidate=copyLegacyToCommander(source.profile,name); candidate.legacySource=raw; activateCommander(await commander.create(name,candidate)); })); };
     };
     modal.querySelectorAll<HTMLElement>('[data-save-slot]').forEach(button => button.onclick = () => { void attempt(async () => { if (!inTown && encounter && !pendingSettlement) { const frozen=structuredClone(encounter); await persist(button.dataset.saveSlot as SlotId, doc => { const state=commander.mode==='story'?doc.story:commander.mode==='raid'?doc.raid:doc.rogue; const auto=state.slots[3]; const index=state.slots.findIndex(slot=>slot.slotId===button.dataset.saveSlot); state.slots[index]=structuredClone({...auto,slotId:button.dataset.saveSlot as SlotId}); doc.encounters ??={}; doc.encounters[commander.mode]=frozen; }); } else await persist(button.dataset.saveSlot as SlotId); sound.play('save'); await profilesMenu(); }); });
     modal.querySelectorAll<HTMLElement>('[data-load-slot]').forEach(button => button.onclick = () => {
       const slot=slots.find(item=>item.slotId===button.dataset.loadSlot)!;
-      openModal(`<h2 id="modal-title">${t('profiles.preview', { slot: slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) }) })}</h2>${slotSummary(slot.state, slot.savedAt)}<p class="hint">${t('profiles.preview.hint')}</p><button id="load-confirm" class="btn primary">${t('profiles.load.confirm')}</button><button data-close class="btn">${t('common.cancel')}</button><p id="load-error" role="status"></p>`);
+      openModal(`<h2 id="modal-title">${t('profiles.preview', { slot: slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) }) })}</h2>${slotSummary(slot.state, slot.savedAt)}<p class="hint">${t('profiles.preview.hint')}</p><button id="load-confirm" class="btn primary">${t('profiles.load.confirm')}</button><button data-nav-parent class="btn">${t('common.cancel')}</button><p id="load-error" role="status"></p>`, { parent: backToProfiles });
       $('load-confirm').onclick = async () => { if (!inTown || pendingSettlement) { $('load-error').textContent=t('profiles.load.blocked'); return; } try { profile=await commander.loadSlot(slot.slotId); activateCommander(commander.document!,commander.mode); closeWithoutResume(); } catch(error) { console.warn('Commander storage:', error); $('load-error').textContent=errorText(error); } };
     });
-    $('continue-latest')?.addEventListener('click', () => { const savedEncounter=commander.document?.encounters?.[commander.mode]; if (!savedEncounter) { $('profile-error').textContent=t('profiles.nocheckpoint'); return; } closeWithoutResume(); void restoreEncounter(savedEncounter); });
-  } catch(error) { console.error('PROFILES_MENU_ERROR:', error); openModal(`<h2 id="modal-title">${t('profiles.protected')}</h2><p>${escapeUI(errorText(error))}</p><p>${t('profiles.protected.copy')}</p>`); }
+    $('continue-latest')?.addEventListener('click', () => { const savedEncounter=commander.document?.encounters?.[commander.mode]; if (!savedEncounter) { $('profile-error').textContent=t('profiles.nocheckpoint'); return; } closeWithoutResume(); departStack = undefined; void restoreEncounter(savedEncounter); });
+  } catch(error) { console.error('PROFILES_MENU_ERROR:', error); openModal(`<h2 id="modal-title">${t('profiles.protected')}</h2><p>${escapeUI(errorText(error))}</p><p>${t('profiles.protected.copy')}</p><button data-close class="btn">${t('common.close')}</button>`); }
 }
+/** Save files' sub-views (preview, rename, delete, paste, old save) go back to the list. */
+const backToProfiles = () => { void profilesMenu(); };
 commander.onStatus = () => { storageStatus(); if (commander.stale && battle.status === 'fighting') battle.pause(); };
 window.addEventListener('beforeunload', () => {
   delete (window as unknown as { gridbound?: unknown }).gridbound;
 });
 if (typeof navigator !== 'undefined' && !navigator.webdriver) {
-  window.addEventListener('beforeunload', event => { if (commander.busy || commander.dirty || pendingSettlement) event.preventDefault(); });
+  // Leaving the page (closing the tab, a Back past the game) asks first while a save is pending or a fight is live (an Undercroft fight left that way is a flee).
+  window.addEventListener('beforeunload', event => { if (commander.busy || commander.dirty || pendingSettlement || (!inTown && ['fighting', 'paused'].includes(battle.status)) || dungeonFightLive()) event.preventDefault(); });
 }
- $('home').addEventListener('click', () => {
-  if (!inTown) { void navigateTown('camp'); return; }
-  sound.play('cursor');
-  void navigateTown(townState.tab === 'camp' ? 'more' : backRoute(routeStack));
-});
+/**
+ * One Back step (navigation contract §7): the HUD Back, Escape, Backspace on a town route, the browser/phone Back, the ready window's
+ * Back and the MENU button on the MENU all come here. The decision is ui/back.ts's backAction; this performs it. 'leave' only at the bare title screen.
+ */
+function navSnapshot(): NavSnapshot {
+  return {
+    busy: !commanderChecked || navBusy > 0 || presentingResult,
+    title: $('title-screen')?.hidden === false,
+    scene: Boolean(document.querySelector('.dialogue-scene:not(.closing)')),
+    modal: modal.open ? { blocking: modal.dataset.blocking === '1', parent: Boolean(modalParent) } : null,
+    picker: !inTown && (pickerHero !== -1 || moveMode),
+    result: !inTown && !resultScreen.hidden ? { details: resultScreen.dataset.detailsOpen === 'true', locked: resultScreen.dataset.result === 'true' } : null,
+    battle: inTown ? null : { status: battle.status, view: ($('battle-screen').dataset.battleView ?? 'arena') as 'arena' | 'hero' | 'log' },
+    route: townState.tab, stack: routeStack,
+  };
+}
+function goBack(source: BackSource): 'handled' | 'leave' {
+  const action = backAction(navSnapshot(), source);
+  switch (action.kind) {
+    case 'none': if (action.focus) modal.querySelector<HTMLElement>('button:not([disabled])')?.focus({ preventScroll: true }); break;
+    case 'skip-scene': document.querySelector<HTMLElement>('.dialogue-scene:not(.closing) .dialogue-skip')?.click(); break;
+    case 'modal-parent': modalBack(); break;
+    case 'close-modal': modal.close(); break;
+    case 'close-picker': moveMode = false; closeSkillPicker(); renderInspector(); break;
+    case 'close-details': resultScreen.querySelector<HTMLButtonElement>('#result-details-toggle')?.click(); break;
+    case 'result-return': resultScreen.querySelector<HTMLButtonElement>('[data-nav-exit="return"]:not([disabled])')?.click(); break;
+    case 'arena': setBattleView('arena'); break;
+    case 'ready-back': void readyBack(); break;
+    case 'pause': pauseMenu(); break;
+    case 'show-result': result(); break;
+    case 'route': sound.play('cursor'); void navigateTown(action.to); break;
+    case 'title': void toTitle(); break;
+    case 'leave': return 'leave';
+  }
+  return 'handled';
+}
+/** The camp's Back (and MENU → Title): the title screen, after the save is flushed (a failed save gets the retry/export prompt). */
+async function toTitle() {
+  if (!inTown) return;
+  if (commander.document) {
+    navBusy++;
+    const saved = await commander.flush().finally(() => { navBusy--; });
+    if (!saved) { if (!commander.stale) unsavedTownModal(() => toTitle(), 'storage.unsaved.leave'); else storageStatus(); return; }
+  }
+  if (inTown) showTitleScreen();
+}
+/** The guard is wanted on every screen but the bare title (the front door, where the browser's Back leaves the page). */
+const bareTitle = () => $('title-screen')?.hidden === false && !modal.open && !document.querySelector('.dialogue-scene:not(.closing)');
+// A layer can appear without a tap of its own (the title fading out after Enter Emberhollow, a camp scene, the Journal reopening after a
+// replay): every change of the title, the modal or the story scenes re-checks the guard, so the next Back never leaves the game from there.
+const layerWatch = new MutationObserver(() => backGuard?.sync());
+layerWatch.observe($('title-screen'), { attributes: true, attributeFilter: ['hidden'] });
+layerWatch.observe(modal, { attributes: true, attributeFilter: ['open'] });
+layerWatch.observe($('app'), { childList: true });
+$('home').addEventListener('click', () => { goBack('button'); });
 $('title-enter').addEventListener('click', enterEmberhollow);
 $('title-profiles').addEventListener('click', () => { void profilesMenu(); });
 $('title-journal').addEventListener('click', () => { void storyJournal(); });
-$('title-settings').addEventListener('click', settings);
-$('menu-button').addEventListener('click', () => { sound.play('confirm'); void navigateTown('more'); });
+$('title-settings').addEventListener('click', () => settings());
+// The MENU button opens the MENU; on the MENU it is pressed and closes it again (one Back step).
+$('menu-button').addEventListener('click', () => { sound.play('confirm'); if (inTown && townState.tab === 'more' && $('title-screen')?.hidden !== false) { goBack('button'); return; } void navigateTown('more'); });
 document.addEventListener('click', event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-lang]');
   if (!button || button.dataset.lang === lang()) return;
@@ -2675,7 +2913,8 @@ const leavePressPhase = () => { if (!titleScreenEl.classList.contains('press-pha
 // PRESS START ends on the click itself, not on pointerdown: a touch's compatibility click lands where the finger was, and leaving on
 // pointerdown would reveal the menu (Journal, language buttons) under the finger in time for that click to press it.
 titleScreenEl.addEventListener('click', event => { if (leavePressPhase()) { event.preventDefault(); event.stopPropagation(); } }, true);
-$('retreat').addEventListener('click', () => navigateTown(battle.mode === 'dungeon' ? 'dungeon' : 'camp'));
+$('retreat').addEventListener('click', leaveBattle);
+$('ready-back').addEventListener('click', () => { void readyBack(); });
 $('battle-screen').addEventListener('click', event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-run-buy]');
   if (button && !button.disabled && !inTown) buyForRun(button.dataset.runBuy!);
@@ -2687,8 +2926,8 @@ $('focus-bar').addEventListener('click', () => setBattleView('hero'));
 $('start').addEventListener('click', begin);
 $('pause').addEventListener('click', pauseMenu);
 $('combat-boons').addEventListener('click', showBoonTray);
-$('howto').addEventListener('click', help);
-$('settings').addEventListener('click', settings);
+$('howto').addEventListener('click', () => help());
+$('settings').addEventListener('click', () => settings());
 $('sound').addEventListener('click', () => { profile.sound = !profile.sound; updateSound(); });
 $('guard').addEventListener('click', () => battle.guard());
 $('potion').addEventListener('click', () => battle.potion());
@@ -2699,10 +2938,15 @@ document.querySelectorAll<HTMLElement>('[data-lane]').forEach(el => el.addEventL
   document.querySelectorAll<HTMLElement>('[data-lane]').forEach(button => { const active = Number(button.dataset.lane) === battle.targetLane; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
 }));
 window.addEventListener('keydown', e => {
-  if (e.repeat || (e.target as HTMLElement).matches('input,textarea,select,[contenteditable="true"]')) return;
+  const target = e.target as HTMLElement, typing = target.matches('input,textarea,select,[contenteditable="true"]');
+  // Escape typed in a field (rename, DELETE, Paste backup) or held down is no Back step: the dialog's native cancel that follows is ignored too.
+  if (e.code === 'Escape' && (typing || e.repeat)) { if (e.repeat) e.preventDefault(); escapeHandled = true; window.setTimeout(() => { escapeHandled = false; }, 0); return; }
+  if (e.repeat || typing) return;
   const titleScreen = $('title-screen');
-  if (titleScreen && !titleScreen.hidden) {
+  if (titleScreen && !titleScreen.hidden && !modal.open) {
     if (leavePressPhase()) { e.preventDefault(); return; }
+    // The title screen is the front door: Escape does nothing there (the browser's Back leaves the page).
+    if (e.code === 'Escape') return;
     if (e.code === 'ArrowDown' || e.code === 'ArrowUp') {
       const items = Array.from(titleScreen.querySelectorAll<HTMLButtonElement>('.title-menu-item'));
       const index = items.indexOf(document.activeElement as HTMLButtonElement);
@@ -2721,20 +2965,24 @@ window.addEventListener('keydown', e => {
     }
     return;
   }
-  if (modal.open) { if (e.code === 'Escape' || (e.code === 'KeyB' && modal.querySelector('.boon-tray-modal'))) { e.preventDefault(); modal.close(); } return; }
-  if (!resultScreen.hidden) {
-    if (e.code === 'Escape' && resultScreen.dataset.detailsOpen === 'true') resultScreen.querySelector<HTMLButtonElement>('#result-details-toggle')?.click();
+  // Escape is one Back step on every layer (a story scene handles its own keys first and skips).
+  if (e.code === 'Escape') { e.preventDefault(); escapeHandled = true; window.setTimeout(() => { escapeHandled = false; }, 0); goBack('escape'); return; }
+  if (modal.open) {
+    if (e.code === 'KeyB' && modal.querySelector('.boon-tray-modal')) { e.preventDefault(); modal.close(); }
+    // P toggles the pause menu (Space presses its focused Resume).
+    else if (e.code === 'KeyP' && !inTown && !modalParent && modal.querySelector('#pause-retreat')) { e.preventDefault(); modal.close(); }
     return;
   }
-  if (inTown) return;
-  const controlFocused = (e.target as HTMLElement).closest('button,a');
-  if (e.code === 'Space' && !controlFocused) { e.preventDefault(); pauseMenu(); }
+  if (!resultScreen.hidden) return;
+  if (inTown) { if (e.code === 'Backspace' && !e.altKey && !e.ctrlKey && !e.metaKey) goBack('backspace'); return; }
+  // Space and P pause; Space on a focused hero card pauses too (it would otherwise tap that hero again).
+  const controlFocused = target.closest('button,a'), heroFocused = target.closest('.unit-tap, .unit-skill');
+  if ((e.code === 'Space' && (!controlFocused || heroFocused)) || e.code === 'KeyP') { e.preventDefault(); pauseMenu(); return; }
   if (e.code === 'Enter' && !controlFocused && battle.status === 'ready') begin();
   if (e.code === 'KeyB') { e.preventDefault(); showBoonTray(); }
   if (e.code === 'KeyH') battle.potion();
   if (e.code === 'KeyG') battle.guard();
   if (e.code === 'KeyR') battle.ultimate();
-  if (e.code === 'Escape') { moveMode = false; closeSkillPicker(); renderInspector(); }
   if (/^Digit[1-9]$/.test(e.code)) { const h = battle.heroes.find(h => h.slot === Number(e.code.slice(-1)) - 1); if (h) { sound.unlock(); tapHero(h.id); } }
   if (e.code === 'KeyQ' || e.code === 'KeyE') cycleSkill(battle.selected, e.code === 'KeyE' ? 1 : -1);
 });
@@ -2771,7 +3019,16 @@ const exposeQaHook = () => { if (import.meta.env.DEV) Object.assign(window, { gr
   boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro, recruitScene: (id: number) => recruitScene(id, true), campScenes: () => playCampScenes(true), endingScene,
   /** Force the first-battle coach on (tips replay from the start) or off, regardless of automation and Config. */
   coach: (force = true) => { coachForced = force; if (force) resetCoach(); else if (coach.step) endCoachStep(); return { step: coach.step ?? null, done: COACH_STEPS.filter(coachDone) }; },
-  get coachStep() { return coach.step ?? null; }, unlockIntro: () => unlockIntro(true),
+  /** `reset`: forget the per-viewer unlock flags first, so the card can play again. */
+  get coachStep() { return coach.step ?? null; }, unlockIntro: (reset = false) => { if (reset) resetUnlockFlags(); unlockIntro(true); },
+  /** The navigation contract's view of the screen (R8): the top layer, the route, the battle's exit state, the open dialog and the history guard. */
+  navState: () => {
+    const s = navSnapshot();
+    return { layer: s.scene ? 'scene' : s.modal ? 'modal' : s.picker ? 'picker' : s.result ? 'result' : s.battle ? 'battle' : s.title ? 'title' : 'town', route: townState.tab, stack: [...routeStack],
+      battle: inTown ? null : { mode: battle.mode, status: battle.status, view: s.battle?.view ?? 'arena', freeBack: readyBackFree() },
+      modal: modal.open ? modal.querySelector('#modal-title')?.textContent ?? '' : null, blocking: Boolean(s.modal?.blocking), guard: backGuard?.state() ?? { armed: false, length: history.length } };
+  },
 } }); };
 // Every player gets a Commander: the latest one, or one migrated from the legacy save (backed up first). The dev QA hook appears once that has settled, so tests never race the migration.
-void ensureCommander().finally(() => { commanderChecked = true; storageStatus(); window.clearTimeout(saveFallback); window.clearTimeout(engineFallback); startEngine(); exposeQaHook(); if (inTown && townState.tab === 'camp') void playCampScenes(); });
+// The browser/phone Back stays in the game from then on (also under automation: the navigation tests need it).
+void ensureCommander().finally(() => { commanderChecked = true; storageStatus(); window.clearTimeout(saveFallback); window.clearTimeout(engineFallback); startEngine(); backGuard ??= installBackGuard({ onBack: () => goBack('history'), wantGuard: () => !bareTitle() }); exposeQaHook(); if (inTown && townState.tab === 'camp') void playCampScenes(); });

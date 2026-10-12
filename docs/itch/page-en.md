@@ -78,7 +78,10 @@ Mouse or touch:
 - **Skill chip on a hero card**: switch to the hero's other equipped skill.
 - **Lanes I · II · III** (above the grid, when minions appear): aim ranged skills at a minion lane; tap the same lane again
   to target the boss.
-- **Guard, Potion** and **Ninefold Dawn** buttons under the grid, **pause** at the top right.
+- **Guard, Potion** and **Ninefold Dawn** buttons under the grid, **Ⅱ Menu** at the top right (resume, controls, settings or
+  leave). Before **FIGHT!**, **◀ Back** returns to where you set out; nothing is spent until you fight.
+- In town, **◀ Back** (top left) goes back one screen; the browser's or phone's Back button does the same (in battle it opens
+  the menu).
 
 Keyboard (click the game once so it has the keyboard):
 
@@ -90,9 +93,9 @@ Keyboard (click the game once so it has the keyboard):
 | H | Potion |
 | R | Ninefold Dawn |
 | B | Boons (Bell Trials) |
-| Space | Pause |
+| Space / P | Pause (the battle menu) |
 | Enter | Start the battle from the ready screen |
-| Esc | Cancel a move, close the skill picker or a dialog |
+| Esc | Back: close the top window, then go back one screen (in battle: the menu) |
 | ↑ / ↓, Enter | Title menu |
 
 ### Your save

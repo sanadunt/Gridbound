@@ -85,7 +85,10 @@ Mouse atau sentuh:
 - **Chip skill di kartu hero**: ganti ke skill terpasang yang lain.
 - **Lane I · II · III** (di atas grid, saat ada minion): arahkan skill jarak jauh ke lane minion; ketuk lane yang sama lagi
   untuk kembali mengincar boss.
-- Tombol **Guard**, **Ramuan**, dan **Fajar Sembilan** di bawah grid, tombol **jeda** di kanan atas.
+- Tombol **Guard**, **Ramuan**, dan **Fajar Sembilan** di bawah grid, **Ⅱ Menu** di kanan atas (lanjutkan, kontrol, pengaturan,
+  atau tinggalkan). Sebelum **SERANG!**, **◀ Kembali** membawamu ke tempat berangkat; belum ada yang terpakai sebelum bertarung.
+- Di kota, **◀ Kembali** (kiri atas) mundur satu layar; tombol Kembali di browser atau ponsel melakukan hal yang sama (di
+  pertarungan tombol itu membuka menu).
 
 Keyboard (klik game sekali supaya keyboard masuk ke game):
 
@@ -97,9 +100,9 @@ Keyboard (klik game sekali supaya keyboard masuk ke game):
 | H | Ramuan |
 | R | Fajar Sembilan |
 | B | Boon (Ujian Lonceng) |
-| Spasi | Jeda |
+| Spasi / P | Jeda (menu pertarungan) |
 | Enter | Mulai pertarungan dari layar siap |
-| Esc | Batalkan pindah, tutup pemilih skill atau dialog |
+| Esc | Kembali: tutup jendela teratas, lalu mundur satu layar (di pertarungan: menu) |
 | ↑ / ↓, Enter | Menu judul |
 
 ### Save-mu

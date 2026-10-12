@@ -23,7 +23,7 @@ const KINDS: DungeonNodeKind[] = ['battle', 'elite', 'event', 'treasure', 'camp'
 /** `outcome`: what the last choice did; `letter`: a letter id found by a lore choice (`dungeon.letter.<id>`). */
 export function dungeonScene(p: Profile, outcome?: string, modes = '', letter?: string): string {
   const run = p.journey.run;
-  return `<section class="dungeon-scene" aria-labelledby="dungeon-title"><h1 id="dungeon-title" class="sr-only">${t('route.dungeon')}</h1>${run?.status === 'active' ? '' : modes}${run ? run.status === 'active' ? activeRun(run, outcome, letter) : finishedRun(run) : depthPicker(p)}</section>`;
+  return `<section class="dungeon-scene" aria-labelledby="dungeon-title"><h1 id="dungeon-title" class="sr-only">${t('route.dungeon')}</h1>${modes}${run ? run.status === 'active' ? activeRun(run, outcome, letter) : finishedRun(run) : depthPicker(p)}</section>`;
 }
 
 function depthPicker(p: Profile): string {
@@ -102,11 +102,12 @@ function activeRun(run: DungeonRun, outcome?: string, letter?: string): string {
     return `<span class="dungeon-hero ${ratio <= 0 ? 'down' : ratio < .35 ? 'low' : ''}" title="${escape(ROSTER[id].name)}"><img src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}"/><span class="gauge"><i style="width:${Math.round(ratio * 100)}%"></i></span></span>`;
   }).join('');
   const blessing = run.blessing.power > 1 || run.blessing.vitality > 1 ? `<span class="dungeon-blessing">${t('dungeon.blessing', { p: Math.round((run.blessing.power - 1) * 100), v: Math.round((run.blessing.vitality - 1) * 100) })}</span>` : '';
-  return `<header class="win dungeon-hud"><div><small>${t('route.dungeon')} · ${t('dungeon.depth.label', { n: run.depth })}</small><h2>${t(`dungeon.depth.${run.depth}` as StringKey)}</h2></div>
+  // The free way out comes first, above the map: the run waits, saved, and the Bell Tower picks it up again ('Abandon run' is the costly exit).
+  return `<div class="dungeon-run-exit"><button class="btn" data-facility="camp" data-nav-exit="back">◀ ${t('dungeon.toCamp')}</button></div><header class="win dungeon-hud"><div><small>${t('route.dungeon')} · ${t('dungeon.depth.label', { n: run.depth })}</small><h2>${t(`dungeon.depth.${run.depth}` as StringKey)}</h2></div>
       <div class="dungeon-pouch"><small>${t('dungeon.pouch')}</small> ${pouchLine(run.pouch)} <span class="pouch-potions">${t('dungeon.potions', { n: run.potions })}</span>${blessing}</div>
       <div class="dungeon-party">${party}</div></header>
     ${mapView(run)}
     ${legend()}
     <section class="win room-panel" aria-live="polite">${roomPanel(run, outcome, letter)}</section>
-    <div class="departure-actions"><button class="btn danger" data-dungeon-leave>${t('dungeon.leave')}</button><small class="hint">${t('dungeon.material.hint', { name: materialName(def.material) })}</small></div>`;
+    <div class="departure-actions dungeon-run-actions"><button class="btn danger" data-dungeon-leave>${t('dungeon.leave')}</button><small class="hint">${t('dungeon.material.hint', { name: materialName(def.material) })}</small></div>`;
 }

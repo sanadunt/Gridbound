@@ -187,7 +187,7 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     const preFlee = await evaluate(runState);
     await enterFight();
     assert.deepEqual((await evaluate('window.gridbound.battle.heroes.map(h => h.id)')).sort(), [...preFlee.party].sort(), 'the fight fields the run party');
-    assert.equal(await evaluate('document.querySelector("#retreat").textContent'), 'Flee the room', 'the retreat button says what it does here');
+    assert.equal(await evaluate('document.querySelector("#retreat").textContent'), 'Flee the room…', 'the retreat button says what it does here');
     await evaluate('for (const h of window.gridbound.battle.heroes) if (h.hp > 0) h.hp = Math.max(1, Math.round(h.maxHp * .5)); window.gridbound.battle.potions = Math.max(0, window.gridbound.battle.potions - 1)');
     await click.retreat();
     await wait('Boolean(document.querySelector("dialog[open] #dungeon-flee"))');

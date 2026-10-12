@@ -6,7 +6,9 @@
 // gives the game the keyboard, keys and the wheel never scroll the host page (the wheel does while the window cuts the frame
 // off), progress survives a reload of the host page, the language switch reloads inside the frame, the save backup downloads and
 // is also shown as text (the fallback when a browser blocks downloads from a frame; Back returns to Config), Paste backup imports
-// it, fullscreen toggles (and is hidden when the frame may not use it).
+// it, fullscreen toggles (and is hidden when the frame may not use it), and the browser's Back (top-level history, as a phone's Back
+// gesture) performs one in-game Back step from a route, a dialog, a story scene (whose keys never scroll the host), the ready window
+// and a fight without leaving the itch page, while Back on the bare title screen leaves it.
 //
 //   node scripts/itch-smoke.mjs                 # npm run package:itch (build + ZIP), then the smoke
 //   node scripts/itch-smoke.mjs --skip-build    # use artifacts/Gridbound-itch-<version>.zip (packaged from dist/ when missing)
@@ -75,7 +77,7 @@ await new Promise(done => host.listen(Number(process.env.ITCH_HOST_PORT || 0), '
 const gameOrigin = `http://127.0.0.1:${game.address().port}`, hostOrigin = `http://localhost:${host.address().port}`;
 
 /** One browser, one itch-like page; `frame` is the game's out-of-process iframe (re-attached after every reload). */
-async function session({ name, width, height, mobile = false, query = '' }, run) {
+async function session({ name, width, height, mobile = false, query = '', previous = false }, run) {
   await withBrowser(async ({ send, evaluate, wait, screenshot, errors, on }) => {
     let frame;
     const requests = [];
@@ -162,6 +164,8 @@ async function session({ name, width, height, mobile = false, query = '' }, run)
     const shot = async file => { await sleep(250); await screenshot(join(shots, `${name}-${file}.png`)); };
     try {
       await allowDownloads(true);
+      // `previous`: a page the player came from, so a Back that leaves the game has somewhere to land.
+      if (previous) { await send('Page.navigate', { url: 'data:text/html,previous-page' }); await sleep(300); }
       await send('Page.navigate', { url: `${hostOrigin}/game.html${query}` });
       await boot();
       try { await run({ send, evaluate, wait, inFrame, waitFrame, click, clickAt, point, wheel, press, hostScroll, boot, shot, allowDownloads, downloads, errors, requests, fitWindow }); }
@@ -178,7 +182,8 @@ async function session({ name, width, height, mobile = false, query = '' }, run)
 const clickUntil = async ({ click, waitFrame }, selector, ready, tries = 3) => { for (let i = 1; ; i++) { await click(selector); try { return await waitFrame(ready, 4000); } catch (error) { if (i >= tries) throw error; } } };
 const saveMenu = async t => { const { click, waitFrame } = t; await clickUntil(t, '#menu-button', 'Boolean(document.querySelector(".more-scene"))'); await click('.more-scene [data-open-action="profiles"]'); await waitFrame('Boolean(document.querySelector("dialog[open] #import-text-button"))'); };
 const config = t => clickUntil(t, '#settings', 'Boolean(document.querySelector("dialog[open] #setting-motion"))');
-const closeModal = async ({ press, waitFrame, inFrame }) => { if (await inFrame('Boolean(document.querySelector("dialog[open]"))')) { await press('Escape'); await waitFrame('!document.querySelector("dialog[open]")'); } };
+/** Escape until no dialog is open: a sub-view (the backup text over Config) first goes back to its parent dialog. */
+const closeModal = async ({ press, waitFrame, inFrame }) => { for (let i = 0; i < 3 && await inFrame('Boolean(document.querySelector("dialog[open]"))'); i++) { await press('Escape'); await sleep(250); } await waitFrame('!document.querySelector("dialog[open]")'); };
 /** Chapter 1 from the camp: the gate, the chapter dossier, Depart, Begin, two taps; the boss bar must move. */
 async function battle(t) {
   const { click, waitFrame, inFrame } = t;
@@ -193,7 +198,8 @@ async function battle(t) {
   await click('[data-tap="0"]'); await click('[data-tap="3"]');
   await waitFrame(`document.querySelector("#boss-hp").style.width !== ${JSON.stringify(before)}`, 15000);
 }
-const retreat = async ({ click, waitFrame }) => { await click('#pause'); await waitFrame('Boolean(document.querySelector("#pause-retreat"))'); await click('#pause-retreat'); await waitFrame('Boolean(document.querySelector("dialog[open] #abandon-run"))'); await click('#abandon-run'); await waitFrame('Boolean(document.querySelector("#town-screen:not([hidden]) .town-spot"))', 15000); };
+/** Ⅱ Menu → Leave battle… → Leave the chapter: back on the dossier the chapter departed from. */
+const retreat = async ({ click, waitFrame }) => { await click('#pause'); await waitFrame('Boolean(document.querySelector("#pause-retreat"))'); await click('#pause-retreat'); await waitFrame('Boolean(document.querySelector("dialog[open] #abandon-run"))'); await click('#abandon-run'); await waitFrame('document.querySelector("#town-screen:not([hidden]) .town-game-shell")?.dataset.townRoute === "mission"', 15000); };
 
 try {
   // The recommended embed on a desktop page: everything the frame changes.
@@ -345,6 +351,62 @@ try {
     console.log('PASS itch frame without fullscreen permission: the Fullscreen setting is hidden');
   });
 
+  // The browser's Back (a phone's Back gesture) on the itch page: one Back step in the game, never off the page, except at the bare title.
+  await session({ name: 'back', width: 1280, height: 1000, previous: true }, async t => {
+    const { inFrame, waitFrame, wait, click, press, hostScroll, evaluate, send, shot } = t;
+    const route = 'document.querySelector("#town-screen:not([hidden]) .town-game-shell")?.dataset.townRoute';
+    const history = async () => { const { entries, currentIndex } = await send('Page.getNavigationHistory'); return { length: entries.length, at: currentIndex, back: entries[currentIndex - 1]?.id }; };
+    const back = async () => { await send('Page.navigateToHistoryEntry', { entryId: (await history()).back }); await sleep(700); };
+    const onPage = async what => assert.equal(await evaluate('location.href'), `${hostOrigin}/game.html`, `${what}: Back kept the itch page`);
+    const start = await history();
+    // The first real click arms the game's one history entry (a guard): Back then stays in the game.
+    await click('.town-spot[data-facility="party"]');
+    await waitFrame(`${route} === "party"`);
+    await sleep(300);
+    assert.equal((await history()).length, start.length + 1, 'one history entry for the game, after the first click');
+    await back(); await onPage('Party');
+    await waitFrame(`${route} === "camp"`, 4000);
+    await config(t);
+    await back(); await onPage('Config');
+    await waitFrame('!document.querySelector("dialog[open]")', 4000);
+    // A story scene keeps the keys (no host scroll) and Back skips it, onto a ready window whose Back is free: twice Back is the dossier.
+    await inFrame("Object.defineProperty(navigator, 'webdriver', { get: () => false, configurable: true })");
+    await click('.town-spot[data-facility="campaign"]');
+    await waitFrame('Boolean(document.querySelector("[data-zone=\\"0\\"]"))');
+    await click('[data-zone="0"]');
+    await waitFrame('Boolean(document.querySelector("[data-depart=adventure]")) && document.querySelector("#storage-status").dataset.level === "ok"');
+    await evaluate('scrollTo(0, 0)');
+    await click('[data-depart="adventure"]');
+    await waitFrame('Boolean(document.querySelector(".dialogue-scene"))', 5000);
+    for (const [code, key] of [['PageDown', 'PageDown'], ['ArrowDown', 'ArrowDown'], ['End', 'End']]) { await press(code, key); await sleep(250); assert.equal(await hostScroll(), 0, `${code} during a story scene does not scroll the host page`); }
+    await shot('scene');
+    await back(); await onPage('story scene');
+    await waitFrame('!document.querySelector(".dialogue-scene") && !document.querySelector("#battle-screen").hidden && !document.querySelector("#ready-back").hidden', 5000);
+    await inFrame('delete navigator.webdriver');
+    await shot('ready');
+    await back(); await onPage('ready window');
+    await waitFrame(`${route} === "mission"`, 5000);
+    // Mid-fight, Back opens the pause menu (it never leaves the battle or the page).
+    await click('[data-depart="adventure"]');
+    await waitFrame('document.querySelector("#battle-screen").hidden === false && !document.querySelector("#start").hidden', 5000);
+    await click('#start');
+    await waitFrame('Boolean(document.querySelector("#pause"))');
+    await sleep(300);
+    await back(); await onPage('battle');
+    await waitFrame('Boolean(document.querySelector("dialog[open] #pause-retreat"))', 4000);
+    await press('Escape'); await waitFrame('!document.querySelector("dialog[open]")');
+    await retreat(t);
+    assert.equal((await history()).length, start.length + 1, 'Backs in the game never grew the history');
+    // The bare title screen is the front door: Back there leaves the itch page for the page the player came from.
+    await clickUntil(t, '#menu-button', 'Boolean(document.querySelector(".more-scene"))');
+    await click('.more-scene [data-open-action="title"]');
+    await waitFrame('Boolean(document.querySelector("#title-screen:not([hidden])"))');
+    await sleep(400);
+    await back();
+    await wait('location.protocol === "data:"', 5000).catch(() => { throw Error('Back on the bare title did not leave the itch page'); });
+    console.log('PASS itch Back: Party, Config, a story scene (keys keep the host still), the free ready Back and a fight stay on the page; the bare title leaves');
+  });
+
   // Phone: itch's mobile view runs the game over the whole screen (Mobile friendly, portrait).
   await session({ name: 'phone-390x844', width: 390, height: 844, mobile: true, query: '?mobile=1' }, async t => {
     const { inFrame, waitFrame, click, shot, send, boot } = t;
@@ -361,8 +423,7 @@ try {
     await click('#export-save');
     await waitFrame('Boolean(document.querySelector("dialog[open] #backup-text"))');
     await shot('backup-text');
-    await t.press('Escape');
-    await waitFrame('!document.querySelector("dialog[open]")');
+    await closeModal(t);
     await send('Page.reload');
     await boot();
     await config(t);

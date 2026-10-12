@@ -68,6 +68,10 @@ for (const [width, height] of [[1440, 900], [390, 844], [360, 640]]) {
       `Mission Deploy remains visible at ${width}×${height}: ${JSON.stringify(deploy)}`);
     assert.ok(await evaluate('document.documentElement.scrollHeight <= innerHeight + 1 && document.documentElement.scrollWidth <= innerWidth + 1'),
       'Mission selection does not create document scrolling');
+    // On a route the HUD shows the framed Back, the route title and the tools side by side (a long title shortens with an ellipsis instead).
+    const hud = await evaluate(`(() => { const r = s => document.querySelector(s).getBoundingClientRect(), back = r('#home'), title = r('#hud-title'), tools = r('.header-tools'); return { back: [back.left, back.right, back.height], title: [title.left, title.right], tools: [tools.left, tools.right], text: document.querySelector('#home').innerText.trim() }; })()`);
+    assert.ok(hud.back[0] >= 0 && hud.back[2] >= 44 && hud.back[1] <= hud.title[0] + 1 && hud.title[1] <= hud.tools[0] + 1 && hud.tools[1] <= width + 1, `HUD Back, title and tools do not overlap at ${width}: ${JSON.stringify(hud)}`);
+    assert.equal(hud.text, '◀ Back');
 
     await click('.mission-map-return');
     await click.nav('more');
@@ -114,3 +118,26 @@ for (const lang of ['en', 'id']) for (const save of [null, ACT_TWO_SAVE]) for (c
   }, { width, height, mobile: true });
 }
 console.log('PASS Camp signs stay apart on small phones (EN/ID, fresh and Act II)');
+
+// The HUD on a route at phone widths: the framed Back, the route title and the tools never overlap, and the title reads in full (on
+// ≤ 420px it switches to the text font, up to two lines, and the wallets stack) — 'Undercroft', 'Bursa Crystal', 'Ujian Lonceng'.
+const hudLayout = `(() => {
+  const r = s => document.querySelector(s).getBoundingClientRect(), back = r('#home'), title = r('#hud-title'), tools = r('.header-tools'), t = document.querySelector('#hud-title');
+  return { text: t.textContent, cut: t.scrollWidth > t.clientWidth + 1 || t.scrollHeight > t.clientHeight + 1, overlap: back.right > title.left + 1 || title.right > tools.left + 1 || tools.right > innerWidth + 1, back: Math.round(back.height) };
+})()`;
+for (const lang of ['en', 'id']) for (const [width, height] of [[360, 640], [390, 844]]) {
+  await withBrowser(async ({ send, wait, evaluate, click, screenshot, errors }) => {
+    await seedSave(send, { ...ACT_TWO_SAVE, gold: 12345, cleared: [0, 1, 2, 3, 4] }, lang);
+    await send('Page.navigate', { url });
+    await wait('window.gridbound && document.querySelector(".town-game-shell")?.dataset.townRoute === "camp"');
+    for (const route of ['dungeon', 'quests', 'challenge-shop', 'endless', 'bestiary', 'raid']) {
+      await click.nav(route);
+      await wait(`document.querySelector(".town-game-shell")?.dataset.townRoute === ${JSON.stringify(route)}`);
+      const hud = await evaluate(hudLayout);
+      assert.ok(!hud.cut && !hud.overlap && hud.back >= 44, `${lang} ${width}×${height} ${route}: the HUD title reads in full beside the Back: ${JSON.stringify(hud)}`);
+      if (width === 360 && route === 'challenge-shop') await screenshot(`artifacts/hud-title-${lang}-${width}x${height}.png`);
+    }
+    assert.deepEqual(errors, []);
+  }, { width, height, mobile: true });
+}
+console.log('PASS The HUD names every route in full at 360 and 390 px (EN/ID)');

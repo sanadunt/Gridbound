@@ -133,8 +133,10 @@ await withBrowser(async ({ send, wait, evaluate, click, screenshot, errors }) =>
   const bank = afterRaid.shared.bankCrystal;
   assert.ok(bank > 57, 'the Raid pays Crystal into the bank');
 
-  // Back to camp: Story mode again, both currencies shown.
+  // Return leads to the Raids setup the hunt departed from; Back from there is the camp: Story mode again, both currencies shown.
   await click('#result-town');
+  await wait('document.querySelector(".town-game-shell")?.dataset.townRoute === "raid"');
+  await click('#home');
   await wait('Boolean(document.querySelector(".camp-scene"))');
   await wait('window.gridbound.profile().gold === ' + storyGold);
   assert.deepEqual(await evaluate(hud()), { gold: storyGold.toLocaleString('en-US'), crystal: bank.toLocaleString('en-US') }, 'camp after a Raid shows Story gold and the bank Crystal');

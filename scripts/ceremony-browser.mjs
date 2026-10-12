@@ -107,7 +107,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   assert.ok(await evaluate('document.documentElement.scrollHeight <= innerHeight + 1 && document.documentElement.scrollWidth <= innerWidth + 1'), 'Result screen must not create document scrolling');
   await click('#result-town');
   await wait('document.querySelector("#modal").open');
-  assert.ok(await evaluate('document.querySelector("#modal").textContent.includes("Abandon ends")'), 'Leaving an incomplete encounter must present a confirmation');
+  assert.ok(await evaluate('document.querySelector("#modal").textContent.includes("Save & suspend keeps your HP")'), 'Leaving after a won battle must present its own confirmation');
   await click('#modal button[data-close]:not(.modal-close)');
   await wait('!document.querySelector("#modal").open && window.gridbound.battle.status === "victory" && !document.querySelector("#result-screen").hidden');
 

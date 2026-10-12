@@ -24,7 +24,8 @@
 .xp-bench { margin: 0; font-size: 13px; color: var(--ink-soft); }
 .xp-bench b { color: var(--gold); font-weight: 600; }
 /* Return/Retry stay on screen however long the result is. */
-.ceremony-actions { position: sticky; bottom: 0; z-index: 3; display: flex; flex-direction: column; gap: 8px; margin: 0 -10px -24px; padding: 10px 10px 16px; background: linear-gradient(180deg, transparent, #08110ff2 22%); }
+/* bottom: −24px = the result screen's bottom padding, so the bar sits on the screen's edge (Chrome keeps sticky boxes inside the padding). */
+.ceremony-actions { position: sticky; bottom: -24px; z-index: 3; display: flex; flex-direction: column; gap: 8px; margin: 0 -10px -24px; padding: 10px 10px 16px; background: linear-gradient(180deg, transparent, #08110ff2 22%); }
 .ceremony-actions .btn { width: 100%; }
 @media (min-width: 480px) { .ceremony-actions { flex-flow: row wrap; } .ceremony-actions .btn { flex: 1 1 40%; } }
 /* Defeat help: power vs the recommendation, the first to fall, the counter, one-tap fixes. */
@@ -51,7 +52,9 @@
 .boon-name { font-size: 18px; color: var(--card-accent, var(--gold)); }
 .boon-desc { font-size: 14px; color: var(--ink-soft); margin: 0; }
 .boon-cta { margin-top: 6px; padding: 4px 14px; border-radius: var(--radius); background: #e6c88d; color: #263329; text-shadow: none; }
-.boon-modal-footer { display: flex; justify-content: center; }
+/* The draft's way out stays on screen under six promotions and three cards (it is the result's Return). */
+.boon-modal-footer { position: sticky; bottom: -24px; z-index: 3; display: flex; justify-content: center; margin: 0 -10px -24px; padding: 10px 10px 16px; background: linear-gradient(180deg, transparent, #08110ff2 22%); }
+.boon-modal-footer .btn { min-width: min(100%, 240px); }
 .run-shop-modal { display: flex; flex-direction: column; gap: 6px; }
 
 /* Boon tray (dialog) */
@@ -81,7 +84,7 @@
 .dialogue-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1.15); animation: scene-pan 24s linear infinite alternate; }
 @keyframes scene-pan { to { transform: scale(1.3) translate(-4%, 3%); } }
 .dialogue-shade { position: absolute; inset: 0; background: linear-gradient(180deg, #08110fcc, #08110f33 40%, #08110fee 85%); }
-.dialogue-skip { position: absolute; z-index: 2; top: 10px; right: 10px; min-height: 40px; padding: 4px 12px; font-size: 13px; }
+.dialogue-skip { position: absolute; z-index: 2; top: 10px; right: 10px; min-height: 44px; padding: 4px 12px; font-size: 14px; }
 .dialogue-card { position: absolute; z-index: 1; left: 16px; right: 16px; top: 34%; text-align: center; transition: opacity 0.4s, transform 0.4s; }
 .dialogue-card small { font-family: var(--pixel); font-size: 11px; color: var(--ink-soft); letter-spacing: 2px; text-shadow: 2px 2px 0 #000; }
 .dialogue-card h2 { margin: 10px 0 8px; font-family: var(--pixel); font-size: clamp(18px, 6vw, 28px); line-height: 1.4; color: var(--gold); text-shadow: 0 3px 0 #7e6734, 0 0 18px #000; }

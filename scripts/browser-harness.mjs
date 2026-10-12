@@ -6,9 +6,10 @@ import { once } from 'node:events';
 
 /** A save that reached Act II: the Undercroft, Raids and the Bell Trials (opened by Chapters 1, 2 and 4) are open. */
 export const ACT_TWO_SAVE = { version: 3, gold: 500, claimedQuests: [], ledger: { raids: 0, victories: 4, enemies: { wolf: 1 } }, roster: [0, 4, 3], cleared: [0, 1, 2, 3], storyActive: [0, 4, 3], loadouts: { 0: { skills: [0, 1], talents: [], xp: 0, slot: 1 }, 4: { skills: [0, 1], talents: [], xp: 0, slot: 7 }, 3: { skills: [0, 1], talents: [], xp: 0, slot: 6 } }, bestFloor: 0, wins: 4, sound: false, motion: true };
-/** Start the tab on a seeded legacy save (migrated into a new Commander on the first boot; reloads keep that Commander). Call before Page.navigate.
+/** Start the tab on a seeded legacy save (migrated into a new Commander on the first boot; reloads keep that Commander). Call before Page.navigate
+ *  (a data: page opened first, as the page a player came from, is left alone).
  *  `profile: null` starts a fresh save; `lang` ('en' | 'id') picks the language after the storage is cleared. */
-export const seedSave = (send, profile = ACT_TWO_SAVE, lang) => send('Page.addScriptToEvaluateOnNewDocument', { source: `if (!sessionStorage.getItem('qa.seeded')) { sessionStorage.setItem('qa.seeded', '1'); localStorage.clear();${lang ? ` localStorage.setItem('gridbound.lang', ${JSON.stringify(lang)});` : ''}${profile ? ` localStorage.setItem('gridbound.v3', ${JSON.stringify(JSON.stringify(profile))});` : ''} }` });
+export const seedSave = (send, profile = ACT_TWO_SAVE, lang) => send('Page.addScriptToEvaluateOnNewDocument', { source: `if (location.protocol.startsWith('http') && !sessionStorage.getItem('qa.seeded')) { sessionStorage.setItem('qa.seeded', '1'); localStorage.clear();${lang ? ` localStorage.setItem('gridbound.lang', ${JSON.stringify(lang)});` : ''}${profile ? ` localStorage.setItem('gridbound.v3', ${JSON.stringify(JSON.stringify(profile))});` : ''} }` });
 
 export async function withBrowser(run, { width = 1440, height = 1000, mobile = false } = {}) {
   let child, socket, profile;
@@ -79,18 +80,20 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
     // Navigate the way a player does: town buildings, the MENU screen, and the gate's mode tabs.
     click.nav = async facility => {
       const route = () => evaluate('document.querySelector(".town-game-shell")?.dataset.townRoute ?? ""');
-      // ◀ walks back one route at a time (MENU → Quests → ◀ is MENU), so a deep stack needs a few presses.
+      // Back walks one route at a time (MENU → Quests → Back is MENU), so a deep stack needs a few presses; on the camp #home is hidden.
       const toCamp = async () => {
         for (let attempt = 0; attempt < 8 && await route() !== 'camp'; attempt++) {
+          if (!await evaluate('Boolean(document.querySelector("#home:not([hidden])"))')) { await new Promise(resolve => setTimeout(resolve, 100)); continue; }
           await click('#home');
           try { await wait('Boolean(document.querySelector(".town-spot"))', 2000); } catch { /* a click landing mid-transition is retried */ }
         }
         await wait('Boolean(document.querySelector(".town-spot"))');
       };
       if (facility === 'camp') return toCamp();
-      if (facility === 'more') { await click('#menu-button'); return wait('Boolean(document.querySelector(".more-scene"))'); }
+      // MENU toggles: on the MENU route a second press closes it, so it is pressed only from elsewhere.
+      if (facility === 'more') { if (await route() !== 'more') await click('#menu-button'); return wait('Boolean(document.querySelector(".more-scene"))'); }
       if (['party', 'party-advanced', 'quests', 'bestiary', 'challenge-shop'].includes(facility)) {
-        await click('#menu-button');
+        if (await route() !== 'more') await click('#menu-button');
         await wait('Boolean(document.querySelector(".more-scene"))');
         await click(`.more-scene [data-facility="${facility}"]`);
         return wait(`document.querySelector(".town-game-shell")?.dataset.townRoute === ${JSON.stringify(facility)}`);
@@ -101,11 +104,18 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
       if (facility !== 'campaign') await click(`.expedition-mode-nav [data-facility="${facility}"]`);
       await wait(`document.querySelector(".town-game-shell")?.dataset.townRoute === ${JSON.stringify(facility)}`);
     };
-    // Leave a battle the way a player does: pause menu → Retreat.
+    // Leave a battle the way a player does: Ⅱ Menu → its exit entry (◀ Back before FIGHT! on a fresh departure, else Leave battle… and its dialog).
     click.retreat = async () => {
       await click('#pause');
       await wait('Boolean(document.querySelector("#pause-retreat"))');
       await click('#pause-retreat');
+    };
+    // Leave a battle for good: Ⅱ Menu → its exit entry; a fresh departure's ready window just goes back (nothing to abandon), otherwise the dialog's `choice`.
+    click.leave = async (choice = '#abandon-run') => {
+      await click.retreat();
+      await wait(`window.gridbound.inTown || Boolean(document.querySelector("dialog[open] ${choice}"))`, 10000);
+      if (!await evaluate('window.gridbound.inTown')) await click(choice);
+      await wait('window.gridbound.inTown', 10000);
     };
     const key = async (key, code = key) => {
       const virtual = ({Escape:27,Enter:13,' ':32,Tab:9,ArrowLeft:37,ArrowRight:39})[key] || (key.length===1 ? key.toUpperCase().charCodeAt(0) : 0);

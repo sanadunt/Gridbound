@@ -128,6 +128,15 @@ await withBrowser(async browser => {
   assert.ok(fight.heroes.every(h => h.power > 1.5), 'level and gear power carry into the raid');
   assert.equal(await evaluate('window.gridbound.profile().economy.commanderCrystal'), 34, 'the tonic costs 6 bank Crystal');
   await wait(`${bankOf(id)}.then(bank => bank === 34)`);
+  // The ready window's free Back: the raid setup again, the tonic refunded and still ticked (nothing is spent until FIGHT!).
+  await click('#ready-back');
+  await wait('window.gridbound.inTown && document.querySelector(".town-game-shell")?.dataset.townRoute === "raid"');
+  assert.equal(await evaluate('window.gridbound.profile().economy.commanderCrystal'), 40, 'a free Back returns the tonic');
+  await wait(`${bankOf(id)}.then(bank => bank === 40)`);
+  assert.equal(await evaluate('document.querySelector("[data-bell-tonic]")?.checked'), true, 'and keeps it ticked for the next departure');
+  await click('.secondary-scene [data-depart=raid]');
+  await wait('window.gridbound.battle.mode === "raid" && window.gridbound.battle.status === "ready" && window.gridbound.battle.potions === 3');
+  await wait(`${bankOf(id)}.then(bank => bank === 34)`);
   // A suspended raid: the setup names it, locks its controls, and Depart resumes it; Abandon (confirmed) opens the setup again.
   await click('#start');
   await wait('window.gridbound.battle.status === "fighting"');

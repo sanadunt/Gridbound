@@ -126,6 +126,9 @@
 .dungeon-letter small { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
 .dungeon-letter p { margin: 4px 0 0 !important; font-style: italic; color: var(--ink) !important; }
 .dungeon-scene .departure-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+/* An active run's free exit stays on screen while the map and the room panel scroll under it. */
+.dungeon-run-exit { position: sticky; top: -10px; z-index: 3; display: flex; margin: -10px -12px 0; padding: 10px 12px 6px; background: linear-gradient(180deg, var(--night) 70%, transparent); }
+.dungeon-run-exit .btn { font-weight: 700; }
 .dungeon-scene .departure-actions small { flex: 1 1 180px; font-size: 12px; }
 
 /* Undercroft: run finished */

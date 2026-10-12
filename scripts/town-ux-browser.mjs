@@ -33,13 +33,20 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   assert.equal(await evaluate(route), 'camp');
   assert.equal(await evaluate('document.querySelector(".town-spot[data-spot=lodge]").getAttribute("aria-label")'), "Hunters' Lodge · Raids · Clear Chapter 2");
 
-  // ◀ returns to the previous route; on the camp the title opens the MENU.
+  // Back returns to the previous route and names it; the camp is the root (no Back there) and MENU toggles the MENU open and shut.
   await click.nav('quests');
+  assert.deepEqual(await evaluate('[document.querySelector("#home").innerText.trim(), document.querySelector("#home").getAttribute("aria-label")]'), ['◀ Back', 'Back to Menu']);
   await click('#home');
   await wait(`${route} === "more"`);
+  assert.equal(await evaluate('document.querySelector("#menu-button").getAttribute("aria-pressed")'), 'true', 'MENU shows that it is open');
   await click('#home');
   await wait(`${route} === "camp"`);
-  await click('#home');
+  assert.equal(await evaluate('document.querySelector("#home").hidden'), true, 'the camp is the root: no Back button');
+  await click('#menu-button');
+  await wait(`${route} === "more"`);
+  await click('#menu-button');
+  await wait(`${route} === "camp"`);
+  await click('#menu-button');
   await wait(`${route} === "more"`);
   assert.equal(await evaluate('document.querySelector("#title-screen").hidden'), true, 'the camp title is not a hidden Title button');
   await click('.more-scene [data-facility="party-advanced"]');

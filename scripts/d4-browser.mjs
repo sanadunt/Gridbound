@@ -173,9 +173,7 @@ async function runBrowserScenario() {
       });
 
       const leaveBattle = async () => {
-        await click('#pause'); await wait('Boolean(document.querySelector("#pause-retreat"))'); await click('#pause-retreat');
-        await wait('Boolean(document.querySelector("#modal #abandon-run"))', 10000);
-        await click('#abandon-run');
+        await click.leave();
         await wait(townReady(), 10000);
       };
       const battleSummary = () => evaluate(`(() => {
@@ -385,7 +383,8 @@ async function runBrowserScenario() {
         addCheck('in-run Roguelike promotion/upgrade is available or its exact runtime blocker is reported', 'BLOCKED', exactRuntimeBlocker);
       }
 
-      const leftFirstRogue = await action('leave Roguelike and return to camp', leaveBattle);
+      // Leaving returns to the Bell Trials setup (where the run departed); Back from there is the camp, in Story mode.
+      const leftFirstRogue = await action('leave Roguelike and return to camp', async () => { await leaveBattle(); await click.nav('camp'); });
       if (leftFirstRogue) {
         await check('leaving Roguelike does not mutate the Story profile', async () => {
           const after = await evaluate('window.gridbound.profile()');
@@ -409,10 +408,9 @@ async function runBrowserScenario() {
           const secondRun = await action('start and immediately abandon the saved Roguelike build', async () => {
             await click('[data-depart="endless"]');
             await wait(battleReady('endless'), 10000);
-            await click('#pause'); await wait('Boolean(document.querySelector("#pause-retreat"))'); await click('#pause-retreat');
-            await wait('Boolean(document.querySelector("#modal #abandon-run"))', 10000);
-            await click('#abandon-run');
+            await click.leave();
             await wait(townReady(), 10000);
+            await click.nav('camp');
           });
           if (secondRun) {
             await check('abandoning the repeat Roguelike run does not mutate the Story profile', async () => {

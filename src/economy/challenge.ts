@@ -235,6 +235,10 @@ export function buyBellTonic(state: CurrencyState, mode: 'raid' | 'roguelike'): 
   const item = bankShopItem(BELL_TONIC)!;
   return debitCurrency(state, mode, 'crystal', item.cost) ? 1 : 0;
 }
+/** A tonic paid for a departure that was taken back before its first fight (the ready window's free Back): the Crystal returns. */
+export function refundBellTonic(state: CurrencyState, mode: 'raid' | 'roguelike'): boolean {
+  return creditCurrency(state, mode, 'crystal', bankShopItem(BELL_TONIC)!.cost);
+}
 export function normalizeChallengeUnlocks(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const ids = new Set(RELIC_IDS);

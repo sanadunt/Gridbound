@@ -7,6 +7,8 @@ export type DialogueChoice = { value: string; label: string; reply?: string };
 export type DialoguePage = { speaker?: string; place?: string; portrait?: string; text: string; choices?: DialogueChoice[]; safeChoice?: number; card?: { kicker?: string; title: string; subtitle?: string } };
 export type DialogueOptions = { kicker?: string; title?: string; subtitle?: string; backdrop?: string; pages: DialoguePage[]; motion: boolean; onBlip?: () => void };
 
+/** Keys whose default action scrolls a page. */
+const SCROLL_KEYS = new Set(['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'PageDown', 'PageUp', 'Home', 'End']);
 /** Picks made this soon after the choices appear are ignored: a tap or key meant to finish the typing never answers the question. */
 export const CHOICE_INPUT_DELAY_MS = 600;
 const escape = (text: string) => text.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
@@ -35,7 +37,7 @@ export function playDialogue(host: HTMLElement, options: DialogueOptions): Promi
     scene.setAttribute('aria-modal', 'true');
     scene.setAttribute('aria-label', options.title ?? t('dialogue.label'));
     scene.innerHTML = `${options.backdrop ? `<img class="dialogue-backdrop" src="${options.backdrop}" alt=""/>` : ''}<div class="dialogue-shade"></div>
-      <button class="btn dialogue-skip" type="button">${t('dialogue.skip')} ▶▶</button>
+      <button class="btn dialogue-skip" type="button" data-nav-exit="skip">${t('dialogue.skip')} ▶▶</button>
       ${options.title ? `<div class="dialogue-card"><small>${escape(options.kicker ?? '')}</small><h2>${escape(options.title)}</h2>${options.subtitle ? `<p>${escape(options.subtitle)}</p>` : ''}</div>` : ''}
       <div class="dialogue-box msg-window" hidden><div class="dialogue-speaker" hidden><img alt=""/><span><b></b><small></small></span></div><p class="dialogue-text" aria-hidden="true"></p><nav class="dialogue-choices menu-list" hidden></nav><span class="msg-caret" aria-hidden="true">▼</span><span class="dialogue-count"></span></div>
       <div class="dialogue-card dialogue-end" hidden><small></small><h2></h2><p></p></div>
@@ -147,7 +149,12 @@ export function playDialogue(host: HTMLElement, options: DialogueOptions): Promi
         if (!buttons.length) advance(); else if (at < 0) buttons[safeIndex(pages[index])]?.focus({ preventScroll: true }); else choose(Number(buttons[at].dataset.choice));
       }
       else if (event.code === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(); }
-      else event.stopPropagation();
+      else {
+        // Keys stop here (the town and the battle behind the scene never see them), so the embed guard never runs either: a scroll key
+        // must not scroll the page that embeds the game (itch.io), and nothing in a scene scrolls.
+        event.stopPropagation();
+        if (SCROLL_KEYS.has(event.code) && !(event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) event.preventDefault();
+      }
     };
     scene.addEventListener('click', event => {
       const target = event.target as HTMLElement, choice = target.closest<HTMLElement>('.dialogue-choice');

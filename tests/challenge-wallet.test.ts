@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BANK_SHOP, BELL_TONIC, CHALLENGE_SHOP, FATE_RELIC, RELIC_IDS, WARD_RELIC, boonDraftSize, buyBankItem, buyBellTonic, buyRunItem, createRunWallet, creditRun, normalizeChallengeUnlocks, raidReward, roguelikeBankReward, validateRaidContract } from '../src/economy/challenge';
+import { BANK_SHOP, BELL_TONIC, CHALLENGE_SHOP, FATE_RELIC, RELIC_IDS, WARD_RELIC, boonDraftSize, buyBankItem, buyBellTonic, refundBellTonic, buyRunItem, createRunWallet, creditRun, normalizeChallengeUnlocks, raidReward, roguelikeBankReward, validateRaidContract } from '../src/economy/challenge';
 import { createCurrencyState } from '../src/economy/currency';
 import { Battle, WARD_RELIC_BARRIER } from '../src/game/simulation';
 import { boonChoices } from '../src/game/world';
@@ -108,6 +108,9 @@ test('WP3: Bell Tonic is a repeatable bank-Crystal sink that adds a potion to a 
   assert.equal(buyBellTonic(state, 'roguelike'), 1);
   assert.equal(state.commanderCrystal, 0);
   assert.equal(buyBellTonic(state, 'raid'), 0, 'unaffordable');
+  assert.equal(refundBellTonic(state, 'raid'), true, 'a departure taken back before its first fight returns the tonic');
+  assert.equal(state.commanderCrystal, tonic.cost);
+  assert.equal(refundBellTonic(state, 'story' as never), false, 'Story never holds Crystal');
   assert.deepEqual(normalizeChallengeUnlocks([BELL_TONIC, WARD_RELIC]), [WARD_RELIC]);
   assert.equal(new Battle('raid', 1, undefined, { extraPotions: 1 }).potions, 3);
   assert.equal(new Battle('endless', 1, undefined, { extraPotions: 1, relics: [WARD_RELIC] }).potions, 4);

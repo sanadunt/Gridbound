@@ -68,6 +68,10 @@ await withBrowser(async ({ send, evaluate, wait, click, key, screenshot, errors 
   await click('#pause-settings');
   await wait('Boolean(document.querySelector("#setting-motion"))');
   assert.equal(await evaluate('document.activeElement.id'), 'modal-title', 'focus follows swapped modal content');
+  // Escape in a pause sub-view returns to the pause menu (still paused, Resume focused); Escape there resumes.
+  await key('Escape');
+  await wait('document.querySelector("#modal-title")?.textContent === "PAUSE" && window.gridbound.battle.status === "paused"');
+  assert.equal(await evaluate('document.activeElement.textContent'), 'Resume', 'back on the pause menu, Resume has the focus');
   await key('Escape');
   await wait('!document.querySelector("#modal").open && window.gridbound.battle.status === "fighting"');
   assert.equal(await evaluate('document.activeElement.id'), 'pause', 'closing the modal returns the focus to the control that opened it');

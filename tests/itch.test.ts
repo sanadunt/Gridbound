@@ -14,6 +14,16 @@ const walk = (dir: string): string[] => readdirSync(dir).flatMap(name => { const
 const sources = walk('src').filter(path => path.endsWith('.ts')).map(path => ({ path, text: readFileSync(path, 'utf8') }));
 const zipNames = (zip: string): string[] => JSON.parse(execFileSync('python3', ['-I', '-c', 'import json, sys, zipfile; print(json.dumps(zipfile.ZipFile(sys.argv[1]).namelist()))', zip], { encoding: 'utf8' }));
 
+test('the history guard keeps the address: pushState/replaceState never get a URL, and only the game\'s own state key', () => {
+  const calls = sources.flatMap(({ path, text }) => [...text.matchAll(/\b(?:pushState|replaceState)\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g)].map(match => ({ path, args: match[1] })));
+  assert.ok(calls.length >= 2, 'the scan finds the guard');
+  for (const { path, args } of calls) {
+    assert.equal(args.split(',').length, 2, `${path}: (${args}) passes no URL (the itch subpath and relative assets stay as they are)`);
+    assert.match(args, /^\{ \[FIELD\]: '(?:base|guard)' \}, ''$/, `${path}: history state is { gridbound: 'base' | 'guard' }`);
+  }
+  assert.match(readFileSync('src/ui/history.ts', 'utf8'), /const FIELD = 'gridbound'/);
+});
+
 test('itch.io build: relative base, a plain index.html, no service worker or manifest, nothing extra in public/', async () => {
   const loaded = await loadConfigFromFile({ command: 'build', mode: 'production' }, 'vite.config.ts');
   assert.equal(loaded?.config.base, './', 'itch serves the game from a nested path: every built URL must be relative');

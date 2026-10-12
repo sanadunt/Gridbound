@@ -187,32 +187,50 @@ details > summary::-webkit-details-marker { display: none; }
   box-shadow: 0 3px 0 var(--win-shadow);
   z-index: 5;
 }
-.brand { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: var(--touch); padding: 4px 6px; border: 0; background: none; color: var(--ink); font-family: var(--pixel); font-size: 10px; white-space: nowrap; }
-#hud-title { overflow: hidden; text-overflow: ellipsis; }
-body[data-screen="camp"] .brand-back { display: none; }
+.hud-nav { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
+/* The town's Back: a framed button (top-left, same place on every route) in the text font; the route's name is a separate heading. */
+.hud-back.btn { flex: 0 0 auto; min-height: 44px; padding: 6px 12px 6px 10px; font: 700 14px/1 var(--text); white-space: nowrap; }
+.hud-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-family: var(--pixel); font-size: 10px; }
 /* Long destination names switch to the text font so the HUD never truncates them. */
-.brand[data-long="true"] #hud-title { font-family: var(--text); font-size: 15px; font-weight: 700; color: var(--gold-bright); }
+.hud-title[data-long="true"] { font-family: var(--text); font-size: 15px; font-weight: 700; color: var(--gold-bright); }
 .menu-button { position: relative; }
 .menu-button[data-badge]:not([data-badge=""])::after { content: attr(data-badge); position: absolute; top: -4px; right: -4px; min-width: 18px; padding: 0 4px; border: 1px solid #fff; border-radius: 9px; background: var(--danger-deep); color: #fff; font-size: 8px; line-height: 16px; text-align: center; box-shadow: 0 1px 0 #000a; }
-.brand-back { color: var(--gold); }
 .header-tools { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .header-tools .icon-button { min-width: 44px; min-height: 44px; padding: 4px; }
-/* Narrow phones: the sound toggle lives in Config, so the location title keeps its room. */
-@media (max-width: 420px) { .header-tools #sound { display: none; } }
 .header-tools { gap: 4px; }
 .wallet + .wallet { margin-right: 2px; }
 
 .wallet { display: flex; align-items: center; font-weight: 600; }
 .currency-amount { display: inline-flex; align-items: center; gap: 4px; font-family: var(--pixel); font-size: 10px; }
 .currency-amount svg { width: 16px; height: 16px; }
-.menu-button { font-size: 9px; padding: 6px 8px; }
+/* MENU reads like the other way-out buttons (Back, Ⅱ Menu): the text font, never the 9px pixel glyphs. Pressed on the MENU route (a second press closes it). */
+.menu-button { padding: 6px 10px; font: 700 14px/1 var(--text); letter-spacing: 0.5px; }
+.menu-button[aria-pressed="true"] { border-color: var(--gold-border); background: var(--gold-bg); color: var(--gold); }
+/* Narrow phones: the sound toggle lives in Config, the two wallets stack and the route title (text font, up to two lines) keeps the
+   room left by the framed Back, so the player still reads where they are ('Undercroft', 'Bursa Crystal' at 360px). */
+@media (max-width: 420px) {
+  .header-tools #sound { display: none; }
+  .header-tools { display: grid; grid-auto-flow: column; align-items: center; justify-items: end; column-gap: 4px; row-gap: 2px; }
+  .header-tools .wallet { grid-row: 1; }
+  .header-tools .bank-wallet { grid-row: 2; grid-column: 1; margin-right: 0; }
+  .header-tools .icon-button { grid-row: 1 / span 2; }
+  .hud-nav { gap: 6px; }
+  .hud-title, .hud-title[data-long="true"] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; white-space: normal; overflow-wrap: normal; line-height: 1.1; font: 700 13px/1.1 var(--text); color: var(--gold-bright); }
+}
+@media (max-width: 380px) {
+  .hud-back.btn, .menu-button { padding: 6px 7px; letter-spacing: 0; }
+  .hud-nav { gap: 4px; }
+  .header-tools { column-gap: 3px; }
+  .hud-title, .hud-title[data-long="true"] { font-size: 12px; }
+}
 body[data-screen="battle"] .site-header { display: none; }
 
 /* Status toast */
 .storage-status { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); max-width: calc(100% - 24px); padding: 4px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: #0e1e19ee; font-size: 12px; color: var(--ink-soft); pointer-events: none; z-index: 30; opacity: 0; transition: opacity 0.3s; }
 .storage-status:not([data-level="warn"]) { display: none; }
 .storage-status[data-level="warn"] { opacity: 1; top: 64px; bottom: auto; border-color: var(--hp-low); color: var(--gold-bright); }
-body[data-screen="battle"] .storage-status[data-level="warn"] { top: 4px; bottom: auto; }
+/* In battle the warning sits below the top bar (Menu, Arena/Status/Log), never over it. */
+body[data-screen="battle"] .storage-status[data-level="warn"] { top: 58px; bottom: auto; }
 
 /* Town notice */
 .town-notice { position: relative; z-index: 20; flex: 0 0 auto; margin: 8px 10px 0; padding: 8px 12px; border: 1px solid var(--gold-border); border-radius: var(--radius); background: var(--gold-bg); color: var(--gold-bright); box-shadow: 0 0 0 3px var(--win-shadow), 0 6px 18px #0008; animation: notice-in 0.25s ease-out; pointer-events: none; }
@@ -249,6 +267,7 @@ dialog#modal h2 { font-family: var(--pixel); font-size: 13px; font-weight: 400; 
 dialog#modal h3 { color: var(--gold-bright); margin: 12px 0 6px; font-size: 15px; }
 dialog#modal > .btn, dialog#modal .btn + .btn { margin-top: 8px; }
 dialog#modal > .btn { width: 100%; }
+dialog#modal > .modal-exit { position: sticky; bottom: -16px; z-index: 2; box-shadow: 0 10px 0 6px var(--win-bot), 0 -8px 14px 2px var(--win-bot); }
 .modal-close { position: absolute; top: 8px; right: 8px; min-width: 36px; min-height: 36px; padding: 0; font-family: var(--text); font-size: 18px; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .setting-row small { display: block; color: var(--ink-dim); }
@@ -271,6 +290,11 @@ dialog#modal > .btn { width: 100%; }
 .backup-text { display: block; width: 100%; min-height: 140px; max-height: 40dvh; margin: 8px 0; padding: 8px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
 #backup-note:empty { display: none; }
 dialog#modal .backup-actions .btn { margin-top: 0; }
+/* Leave dialogs: Save & suspend, the costly option, Cancel — stacked, full width. */
+.leave-actions { display: grid; gap: 8px; margin-top: 12px; }
+dialog#modal .leave-actions .btn { margin-top: 0; }
+/* A menu's exit entry (the pause menu's Back / Leave battle…) is set apart from the rest. */
+.menu-item.menu-exit { margin-top: 6px; border-top: 1px solid var(--line); }
 /* Embedded in another page (itch.io's iframe): a list scrolled to its end never hands the scroll on to the host page. */
 html.embedded * { overscroll-behavior: contain; }
 
