@@ -1,0 +1,73 @@
+name: Publish to itch.io
+# Manual only (Actions → Publish to itch.io → Run workflow); it never runs on push or pull requests. See docs/ITCH.md.
+# Needs: secret BUTLER_API_KEY (https://itch.io/user/settings/api-keys) and repository variables ITCH_USER (itch.io username)
+# and ITCH_GAME (the project's URL slug), under Settings → Secrets and variables → Actions.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: butler channel for the browser build
+        required: true
+        default: html5
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: itch-publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ITCH_USER: ${{ vars.ITCH_USER }}
+      ITCH_GAME: ${{ vars.ITCH_GAME }}
+      CHANNEL: ${{ inputs.channel }}
+    steps:
+      - name: Check itch.io settings
+        env:
+          HAS_KEY: ${{ secrets.BUTLER_API_KEY != '' }}
+        run: |
+          missing=""
+          [ "$HAS_KEY" = "true" ] || missing="$missing secret BUTLER_API_KEY,"
+          [ -n "$ITCH_USER" ] || missing="$missing variable ITCH_USER,"
+          [ -n "$ITCH_GAME" ] || missing="$missing variable ITCH_GAME,"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing${missing%,}. Add them under Settings → Secrets and variables → Actions (docs/ITCH.md, section GitHub Actions)."
+            exit 1
+          fi
+          if ! printf '%s' "$ITCH_USER/$ITCH_GAME:$CHANNEL" | grep -Eq '^[A-Za-z0-9_-]+/[A-Za-z0-9_-]+:[A-Za-z0-9._-]+$'; then
+            echo "::error::'$ITCH_USER/$ITCH_GAME:$CHANNEL' is not a valid butler target (user/game:channel; letters, digits, '-', '_', and '.' in the channel)."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Build the itch.io ZIP
+        run: npm run package:itch
+      - name: Download butler
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/butler.zip" https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          mkdir -p "$RUNNER_TEMP/butler"
+          unzip -q "$RUNNER_TEMP/butler.zip" -d "$RUNNER_TEMP/butler"
+          chmod +x "$RUNNER_TEMP/butler/butler"
+          "$RUNNER_TEMP/butler/butler" -V
+          echo "$RUNNER_TEMP/butler" >> "$GITHUB_PATH"
+      - name: Push to itch.io
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          zip="artifacts/Gridbound-itch-$version.zip"
+          [ -f "$zip" ] || { echo "::error::$zip was not built (npm run package:itch)."; exit 1; }
+          butler push "$zip" "$ITCH_USER/$ITCH_GAME:$CHANNEL" --userversion "$version"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gridbound-itch-upload
+          path: |
+            artifacts/Gridbound-itch-*.zip
+            artifacts/Gridbound-itch-*.sha256

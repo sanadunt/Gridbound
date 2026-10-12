@@ -18,6 +18,7 @@ jobs:
       - run: npm run build
       - run: npm run balance
       - run: python3 scripts/package-hostinger.py
+      - run: python3 scripts/package-itch.py
       - uses: actions/upload-artifact@v4
         with:
           name: gridbound-static
@@ -29,3 +30,9 @@ jobs:
           path: |
             artifacts/Gridbound-Hostinger-*.zip
             artifacts/Gridbound-Hostinger-*.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gridbound-itch
+          path: |
+            artifacts/Gridbound-itch-*.zip
+            artifacts/Gridbound-itch-*.sha256

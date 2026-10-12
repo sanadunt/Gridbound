@@ -14,6 +14,7 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
   let child, socket, profile;
   const pending = new Map();
   const errors = [];
+  const listeners = new Set();
   let counter = 0;
   try {
     profile = await mkdtemp(join(tmpdir(), 'gridbound-qa-'));
@@ -43,16 +44,20 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
         if (message.error) request.reject(new Error(JSON.stringify(message.error)));
         else request.resolve(message.result);
       }
+      if (message.method) for (const listener of listeners) listener(message);
       if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') errors.push(message.params);
       if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
       if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') errors.push(message.params.entry);
     });
-    const send = (method, params = {}) => new Promise((resolve, reject) => {
+    // `sessionId`: a flattened target session (Target.setAutoAttach with flatten:true), e.g. a cross-origin iframe.
+    const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
       const id = ++counter;
       const timer = setTimeout(() => { pending.delete(id); reject(new Error(`CDP timeout ${method}`)); }, 15000);
       pending.set(id, { resolve, reject, timer });
-      socket.send(JSON.stringify({ id, method, params }));
+      socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
     });
+    /** Every CDP event (`{method, params, sessionId?}`), from the page and from attached sessions; returns an unsubscribe function. */
+    const on = listener => { listeners.add(listener); return () => listeners.delete(listener); };
     const evaluate = async expression => {
       const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
       if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
@@ -117,7 +122,7 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
     await send('Page.enable');
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
     if (mobile) await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
-    await run({ send, evaluate, wait, click, key, screenshot, errors });
+    await run({ send, evaluate, wait, click, key, screenshot, errors, on });
   } finally {
     for (const request of pending.values()) clearTimeout(request.timer);
     socket?.close();

@@ -31,6 +31,7 @@ import { defeatFixes, xpSummary } from './ui/result-help';
 import { COACH_STEPS, Coach, coachEnabled, coachDone, markCoach, resetCoach, setCoachEnabled, skipCoach, type CoachStep } from './ui/coach';
 import { actArt, starRow } from './ui/world-map';
 import { playDialogue, paginate, type DialoguePage } from './ui/dialogue';
+import { fullscreenAvailable, fullscreenOn, installEmbedGuards, toggleFullscreen } from './ui/embed';
 import { BattleScene, ARENA, cell } from './render/BattleScene';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
@@ -380,6 +381,24 @@ $('app').innerHTML = `
   <div id="battle-announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <dialog id="modal" aria-labelledby="modal-title"></dialog>`;
 const modal = $<HTMLDialogElement>('modal');
+/** Embedded in another page (itch.io's cross-origin iframe): keyboard/scroll guards, Config → Fullscreen, the backup as text and
+ *  Save → Paste backup. A top-level page (the normal web build) gets none of them. */
+const embedded = installEmbedGuards();
+// Entering fullscreen puts the page above an open modal (both live in the top layer, the newest on top): the modal would stay open,
+// invisible, over an inert page. It is shown again on top with its focus; the close this queues is swallowed (no resume, no refocus).
+let raisingModal = false;
+if (embedded) {
+  document.addEventListener('close', event => { if (event.target === modal && raisingModal) { raisingModal = false; if (modal.open) event.stopImmediatePropagation(); } }, true);
+  document.addEventListener('fullscreenchange', () => {
+    const box = document.getElementById('setting-fullscreen') as HTMLInputElement | null;
+    if (box) box.checked = fullscreenOn();
+    if (!modal.open || !document.fullscreenElement) return;
+    const focused = modal.contains(document.activeElement) ? document.activeElement as HTMLElement : null;
+    raisingModal = true; modal.close();
+    try { modal.showModal(); } catch { modal.show(); }
+    focused?.focus({ preventScroll: true });
+  });
+}
 const resultScreen = $<HTMLElement>('result-screen');
 
 /** Unsettled Raid and Bell Trials encounters of the open file: what Depart would resume. */
@@ -1748,11 +1767,14 @@ function settings() {
     <label class="setting-row"><span><b>${t('settings.sound')}</b><small>${t('settings.sound.sub')}</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.motion')}</b><small>${reduceMotionQuery.matches ? t('settings.motion.device') : t('settings.motion.sub')}</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.coach')}</b><small>${t('settings.coach.sub')}</small></span><input id="setting-coach" type="checkbox" ${coachEnabled() ? 'checked' : ''}></label>
+    ${embedded && fullscreenAvailable() ? `<label class="setting-row"><span><b>${t('settings.fullscreen')}</b><small>${t('settings.fullscreen.sub')}</small></span><input id="setting-fullscreen" type="checkbox" ${fullscreenOn() ? 'checked' : ''}></label>` : ''}
     <p class="hint">${t('settings.save.note')}</p><button id="export-save" class="btn">${t('settings.export')}</button><button class="btn primary" data-close>${t('common.back')}</button>`);
   $('export-save').addEventListener('click',exportCommander);
   $('setting-sound').addEventListener('change', e => { profile.sound = (e.target as HTMLInputElement).checked; updateSound(); });
   $('setting-coach').addEventListener('change', e => { setCoachEnabled((e.target as HTMLInputElement).checked); if (coach.step) endCoachStep(); });
   $('setting-motion').addEventListener('change', e => { profile.motion = (e.target as HTMLInputElement).checked; applyMotion(); persist(); });
+  // The checkbox shows the real state: a refused request (no user gesture, a page that disallows it) puts it back.
+  document.getElementById('setting-fullscreen')?.addEventListener('change', e => { void toggleFullscreen().then(on => { (e.target as HTMLInputElement).checked = on; }); });
 }
 function updateSound() { sound.enabled = profile.sound; if (profile.sound) sound.unlock(); $('sound').setAttribute('aria-pressed', String(profile.sound)); persist(); }
 function pauseMenu() {
@@ -2420,7 +2442,33 @@ function download(data: unknown, filename: string) {
   if (!text) { openModal(`<h2 id="modal-title">${t('export.empty.title')}</h2><p>${t('export.empty.copy')}</p><button data-close class="btn primary">${t('common.close')}</button>`, false); return false; }
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url),1000);
+  // Embedded in another page (itch.io), a browser may block the download without telling the page: the backup is also shown as text.
+  if (embedded) backupText(text, filename);
   return true;
+}
+/** The backup as text to copy (Paste backup in the Save menu restores it). Copy tries the clipboard, then the selection; the text stays selected
+ *  for a manual copy. Opened over another dialog (Config, Save files, a 'Not saved' prompt), Back puts that dialog back as it was, controls included. */
+function backupText(text: string, filename: string) {
+  const previous = modal.open ? Array.from(modal.childNodes) : [], opener = document.activeElement instanceof HTMLElement && modal.contains(document.activeElement) ? document.activeElement : null;
+  openModal(`<h2 id="modal-title">${t('export.text.title')}</h2><p class="hint">${t('export.text.copy', { file: escapeUI(filename) })}</p><textarea id="backup-text" class="backup-text" readonly rows="8" spellcheck="false" aria-label="${t('export.text.label')}">${escapeUI(text)}</textarea><div class="departure-actions backup-actions"><button id="backup-select" class="btn">${t('export.text.select')}</button><button id="backup-copy" class="btn primary">${t('export.text.clipboard')}</button></div><p id="backup-note" role="status"></p>${previous.length ? `<button id="backup-back" class="btn">${t('common.back')}</button>` : `<button data-close class="btn">${t('common.close')}</button>`}`, false);
+  const area = $<HTMLTextAreaElement>('backup-text'), note = $('backup-note'), select = () => { area.focus({ preventScroll: true }); area.select(); area.setSelectionRange(0, text.length); };
+  $('backup-select').onclick = select;
+  $('backup-copy').onclick = async () => {
+    select();
+    // A frame without allow="clipboard-write" (itch.io's) refuses the Clipboard API with a console error: ask the policy first, where the browser can tell.
+    const policy = (document as Document & { featurePolicy?: { allowsFeature(feature: string): boolean } }).featurePolicy;
+    let copied = false;
+    if (navigator.clipboard && policy?.allowsFeature('clipboard-write') !== false) try { await navigator.clipboard.writeText(text); copied = true; } catch { /* refused: the selection below */ }
+    if (!area.isConnected) return;
+    if (!copied) try { copied = document.execCommand('copy'); } catch { copied = false; }
+    if (!copied) select();
+    note.textContent = t(copied ? 'export.text.copied' : 'export.text.manual');
+  };
+  document.getElementById('backup-back')?.addEventListener('click', () => {
+    modal.replaceChildren(...previous); modal.scrollTop = 0;
+    const title = modal.querySelector<HTMLElement>('#modal-title');
+    if (opener?.isConnected) opener.focus(); else if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
+  });
 }
 /** gridbound.v3 as written, when it is a complete save that holds the latest progress; the live profile otherwise (corrupt or blocked key, a failed write, or a boot that has not written it yet). */
 function legacyProfile() {
@@ -2469,9 +2517,9 @@ async function storyJournal() {
 function hasProgress(p: Profile) { return p.cleared.length > 0 || p.roster.length > 3 || p.gold !== createProfile().gold; }
 const progressSummary = (p: Profile) => ({ ch: p.cleared.length, gold: p.gold, heroes: p.roster.length });
 /** Import a downloaded backup as a new Commander (fresh id, three-file limit). It keeps its Crystal bank only when that cannot duplicate one: no Commander here came from the same file (a legacy backup: no Commander at all). */
-async function importSave(file: File, documents: CommanderDocument[]) {
+async function importSave(text: string, documents: CommanderDocument[]) {
   if (documents.length >= 3) throw new CommanderError('import-full', 'All three Commander files are in use.');
-  const imported = commanderFromBackup(await file.text().catch(() => ''), { id: globalThis.crypto?.randomUUID?.() ?? `commander-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, name: t('profiles.legacy.name'), timestamp: Date.now() });
+  const imported = commanderFromBackup(text, { id: globalThis.crypto?.randomUUID?.() ?? `commander-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, name: t('profiles.legacy.name'), timestamp: Date.now() });
   if (!imported) throw new CommanderError('import-invalid', 'This file is not a Gridbound save backup.');
   // A copy next to its source (or a legacy backup next to any Commander) keeps the progress but not a second bank: it is named as a copy,
   // and the dialog says where the Crystal and relics stayed, so restoring a backup never looks like losing them.
@@ -2532,7 +2580,7 @@ async function profilesMenu() {
       <div class="save-files">${documents.map((doc,index) => `<div class="save-file ${current?.commanderId === doc.commanderId ? 'current' : ''}"><div><b>${escapeUI(doc.name)}</b><small>${t('profiles.file', { ch: doc.story.slots[3].state?.cleared.length ?? 0, total: CAMPAIGN.length, crystal: doc.shared.bankCrystal })}</small></div><button data-commander="${index}" class="btn">${current?.commanderId === doc.commanderId ? t('profiles.current') : t('profiles.switch')}</button></div>`).join('') || (unheld ? '' : `<p>${t('profiles.empty')}</p>`)}</div>
       <label class="name-field">${t('profiles.name')} <input id="commander-name" maxlength="32" value="${escapeUI(current?.name ?? t('profiles.default.name'))}"></label>
       ${unheld ? `<p class="hint" id="continue-summary">${t('profiles.continue.summary', progressSummary(profile))}</p>` : ''}
-      <div class="departure-actions">${unheld ? `<button id="continue-mine" class="btn primary" ${full ? 'disabled' : ''}>${t('profiles.continue.mine')}</button>` : ''}<button id="new-commander" class="btn" ${full ? 'disabled' : ''}>${t('profiles.new')}</button>${current ? `<button id="rename-commander" class="btn">${t('profiles.rename')}</button><button id="export-commander" class="btn">${t('profiles.export')}</button><button id="delete-commander" class="btn danger">${t('profiles.delete')}</button>${retryable ? `<button id="save-retry" class="btn">${t('result.unsaved.retry')}</button>` : ''}` : ''}${legacyHere ? `<button id="legacy-preview" class="btn">${t('profiles.legacy')}</button>` : ''}<button id="import-save-button" class="btn" ${full ? 'disabled' : ''}>${t('profiles.import')}</button><input id="import-save" type="file" accept="application/json,.json" hidden></div>
+      <div class="departure-actions">${unheld ? `<button id="continue-mine" class="btn primary" ${full ? 'disabled' : ''}>${t('profiles.continue.mine')}</button>` : ''}<button id="new-commander" class="btn" ${full ? 'disabled' : ''}>${t('profiles.new')}</button>${current ? `<button id="rename-commander" class="btn">${t('profiles.rename')}</button><button id="export-commander" class="btn">${t('profiles.export')}</button><button id="delete-commander" class="btn danger">${t('profiles.delete')}</button>${retryable ? `<button id="save-retry" class="btn">${t('result.unsaved.retry')}</button>` : ''}` : ''}${legacyHere ? `<button id="legacy-preview" class="btn">${t('profiles.legacy')}</button>` : ''}<button id="import-save-button" class="btn" ${full ? 'disabled' : ''}>${t('profiles.import')}</button>${embedded ? `<button id="import-text-button" class="btn" ${full ? 'disabled' : ''}>${t('profiles.import.paste')}</button>` : ''}<input id="import-save" type="file" accept="application/json,.json" hidden></div>
       ${current ? `<h3 class="subheading">${t('profiles.slots', { mode: modeName(commander.mode) })}</h3><p class="hint">${t('profiles.slots.hint')}</p><div class="save-files">${slots.map(slot => `<div class="save-file"><div><b>${slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) })}</b><small>${t(`profiles.status.${slot.status}` as never)} · ${slot.savedAt ? fmtDateTime(slot.savedAt) : t('profiles.emptyslot')}</small></div><span>${slot.slotId !== 'auto' ? `<button data-save-slot="${slot.slotId}" class="btn">${t('profiles.save')}</button>` : ''}<button data-load-slot="${slot.slotId}" class="btn" ${!slot.state ? 'disabled' : ''}>${t('profiles.load')}</button></span></div>`).join('')}</div><button id="continue-latest" class="btn primary">${t('profiles.continue')}</button>` : ''}
       <p id="profile-error" role="status">${commander.error || commander.repository?.warning ? escapeUI(errorText(commander.error || commander.repository?.warning)) : ''}</p><button data-close class="btn">${t('common.close')}</button>`);
     const attempt = async (task: () => Promise<void>) => { try { await task(); } catch(error) { console.warn('Commander storage:', error); $('profile-error').textContent = errorText(error); } };
@@ -2548,7 +2596,16 @@ async function profilesMenu() {
       $('new-cancel').onclick = () => { void profilesMenu(); };
     };
     $('import-save-button').onclick = () => $<HTMLInputElement>('import-save').click();
-    $('import-save').onchange = () => { const file = $<HTMLInputElement>('import-save').files?.[0]; if (file) void attempt(() => importSave(file, documents)); };
+    $('import-save').onchange = () => { const file = $<HTMLInputElement>('import-save').files?.[0]; if (file) void attempt(async () => importSave(await file.text().catch(() => ''), documents)); };
+    // Where a file picker is awkward or a download was blocked (an embedded page), the backup text can be pasted instead.
+    document.getElementById('import-text-button')?.addEventListener('click', () => {
+      openModal(`<h2 id="modal-title">${t('profiles.import.paste.title')}</h2><p class="hint">${t('profiles.import.paste.hint')}</p><textarea id="import-text" class="backup-text" rows="8" spellcheck="false" aria-label="${t('export.text.label')}"></textarea><p id="profile-error" role="status"></p><div class="departure-actions backup-actions"><button id="import-text-confirm" class="btn primary" disabled>${t('profiles.import.paste.confirm')}</button><button id="import-text-back" class="btn">${t('common.back')}</button></div>`);
+      const area = $<HTMLTextAreaElement>('import-text');
+      area.oninput = () => { $<HTMLButtonElement>('import-text-confirm').disabled = !area.value.trim(); };
+      area.focus({ preventScroll: true });
+      $('import-text-confirm').onclick = () => { void attempt(() => importSave(area.value.trim(), documents)); };
+      $('import-text-back').onclick = () => { void profilesMenu(); };
+    });
     $('rename-commander')?.addEventListener('click', () => { const name = $<HTMLInputElement>('commander-name').value.trim().slice(0,32); void attempt(async () => { if (!name) throw new CommanderError('name-required', 'Enter a name.'); if (await persist('auto', doc => { doc.name=name; })) await profilesMenu(); }); });
     $('export-commander')?.addEventListener('click',exportCommander);
     $('save-retry')?.addEventListener('click', () => { if (pendingSettlement) retryResultSave(); else void persist().then(() => profilesMenu()); });

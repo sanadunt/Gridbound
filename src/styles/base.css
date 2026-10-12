@@ -268,6 +268,11 @@ dialog#modal > .btn { width: 100%; }
 .journal-entry-card { margin: 4px 0; }
 #profile-error:empty, #load-error:empty { display: none; }
 #profile-error, #load-error { color: var(--danger); }
+.backup-text { display: block; width: 100%; min-height: 140px; max-height: 40dvh; margin: 8px 0; padding: 8px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
+#backup-note:empty { display: none; }
+dialog#modal .backup-actions .btn { margin-top: 0; }
+/* Embedded in another page (itch.io's iframe): a list scrolled to its end never hands the scroll on to the host page. */
+html.embedded * { overscroll-behavior: contain; }
 
 body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; } }

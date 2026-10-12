@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><link rel="icon" href="data:,"/><title>Gridbound · itch.io art</title>
+<style>
+/* Store art for itch.io (scripts/itch-assets.mjs screenshots this page): the game's own procedural pixel art, fonts and palette. */
+:root { --gold: #e5c687; --gold-deep: #7e6734; --night: #08110f; --ink: #eee8d2; --pixel: 'Press Start 2P', monospace; --text: 'Space Grotesk', sans-serif; }
+html, body { margin: 0; background: var(--night); overflow: hidden; }
+#art { position: relative; overflow: hidden; background: var(--night); }
+#art canvas { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+.shade { position: absolute; inset: 0; pointer-events: none; }
+.brand { position: absolute; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.eyebrow { font-family: var(--text); font-weight: 600; text-transform: uppercase; color: var(--gold); letter-spacing: 4px; text-shadow: 0 2px 6px #000, 0 0 2px #000; }
+.logo { font-family: var(--pixel); color: var(--gold); letter-spacing: 3px; line-height: 1; text-shadow: 0 4px 0 var(--gold-deep), 0 8px 0 #07120f, 0 0 30px #e5c68755; }
+.sub { display: flex; align-items: center; gap: 12px; font-family: var(--pixel); color: #fff; letter-spacing: 3px; text-shadow: 3px 3px 0 #000; }
+.flourish { display: block; height: 3px; background: linear-gradient(90deg, transparent, var(--gold)); }
+.flourish.right { background: linear-gradient(90deg, var(--gold), transparent); }
+</style></head>
+<body><div id="art"></div><script type="module" src="./cover.js"></script></body></html>
