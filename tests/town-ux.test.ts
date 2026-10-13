@@ -11,6 +11,7 @@ import { GEAR } from '../src/game/jobs';
 import { gearReason } from '../src/game/profile';
 import { defeatFixes } from '../src/ui/result-help';
 import { nextObjective, promotion } from '../src/ui/town';
+import { startRun } from '../src/game/dungeon';
 import { HERO_LOOKS, heroKey } from '../src/art/pixels';
 import { COACH_STEPS, coachDone, coachEnabled, markCoach, resetCoach, setCoachEnabled, skipCoach } from '../src/ui/coach';
 
@@ -61,9 +62,10 @@ test('WP10 modes open with the story: Undercroft after chapter 1, Raids after 2,
   const veteran = createProfile(); veteran.ledger.raids = 1; veteran.bestFloor = 2;
   assert.equal(featureOpen(veteran, 'raid'), true); assert.equal(featureOpen(veteran, 'endless'), true);
   // A Commander with a run in progress keeps that mode reachable (a suspended Trials run that never won a floor, an unfinished raid).
-  noteModesInUse({ rogue: { activeRun: { runId: 'r' } }, encounters: { raid: { settled: false } } });
+  const raid = (settled: boolean) => ({ runId: 'q', settled, battle: { mode: 'raid', status: settled ? 'victory' : 'ready', floor: 3, stage: 0, stageCount: 1 } });
+  noteModesInUse({ rogue: { activeRun: { runId: 'r' } }, encounters: { raid: raid(false) } });
   assert.deepEqual((['raid', 'endless'] as const).map(f => featureOpen(fresh, f)), [true, true]);
-  noteModesInUse({ encounters: { raid: { settled: true } } });
+  noteModesInUse({ encounters: { raid: raid(true) } });
   assert.deepEqual((['raid', 'endless'] as const).map(f => featureOpen(fresh, f)), [false, false], 'a settled raid is no run in progress');
   noteModesInUse(undefined);
 });
@@ -174,4 +176,12 @@ test('an under-powered party with a promotion in reach is pointed at the Trainin
   assert.match(goal.text, new RegExp(`${ROSTER[promo.hero].name} can become a ${promo.job.name}`));
   n.gold = n.economy.gold = 0;
   assert.equal(promotion(n), undefined); assert.match(nextObjective(n).text, /^Party power .* Promote heroes/, 'without gold the guide still names promotion first');
+});
+
+test('RUNS: a paused Story chapter is the camp guide step (its Resume), right after an Undercroft run in progress', () => {
+  const paused = { chapter: 5, battle: 2, total: 5, heroic: false, won: false, gold: 30 };
+  for (const p of [midGame(5), createProfile()]) assert.deepEqual(nextObjective(p, paused), { text: 'CH 6 is paused at battle 2/5', resume: 5 }, 'before empty slots, chests, quests or the next chapter (even CH 1)');
+  assert.equal(nextObjective(midGame(5), { ...paused, heroic: true }).text, 'CH 6 is paused at battle 2/5 · Heroic');
+  const run = midGame(5); run.journey.run = startRun(1, 7, run.storyActive);
+  assert.equal(nextObjective(run, paused).facility, 'dungeon', 'an Undercroft run in progress still comes first');
 });

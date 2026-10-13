@@ -117,7 +117,9 @@ export type CommanderDocument = {
   activeMode: CommanderMode;
   revision: number;
   shared: SharedCommanderState;
-  encounters?: Partial<Record<CommanderMode, { runId: string; seq: number; battle: ReturnType<Battle['checkpoint']>; purse: number; boons: string[]; seed: number; settled: boolean }>>;
+  /** The battle-boundary checkpoint per mode (what Depart or Save → Continue latest resumes). `reroll`: Fate Rerolls bought for a Bell Trials floor
+   *  (its boon draft's seed). `played`: FIGHT! was pressed on this battle (a Story departure's unplayed start pins no party: ui/runs). */
+  encounters?: Partial<Record<CommanderMode, { runId: string; seq: number; battle: ReturnType<Battle['checkpoint']>; purse: number; boons: string[]; seed: number; settled: boolean; reroll?: number; played?: boolean }>>;
   legacySource?: string;
   story: StoryModeState;
   rogue: RogueModeState;

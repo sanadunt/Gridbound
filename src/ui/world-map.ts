@@ -5,7 +5,7 @@ import { canEnterZone, chapterReward, replayFactor, type Profile } from '../game
 import { ROSTER } from '../game/content';
 import { monsterDataURL } from '../art/monsters';
 import { overworldCanvas } from '../art/overworld';
-import { expeditionModes, type TownState } from './town';
+import { expeditionModes, pausedTitle, resumeCard, type TownState } from './town';
 import { t, fmtInt, type StringKey } from '../i18n';
 import { heroicScale } from '../game/simulation';
 import { intentChips } from './intent';
@@ -46,6 +46,11 @@ export function renderWorldMap(p: Profile, state: TownState): string {
   const finalStage = zone.stages[zone.stages.length - 1];
   const boss = ENEMIES[finalStage.enemy];
   const mission = state.tab === 'mission';
+  // A paused chapter (Save & suspend mid-way): its own dossier shows the resume card under its title (seen on arrival, above the sticky actions)
+  // and Enter resumes it (at its difficulty); any other chapter says that entering asks first (Resume it, or abandon it and enter this one).
+  const paused = state.suspended?.story, pausedHere = paused?.chapter === state.zone, resumes = pausedHere && paused!.heroic === heroic;
+  const pausedInfo = !paused ? '' : pausedHere ? resumeCard('story', t('story.paused.party', { n: paused.chapter + 1 }), pausedTitle(paused), t('run.abandon.story', { n: paused.chapter + 1 }))
+    : `<p class="hint paused-note-line" data-paused-note>${t('story.paused.note', { n: paused.chapter + 1 })}</p>`;
   const art = actArt(actId);
   const nodes = act.zones.map((zoneIdx, nodeIdx) => {
     const z = CAMPAIGN[zoneIdx], cleared = p.cleared.includes(zoneIdx), open = canEnterZone(p, zoneIdx), climax = nodeIdx === 3;
@@ -64,6 +69,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
   }).join('');
   const dossier = `<article class="win mission-brief world-map-dossier" aria-label="${t('map.dossier')}">
     <header class="dossier-header"><small>${escape(zone.speaker)}</small><h3>${escape(zone.name)}</h3><p class="zone-subtitle">${escape(zone.subtitle)}</p></header>
+    ${pausedInfo}
     <div class="dossier-boss-card"><div class="boss-avatar-frame"><img src="${monsterDataURL(finalStage.enemy)}" alt="${escape(finalStage.enemyName ?? boss.name)}"/></div>
       <div class="boss-intel"><small>${t('map.boss')}</small><h4>${escape(finalStage.enemyName ?? boss.name)}</h4><small class="dossier-boss-title">${escape(finalStage.enemyTitle ?? boss.title)}</small>
         <div class="intent-row">${intentChips(finalStage.enemy, boss.patterns)}</div></div></div>
@@ -76,7 +82,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
     <details class="dossier-lore-accordion"><summary>${t('map.story')}</summary><p class="zone-narrative-intro">${escape(zone.intro).replace(/\n/g, '<br>')}</p>
       <ol class="stage-route">${zone.stages.map((s, idx) => `<li><small>${idx === zone.stages.length - 1 ? t('map.finalboss') : t('map.wave', { n: idx + 1 })}</small> <b>${escape(s.name)}</b></li>`).join('')}</ol>
       <p class="hint mission-warning">${t('map.attrition')}</p></details>
-    <div class="departure-actions"><button class="btn primary ${heroic ? 'heroic-depart' : ''}" data-depart="adventure" ${canEnter ? '' : 'disabled'}>${heroic ? `${t('heroic.badge')} · ` : ''}${t('map.depart', { name: escape(zone.name) })} ▶</button><button class="btn" data-facility="party">${t('map.prepare')}</button></div>
+    <div class="departure-actions"><button class="btn primary ${heroic ? 'heroic-depart' : ''}" data-depart="adventure" ${resumes ? 'data-resume-run' : ''} ${canEnter ? '' : 'disabled'}>${heroic ? `${t('heroic.badge')} · ` : ''}${resumes ? t('story.resume', { k: paused!.battle, total: paused!.total }) : t('map.depart', { name: escape(zone.name) })} ▶</button><button class="btn" data-facility="party">${t('map.prepare')}</button></div>
   </article>`;
   return `<div class="world-map-wrapper ${act.biomeClass} ${mission ? 'mission-view' : 'map-view'}" aria-label="${t('route.campaign')}">
     ${expeditionModes('campaign', p)}

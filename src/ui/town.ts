@@ -27,6 +27,7 @@ import { dungeonBadge, heroNeeds, trainingBadge } from './badges';
 import { t, lockText, lang, fmtInt, fmtDec, fmtSec, type StringKey } from '../i18n';
 import { intentChips } from './intent';
 import { localizedRaidModifier } from '../i18n/content';
+import { resumesPaused, type PausedStory } from './runs';
 
 export type TownTab = 'camp' | 'campaign' | 'mission' | 'dungeon' | 'party' | 'party-advanced' | 'more' | 'bestiary' | 'quests' | 'raid' | 'endless' | 'challenge-shop';
 export type TrainingTab = 'overview'|'skills'|'jobs'|'talents'|'gear'|'formation';
@@ -57,8 +58,9 @@ export type TownState = {
   rogueSetup?: RogueBuild;
   /** Bell Tonic ticked for the next Raid/Roguelike departure (paid with bank Crystal when the run starts). */
   tonic?: boolean;
-  /** Suspended challenge runs (unsettled encounters): their setup is locked and the departure resumes them. */
-  suspended?: { raid?: { enemy: string; tier: RaidTier; practice: boolean }; roguelike?: { floor: number } };
+  /** Suspended runs (ui/runs): a challenge run locks its setup and its departure resumes it (`draft`: a Bell Trials boon draft left open,
+   *  `floor` is the floor its boon leads to); a paused Story chapter gets resume cards and asks before another chapter is entered. */
+  suspended?: { raid?: { enemy: string; tier: RaidTier; practice: boolean }; roguelike?: { floor: number; draft?: boolean }; story?: PausedStory };
 };
 
 const portraits = new Map<string, string>();
@@ -104,10 +106,12 @@ export function promotion(p: Profile) {
   }
   return undefined;
 }
-export function nextObjective(p: Profile): { text: string; facility?: string; tab?: TrainingTab; action?: string; chapter?: number } {
+/** `paused`: a Story chapter left with Save & suspend; after an Undercroft run in progress it is the next step (the camp's Resume button). */
+export function nextObjective(p: Profile, paused?: PausedStory): { text: string; facility?: string; tab?: TrainingTab; action?: string; chapter?: number; resume?: number } {
   const ready = QUESTS.filter(q => questProgress(p, q).ready).length;
-  if (!p.cleared.length) return { text: t('town.msg.first'), facility: 'campaign', chapter: 0 };
   if (p.journey.run?.status === 'active') return { text: t('guide.run'), facility: 'dungeon' };
+  if (paused) return { text: pausedTitle(paused), resume: paused.chapter };
+  if (!p.cleared.length) return { text: t('town.msg.first'), facility: 'campaign', chapter: 0 };
   // An empty party slot is the biggest free power gain, so it comes before chests, quests and skill points.
   const empty = emptySlots(p);
   if (empty) return { text: t('guide.emptySlots', { n: empty }), facility: 'party', tab: 'formation' };
@@ -137,7 +141,10 @@ export function storyNext(p: Profile) {
 /** Hotspots that open later in the story (UI unlock table). */
 const SPOT_FEATURE: Partial<Record<string, Feature>> = { chapel: 'dungeon', lodge: 'raid', well: 'endless' };
 
-function campScene(p: Profile) {
+/** 'CH n is paused at battle k/total' (· Heroic): the camp guide, the dossier card and the departure prompt name a paused chapter alike. */
+export const pausedTitle = (paused: PausedStory) => `${t('story.paused.title', { n: paused.chapter + 1, k: paused.battle, total: paused.total })}${paused.heroic ? ` · ${t('heroic.heroic')}` : ''}`;
+
+function campScene(p: Profile, state: TownState) {
   const townImage = townSceneDataURL();
   fireStrip ||= strip([0, 1, 2, 3].map(frame => campfireCanvas(frame)));
   smokeStrip ||= strip([0, 1, 2, 3].map(frame => smokeCanvas(frame)));
@@ -163,10 +170,15 @@ function campScene(p: Profile) {
     const offset = (i - (party.length - 1) / 2) * 7;
     return `<img class="plaza-hero" src="${portrait(ROSTER[id].classId, 0, id)}" alt="" style="left:${PLAZA.x + offset * 1.6}%;top:${PLAZA.y + (i % 2 ? 1.5 : 0)}%;width:${26 / TOWN_W * 100}%;animation-delay:${i * -0.37}s"/>`;
   }).join('');
-  const goal = nextObjective(p), next = storyNext(p);
+  const paused = state.suspended?.story, goal = nextObjective(p, paused), next = storyNext(p);
   // One tap from camp to the next chapter's dossier; when the guide's step is that chapter, this button is the guide's Go.
-  const go = goal.chapter !== undefined && next !== undefined ? '' : goal.action ? `<button class="btn guide-go" data-open-action="${goal.action}">${t('common.go')} ▶</button>` : goal.facility ? `<button class="btn guide-go" data-facility="${goal.facility}"${goal.tab ? ` data-training-tab="${goal.tab}"` : ''}>${t('common.go')} ▶</button>` : '';
-  const story = next !== undefined ? `<button class="btn primary continue-story ${go ? '' : 'guide-go'}" data-continue-story="${next}">${escape(t('town.continue', { n: next + 1, name: CAMPAIGN[next].name }))} ▶</button>` : '';
+  // A paused chapter takes its place: Resume departs straight into it, Abandon (confirmed) ends it.
+  const go = goal.resume !== undefined || (goal.chapter !== undefined && next !== undefined) ? '' : goal.action ? `<button class="btn guide-go" data-open-action="${goal.action}">${t('common.go')} ▶</button>` : goal.facility ? `<button class="btn guide-go" data-facility="${goal.facility}"${goal.tab ? ` data-training-tab="${goal.tab}"` : ''}>${t('common.go')} ▶</button>` : '';
+  // The guide's Abandon… sits beside its text when the paused chapter is the step (where Go would be), else beside Resume.
+  const abandon = paused ? `<button class="btn danger continue-abandon" data-abandon-run="story" aria-label="${escape(t('run.abandon.story', { n: paused.chapter + 1 }))}">${t('run.abandon.short')}</button>` : '';
+  const resume = paused ? `<button class="btn primary continue-story ${go ? '' : 'guide-go'}" data-resume-story="${paused.chapter}" data-resume-run>${escape(t('town.resume', { n: paused.chapter + 1, k: paused.battle }))} ▶</button>` : '';
+  const story = paused ? (go ? `<div class="continue-row">${resume}${abandon}</div>` : resume)
+    : next !== undefined ? `<button class="btn primary continue-story ${go ? '' : 'guide-go'}" data-continue-story="${next}">${escape(t('town.continue', { n: next + 1, name: CAMPAIGN[next].name }))} ▶</button>` : '';
   return `<section class="camp-scene" aria-labelledby="camp-title">
     <div class="town-map-frame" style="--town-w:${TOWN_W};--town-h:${TOWN_H}"><div class="town-map">
       <img class="town-map-art camp-art" src="${townImage}" alt="${escape(t('town.alt'))}"/>
@@ -177,7 +189,7 @@ function campScene(p: Profile) {
     </div></div>
     <div class="msg-window camp-copy">
       <h1 id="camp-title">${t('town.name')} <small>${t('town.seals', { n: p.cleared.length, total: CAMPAIGN.length })}</small></h1>
-      <div class="camp-guide"><p><b class="guide-label">${t('guide.title')}:</b> ${escape(goal.text)}</p>${go}</div>
+      <div class="camp-guide"><p><b class="guide-label">${t('guide.title')}:</b> ${escape(goal.text)}</p>${go}${paused && !go ? abandon : ''}</div>
       ${story}
     </div>
   </section>`;
@@ -216,7 +228,7 @@ function secondaryScene(p: Profile, state: TownState) {
   const deployment = tab === 'raid'
     ? `<div class="deploy-bar secondary-deploy" role="group" aria-label="${t('common.depart')}">${raidRun ? `<button class="btn primary" data-depart="raid" data-resume-run>${t('raid.resume', { name: escape(raidName(p, raidRun.enemy)), tier: raidTierName(raidRun) })} ▶</button>` : raidQuarryUnlocked(p, state.raid) ? `<button class="btn primary" data-depart="raid">${t('raid.hunt', { name: escape(raidName(p, state.raid)) })} ▶</button>` : `<button class="btn primary" data-depart="raid" disabled>${t('raid.none')}</button>`}</div>`
     : tab === 'endless'
-      ? `<div class="deploy-bar secondary-deploy" role="group" aria-label="${t('common.depart')}"><button class="btn primary" data-depart="endless" ${rogueRun ? 'data-resume-run' : ''}>${rogueRun ? t('endless.resume', { n: rogueRun.floor }) : t('endless.descend')} ▶</button></div>`
+      ? `<div class="deploy-bar secondary-deploy" role="group" aria-label="${t('common.depart')}"><button class="btn primary" data-depart="endless" ${rogueRun ? 'data-resume-run' : ''}>${rogueRun ? t(rogueRun.draft ? 'endless.resume.draft' : 'endless.resume', { n: rogueRun.floor }) : t('endless.descend')} ▶</button></div>`
       : '';
   return `<section class="secondary-scene" aria-labelledby="secondary-title"><h1 id="secondary-title" class="sr-only">${routeTitle(state.tab)}</h1>${modeNav}<div class="secondary-content">${body}</div>${deployment}</section>`;
 }
@@ -231,7 +243,7 @@ export function expeditionModes(active: 'campaign' | 'dungeon' | 'raid' | 'endle
 }
 
 export function renderTown(root: HTMLElement, p: Profile, state: TownState) {
-  const content = state.tab === 'camp' ? campScene(p) : state.tab === 'dungeon' ? dungeonScene(p, state.dungeonOutcome, expeditionModes('dungeon', p), state.dungeonLetter) : state.tab === 'campaign' || state.tab === 'mission' ? renderWorldMap(p, state) : state.tab === 'party' || state.tab === 'party-advanced' ? training(p, state, state.tab === 'party-advanced') : state.tab === 'more' ? moreScene(p) : secondaryScene(p, state);
+  const content = state.tab === 'camp' ? campScene(p, state) : state.tab === 'dungeon' ? dungeonScene(p, state.dungeonOutcome, expeditionModes('dungeon', p), state.dungeonLetter) : state.tab === 'campaign' || state.tab === 'mission' ? renderWorldMap(p, state) : state.tab === 'party' || state.tab === 'party-advanced' ? training(p, state, state.tab === 'party-advanced') : state.tab === 'more' ? moreScene(p) : secondaryScene(p, state);
   root.innerHTML = `<div class="town-game-shell" data-town-route="${state.tab}"><section class="town-scene" aria-label="${escape(routeTitle(state.tab))}"><p id="town-notice" class="town-notice" role="status" ${state.notice ? '' : 'hidden'}>${escape(state.notice)}</p>${content}</section></div>`;
 }
 
@@ -244,13 +256,17 @@ function training(p: Profile, state: TownState, advanced: boolean) {
   const panel = active === 'overview' ? trainingOverview(p, state, preview, progress) : active === 'skills' ? skillsPanel(loadout, kit, r.classId) : active === 'jobs' ? advancement(p, state.hero) : active === 'talents' ? talentsPanel(p, state, r, kit, loadout) : active === 'gear' ? forge(p, state.hero, state) : formation(p, state.hero, r, loadout) + storyPartyPanel(p);
   const zone = CAMPAIGN[state.zone];
   const deployable = zone !== undefined && canEnterZone(p, state.zone);
+  // A paused chapter keeps the party it started with: the note above the panel says so (with its Abandon; seen on arrival, out of the sticky
+  // deploy bar), and the deploy button names the resume when it is that chapter.
+  const paused = state.suspended?.story, resumes = deployable && paused !== undefined && resumesPaused(paused, state.zone, state.heroic === true && p.cleared.includes(state.zone));
+  const pausedNote = paused ? `<div class="paused-note" data-paused-note><p>${escape(t('story.paused.party', { n: paused.chapter + 1 }))}</p><button class="btn danger" data-abandon-run="story" aria-label="${escape(t('run.abandon.story', { n: paused.chapter + 1 }))}">${t('run.abandon.short')}</button></div>` : '';
   return `<section class="party-scene" aria-labelledby="party-title" style="--class-color:${kit.color}">
     <h1 id="party-title" class="sr-only">${advanced ? t('route.progression') : t('route.party')}</h1>
     <nav class="party-roster" aria-label="${t('party.choose')}">${p.roster.map(id => { const needs = heroNeeds(p, id).length > 0; return `<button data-town-hero="${id}" class="${state.hero === id ? 'active' : ''}" aria-pressed="${state.hero === id}"${needs ? ` title="${escape(t('party.dot'))}"` : ''}><img src="${portrait(ROSTER[id].classId, 0, id)}" alt=""/><span>${ROSTER[id].name}</span><small>LV ${heroProgress(p.loadouts[id].xp).level}</small>${needs ? `<i class="hero-dot" aria-label="${escape(t('party.dot'))}"></i>` : ''}</button>`; }).join('')}</nav>
     <div class="party-sticky">${heroSheet(p, state.hero, preview, progress)}
     <nav class="tabs training-tabs" aria-label="${t('party.sections')}">${tabs.map(([id,key]) => `<button data-training-tab="${id}" class="${active === id ? 'active' : ''}" aria-current="${active === id ? 'page' : 'false'}">${t(key)}</button>`).join('')}<button class="party-advanced-link" data-facility="${advanced ? 'party' : 'party-advanced'}">${advanced ? `⇄ ${t('route.party')}` : `${t('route.progression')} ▶`}</button></nav></div>
-    <section class="win training-panel" data-training-panel="${active}">${panel}</section>
-    <div class="deploy-bar party-deploy"><button type="button" class="btn primary party-deploy-button" data-depart="adventure" aria-label="${escape(t('party.deploy', { name: zone?.name ?? '' }))}" ${deployable ? '' : 'disabled'}><span>${escape(t('party.deploy', { name: zone?.name ?? '' }))}</span><small>${deployable ? t('party.deploy.go') : t('party.deploy.locked')}</small></button></div>
+    ${pausedNote}<section class="win training-panel" data-training-panel="${active}">${panel}</section>
+    <div class="deploy-bar party-deploy"><button type="button" class="btn primary party-deploy-button" data-depart="adventure" ${resumes ? 'data-resume-run' : ''} aria-label="${escape(t('party.deploy', { name: zone?.name ?? '' }) + (resumes ? ` · ${t('story.resume', { k: paused!.battle, total: paused!.total })}` : ''))}" ${deployable ? '' : 'disabled'}><span>${escape(t('party.deploy', { name: zone?.name ?? '' }))}</span><small>${resumes ? `${t('story.resume', { k: paused!.battle, total: paused!.total })} ▶` : deployable ? t('party.deploy.go') : t('party.deploy.locked')}</small></button></div>
   </section>`;
 }
 
@@ -426,9 +442,9 @@ function tonicToggle(p: Profile, state: TownState) {
 const raidKnown = (p: Profile, id: string) => seenFamily(p, ENEMIES[id]?.archetype ?? id);
 const raidName = (p: Profile, id: string) => raidKnown(p, id) ? ENEMIES[id]?.name ?? '?' : '???';
 const raidTierName = (run: { tier: RaidTier; practice: boolean }) => run.practice ? t('raid.sandbox') : t(`raid.tier.${run.tier}` as StringKey);
-/** The suspended run's card: what it is, and an explicit Abandon (the departure button resumes it). */
-function resumeCard(mode: 'raid' | 'roguelike', copy: string) {
-  return `<article class="win resume-card" data-suspended-run="${mode}"><h3 class="subheading">${t('run.suspended.title')}</h3><p>${escape(copy)}</p><button class="btn danger" data-abandon-run="${mode}">${t('run.abandon')}</button></article>`;
+/** The suspended run's card: what it is, and an explicit Abandon (the departure button resumes it). A paused Story chapter names itself. */
+export function resumeCard(mode: 'raid' | 'roguelike' | 'story', copy: string, title = t('run.suspended.title'), abandon = t('run.abandon')) {
+  return `<article class="win resume-card" data-suspended-run="${mode}"><h3 class="subheading">${escape(title)}</h3><p>${escape(copy)}</p><button class="btn danger" data-abandon-run="${mode}">${escape(abandon)}</button></article>`;
 }
 /** While a run is suspended its setup is shown but locked (a disabled fieldset disables every control in it). */
 const lockSetup = (locked: boolean, html: string) => locked ? `<fieldset class="setup-lock" disabled>${html}</fieldset>` : html;
@@ -480,7 +496,7 @@ function challengeShop(p: Profile) {
 
 function endless(p: Profile, state: TownState) {
   const run = state.suspended?.roguelike;
-  return run ? resumeCard('roguelike', t('endless.resume.copy', { n: run.floor })) + lockSetup(true, endlessSetup(p, state)) : endlessSetup(p, state);
+  return run ? resumeCard('roguelike', run.draft ? t('endless.resume.draft.copy', { cleared: run.floor - 1, n: run.floor }) : t('endless.resume.copy', { n: run.floor })) + lockSetup(true, endlessSetup(p, state)) : endlessSetup(p, state);
 }
 function endlessSetup(p: Profile, state: TownState) {
   const build = state.rogueSetup ?? createRogueBuild();

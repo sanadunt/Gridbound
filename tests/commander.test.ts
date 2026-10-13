@@ -67,7 +67,8 @@ test('unsupported and incomplete Commander documents remain protected', () => {
 
 // WP1: every Story field survives a Commander load, and challenge runs never rewrite Story slots.
 import { buyTalent, promote, equipGear, refineGear, completeZone, normalizeProfile, settleProgress, claimStarChest, type Profile } from '../src/game/profile';
-import { storyStateFromProfile, mergeLedger, mergeChallengeXp, type CommanderDocument } from '../src/game/commander';
+import { storyStateFromProfile, mergeLedger, mergeChallengeXp, createRunCheckpoint, type CommanderDocument } from '../src/game/commander';
+import { resumableEncounter, pausedStory } from '../src/ui/runs';
 import { CommanderSession } from '../src/game/commander-session';
 import { setStoryParty } from '../src/game/story-party';
 import { xpForLevel } from '../src/game/levels';
@@ -224,4 +225,20 @@ test('a Story profile saved under a challenge mode is refused instead of wiping 
   assert.equal(session.failed,true,'re-selecting the open file (a mode switch) keeps a failed save marked');
   session.stale=true; session.select(session.document!,'story');
   assert.equal(session.stale,true,'a mode switch never lifts a stale tab\'s read-only state');
+});
+
+test('RUNS: a Bell Trials boon draft left open survives the save round trip (its Fate Reroll included) and stays resumable', () => {
+  const doc=createCommanderDocument(createProfile(),'draft');
+  const floor=new Battle('endless',2,undefined,{}); floor.status='victory';
+  doc.encounters={roguelike:{runId:'run-7',seq:4,battle:floor.checkpoint(),purse:31,boons:['tide'],seed:4242,settled:true,reroll:1}};
+  doc.rogue.activeRun={...createRunCheckpoint('roguelike',{runId:'run-7',floor:2,seed:4242}),status:'suspended'};
+  const story=new Battle('adventure',6,undefined,{}); story.stage=1; story.gold=40;
+  doc.encounters.story={runId:'s',seq:2,battle:story.checkpoint(),purse:0,boons:[],seed:1,settled:false,played:true};
+  const back=normalizeCommanderDocument(JSON.parse(JSON.stringify(doc)))!;
+  assert.equal(back.encounters?.roguelike?.reroll,1);
+  assert.equal(back.encounters?.story?.played,true,'FIGHT! having been pressed survives the round trip');
+  assert.equal(resumableEncounter(back,'roguelike')?.runId,'run-7','a suspended run at its draft is resumable after a reload');
+  assert.deepEqual(pausedStory(back),{chapter:5,battle:2,total:story.stageCount,heroic:false,won:false,gold:40});
+  back.rogue.activeRun=undefined;
+  assert.equal(resumableEncounter(back,'roguelike'),undefined,'an abandoned run is not');
 });

@@ -27,6 +27,7 @@ import { claimAllQuests, questGearText } from './ui/quests';
 import { UNLOCKS, isFeature, markIntro, markVisited, noteModesInUse, pendingIntros, resetUnlockFlags, routeLocked, type Feature } from './ui/unlocks';
 import { menuBadge } from './ui/badges';
 import { pushRoute, backRoute } from './ui/route-stack';
+import { pausedStory, resumableEncounter, resumesPaused, type PausedStory } from './ui/runs';
 import { backAction, type BackSource, type NavSnapshot } from './ui/back';
 import { installBackGuard, type BackGuard } from './ui/history';
 import { defeatFixes, xpSummary } from './ui/result-help';
@@ -416,10 +417,11 @@ if (embedded) {
 }
 const resultScreen = $<HTMLElement>('result-screen');
 
-/** Unsettled Raid and Bell Trials encounters of the open file: what Depart would resume. */
+/** The open file's suspended runs, as Depart would resume them (ui/runs): a Raid, a Bell Trials floor or its pending boon draft
+ *  (`floor` is then the floor the next boon leads to), and a Story chapter paused mid-way (its resume card and the guard on other departures). */
 function suspendedRuns(): NonNullable<TownState['suspended']> {
-  const encounters = commander.document?.encounters, raid = encounters?.raid && !encounters.raid.settled ? encounters.raid.battle : undefined, rogue = encounters?.roguelike && !encounters.roguelike.settled ? encounters.roguelike.battle : undefined;
-  return { ...(raid ? { raid: { enemy: raid.enemyId, tier: raid.raidContract?.tier ?? 'bronze', practice: Boolean(raid.raidContract?.sandbox) } } : {}), ...(rogue ? { roguelike: { floor: rogue.floor } } : {}) };
+  const doc = commander.document, raid = resumableEncounter(doc, 'raid')?.battle, rogue = resumableEncounter(doc, 'roguelike'), story = pausedStory(doc);
+  return { ...(raid ? { raid: { enemy: raid.enemyId, tier: raid.raidContract?.tier ?? 'bronze', practice: Boolean(raid.raidContract?.sandbox) } } : {}), ...(rogue ? { roguelike: rogue.settled ? { floor: rogue.battle.floor + 1, draft: true } : { floor: rogue.battle.floor } } : {}), ...(story ? { story } : {}) };
 }
 function modeForTownTab(tab: TownTab, fallback = commander.mode): CommanderMode {
   if (tab === 'raid') return 'raid';
@@ -506,17 +508,15 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   if (tab === 'camp') void playCampScenes().then(() => unlockIntro());
 }
 const lockNotice = (feature: Feature) => t('unlock.locked', { name: routeTitle(feature), n: UNLOCKS[feature] });
-let unlockShowing = false;
 /** A one-time card when the story opens a mode (Undercroft, Raids, Bell Trials); skipped under automation like the camp scenes. */
 function unlockIntro(force = false) {
-  if (unlockShowing || (!force && navigator.webdriver) || !commanderChecked || !inTown || townState.tab !== 'camp' || playingScene || campScenesRunning || modal.open || commander.stale || pendingSettlement || $('title-screen')?.hidden === false) return;
+  // An open dialog (this card included) keeps it from opening twice; no separate flag that a stray close event could leave set.
+  if ((!force && navigator.webdriver) || !commanderChecked || !inTown || townState.tab !== 'camp' || playingScene || campScenesRunning || modal.open || commander.stale || pendingSettlement || $('title-screen')?.hidden === false) return;
   const features = pendingIntros(profile);
   if (!features.length) return;
   features.forEach(markIntro);
-  unlockShowing = true;
   openModal(`<div class="unlock-card"><small class="unlock-kicker">${t('unlock.kicker')}</small>${features.map((f, i) => `<section class="unlock-entry" data-unlock="${f}"><h2 ${i ? '' : 'id="modal-title"'}>${t(`unlock.${f}.title` as never)}</h2><p>${t(`unlock.${f}.body` as never)}</p><button class="btn primary" data-unlock-go="${f}">${t('unlock.go')} ▶</button></section>`).join('')}<button class="btn" data-close>${t('unlock.later')}</button></div>`);
   modal.querySelectorAll<HTMLButtonElement>('[data-unlock-go]').forEach(button => button.addEventListener('click', () => { modal.close(); void navigateTown(button.dataset.unlockGo as TownTab); }));
-  modal.addEventListener('close', () => { unlockShowing = false; }, { once: true });
 }
 $('town-screen').addEventListener('click', event => {
   if (modal.open) modal.close();
@@ -751,19 +751,31 @@ $('town-screen').addEventListener('click', event => {
   if(button.dataset.trackQuest){const q=QUESTS.find(q=>q.id===button.dataset.trackQuest);if(q&&questProgress(profile,q).unlocked){profile.trackedQuest=q.id;showTown('quests',t('notice.quest.track'));}}
   // The hunt target survives the switch into Raid mode (activateCommander would restore the stored contract's boss).
   if(button.dataset.questHunt){townState.raid=huntTarget=button.dataset.questHunt;townState.raidSandbox=undefined;navigateTown('raid');}
+  // The camp guide's Resume: the paused chapter at its own difficulty, departed from the camp (leaving it comes back here).
+  if (button.dataset.resumeStory !== undefined) {
+    const paused = townState.suspended?.story;
+    if (!paused || !canEnterZone(profile, paused.chapter)) { showTown(townState.tab); return; }
+    selectZone(paused.chapter); townState.heroic = paused.heroic; townState.campaignPage = paused.chapter;
+    depart('adventure');
+    return;
+  }
   if (button.dataset.depart) {
     depart(button.dataset.depart as Mode);
   }
-  if (button.dataset.abandonRun) abandonSuspended(button.dataset.abandonRun as 'raid' | 'roguelike');
+  if (button.dataset.abandonRun) abandonSuspended(button.dataset.abandonRun as 'raid' | 'roguelike' | 'story');
 });
-/** Abandon a suspended Raid or Bell Trials run from its setup (confirmed): it ends with no reward and the setup opens again. */
-function abandonSuspended(mode: 'raid' | 'roguelike') {
-  const tab: TownTab = mode === 'raid' ? 'raid' : 'endless';
-  openModal(`<h2 id="modal-title">${t('run.abandon.title')}</h2><p>${t('run.abandon.copy')}</p><button id="abandon-suspended" class="btn danger">${t('run.abandon')}</button><button class="btn" data-close data-autofocus>${t('common.cancel')}</button>`);
+/** Abandon a suspended run (confirmed, Cancel focused): a Raid or Bell Trials run from its setup, which opens again; a paused Story chapter
+ *  from the camp guide, its dossier or the Party note, which stay where they are. It ends with no reward (clearEncounter drops the encounter
+ *  and, in Story, the gold it carried; nothing else of the profile changes). */
+function abandonSuspended(mode: 'raid' | 'roguelike' | 'story') {
+  const paused = mode === 'story' ? pausedStory(commander.document) : undefined;
+  if (mode === 'story' && !paused) { showTown(townState.tab); return; }
+  const tab: TownTab = mode === 'raid' ? 'raid' : mode === 'roguelike' ? 'endless' : townState.tab, n = (paused?.chapter ?? 0) + 1;
+  openModal(`<h2 id="modal-title">${paused ? t('run.abandon.story.title', { n }) : t('run.abandon.title')}</h2><p>${paused ? paused.gold ? t('run.abandon.story.copy', { gold: paused.gold }) : t('run.abandon.story.copy.nogold') : t('run.abandon.copy')}</p><button id="abandon-suspended" class="btn danger">${paused ? t('run.abandon.story', { n }) : t('run.abandon')}</button><button class="btn" data-close data-autofocus>${t('common.cancel')}</button>`);
   $('abandon-suspended').addEventListener('click', () => {
     modal.close();
     if (!ensureMode(mode, () => abandonSuspended(mode))) return;
-    void clearEncounter().then(ok => { if (ok) showTown(tab, t('run.abandon.done')); else if (!commander.stale) unsavedTownModal(() => abandonSuspended(mode)); else storageStatus(); });
+    void clearEncounter().then(ok => { if (ok) showTown(tab, paused ? t('run.abandon.story.done', { n }) : t('run.abandon.done')); else if (!commander.stale) unsavedTownModal(() => abandonSuspended(mode)); else storageStatus(); });
   });
 }
 $('town-screen').addEventListener('change', event => {
@@ -1068,15 +1080,47 @@ function depart(mode: Mode) {
   if (inTown) departStack = [...routeStack];
   if (commander.document) commander.document.activeMode = commander.mode;
   if (mode === 'adventure' && !canEnterZone(profile, townState.zone)) return;
-  const existing = commander.document?.encounters?.[commander.mode];
-  if (existing && !existing.settled) { void restoreEncounter(existing); return; }
+  // A suspended run resumes (ui/runs: an unsettled encounter, or a Bell Trials boon draft left open). A paused Story chapter resumes only
+  // from its own chapter at its own difficulty; any other chapter asks first, so a paused battle never replaces the chapter the player picked.
+  const existing = resumableEncounter(commander.document, commander.mode), paused = mode === 'adventure' ? pausedStory(commander.document) : undefined;
+  if (existing && paused && !resumesPaused(paused, townState.zone, heroicPick())) { pausedStoryModal(paused, existing); return; }
+  if (existing) { void restoreEncounter(existing); return; }
+  freshDeparture(mode);
+}
+/** The Heroic toggle as a departure reads it: only for a chapter already cleared. */
+const heroicPick = () => townState.heroic === true && profile.cleared.includes(townState.zone);
+/** A new departure from the setup (no run to resume): the chapter intro on a first visit, then the battle. */
+function freshDeparture(mode: Mode) {
   if (mode === 'raid' && !raidQuarryUnlocked(profile, townState.raid)) return;
   const firstVisit = mode === 'adventure' && !profile.cleared.includes(townState.zone) && !introSeen(townState.zone);
   if (firstVisit && typeof navigator !== 'undefined' && !navigator.webdriver) { sound.unlock(); void chapterIntro(townState.zone).then(() => startDeparture(mode)); return; }
   startDeparture(mode);
 }
+/** Depart on another chapter (or the paused one at the other difficulty) while a Story battle is paused: Resume it (focused), abandon it and
+ *  enter the chosen chapter with the current party, or Cancel (the dossier stays). The paused battle keeps the party it started with. */
+function pausedStoryModal(paused: PausedStory, existing: Parameters<typeof restoreEncounter>[0]) {
+  const label = (zone: number, heroic: boolean) => heroic ? `${zone + 1} · ${t('heroic.heroic')}` : String(zone + 1);
+  const n = label(paused.chapter, paused.heroic), m = label(townState.zone, heroicPick());
+  openModal(`<h2 id="modal-title">${t('story.paused.title', { n, k: paused.battle, total: paused.total })}</h2><p>${paused.gold ? t('story.paused.copy', { gold: paused.gold, m }) : t('story.paused.copy.nogold', { m })}</p><div class="leave-actions"><button id="paused-resume" class="btn primary" data-resume-run data-autofocus>${t('story.paused.resume', { n })} ▶</button><button id="paused-abandon" class="btn danger">${t('story.paused.abandonEnter', { n, m })}</button><button class="btn" data-close>${t('common.cancel')}</button></div>`);
+  let busy = false;
+  $('paused-resume').addEventListener('click', () => {
+    if (busy) return;
+    busy = true; modal.close();
+    selectZone(paused.chapter); townState.heroic = paused.heroic; townState.campaignPage = paused.chapter;
+    void restoreEncounter(existing);
+  });
+  $('paused-abandon').addEventListener('click', async () => {
+    if (busy) return;
+    busy = true; modal.close();
+    // A Back pressed while the abandon is saved waits for it (navBusy), so the departure below starts from the screen it was asked from.
+    navBusy++;
+    const cleared = await clearEncounter().finally(() => { navBusy--; });
+    if (!cleared) { if (!commander.stale) unsavedTownModal(() => depart('adventure')); else storageStatus(); return; }
+    if (inTown && !playingScene && !campScenesRunning) freshDeparture('adventure');
+  });
+}
 function startDeparture(mode: Mode) {
-  runBoons = [];
+  runBoons = []; boonReroll = 0;
   resetRunWallet(runWallet);
   runWallet = createRunWallet();
   runSeed = Date.now() % 1000000;
@@ -1306,7 +1350,8 @@ async function begin() {
   if (inTown) return;
   if (commander.stale || pendingSettlement) return;
   if (['victory', 'defeat'].includes(battle.status)) { result(); return; }
-  encounter = makeEncounter();
+  // `played`: from FIGHT! on this checkpoint is a paused chapter to resume (ui/runs); a departure's unplayed start pins no party.
+  encounter = { ...makeEncounter(), played: true };
   stageStart = battle.mode === 'adventure' ? structuredClone(encounter) : undefined;
   // From FIGHT! on, leaving this departure goes through the leave dialog (or the flee dialog in the Undercroft).
   freeBack = false; tonicPaid = undefined;
@@ -2220,6 +2265,9 @@ async function presentResult() {
     pendingSettlement = false;
     recorded = true;
   }
+  // The draft is rebuilt from the run's saved seed, so a draft left with Save & suspend (or a reload, a closed tab, Back) and resumed from the
+  // Bell Trials offers the same boons: resumeEncounter restores the run seed, the boons taken and the Fate Rerolls bought for this floor. Promotions
+  // spent at the draft are not saved before a boon is taken; a resumed draft gives their points back.
   if (won && battle.mode === 'endless') { offeredBoons = boonChoices(runBoons, runSeed + battle.floor * 7919 + boonReroll * 104729, boonDraftSize(profile.challengeUnlocks)); boonReroll = 0; }
   // The after-battle window stays hidden under the result sheet (it would show through); it only offers 'Results' if the sheet is not up.
   showAfterOverlay(false);
@@ -2325,18 +2373,7 @@ async function presentResult() {
     if (experienceRewards.some(r => r.after > r.before)) window.setTimeout(() => sound.play('levelup'), 1300);
     animateCeremony();
   }
-  $('next-wave')?.addEventListener('click', () => {
-    closeWithoutResume();
-    if (battle.nextWave()) {
-      lastStatus = 'ready';
-      recorded = false;
-      if (initialized) scene.replace(battle);
-      makeUnits();
-      updateExpedition();
-      showReady();
-      frame(1);
-    }
-  });
+  $('next-wave')?.addEventListener('click', () => { closeWithoutResume(); advanceWave(); });
   resultScreen.querySelectorAll<HTMLElement>('[data-boon]').forEach(el => el.addEventListener('click', () => {
     const id = el.dataset.boon!;
     if (!offeredBoons.some(b => b.id === id)) return;
@@ -2351,7 +2388,7 @@ async function presentResult() {
   $('retry')?.addEventListener('click', () => {
     // Read before boot replaces `battle`: a Heroic retry stays Heroic.
     const mode = battle.mode, floor = battle.mode === 'endless' ? 1 : battle.floor, heroic = battle.heroic;
-    runBoons = [];
+    runBoons = []; boonReroll = 0;
     closeWithoutResume();
     boot(mode, floor, mode === 'adventure' && heroic ? { heroic: true } : {});
     // A Retry is a fresh start: its ready window's Back is free again.
@@ -2383,7 +2420,7 @@ async function presentResult() {
     showTown(tab ?? destination, '', true);
   };
   $('result-town').addEventListener('click', () => {
-    // A won wave is mid-chapter: its leave dialog offers Save & suspend. The Bell Trials boon draft can only be abandoned (see leaveSafely).
+    // A won wave is mid-chapter and the Bell Trials boon draft mid-run: their leave dialogs offer Save & suspend (the draft resumes as it is).
     if (moreWaves) { void leaveSafely(goOrigin, { wave: { n: battle.stage + 1, total: battle.stageCount, next: battle.stage + 2, gold: battle.gold } }); return; }
     if (won && battle.mode === 'endless') { void leaveSafely(goOrigin, { draft: true }); return; }
     leaveResult(undefined);
@@ -2453,8 +2490,10 @@ async function presentDungeonResult() {
 let dungeonLoot: { gold: number; materials: Record<string, number> } | undefined;
 let dungeonBefore: { hp: Record<number, number>; pouch: Pouch } | undefined;
 let dungeonSettled: Battle | undefined;
+/** The encounter checkpoint of the battle as it stands. A Fate Reroll bought for this floor travels with it, so a resumed floor (or its boon
+ *  draft) offers the same boons. */
 function makeEncounter(settled = false): NonNullable<typeof encounter> {
-  return { runId: encounter?.runId ?? crypto.randomUUID(), seq: (encounter?.seq ?? 0) + 1, battle: battle.checkpoint(), purse: runWallet.crystal, boons: [...runBoons], seed: runSeed, settled };
+  return { runId: encounter?.runId ?? crypto.randomUUID(), seq: (encounter?.seq ?? 0) + 1, battle: battle.checkpoint(), purse: runWallet.crystal, boons: [...runBoons], seed: runSeed, settled, ...(boonReroll ? { reroll: boonReroll } : {}) };
 }
 async function checkpoint(terminal = false, slotId: SlotId = 'auto') {
   if (battle.mode === 'dungeon') return persist(slotId, () => {});
@@ -2491,6 +2530,19 @@ async function restoreEncounter(savedEncounter: NonNullable<typeof encounter>) {
   if (!inTown || pendingSettlement) return;
   resumeEncounter(savedEncounter);
 }
+/** On to the chapter's next battle after a won wave: its ready window, and its start is the checkpoint now (Save & suspend or a reload at that
+ *  ready window resumes it there, not at the won wave). */
+function advanceWave() {
+  if (!battle.nextWave()) return;
+  lastStatus = 'ready';
+  recorded = false;
+  if (initialized) scene.replace(battle);
+  makeUnits();
+  updateExpedition();
+  showReady();
+  frame(1);
+  void checkpoint();
+}
 /** Rebuild the battle from an encounter checkpoint (a resumed save, or 'Retry this battle'). */
 function resumeEncounter(savedEncounter: NonNullable<typeof encounter>) {
   const frozen = structuredClone(savedEncounter);
@@ -2498,13 +2550,15 @@ function resumeEncounter(savedEncounter: NonNullable<typeof encounter>) {
   battle.restoreCheckpoint(frozen.battle);
   encounter = frozen;
   runWallet = createRunWallet(); runWallet.crystal = frozen.purse; battle.runWallet = runWallet;
-  runBoons = [...frozen.boons]; runSeed = frozen.seed;
+  runBoons = [...frozen.boons]; runSeed = frozen.seed; boonReroll = Number.isInteger(frozen.reroll) && frozen.reroll! > 0 ? frozen.reroll! : 0;
   recorded = frozen.settled;
   townState.rogueSetup = battle.rogueBuild ? structuredClone(battle.rogueBuild) : townState.rogueSetup;
   if (initialized) scene.replace(battle);
   makeUnits(); updateExpedition(); showReady();
   $('ready-copy').textContent = t('ready.resume'); $('ready-tip').hidden = true;
   if (frozen.settled) result();
+  // A won wave left with Save & suspend resumes where its resume card says ('Resume CH n · battle k'): the next battle's ready window.
+  else if (battle.mode === 'adventure' && battle.status === 'victory' && battle.stage + 1 < battle.stageCount) advanceWave();
 }
 /** Town changes could not be saved: retry (then continue with `next`) or export them. */
 function unsavedTownModal(next: () => unknown, copy: 'storage.unsaved.copy' | 'storage.unsaved.leave' = 'storage.unsaved.copy') {
@@ -2585,10 +2639,11 @@ async function leaveSafely(action: () => void | Promise<void>, context: { wave?:
   // A dungeon fight under way can only be left by fleeing (wounds kept, half the pouch lost); before Begin or after the result it just closes.
   if (dungeonFightLive() && battle.status !== 'ready') { fleeDungeonModal(); return; }
   if (inTown || battle.mode === 'dungeon') { closeWithoutResume(); inTown = true; await action(); return; }
-  // The Bell Trials boon draft cannot be suspended yet (its encounter is already settled, so Depart would start a new run): it only offers the abandon.
-  const { wave, draft } = context, hasCommander = Boolean(commander.document), canSuspend = hasCommander && !draft;
+  // The Bell Trials boon draft suspends like any battle: its settled floor clear stays the run's encounter (ui/runs: a pending draft), and
+  // Depart from the Bell Trials opens the same draft again.
+  const { wave, draft } = context, canSuspend = Boolean(commander.document);
   const title = wave ? t('leave.wave.title') : battle.mode === 'adventure' ? t('leave.story.title', { n: battle.floor }) : battle.mode === 'raid' ? t('leave.raid.title') : t('leave.trials.title');
-  const copy = draft ? t('leave.draft.copy') : !hasCommander ? t('leave.copy.none') : wave ? t('leave.wave.copy', wave) : battle.mode === 'adventure' ? t('leave.story.copy', { k: battle.stage + 1, total: battle.stageCount }) : t('leave.copy');
+  const copy = !canSuspend ? t('leave.copy.none') : draft ? t('leave.draft.copy') : wave ? t('leave.wave.copy', wave) : battle.mode === 'adventure' ? t('leave.story.copy', { k: battle.stage + 1, total: battle.stageCount }) : t('leave.copy');
   const abandon = battle.mode === 'adventure' ? t('leave.story.abandon') : battle.mode === 'raid' ? t('leave.raid.abandon') : t('leave.trials.abandon');
   openModal(`<h2 id="modal-title">${title}</h2><p>${copy}</p><div class="leave-actions">${canSuspend ? `<button id="suspend-run" class="btn primary" data-autofocus>${t('leave.suspend')}</button>` : ''}<button id="abandon-run" class="btn danger">${abandon}</button><button data-close class="btn" ${canSuspend ? '' : 'data-autofocus'}>${t('common.cancel')}</button></div>`);
   // A save already in flight (the battle-start checkpoint) is queued behind, not a reason to drop the click; `leaving` only stops a double tap.

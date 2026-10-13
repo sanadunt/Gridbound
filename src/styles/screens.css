@@ -326,9 +326,15 @@
 .status-item.empty b { color: var(--ink-dim); }
 .status-item .skill-emblem { width: 36px; height: 36px; }
 
-/* A suspended Raid / Bell Trials run: its card, and the setup shown but locked until it is resumed or abandoned. */
+/* A suspended Raid / Bell Trials run: its card, and the setup shown but locked until it is resumed or abandoned. A paused Story chapter uses the
+   same card on its dossier, a one-line note on the other dossiers and a note with Abandon… above the Party's panel. */
 .resume-card { border-color: var(--gold-border); }
 .resume-card p { margin: 4px 0 8px; }
+.world-map-dossier .resume-card { margin: 10px 0; }
+.paused-note-line { margin: 8px 0 10px; color: var(--gold); }
+.paused-note { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--gold-border); border-radius: var(--radius); background: var(--night); }
+.paused-note p { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 13px; color: var(--ink-soft); }
+.paused-note .btn { flex: 0 0 auto; width: auto; }
 .setup-lock { display: contents; border: 0; margin: 0; padding: 0; min-width: 0; }
 .setup-lock[disabled] > * { opacity: .55; }
 .pact-practice { margin-left: 4px; font-style: normal; font-size: 11px; font-weight: 600; color: var(--ink-dim); text-transform: uppercase; letter-spacing: .5px; }

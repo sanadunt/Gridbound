@@ -1,5 +1,6 @@
 import type { Profile } from '../game/profile';
 import { unlockedDepth } from '../game/dungeon';
+import { resumableEncounter, type RunDoc } from './runs';
 
 /** Town features that open as the story reaches them (UI-side table; game rules never read it). Value = chapters cleared. */
 export const UNLOCKS = { dungeon: 1, raid: 2, endless: 4 } as const;
@@ -7,11 +8,12 @@ export type Feature = keyof typeof UNLOCKS;
 export const FEATURES = Object.keys(UNLOCKS) as Feature[];
 export const isFeature = (tab: string): tab is Feature => tab in UNLOCKS;
 
-/** Challenge modes the active Commander has a run in (a suspended Bell Trials run, an unfinished raid): reachable whatever the story. */
+/** Challenge modes the active Commander has a run in (a suspended Bell Trials run or boon draft, an unfinished raid): reachable whatever the story. */
 let inUse: Feature[] = [];
-type RunHolder = { raid?: { activeRun?: unknown }; rogue?: { activeRun?: unknown }; encounters?: Partial<Record<string, { settled: boolean }>> };
+type RunHolder = RunDoc & { raid?: { activeRun?: unknown }; rogue?: { activeRun?: unknown } };
 export function noteModesInUse(doc: RunHolder | undefined) {
-  const open = (run: unknown, mode: string) => Boolean(run) || doc?.encounters?.[mode]?.settled === false;
+  // The same predicate as Depart and the setup's resume card (ui/runs): an unsettled encounter or a pending boon draft.
+  const open = (run: unknown, mode: 'raid' | 'roguelike') => Boolean(run) || Boolean(resumableEncounter(doc, mode));
   inUse = doc ? (['raid', 'endless'] as const).filter(f => f === 'raid' ? open(doc.raid?.activeRun, 'raid') : open(doc.rogue?.activeRun, 'roguelike')) : [];
 }
 /** Open once the story reached it, or already used (an older save that raided or descended keeps its modes, a run in progress stays reachable). */

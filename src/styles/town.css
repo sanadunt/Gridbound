@@ -74,6 +74,10 @@
 .camp-guide p { flex: 1 1 auto; min-width: 0; }
 .camp-copy .guide-go { flex: 0 0 auto; margin: 0; }
 .camp-copy .continue-story { display: block; width: 100%; margin-top: 8px; }
+/* A paused Story chapter: Resume takes the full row; a compact Abandon… sits in the guide row (or beside Resume when the guide has its own Go). */
+.continue-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.continue-row .continue-story { flex: 1 1 200px; width: auto; margin: 0; }
+.continue-row .continue-abandon, .camp-guide .continue-abandon { flex: 0 0 auto; }
 
 /* Main menu */
 .more-scene { display: flex; flex-direction: column; gap: 10px; }

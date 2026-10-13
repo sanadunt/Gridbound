@@ -201,7 +201,13 @@ async function run(viewport, { spoof = false } = {}) {
     await screen('won-wave dialog', { at: 's.modal === "Leave for now?"', enter: () => tclick('wave leave', '#result-town'), expect: 's.layer === "result" && !s.modal' });
     await tclick('next', '#next-wave'); await wait('window.gridbound.battle.status === "ready"');
     await screen('Story ready (guarded)', { at: 's.layer === "battle" && s.battle.status === "ready" && !s.battle.freeBack', enter: closeModal, expect: 's.layer === "modal" && /^Leave CH/.test(s.modal)' });
-    await closeModal();
+    // Save & suspend at battle 2: the paused chapter's dossier shows its resume card; another chapter's Enter asks first (Resume focused).
+    await closeModal(); await tclick('leave', '#ready-back'); await wait('Boolean(document.querySelector("#modal #suspend-run"))'); await tclick('suspend', '#suspend-run'); await wait('window.gridbound.inTown');
+    await screen('dossier (paused chapter)', { at: 's.route === "mission" && !!document.querySelector(".resume-card[data-suspended-run=story]")', enter: toDossier, expect: 's.route === "campaign"' });
+    const otherDossier = async () => { await toGate('campaign'); await tclick('act I', '[data-act="0"]'); await tclick('CH 4', '[data-zone="3"]'); await wait('Boolean(document.querySelector(".world-map-dossier [data-paused-note]"))'); };
+    await screen('paused-chapter prompt', { at: 's.layer === "modal" && !!document.querySelector("#paused-resume")', enter: async () => { if (await route() !== 'mission') await otherDossier(); await tclick('enter', '.world-map-dossier [data-depart="adventure"]'); }, expect: 's.layer === "town" && s.route === "mission" && !s.modal' });
+    assert.equal(await evaluate('(document.querySelector(".world-map-dossier [data-depart=adventure]").click(), document.activeElement?.id)'), 'paused-resume', 'the prompt focuses Resume');
+    await tclick('resume', '#paused-resume'); await wait('!window.gridbound.inTown && window.gridbound.battle.status === "ready" && window.gridbound.battle.stage === 1');
     await tclick('fight', '#start'); await kill('heroes'); await wait(resultReady, 15000);
     await screen('Story defeat', { at: 's.layer === "result"', enter: async () => { await fighting(); await kill('heroes'); await wait(resultReady, 15000); }, expect: 's.layer === "town" && s.route === "mission"' });
 
@@ -219,13 +225,17 @@ async function run(viewport, { spoof = false } = {}) {
     await evaluate('localStorage.removeItem("qa.failPut")'); await tclick('retry save', '#retry-save'); await wait(resultReady, 15000);
     await screen('Raid victory', { at: 's.layer === "result"', enter: async () => { await departRaid(); await closeModal(); if ((await nav()).battle.status === 'ready') await tclick('fight', '#start'); await kill('boss'); await wait(resultReady, 15000); }, expect: 's.layer === "town" && s.route === "raid"' });
 
-    // ---- Bell Trials: the boon draft's 'Leave the run…' opens the run's leave dialog (no Save & suspend: a draft cannot be resumed yet).
+    // ---- Bell Trials: the boon draft's 'Leave for now…' opens the run's leave dialog; Save & suspend keeps the draft for the setup's resume card.
     const draft = async () => { if (!(await nav()).battle) { await toGate('endless'); await tclick('trials depart', '[data-depart="endless"]'); await wait('!window.gridbound.inTown'); await tclick('fight', '#start'); await kill('boss'); await wait(resultReady, 15000); } };
     await screen('Bell Trials ready (free)', { at: 's.layer === "battle" && s.battle.status === "ready"', enter: async () => { await toGate('endless'); await tclick('trials depart', '[data-depart="endless"]'); }, expect: 's.layer === "town" && s.route === "endless"' });
     await screen('boon draft', { at: 's.layer === "result"', enter: async () => { await closeModal(); await draft(); }, expect: 's.layer === "modal" && s.modal === "Leave this Bell Trials run?"' });
     await screen('Bell Trials leave dialog', { at: 's.modal === "Leave this Bell Trials run?"', enter: () => tclick('draft leave', '#result-town'), expect: 's.layer === "result" && !s.modal' });
     await tclick('draft leave', '#result-town'); await wait('Boolean(document.querySelector("#modal #abandon-run"))');
-    assert.deepEqual(await evaluate('[Boolean(document.querySelector("#modal #suspend-run")), document.activeElement?.dataset.navExit]'), [false, 'close'], 'the draft offers no Save & suspend it cannot keep; Cancel is focused');
+    assert.equal(await evaluate('document.activeElement?.id'), 'suspend-run', 'the draft suspends like a battle: Save & suspend is focused');
+    await tclick('suspend', '#suspend-run'); await wait('window.gridbound.inTown');
+    await screen('Bell Trials setup (pending boon draft)', { at: 's.route === "endless" && !!document.querySelector(".resume-card[data-suspended-run=roguelike]")', enter: () => toGate('endless'), expect: 's.route === "camp"' });
+    await toGate('endless'); await tclick('resume draft', '[data-depart="endless"][data-resume-run]'); await wait(resultReady, 15000);
+    await tclick('draft leave', '#result-town'); await wait('Boolean(document.querySelector("#modal #abandon-run"))');
     await tclick('abandon', '#abandon-run'); await wait('window.gridbound.inTown');
 
     // ---- Undercroft: the run map's free 'Back to Emberhollow (run saved)', a room's free Back, the flee dialog.
