@@ -247,6 +247,15 @@ async function run(viewport, { spoof = false } = {}) {
     assert.equal(await evaluate('(document.querySelector("#pause").click(), document.querySelector("#pause-retreat").textContent)'), 'Flee the room…');
     await screen('Undercroft flee dialog', { at: 's.layer === "modal" && s.modal === "Flee the room?"', enter: async () => { if (!(await nav()).modal) await tclick('pause', '#pause'); await tclick('flee', '#pause-retreat'); }, expect: 's.layer === "battle" && !s.modal && s.battle.status === "fighting"' });
 
+    // ---- Another tab saves this Commander (a second repository commits it): this tab is read-only, and says so in a blocking dialog whose
+    // labelled buttons (Reload, Download save backup, Keep viewing) are the way on; Escape and Back keep it.
+    await evaluate(`(async () => { const { openCommanderRepository } = await import('/src/game/commander.ts'); const repository = await openCommanderRepository(); const doc = (await repository.list()).sort((a, b) => b.lastPlayed - a.lastPlayed)[0]; await repository.commit({ ...doc, name: 'Other tab' }, doc.revision); repository.close(); })()`);
+    await wait('document.querySelector("#modal").open && window.gridbound.navState().blocking && Boolean(document.querySelector("#modal #stale-reload"))', 10000).catch(() => fail('stale dialog', 'another tab\'s save opened no blocking dialog'));
+    await exitsOk('stale dialog', '#modal .leave-actions .btn');
+    for (const press of [() => key('Escape'), () => evaluate('history.back(), true')]) { await press(); await sleep(400); const s = await nav(); if (!s.blocking || s.modal !== 'Opened in another tab' || await evaluate('location.protocol') === 'data:') await fail('stale dialog', `a Back closed the blocking dialog: ${JSON.stringify(s)}`); }
+    await shot('stale-dialog');
+    checked++;
+
     // ---- No history growth across all of that, and a reload keeps the one guard.
     const end = await nav();
     assert.equal(end.guard.length, armedLength, 'dozens of Backs never grew the history'); assert.equal(end.guard.armed, true);

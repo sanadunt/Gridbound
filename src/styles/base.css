@@ -268,6 +268,8 @@ dialog#modal h3 { color: var(--gold-bright); margin: 12px 0 6px; font-size: 15px
 dialog#modal > .btn, dialog#modal .btn + .btn { margin-top: 8px; }
 dialog#modal > .btn { width: 100%; }
 dialog#modal > .modal-exit { position: sticky; bottom: -16px; z-index: 2; box-shadow: 0 10px 0 6px var(--win-bot), 0 -8px 14px 2px var(--win-bot); }
+/* Whatever is scrolled into view (an error, Continue latest and its reason) stops above that sticky exit, never under it. */
+dialog#modal:has(> .modal-exit) { scroll-padding-bottom: 84px; }
 .modal-close { position: absolute; top: 8px; right: 8px; min-width: 36px; min-height: 36px; padding: 0; font-family: var(--text); font-size: 18px; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .setting-row small { display: block; color: var(--ink-dim); }
@@ -285,8 +287,10 @@ dialog#modal > .modal-exit { position: sticky; bottom: -16px; z-index: 2; box-sh
 .journal-scene, .journal-chronicle { margin: 10px 0; padding-top: 8px; border-top: 1px solid var(--line); }
 .journal-outcome { color: var(--gold); }
 .journal-entry-card { margin: 4px 0; }
-#profile-error:empty, #load-error:empty { display: none; }
-#profile-error, #load-error { color: var(--danger); }
+#profile-error:empty, #load-error:empty, #delete-error:empty, #continue-hint:empty { display: none; }
+#profile-error, #load-error, #delete-error { color: var(--danger); }
+/* What the last Save files action did (Renamed to…, Saved to Slot n), at the top of the dialog. */
+.profiles-notice { margin: 6px 0; padding: 6px 10px; border: 1px solid var(--gold-border); border-radius: var(--radius); background: var(--gold-bg); color: var(--gold-bright); }
 .backup-text { display: block; width: 100%; min-height: 140px; max-height: 40dvh; margin: 8px 0; padding: 8px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
 #backup-note:empty { display: none; }
 dialog#modal .backup-actions .btn { margin-top: 0; }

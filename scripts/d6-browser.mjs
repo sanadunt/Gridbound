@@ -107,8 +107,11 @@ try {
    await click.nav('campaign');
    await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');
    await click(`.world-map-wrapper .expedition-mode-nav [data-facility="${mode}"]`);
-   await openProfiles();await wait('Boolean(document.querySelector("#continue-latest"))');await click('#continue-latest');
-   await wait('document.querySelector("#profile-error")?.textContent.includes("No checkpoint")');await click('[data-close]');
+   // Nothing left to continue: the button is disabled and says why above it.
+   await openProfiles();await wait('Boolean(document.querySelector("#continue-latest"))');
+   assert.equal(await evaluate('document.querySelector("#continue-latest").disabled'),true,mode+' Continue latest is disabled without a checkpoint');
+   assert.match(await evaluate('document.querySelector("#continue-hint").textContent'),/No saved battle/);
+   await click('dialog[open] > [data-close].btn');
   }
   await click.nav('campaign');
   await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');

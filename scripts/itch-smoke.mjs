@@ -258,9 +258,10 @@ try {
     assert.equal(await hostScroll(), 0, 'the wheel over the Save dialog does not scroll the host page');
 
     // Progress persists across a reload of the whole page (IndexedDB in the partitioned frame): a renamed file and a setting.
-    await inFrame('document.querySelector("#commander-name").value = "itch smoke"');
+    // Rename is offered once the field holds another name (an input event), and says what it did.
+    await inFrame('(() => { const field = document.querySelector("#commander-name"); field.value = "itch smoke"; field.dispatchEvent(new Event("input", { bubbles: true })); })()');
     await click('#rename-commander');
-    await waitFrame('document.querySelector("dialog[open] .save-file.current b")?.textContent === "itch smoke" && document.querySelector("#storage-status").dataset.level === "ok"');
+    await waitFrame('document.querySelector("dialog[open] .save-file.current b")?.textContent === "itch smoke" && document.querySelector("#storage-status").dataset.level === "ok" && document.querySelector("#profiles-notice")?.textContent.includes("itch smoke")');
     await closeModal(t);
     await config(t);
     assert.equal(await inFrame('document.querySelector("#setting-motion").checked'), true);

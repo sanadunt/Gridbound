@@ -63,7 +63,7 @@ test('WP12 storage and save failures are codes: every code has EN and ID text, r
   assert.equal(await session.save({ mode: 'story', slotId: 'auto', profile }), false);
   assert.equal(session.error, 'stale');
   setLang('id');
-  assert.match(errorText(session.error), /^Tab lain mengubah Commander ini/);
+  assert.match(errorText(session.error), /^Tab lain menyimpan Commander ini/);
 });
 
 test('WP12 talent and gear lock reasons are codes rendered in the chosen language', () => {

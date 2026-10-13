@@ -43,9 +43,10 @@ export function playDialogue(host: HTMLElement, options: DialogueOptions): Promi
       <div class="dialogue-card dialogue-end" hidden><small></small><h2></h2><p></p></div>
       <p class="dialogue-live sr-only" role="status" aria-live="polite" aria-atomic="true"></p>`;
     // The rest of the page is inert while the scene plays (no Tab or click into the town behind it); only what this scene made inert is restored.
-    // Status regions (the save status, the battle announcer) hold no controls and stay live, so a save warning is still spoken.
+    // Status regions (the save status, the battle announcer) hold no controls and stay live, so a save warning is still spoken. An open dialog
+    // is in the top layer, above the scene: it is never made inert (its buttons would be dead on top of everything; contract §5.5).
     const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
-    const behind = Array.from(host.children).filter((el): el is HTMLElement => el instanceof HTMLElement && !el.inert && el.getAttribute('role') !== 'status');
+    const behind = Array.from(host.children).filter((el): el is HTMLElement => el instanceof HTMLElement && !el.inert && el.getAttribute('role') !== 'status' && !(el instanceof HTMLDialogElement && el.open));
     behind.forEach(el => { el.inert = true; el.dataset.dialogueInert = '1'; });
     host.append(scene);
     /** Screen readers get each page once, whole (the typewriter text itself is aria-hidden). */
