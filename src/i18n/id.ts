@@ -817,7 +817,7 @@ export const ID: Record<keyof typeof EN, string> = {
   'hud.back.to': 'Kembali ke {name}',
   'battle.menu': 'Menu',
   'ready.back': 'Kembali',
-  'ready.back.hint': 'Belum ada yang terpakai sebelum kamu menekan {begin}',
+  'ready.back.hint': 'Belum ada yang terpakai sebelum {begin}',
   'ready.leave': 'Tinggalkan…',
   'dungeon.back.map': 'Kembali ke peta',
   'dungeon.toCamp': 'Kembali ke Emberhollow (run tersimpan)',

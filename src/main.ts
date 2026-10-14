@@ -1366,8 +1366,9 @@ function showReady() {
   const beat = battle.mode === 'adventure' ? CAMPAIGN[battle.floor - 1]?.stages[battle.stage]?.beat : undefined;
   $('ready-copy').textContent = beat ?? (battle.stage > 0 ? t('ready.copy.next') : battle.mode === 'adventure' ? t('ready.copy.story') : t('ready.copy.other'));
   $('ready-copy').classList.toggle('story-beat', Boolean(beat));
-  // The very first wave keeps its how-to-play tip under the story beat.
-  $('ready-tip').hidden = !(beat && battle.floor === 1 && battle.stage === 0 && !battle.heroic);
+  // The very first wave keeps its how-to-play tip under the story beat, unless the coach is about to teach the same moves in the fight
+  // (a shorter sheet keeps the front row in view on a phone).
+  $('ready-tip').hidden = !(beat && battle.floor === 1 && battle.stage === 0 && !battle.heroic) || coachDue();
   $('start').textContent = t('battle.begin');
   updateReadyBack();
   if (motionOn()) {
@@ -1880,7 +1881,9 @@ function frame(dt: number) {
  * with window.gridbound.coach(true).
  */
 function endCoachStep(step?: CoachStep) { if (step) markCoach(step); coach.hide(); if (initialized) scene.timeScale = 1; }
-const coachOn = () => battle.mode === 'adventure' && battle.floor === 1 && !battle.heroic && battle.status === 'fighting' && !COACH_STEPS.every(coachDone) && (coachForced || (!navigator.webdriver && coachEnabled() && !profile.cleared.includes(0)));
+/** The coach will teach this battle (Chapter 1 before its first clear, tips on, some left): its tips replace the ready window's how-to-play line. */
+function coachDue() { return battle.mode === 'adventure' && battle.floor === 1 && !battle.heroic && !COACH_STEPS.every(coachDone) && (coachForced || (!navigator.webdriver && coachEnabled() && !profile.cleared.includes(0))); }
+const coachOn = () => battle.status === 'fighting' && coachDue();
 function coachFrame(guardWindow: boolean) {
   if (!coachOn()) { if (coach.step) endCoachStep(); return; }
   const card = (id: number) => () => unitViews.get(id)?.card ?? null;

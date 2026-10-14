@@ -173,6 +173,8 @@
    keyboard-only devices (pointer: none, also what headless Chrome reports) keep them. */
 .key-hint { font: inherit; }
 .key-hint::after { content: ' · '; }
+/* Nothing follows the Potion key (its count is the big number): no dangling separator ('H ·'). */
+.key-hint:last-child::after { content: none; }
 @media (pointer: coarse) { .key-hint { display: none; } }
 #resolve-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(180deg, #ffe48a66, #e0a93a55); transition: width 0.2s; }
 .ultimate-button.ready { border-color: var(--gold); background: #e6c88d; color: #263329; text-shadow: none; animation: ult-ready 0.5s steps(2) infinite; filter: none; }
