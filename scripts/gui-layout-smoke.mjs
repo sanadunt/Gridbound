@@ -68,7 +68,8 @@ for (const [width, height] of viewports) {
           });
         const notice = document.querySelector('.town-notice:not([hidden])');
         const noticeRect = notice?.getBoundingClientRect();
-        const noticeOverlaps = notice ? [...scene.querySelectorAll('h1,h2,h3,button,select,summary')]
+        // The notice is a toast over the route (taps pass through it, it fades by itself): only a notice that could catch a tap may not overlap controls.
+        const noticeOverlaps = notice && getComputedStyle(notice).pointerEvents !== 'none' ? [...scene.querySelectorAll('h1,h2,h3,button,select,summary')]
           .filter(element => element !== notice && visible(element))
           .filter(element => {
             const bounds = element.getBoundingClientRect();

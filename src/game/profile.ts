@@ -34,16 +34,30 @@ export function equipSkill(p:Profile,heroId:number,slotIndex:number,skillIndex:n
   if(h.skills[other]===skillIndex)h.skills[other]=h.skills[slotIndex];
   h.skills[slotIndex]=skillIndex;return true;
 }
+/** What a reset would take back and refund (the Reset confirmation reads it): the job and its parent, the talent count and the gold, the same sums respecHero pays. */
+export function respecPreview(p:Profile,heroId:number):{job?:string;parentJob?:string;talents:number;gold:number}|undefined {
+  const h=loadout(p,heroId);if(!h)return undefined;
+  const talents=TALENTS.filter(t=>h.talents.includes(t.id)),j=JOBS[h.job??''],parent=j?.parent?JOBS[j.parent]:undefined;
+  return {...(j?{job:j.id}:{}),...(parent?{parentJob:parent.id}:{}),talents:talents.length,gold:talents.reduce((sum,t)=>sum+t.cost,0)+(j?j.cost+(parent?.cost??0):0)};
+}
 export function respecHero(p:Profile,heroId:number) {
-  const h=loadout(p,heroId);if(!h||(!h.talents.length&&!h.job))return false;
-  p.gold+=TALENTS.filter(t=>h.talents.includes(t.id)).reduce((sum,t)=>sum+t.cost,0);
-  const j=JOBS[h.job??''];if(j)p.gold+=j.cost+(j.parent?JOBS[j.parent].cost:0);
-  delete h.job;h.talents=[];h.skills=[0,1];return true;
+  const h=loadout(p,heroId),r=respecPreview(p,heroId);if(!h||!r||(!h.talents.length&&!h.job))return false;
+  p.gold+=r.gold;delete h.job;h.talents=[];h.skills=[0,1];return true;
+}
+/** Why a hero cannot take a job now (undefined when Promote would succeed); the Jobs inspector shows it with lockText. */
+export function jobReason(p:Profile,id:number,jobId:string,ignoreGold=false):LockReason|undefined {
+  const h=loadout(p,id),j=JOBS[jobId];if(!h)return {code:'unrecruited'};
+  if(!j||j.base!==ROSTER[id].classId)return {code:'class'};
+  if(h.job===j.id||JOBS[h.job??'']?.parent===j.id)return {code:'learned'};
+  if(j.tier===2&&h.job!==undefined)return {code:'path'};
+  if(j.tier===3&&h.job!==j.parent)return h.job!==undefined?{code:'path'}:{code:'requires',name:JOBS[j.parent??'']?.name??j.parent};
+  if(p.cleared.length+1<j.level)return {code:'rank',n:j.level};
+  if(!ignoreGold&&p.gold<j.cost)return {code:'gold'};
+  return undefined;
 }
 export function promote(p:Profile,id:number,jobId:string) {
   const h=loadout(p,id),j=JOBS[jobId];
-  if(!h||!j||j.base!==ROSTER[id].classId||p.cleared.length+1<j.level||p.gold<j.cost||h.job===j.id)return false;
-  if(j.tier===2?h.job!==undefined:h.job!==j.parent)return false;
+  if(!h||!j||jobReason(p,id,jobId))return false;
   p.gold-=j.cost;h.job=j.id;return true;
 }
 export function equipGear(p:Profile,id:number,gearId:string) {
@@ -172,7 +186,7 @@ export function availablePoints(p:Profile,id:number) {
 /** Share of the expedition EXP a hero who ended the fight down still receives. */
 export const FALLEN_XP=.6;
 /** Why a talent or gear piece cannot be taken: a code the UI renders with t('lock.<code>', {n, name}); undefined when it can. */
-export type LockReason={code:'unrecruited'|'learned'|'class'|'requires'|'branches'|'level'|'keystone'|'points'|'gold'|'unavailable'|'quest';n?:number;name?:string};
+export type LockReason={code:'unrecruited'|'learned'|'class'|'requires'|'branches'|'level'|'keystone'|'points'|'gold'|'unavailable'|'quest'|'rank'|'path';n?:number;name?:string};
 export function talentReason(p:Profile,id:number,t:Talent,ignoreGold=false):LockReason|undefined {
   const h=loadout(p,id);if(!h)return {code:'unrecruited'};
   if(h.talents.includes(t.id))return {code:'learned'};
@@ -195,17 +209,22 @@ export function gearReason(p:Profile,id:number,gearId:string,ignoreGold=false):L
   }
   return undefined;
 }
-/** Claim a ready quest for its own hero (or `recipient`): gold, EXP and its gear go to that hero. A gear reward the hero already owns is sold
- *  for its price instead of vanishing. Returns who received it, the gear and the refund (false when nothing was claimed). */
-export function claimQuest(p:Profile,id:string,recipient:number):{hero:number;gear?:string;refund:number}|false {
+/** Claim a ready quest for its own hero (or `recipient`): gold and EXP go to that hero, and so does its gear unless `gearTo` names another
+ *  recruited hero (Claim all hands gear to a deployed hero with the slot empty). A gear reward is equipped at once when the owner's slot for it
+ *  is empty and the owner can wear it; one the owner already owns is sold for its price instead of vanishing. Returns who received the EXP
+ *  (`hero`), the gear and its `owner`, whether it was `equipped`, and the refund (false when nothing was claimed). */
+export function claimQuest(p:Profile,id:string,recipient:number,gearTo?:number):{hero:number;gear?:string;owner?:number;equipped?:boolean;refund:number}|false {
   const q=QUESTS.find(q=>q.id===id);if(!q||!questProgress(p,q).ready)return false;
   const heroId=q.heroId??recipient,h=loadout(p,heroId);if(!h)return false;
+  const g=q.gear?GEAR.find(g=>g.id===q.gear):undefined,owner=q.heroId===undefined&&gearTo!==undefined&&loadout(p,gearTo)?gearTo:heroId,o=loadout(p,owner)!;
   p.claimedQuests.push(q.id);p.gold+=q.gold;awardExperience(p,heroId,q.xp);
-  const g=q.gear?GEAR.find(g=>g.id===q.gear):undefined;let refund=0;
-  if(g){h.inventory??=[];if(h.inventory.includes(g.id)){refund=g.cost;p.gold=Math.min(1000000,p.gold+refund);}else h.inventory.push(g.id);}
+  let refund=0,equipped=false;
+  if(g){o.inventory??=[];if(o.inventory.includes(g.id)){refund=g.cost;p.gold=Math.min(1000000,p.gold+refund);}else{o.inventory.push(g.id);if(!o.gear?.[g.slot]&&!gearReason(p,owner,g.id,true)){(o.gear??={})[g.slot]=g.id;equipped=true;}}}
   if(p.trackedQuest===q.id)delete p.trackedQuest;
-  return {hero:heroId,...(g?{gear:g.id}:{}),refund};
+  return {hero:heroId,...(g?{gear:g.id,owner,...(equipped?{equipped}:{})}:{}),refund};
 }
+/** A hero who could wear quest gear once it is theirs: right class and level (ignores that the piece is not owned yet). */
+export const canWearGear=(p:Profile,id:number,gearId:string)=>{const r=gearReason(p,id,gearId,true);return !r||r.code==='quest';};
 const settled=new WeakSet<Battle>();
 function bankRewardForRun(b: Battle): number {
   if (!b.runAct || !b.runActClear) return 0;

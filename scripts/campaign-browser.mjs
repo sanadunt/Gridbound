@@ -30,8 +30,12 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
       await click('[data-training-tab="jobs"]');
       const job = chapter === 3 ? 'paladin' : 'aegis';
       await wait(`Boolean(document.querySelector('[data-promote="${job}"]'))`);
+      // A card only opens its inspector; Promote there spends the gold.
       await click(`[data-promote="${job}"]`);
-      assert.equal(await evaluate('window.gridbound.profile().loadouts[0].job'), job);
+      await wait(`Boolean(document.querySelector('[data-job-inspector="${job}"] [data-confirm-job]'))`);
+      assert.equal(await evaluate('window.gridbound.profile().loadouts[0].job'), chapter === 3 ? undefined : 'paladin', 'the tap alone buys nothing');
+      await click('[data-confirm-job]');
+      await wait(`window.gridbound.profile().loadouts[0].job === ${JSON.stringify(job)}`);
       await click.nav('party');
       await click('[data-training-tab="skills"]');
       const skill = chapter === 3 ? 4 : 6;

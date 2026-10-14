@@ -1,6 +1,6 @@
 import { ROSTER } from '../game/content';
 import { GEAR, JOBS, gearStats } from '../game/jobs';
-import { TALENTS, gearReason, talentReason, type Profile } from '../game/profile';
+import { TALENTS, gearReason, jobReason, talentReason, type Profile } from '../game/profile';
 import { QUESTS, questProgress } from '../game/quests';
 import { claimableChests } from '../game/journey';
 import { DEPTHS, unlockedDepth } from '../game/dungeon';
@@ -28,7 +28,8 @@ export function heroNeeds(p: Profile, id: number): ('talent' | 'job' | 'gear')[]
   if (!h || !cls) return [];
   const out: ('talent' | 'job' | 'gear')[] = [];
   if (TALENTS.some(talent => (!talent.classId || talent.classId === cls) && !talentReason(p, id, talent))) out.push('talent');
-  if (Object.values(JOBS).some(j => j.base === cls && (j.tier === 2 ? !h.job : h.job === j.parent) && p.cleared.length + 1 >= j.level && p.gold >= j.cost)) out.push('job');
+  // The same rule as the Jobs inspector's Promote button (jobReason), so the dot never promises a job the screen refuses.
+  if (Object.values(JOBS).some(j => j.base === cls && !jobReason(p, id, j.id))) out.push('job');
   if (affordableUpgrade(p, id)) out.push('gear');
   return out;
 }

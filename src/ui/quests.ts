@@ -2,7 +2,8 @@ import { QUESTS, questProgress } from '../game/quests';
 import { ROSTER } from '../game/content';
 import { GEAR } from '../game/jobs';
 import { ENEMIES } from '../game/world';
-import { claimQuest, type Profile } from '../game/profile';
+import { claimQuest, canWearGear, type Profile } from '../game/profile';
+import { normalizeStoryParty } from '../game/story-party';
 import { t, type StringKey } from '../i18n';
 import { featureOpen } from './unlocks';
 
@@ -16,24 +17,36 @@ export function boardQuests(p: Profile, filter: 'available'|'all'|'claimed' = 'a
   return GROUPS.flatMap(group => matches.filter(q => questGroup(p, q) === group));
 }
 
+/** Who gets a Claim all gear reward: a deployed hero with that slot empty who can wear it and does not own it yet, the one wearing the
+ *  fewest pieces first (party order breaks ties), so the rewards spread over the party; undefined when nobody fits (the recipient keeps it). */
+export function gearOwner(p: Profile, gearId: string) {
+  const g = GEAR.find(g => g.id === gearId), worn = (id: number) => Object.values(p.loadouts[id]?.gear ?? {}).filter(Boolean).length;
+  if (!g) return undefined;
+  return normalizeStoryParty(p.storyActive, p.roster, p.cleared).filter(id => !p.loadouts[id]?.gear?.[g.slot] && !p.loadouts[id]?.inventory?.includes(g.id) && canWearGear(p, id, g.id))
+    .reduce<number | undefined>((best, id) => best === undefined || worn(id) < worn(best) ? id : best, undefined);
+}
 /** Claim every ready quest for its own hero (or the chosen recipient); a claim can open the next quest of a chain, which is claimed too when ready.
- *  `gear` lists each gear reward with the hero who got it (or, when that hero already owned it, the gold it was sold for). */
+ *  The recipient gets the gold and EXP; each gear reward goes to a deployed hero with that slot empty (`gearOwner`, else the recipient) and is
+ *  equipped there. `gear` lists each gear reward with its owner, whether it was equipped and, when the owner already had it, the gold it was sold for. */
 export function claimAllQuests(p: Profile, recipient: number) {
-  const claimed: string[] = [], gear: { hero: number; gear: string; refund: number }[] = [], gold = p.gold;
+  const claimed: string[] = [], gear: { hero: number; gear: string; refund: number; equipped?: boolean }[] = [], gold = p.gold;
   for (let guard = 0; guard < QUESTS.length; guard++) {
-    const q = QUESTS.find(q => questProgress(p, q).ready), got = q && claimQuest(p, q.id, recipient);
+    const q = QUESTS.find(q => questProgress(p, q).ready), owner = q?.gear ? gearOwner(p, q.gear) : undefined;
+    const got = q && claimQuest(p, q.id, recipient, owner);
     if (!q || !got) break;
     claimed.push(q.id);
-    if (got.gear) gear.push({ hero: got.hero, gear: got.gear, refund: got.refund });
+    if (got.gear) gear.push({ hero: got.owner ?? got.hero, gear: got.gear, refund: got.refund, ...(got.equipped ? { equipped: true } : {}) });
   }
   return { claimed, gold: p.gold - gold, gear };
 }
-/** One line per gear reward for a notice: 'Forged Edge for Aldric', or 'Ember Pendant sold, Aldric already owns one'. */
-export const questGearText = (rewards: { hero: number; gear: string; refund: number }[]) => rewards.map(r => t(r.refund ? 'quest.gear.sold' : 'quest.gear.to', { gear: GEAR.find(g => g.id === r.gear)?.name ?? r.gear, name: ROSTER[r.hero]?.name ?? '?' })).join(', ');
+/** How many rewards Claim all really hands out: chains that open on the way included (claimed on a copy). */
+export const claimAllCount = (p: Profile, recipient: number) => claimAllQuests(structuredClone(p), recipient).claimed.length;
+/** One line per gear reward for a notice: 'Forged Edge equipped on Aldric', 'Forged Edge for Aldric', or 'Ember Pendant sold, Aldric already owns one'. */
+export const questGearText = (rewards: { hero: number; gear: string; refund: number; equipped?: boolean }[]) => rewards.map(r => t(r.refund ? 'quest.gear.sold' : r.equipped ? 'quest.gear.equipped' : 'quest.gear.to', { gear: GEAR.find(g => g.id === r.gear)?.name ?? r.gear, name: ROSTER[r.hero]?.name ?? '?' })).join(', ');
 
 /** The Quest Board: one scrollable list of compact cards grouped by state (ready rewards on top) with a Claim all button. */
 export function questBoard(p: Profile, hero: number, filter: 'available'|'all'|'claimed' = 'available') {
-  const ready = QUESTS.filter(q => questProgress(p, q).ready).length;
+  const ready = QUESTS.filter(q => questProgress(p, q).ready).length, all = ready ? claimAllCount(p, hero) : 0;
   const list = boardQuests(p, filter), hunts = featureOpen(p, 'raid');
   const sections = GROUPS.map(group => {
     const records = list.filter(q => questGroup(p, q) === group);
@@ -46,5 +59,5 @@ export function questBoard(p: Profile, hero: number, filter: 'available'|'all'|'
       return `<article class="win quest-entry ${s.claimed ? 'claimed' : ''} ${s.ready ? 'ready' : ''} ${tracked ? 'tracked' : ''}" data-quest="${q.id}" data-quest-state="${questGroup(p, q)}"><div><small>${t(`quest.kind.${q.kind}` as StringKey)} · ${state}</small><h3>${q.name}</h3><p class="quest-story">${q.giver} — ${q.story}</p><b>${objective}</b><span class="gauge" aria-hidden="true"><i style="width:${Math.min(1, s.value / q.target) * 100}%"></i></span><progress hidden max="${q.target}" value="${s.value}" aria-label="${q.name}: ${s.value}/${q.target}"></progress><span>${s.value}/${q.target}${s.unlocked ? '' : ` · ${locked}`}</span></div><footer><p class="quest-reward">${q.gear ? t('quest.reward.gear', { gold: q.gold, xp: q.xp, gear: GEAR.find(g => g.id === q.gear)?.name ?? '', name: ROSTER[q.heroId ?? hero].name }) : t('quest.reward', { gold: q.gold, xp: q.xp, name: ROSTER[q.heroId ?? hero].name })}</p><div class="quest-actions"><button data-claim-quest="${q.id}" class="btn ${s.ready ? 'primary' : ''}" ${s.ready ? '' : 'disabled'}>${s.claimed ? t('quest.claimed') : t('quest.claim')}</button>${!s.claimed ? `<button class="btn" data-track-quest="${q.id}" ${!s.unlocked || tracked ? 'disabled' : ''}>${tracked ? t('quest.tracked') : t('quest.track')}</button>` : ''}${q.enemy && s.unlocked && !s.claimed && hunts ? `<button class="btn" data-quest-hunt="${q.enemy}">${t('quest.hunt')}</button>` : ''}</div></footer></article>`;
     }).join('')}</div></section>`;
   }).join('');
-  return `<div class="win quest-head"><div class="quest-head-row"><p>${t('quest.summary', { ready, claimed: p.claimedQuests.length, total: QUESTS.length })}</p>${ready ? `<button class="btn primary" data-claim-all>${t('quest.claim.all', { n: ready })}</button>` : ''}</div><div class="quest-filters"><label class="quest-recipient">${t('quest.filter')}<select data-quest-filter aria-label="${t('quest.filter')}">${(['available', 'all', 'claimed'] as const).map(f => `<option value="${f}" ${f === filter ? 'selected' : ''}>${t(`quest.filter.${f}` as StringKey)}</option>`).join('')}</select></label><label class="quest-recipient">${t('quest.recipient')}<select data-quest-recipient aria-label="${t('quest.recipient')}">${p.roster.map(id => `<option value="${id}" ${hero === id ? 'selected' : ''}>${ROSTER[id].name}</option>`).join('')}</select></label></div></div><div class="quest-board">${sections || `<p class="win hint">${t('quest.empty')}</p>`}</div>`;
+  return `<div class="win quest-head"><div class="quest-head-row"><p>${t('quest.summary', { ready, claimed: p.claimedQuests.length, total: QUESTS.length })}</p>${ready ? `<button class="btn primary" data-claim-all>${t('quest.claim.all', { n: all })}</button>` : ''}</div><div class="quest-filters"><label class="quest-recipient">${t('quest.filter')}<select data-quest-filter aria-label="${t('quest.filter')}">${(['available', 'all', 'claimed'] as const).map(f => `<option value="${f}" ${f === filter ? 'selected' : ''}>${t(`quest.filter.${f}` as StringKey)}</option>`).join('')}</select></label><label class="quest-recipient">${t('quest.recipient')}<select data-quest-recipient aria-label="${t('quest.recipient')}">${p.roster.map(id => `<option value="${id}" ${hero === id ? 'selected' : ''}>${ROSTER[id].name}</option>`).join('')}</select></label></div></div><div class="quest-board">${sections || `<p class="win hint">${t('quest.empty')}</p>`}</div>`;
 }

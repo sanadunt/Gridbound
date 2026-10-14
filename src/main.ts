@@ -18,10 +18,10 @@ import { Battle, GUARD_DURATION, ENRAGE_WARN, ENRAGE_AT, ENRAGE_DMG, BREAK_SECON
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
 import { CAMPAIGN, BOONS, ENEMIES, boonChoices } from './game/world';
-import { promote, equipGear, buyTalent, equipSkill, respecHero, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, ownsChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult, chapterReward } from './game/profile';
+import { promote, equipGear, buyTalent, equipSkill, respecHero, respecPreview, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, ownsChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult, chapterReward } from './game/profile';
 import { DEPTHS, startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fleeFight, interruptFight, noteFight, dungeonBattleOptions, type Outcome, type Pouch } from './game/dungeon';
 import { chapterStars, STAR_PAR_SECONDS } from './game/journey';
-import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
+import { renderTown, routeTitle, portrait, emptySlots, type TownState, type TownTab } from './ui/town';
 import { partyPower, powerVerdict, recommendedHeroicPower, recommendedPower } from './game/power';
 import { claimAllQuests, questGearText } from './ui/quests';
 import { UNLOCKS, isFeature, markIntro, markVisited, noteModesInUse, pendingIntros, resetUnlockFlags, routeLocked, type Feature } from './ui/unlocks';
@@ -65,6 +65,17 @@ let pendingSettlement = false;
 const reduceMotionQuery = matchMedia('(prefers-reduced-motion: reduce)');
 /** Effective motion: the player's Motion setting, unless the device asks for reduced motion (the saved setting is never overwritten). */
 const motionOn = () => profile.motion && !reduceMotionQuery.matches;
+type Targets = Element | null | undefined | ArrayLike<Element | null | undefined>;
+/** The elements of a tween that exist right now. GSAP logs 'GSAP target … not found' for a selector that matches nothing or an empty list,
+ *  so animations get element lists filtered for null, never a bare selector. */
+const present = (...targets: Targets[]) => targets.flatMap(target => !target ? [] : target instanceof Element ? [target] : Array.from(target)).filter((el): el is Element => Boolean(el));
+const q = (selector: string, root: ParentNode = document) => root.querySelectorAll(selector);
+/** gsap.fromTo (or a timeline's, at `position`) on the targets that exist; nothing (no tween, no warning) when none does. */
+function fromTo(targets: Targets, from: gsap.TweenVars, to: gsap.TweenVars, tl?: gsap.core.Timeline, position?: gsap.Position) {
+  const els = present(targets);
+  if (!els.length) return;
+  if (tl) tl.fromTo(els, from, to, position); else gsap.fromTo(els, from, to);
+}
 let storageFailed = false;
 const heroName = (h: { name: string }) => eventText(h.name, lang());
 const stageLabel = () => eventText(battle.stageName, lang());
@@ -106,10 +117,10 @@ function showTitleScreen(animated = true) {
   updateTitleStatus();
   if (animated && motionOn()) {
     const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
-    tl.fromTo('.title-logo', { opacity: 0, y: -30, scale: 1.4 }, { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: 'back.out(1.6)' })
-      .fromTo('.title-flourish', { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: 'power3.out' }, '-=0.2')
-      .fromTo('.title-menu', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.35, clearProps: 'transform' }, '-=0.1')
-      .fromTo('.title-footer', { opacity: 0 }, { opacity: 1, duration: 0.3, clearProps: 'all' }, '-=0.2');
+    fromTo(q('.title-logo', titleScreen), { opacity: 0, y: -30, scale: 1.4 }, { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: 'back.out(1.6)' }, tl);
+    fromTo(q('.title-flourish', titleScreen), { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: 'power3.out' }, tl, '-=0.2');
+    fromTo(q('.title-menu', titleScreen), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.35, clearProps: 'transform' }, tl, '-=0.1');
+    fromTo(q('.title-footer', titleScreen), { opacity: 0 }, { opacity: 1, duration: 0.3, clearProps: 'all' }, tl, '-=0.2');
   }
   requestAnimationFrame(() => $('title-enter')?.focus({ preventScroll: true }));
 }
@@ -117,8 +128,9 @@ function animateTownEntrance() {
   if (!motionOn()) return;
   const town = $('town-screen');
   if (!town || town.hidden) return;
-  gsap.fromTo('.town-map', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', clearProps: 'opacity' });
-  gsap.fromTo('.camp-copy', { opacity: 0, y: 16 }, { opacity: 1, y: 0, delay: 0.25, duration: 0.3, ease: 'power2.out', clearProps: 'all' });
+  // Entering from the title lands on whatever route was open (MENU → Title → Enter): only the camp has a map and a guide to bring in.
+  fromTo(q('.town-map', town), { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', clearProps: 'opacity' });
+  fromTo(q('.camp-copy', town), { opacity: 0, y: 16 }, { opacity: 1, y: 0, delay: 0.25, duration: 0.3, ease: 'power2.out', clearProps: 'all' });
 }
 function enterEmberhollow() {
   const titleScreen = $('title-screen');
@@ -130,13 +142,14 @@ function enterEmberhollow() {
       onComplete: () => {
         titleScreen.hidden = true;
         titleScreen.classList.remove('dismissing');
-        gsap.set([titleScreen, '.title-menu'], { clearProps: 'all' });
+        gsap.set(present(titleScreen, q('.title-menu', titleScreen)), { clearProps: 'all' });
         animateTownEntrance();
         if (inTown && townState.tab === 'camp') void playCampScenes();
       }
     });
-    tl.to('#title-enter', { x: 8, duration: 0.08, yoyo: true, repeat: 1 })
-      .to(titleScreen, { opacity: 0, duration: 0.35, ease: 'power2.in' }, 0.12);
+    const enter = present($('title-enter'));
+    if (enter.length) tl.to(enter, { x: 8, duration: 0.08, yoyo: true, repeat: 1 });
+    tl.to(titleScreen, { opacity: 0, duration: 0.35, ease: 'power2.in' }, 0.12);
   } else {
     titleScreen.classList.add('dismissing');
     setTimeout(() => {
@@ -210,6 +223,8 @@ sound.enabled = profile.sound;
 let battle = new Battle('adventure', 1, profileModifiers(profile), storyBattleOptions(profile));
 let scene: BattleScene;
 let inTown = true;
+/** When showTown last rendered a notice (dismissNotice ignores input in the first moment after it). */
+let noticeAt = 0;
 let initialized = false;
 let engine: Phaser.Game | undefined;
 /** The Phaser loop runs only while a fight is on screen: in town (once the result screen is closed) it sleeps, so the hidden arena is not redrawn every frame; boot() wakes it. */
@@ -449,6 +464,9 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   pauseForDetails = false;
   if (battle.status === 'fighting') battle.pause();
   if (coach.step) endCoachStep();
+  // The Story party list keeps the open/closed state the player left it in while Party re-renders; another route forgets it.
+  if (routeChanged && tab !== 'party') townState.storyPartyOpen = undefined;
+  if (routeChanged && tab !== 'party-advanced') townState.pendingJob = undefined;
   townState.tab = tab;
   townState.notice = notice;
   // A locked quarry (unseen boss, chapter not cleared) is never offered: fall back to the first open one.
@@ -479,7 +497,11 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   const oldPanel = $('town-screen').querySelector<HTMLElement>('[data-training-panel]');
   const kept = routeChanged ? [] : Array.from($('town-screen').querySelectorAll<HTMLElement>(scrollers), el => ({ key: el.dataset.trainingPanel ?? el.className, top: el.scrollTop }));
   const keptPanel = oldPanel?.dataset.trainingPanel;
+  // The Story party list stays as the player left it (open or closed) when Party re-renders: a bench/deploy never folds it under the finger.
+  const partyList = routeChanged ? null : $('town-screen').querySelector<HTMLDetailsElement>('details.story-party:not(.locked)');
+  if (partyList) townState.storyPartyOpen = partyList.open;
   renderTown($('town-screen'), profile, townState);
+  if (notice) noticeAt = performance.now();
   $('town-screen').querySelectorAll<HTMLElement>(scrollers).forEach(el => { const old = kept.find(k => k.key === (el.dataset.trainingPanel ?? el.className)); if (old && (!el.dataset.trainingPanel || el.dataset.trainingPanel === keptPanel)) el.scrollTop = old.top; });
   if (routeChanged) {
     const scene = $('town-screen').querySelector<HTMLElement>('.town-scene');
@@ -495,8 +517,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   if (animate && motionOn()) {
     if (tab === 'camp') animateTownEntrance();
     else {
-      const panel = document.querySelector<HTMLElement>('.town-scene');
-      if (panel) gsap.fromTo(panel, { opacity: 0.6 }, { opacity: 1, duration: 0.2, ease: 'power2.out', clearProps: 'opacity' });
+      fromTo(document.querySelector('.town-scene'), { opacity: 0.6 }, { opacity: 1, duration: 0.2, ease: 'power2.out', clearProps: 'opacity' });
     }
     if (tab === 'party' || tab === 'party-advanced') animateMirrorTalents();
     else if (tab === 'bestiary') animateCodexEntry();
@@ -507,6 +528,14 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   }
   if (tab === 'camp') void playCampScenes().then(() => unlockIntro());
 }
+/** The notice toast steps aside on the player's next tap, wheel turn, swipe or key, so it never keeps the gate tabs, the Quest Board's filters or
+ *  Claim all hidden for its whole reading time. The tap that showed it came first (its pointerdown precedes the re-render); the first 400 ms are ignored. */
+const dismissNotice = () => {
+  const n = document.getElementById('town-notice');
+  if (!n || n.hidden || !inTown || performance.now() - noticeAt < 400 || n.classList.contains('dismissed') || getComputedStyle(n).visibility === 'hidden') return;
+  n.classList.add('dismissed');
+};
+for (const type of ['pointerdown', 'wheel', 'touchmove', 'keydown']) document.addEventListener(type, dismissNotice, { capture: true, passive: true });
 const lockNotice = (feature: Feature) => t('unlock.locked', { name: routeTitle(feature), n: UNLOCKS[feature] });
 /** A one-time card when the story opens a mode (Undercroft, Raids, Bell Trials); skipped under automation like the camp scenes. */
 function unlockIntro(force = false) {
@@ -612,7 +641,9 @@ $('town-screen').addEventListener('click', event => {
     return;
   }
   if (button.dataset.facility) {
-    townState.pendingGear = undefined;
+    townState.pendingGear = townState.pendingJob = undefined;
+    // The camp guide's promotion step opens on that hero's job inspector.
+    if (button.dataset.pickJob) { townState.hero = Number(button.dataset.pickHero); townState.pendingJob = { hero: townState.hero, job: button.dataset.pickJob }; }
     if (button.dataset.trainingTab) townState.trainingTab = button.dataset.trainingTab as TownState['trainingTab'];
     void navigateTown(button.dataset.facility as TownTab);
     return;
@@ -641,9 +672,10 @@ $('town-screen').addEventListener('click', event => {
     return;
   }
   if (button.dataset.equipSkill !== undefined) {
+    // The skill book (Party) and the Jobs inspector's 'Equip {skill} now' both equip here; each stays on its own screen.
     const ok = equipSkill(profile, townState.hero, Number(button.dataset.skillSlot), Number(button.dataset.equipSkill));
-    showTown('party', ok ? t('notice.loadout') : t('notice.loadout.fail'), true);
-    if (ok) celebrate(`[data-loadout-slot="${button.dataset.skillSlot}"]`);
+    showTown(townState.tab === 'party-advanced' ? 'party-advanced' : 'party', ok ? t('notice.loadout') : t('notice.loadout.fail'), true);
+    if (ok) celebrate(`[data-loadout-slot="${button.dataset.skillSlot}"], [data-job-inspector]`);
     return;
   }
   if (button.dataset.inspectTalent) {
@@ -656,6 +688,7 @@ $('town-screen').addEventListener('click', event => {
   if (button.dataset.branch) { townState.talentBranch = button.dataset.branch; townState.selectedTalent = undefined; showTown('party-advanced', '', true); return; }
   if (button.dataset.trainingTab) {
     townState.trainingTab = button.dataset.trainingTab as TownState['trainingTab'];
+    townState.pendingJob = undefined;
     townState.tab = button.dataset.trainingTab === 'overview' || button.dataset.trainingTab === 'jobs' || button.dataset.trainingTab === 'talents' ? 'party-advanced' : 'party';
     showTown(townState.tab, '', true);
     return;
@@ -677,11 +710,10 @@ $('town-screen').addEventListener('click', event => {
   }
   if (button.dataset.townHero) {
     townState.hero = Number(button.dataset.townHero);
-    townState.pendingGear = undefined;
+    townState.pendingGear = townState.pendingJob = undefined;
     showTown(townState.tab === 'party-advanced' ? 'party-advanced' : 'party', '', true);
     if (motionOn()) {
-      const heroBtn = document.querySelector<HTMLElement>(`[data-town-hero="${townState.hero}"]`);
-      if (heroBtn) gsap.fromTo(heroBtn, { scale: 0.93 }, { scale: 1, duration: 0.22, ease: 'back.out(2)', clearProps: 'transform' });
+      fromTo(document.querySelector(`[data-town-hero="${townState.hero}"]`), { scale: 0.93 }, { scale: 1, duration: 0.22, ease: 'back.out(2)', clearProps: 'transform' });
     }
   }
   if (button.dataset.act !== undefined) {
@@ -729,26 +761,38 @@ $('town-screen').addEventListener('click', event => {
     showTown('party');
     return;
   }
-  if (button.dataset.promote) { const job=button.dataset.promote;const ok=promote(profile,townState.hero,job);showTown('party-advanced',ok?t('notice.job.ok'):t('notice.job.fail'));if(ok)celebrate(`[data-promote="${job}"], .hero-sheet`); }
+  // A job card only opens its inspector (a second tap closes it); Promote there spends the gold (inspect, then buy, like gear and talents).
+  if (button.dataset.promote) {
+    const job = button.dataset.promote, same = townState.pendingJob?.hero === townState.hero && townState.pendingJob.job === job;
+    townState.pendingJob = same ? undefined : { hero: townState.hero, job };
+    sound.play('cursor');
+    showTown('party-advanced');
+    if (!same) document.querySelector('[data-job-inspector]')?.scrollIntoView({ block: 'nearest' });
+    // A keyboard press lost its card to the re-render: the inspector's safe exit (Close) takes the focus; Tab reaches Promote before it.
+    if (!same && (event as MouseEvent).detail === 0) document.querySelector<HTMLElement>('[data-cancel-job]')?.focus({ preventScroll: true });
+    return;
+  }
+  if (button.dataset.confirmJob) {
+    const job = button.dataset.confirmJob, ok = townState.pendingJob?.hero === townState.hero && promote(profile, townState.hero, job);
+    // The inspector stays open on the learned job and offers to equip its signature skill.
+    showTown('party-advanced', ok ? t('notice.job.ok') : t('notice.job.fail'));
+    if (ok) celebrate(`[data-promote="${job}"], [data-job-inspector], .hero-sheet`);
+    return;
+  }
+  if (button.hasAttribute('data-cancel-job')) { townState.pendingJob = undefined; showTown('party-advanced'); return; }
 
   if (button.dataset.formation) {
     moveFormation(profile, townState.hero, Number(button.dataset.formation));
     showTown('party', t('notice.formation'));
   }
-  if (button.hasAttribute('data-respec')) {
-    const reset = respecHero(profile, townState.hero);
-    showTown('party-advanced', reset
-      ? t('notice.respec.ok')
-      : t('notice.respec.fail'));
-  }
+  if (button.hasAttribute('data-respec')) { respecModal(townState.hero); return; }
   if(button.dataset.claimQuest){
     const questId = button.dataset.claimQuest;
     const ok=claimQuest(profile,questId,townState.hero);
     const gearName = ok && ok.gear ? GEAR.find(g => g.id === ok.gear)?.name ?? ok.gear : '';
-    showTown('quests',ok?t(!ok.gear ? 'notice.quest.ok' : ok.refund ? 'notice.quest.gear.refund' : 'notice.quest.ok.gear', { name: ROSTER[ok.hero].name, gear: gearName, gold: ok.refund }):t('notice.quest.fail'), true);
+    showTown('quests',ok?t(!ok.gear ? 'notice.quest.ok' : ok.refund ? 'notice.quest.gear.refund' : ok.equipped ? 'notice.quest.gear.equipped' : 'notice.quest.ok.gear', { name: ROSTER[ok.hero].name, gear: gearName, gold: ok.refund }):t('notice.quest.fail'), true);
     if (ok && motionOn()) {
-      const entry = document.querySelector<HTMLElement>(`[data-quest="${questId}"]`);
-      if (entry) gsap.fromTo(entry, { scale: 0.96, filter: 'brightness(1.5)' }, { scale: 1, filter: 'brightness(1)', duration: 0.35, ease: 'back.out(2)', clearProps: 'transform,filter' });
+      fromTo(document.querySelector(`[data-quest="${questId}"]`), { scale: 0.96, filter: 'brightness(1.5)' }, { scale: 1, filter: 'brightness(1)', duration: 0.35, ease: 'back.out(2)', clearProps: 'transform,filter' });
     }
   }
   if(button.dataset.trackQuest){const q=QUESTS.find(q=>q.id===button.dataset.trackQuest);if(q&&questProgress(profile,q).unlocked){profile.trackedQuest=q.id;showTown('quests',t('notice.quest.track'));}}
@@ -779,6 +823,21 @@ function abandonSuspended(mode: 'raid' | 'roguelike' | 'story') {
     modal.close();
     if (!ensureMode(mode, () => abandonSuspended(mode))) return;
     void clearEncounter().then(ok => { if (ok) showTown(tab, paused ? t('run.abandon.story.done', { n }) : t('run.abandon.done')); else unsavedTownModal(() => abandonSuspended(mode)); });
+  });
+}
+/** Reset asks first (Cancel focused): the job and its parent, the talent count and the gold it refunds (respecPreview, the sums respecHero pays). */
+function respecModal(hero: number) {
+  const r = respecPreview(profile, hero), name = ROSTER[hero]?.name ?? '';
+  if (!r || (!r.job && !r.talents)) { showTown(townState.tab, t('notice.respec.fail')); return; }
+  const job = r.job ? JOBS[r.job]?.name ?? r.job : '', parent = r.parentJob ? JOBS[r.parentJob]?.name ?? r.parentJob : '';
+  const lines = [job ? (parent ? t('respec.confirm.jobs', { job, parent }) : t('respec.confirm.job', { job })) : '', r.talents ? t('respec.confirm.talents', { n: r.talents }) : '', t('respec.confirm.gold', { gold: r.gold })].filter(Boolean);
+  openModal(`<h2 id="modal-title">${t('respec.confirm.title', { name: escapeUI(name) })}</h2><ul class="respec-list">${lines.map(line => `<li>${escapeUI(line)}</li>`).join('')}</ul><p>${t('respec.confirm.body')}</p><div class="leave-actions"><button id="respec-confirm" class="btn danger">${t('respec.confirm.ok', { name: escapeUI(name) })}</button><button class="btn" data-close data-autofocus>${t('common.cancel')}</button></div>`);
+  $('respec-confirm').addEventListener('click', () => {
+    modal.close();
+    if (!inTown || commander.stale) { if (commander.stale) staleModal(); return; }
+    const reset = respecHero(profile, hero);
+    townState.pendingJob = undefined;
+    showTown(townState.tab, reset ? t('notice.respec.ok') : t('notice.respec.fail'));
   });
 }
 $('town-screen').addEventListener('change', event => {
@@ -1092,7 +1151,30 @@ function depart(mode: Mode) {
   const existing = resumableEncounter(commander.document, commander.mode), paused = mode === 'adventure' ? pausedStory(commander.document) : undefined;
   if (existing && paused && !resumesPaused(paused, townState.zone, heroicPick())) { pausedStoryModal(paused, existing); return; }
   if (existing) { void restoreEncounter(existing); return; }
-  freshDeparture(mode);
+  checkedDeparture(mode);
+}
+/** A fresh departure, after asking about free Story party slots (emptySlotsModal) when benched heroes could fill them (not while an
+ *  Undercroft run locks the party: Fill party could not change it). Like the intros and the coach it is skipped under automation, whose seeded
+ *  saves rarely fill the party; tests turn it on with window.gridbound.emptySlotPrompt(). */
+let emptySlotPrompt = false;
+function checkedDeparture(mode: Mode) {
+  const ask = mode === 'adventure' && (emptySlotPrompt || !navigator.webdriver) && emptySlots(profile) > 0 && !storyPartyLocked(profile);
+  if (ask) emptySlotsModal(() => freshDeparture(mode)); else freshDeparture(mode);
+}
+/** A fresh Story departure with free party slots and benched heroes asks first: Fill party (focused) opens Formation with the bench list open,
+ *  Depart anyway goes on with the smaller party, Cancel stays. A party of 2 in a chapter tuned for 3 is the commonest silent defeat. */
+function emptySlotsModal(go: () => void) {
+  const n = emptySlots(profile), party = normalizeStoryParty(profile.storyActive, profile.roster, profile.cleared);
+  const bench = profile.roster.filter(id => !party.includes(id)).map(id => ROSTER[id]?.name).filter(Boolean).join(', ');
+  openModal(`<h2 id="modal-title">${t('party.empty.title', { n })}</h2><p>${t('party.empty.copy', { n, names: escapeUI(bench) })}</p><div class="leave-actions"><button id="empty-fill" class="btn primary" data-autofocus>${t('party.empty.fill')}</button><button id="empty-go" class="btn">${t('party.empty.go')}</button><button class="btn" data-close>${t('common.cancel')}</button></div>`);
+  $('empty-fill').addEventListener('click', () => {
+    modal.close();
+    // Party → Formation with the bench list open (also when Depart was pressed on Party itself, whose list the re-render reads).
+    townState.trainingTab = 'formation'; townState.storyPartyOpen = true; townState.pendingGear = undefined;
+    const list = document.querySelector<HTMLDetailsElement>('details.story-party'); if (list) list.open = true;
+    void navigateTown('party').then(() => document.querySelector('details.story-party')?.scrollIntoView({ block: 'nearest' }));
+  });
+  $('empty-go').addEventListener('click', () => { modal.close(); if (inTown && !playingScene && !campScenesRunning) go(); });
 }
 /** The Heroic toggle as a departure reads it: only for a chapter already cleared. */
 const heroicPick = () => townState.heroic === true && profile.cleared.includes(townState.zone);
@@ -1123,7 +1205,7 @@ function pausedStoryModal(paused: PausedStory, existing: Parameters<typeof resto
     navBusy++;
     const cleared = await clearEncounter().finally(() => { navBusy--; });
     if (!cleared) { unsavedTownModal(() => depart('adventure')); return; }
-    if (inTown && !playingScene && !campScenesRunning) freshDeparture('adventure');
+    if (inTown && !playingScene && !campScenesRunning) checkedDeparture('adventure');
   });
 }
 function startDeparture(mode: Mode) {
@@ -1270,7 +1352,7 @@ function showReady() {
   $('start').textContent = t('battle.begin');
   updateReadyBack();
   if (motionOn()) {
-    gsap.fromTo('#start-overlay .start-window', { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
+    fromTo(q('#start-overlay .start-window'), { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
   }
 }
 /** The ready window's Back, before FIGHT!: free ('◀ Back', nothing spent) or guarded ('◀ Leave…', the leave dialog). Also the Log view's exit label. */
@@ -1722,7 +1804,7 @@ function frame(dt: number) {
   intent.classList.toggle('danger', isDanger);
   intent.classList.toggle('guarding', !isDanger && battle.guardLeft > 0);
   if (isDanger && !wasDanger && motionOn()) {
-    gsap.fromTo('#intent', { scale: 1.08 }, { scale: 1, duration: 0.25, ease: 'back.out(2)', clearProps: 'transform' });
+    fromTo($('intent'), { scale: 1.08 }, { scale: 1, duration: 0.25, ease: 'back.out(2)', clearProps: 'transform' });
   }
   setText(intent.querySelector('b')!, threat ? `${t('battle.intent.time', { name: eventText(threat.name, lang()), s: fmtDec(Math.max(0, threat.left)) })}${threat.targetId !== undefined ? ` → ${heroLabel(threat.targetId)}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: fmtDec(battle.guardLeft) }) : t('battle.watch'));
   setText(intent.querySelector('span')!, threat ? `${threat.counter ? touchText(eventText(threat.counter, lang())) : t('battle.counter.default')}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.hint'));
@@ -2092,107 +2174,58 @@ const boonColor = (id: string) => BOON_COLORS[id] ?? '#f5c462';
 
 function animateBoonDraft() {
   if (!motionOn()) return;
-  const cards = resultScreen.querySelectorAll('.boon-card');
-  if (!cards.length) return;
-  gsap.fromTo(
-    cards,
-    { opacity: 0, y: 35, scale: 0.88 },
-    {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      stagger: 0.08,
-      duration: 0.4,
-      ease: 'back.out(1.6)',
-      clearProps: 'opacity,transform',
-    }
-  );
+  fromTo(q('.boon-card', resultScreen), { opacity: 0, y: 35, scale: 0.88 }, { opacity: 1, y: 0, scale: 1, stagger: 0.08, duration: 0.4, ease: 'back.out(1.6)', clearProps: 'opacity,transform' });
 }
 
 function animateCeremony() {
   if (!motionOn()) return;
   const modalEl = resultScreen.querySelector('.result-ceremony-modal');
   if (!modalEl) return;
-  const crest = modalEl.querySelector('.result-banner');
-  const plaques = modalEl.querySelectorAll('.stat-plaque');
-  const cards = modalEl.querySelectorAll('.xp-card');
-  const tl = gsap.timeline();
+  const tl = gsap.timeline(), crest = modalEl.querySelector('.result-banner');
   if (crest) {
-    tl.fromTo(crest, { scale: 2.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(2.2)', clearProps: 'opacity,transform' });
-    tl.fromTo(modalEl.querySelectorAll('.win'), { opacity: 0, scaleY: 0.3 }, { opacity: 1, scaleY: 1, stagger: 0.08, duration: 0.2, ease: 'power2.out', clearProps: 'opacity,transform' }, '-=0.1');
+    fromTo(crest, { scale: 2.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(2.2)', clearProps: 'opacity,transform' }, tl);
+    fromTo(q('.win', modalEl), { opacity: 0, scaleY: 0.3 }, { opacity: 1, scaleY: 1, stagger: 0.08, duration: 0.2, ease: 'power2.out', clearProps: 'opacity,transform' }, tl, '-=0.1');
   }
-  if (plaques.length) {
-    tl.fromTo(plaques, { opacity: 0, y: 14 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.28, ease: 'power2.out', clearProps: 'opacity,transform' }, '-=0.15');
-  }
-  if (cards.length) {
-    tl.fromTo(cards, { opacity: 0, x: -14 }, { opacity: 1, x: 0, stagger: 0.035, duration: 0.25, ease: 'power2.out', clearProps: 'opacity,transform' }, '-=0.1');
-  }
+  fromTo(q('.stat-plaque', modalEl), { opacity: 0, y: 14 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.28, ease: 'power2.out', clearProps: 'opacity,transform' }, tl, '-=0.15');
+  fromTo(q('.xp-card', modalEl), { opacity: 0, x: -14 }, { opacity: 1, x: 0, stagger: 0.035, duration: 0.25, ease: 'power2.out', clearProps: 'opacity,transform' }, tl, '-=0.1');
 }
 
 function animateMirrorTalents() {
   if (!motionOn()) return;
-  const nodes = document.querySelectorAll('.talent-flow-node');
-  if (!nodes.length) return;
-  gsap.fromTo(
-    nodes,
-    { opacity: 0, scale: 0.94 },
-    { opacity: 1, scale: 1, stagger: 0.02, duration: 0.2, ease: 'power2.out', clearProps: 'opacity,transform' }
-  );
+  fromTo(q('.talent-flow-node'), { opacity: 0, scale: 0.94 }, { opacity: 1, scale: 1, stagger: 0.02, duration: 0.2, ease: 'power2.out', clearProps: 'opacity,transform' });
 }
 
 function animateCodexEntry() {
   if (!motionOn()) return;
   const art = document.querySelector<HTMLElement>('.bestiary-list article');
   if (!art) return;
-  const img = art.querySelector<HTMLElement>('img');
-  const details = art.querySelector<HTMLElement>('div');
   const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
-  if (img) tl.fromTo(img, { opacity: 0, scale: 0.88, rotate: -2 }, { opacity: 1, scale: 1, rotate: 0, duration: 0.28 });
-  if (details) tl.fromTo(details.children, { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: 0.04, duration: 0.22, clearProps: 'all' }, '-=0.15');
+  fromTo(art.querySelector('img'), { opacity: 0, scale: 0.88, rotate: -2 }, { opacity: 1, scale: 1, rotate: 0, duration: 0.28 }, tl);
+  fromTo(art.querySelector('div')?.children, { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: 0.04, duration: 0.22, clearProps: 'all' }, tl, '-=0.15');
 }
 
 function animateProphecies() {
   if (!motionOn()) return;
-  const entries = document.querySelectorAll<HTMLElement>('.quest-entry');
-  if (!entries.length) return;
-  gsap.fromTo(entries, { opacity: 0, y: 12 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.25, ease: 'power2.out', clearProps: 'all' });
+  fromTo(q('.quest-entry'), { opacity: 0, y: 12 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.25, ease: 'power2.out', clearProps: 'all' });
 }
 
 function animateChallengeShop() {
   if (!motionOn()) return;
-  const items = document.querySelectorAll<HTMLElement>('.challenge-shop-grid .shop-item');
-  if (!items.length) return;
-  gsap.fromTo(items, { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: 0.03, duration: 0.22, ease: 'power2.out', clearProps: 'all' });
+  fromTo(q('.challenge-shop-grid .shop-item'), { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: 0.03, duration: 0.22, ease: 'power2.out', clearProps: 'all' });
 }
 
 function animatePactRaid() {
   if (!motionOn()) return;
-  const cards = document.querySelectorAll<HTMLElement>('.raid-roster button');
-  if (cards.length) {
-    gsap.fromTo(cards, { opacity: 0, scale: 0.95, y: 8 }, { opacity: 1, scale: 1, y: 0, stagger: 0.03, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
-  }
-  const brief = document.querySelector<HTMLElement>('.mission-brief');
-  if (brief) {
-    gsap.fromTo(brief, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.25, ease: 'power2.out', clearProps: 'opacity,transform' });
-  }
-  const deploy = document.querySelector<HTMLElement>('.secondary-deploy');
-  if (deploy) gsap.fromTo(deploy, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.24, ease: 'power2.out', clearProps: 'opacity,transform' });
+  fromTo(q('.raid-roster button'), { opacity: 0, scale: 0.95, y: 8 }, { opacity: 1, scale: 1, y: 0, stagger: 0.03, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
+  fromTo(document.querySelector('.mission-brief'), { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.25, ease: 'power2.out', clearProps: 'opacity,transform' });
+  fromTo(document.querySelector('.secondary-deploy'), { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.24, ease: 'power2.out', clearProps: 'opacity,transform' });
 }
 
 function animateSunkenDescent() {
   if (!motionOn()) return;
-  const pillars = document.querySelectorAll<HTMLElement>('.endless-rules p');
-  if (pillars.length) {
-    gsap.fromTo(pillars, { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.24, ease: 'power2.out', clearProps: 'opacity,transform' });
-  }
-  const slots = document.querySelectorAll<HTMLElement>('.loadout-slots label');
-  if (slots.length) {
-    gsap.fromTo(slots, { opacity: 0 }, { opacity: 1, stagger: 0.06, duration: 0.25, ease: 'power2.out', clearProps: 'opacity' });
-  }
-  const cta = document.querySelector<HTMLElement>('button[data-depart="endless"]');
-  if (cta) {
-    gsap.fromTo(cta, { opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1, duration: 0.28, ease: 'power2.out', clearProps: 'opacity,transform' });
-  }
+  fromTo(q('.endless-rules p'), { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.24, ease: 'power2.out', clearProps: 'opacity,transform' });
+  fromTo(q('.loadout-slots label'), { opacity: 0 }, { opacity: 1, stagger: 0.06, duration: 0.25, ease: 'power2.out', clearProps: 'opacity' });
+  fromTo(document.querySelector('button[data-depart="endless"]'), { opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1, duration: 0.28, ease: 'power2.out', clearProps: 'opacity,transform' });
 }
 
 function result() {
@@ -3173,6 +3206,8 @@ const exposeQaHook = () => { if (import.meta.env.DEV) Object.assign(window, { gr
   boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro, recruitScene: (id: number) => recruitScene(id, true), campScenes: () => playCampScenes(true), endingScene,
   /** Force the first-battle coach on (tips replay from the start) or off, regardless of automation and Config. */
   coach: (force = true) => { coachForced = force; if (force) resetCoach(); else if (coach.step) endCoachStep(); return { step: coach.step ?? null, done: COACH_STEPS.filter(coachDone) }; },
+  /** Ask before a Story departure with free party slots even under automation (`on = false`: back to skipping it there). */
+  emptySlotPrompt: (on = true) => { emptySlotPrompt = on; },
   /** `reset`: forget the per-viewer unlock flags first, so the card can play again. */
   get coachStep() { return coach.step ?? null; }, unlockIntro: (reset = false) => { if (reset) resetUnlockFlags(); unlockIntro(true); },
   /** The navigation contract's view of the screen (R8): the top layer, the route, the battle's exit state, the open dialog and the history guard. */

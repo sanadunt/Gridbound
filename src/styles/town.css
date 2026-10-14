@@ -92,16 +92,19 @@
 .menu-columns { display: grid; grid-template-columns: 1fr; gap: 10px; }
 @media (min-width: 480px) { .menu-columns { grid-template-columns: 1.5fr 1fr; } }
 .menu-badge { display: inline-block; min-width: 20px; margin-left: 4px; padding: 0 5px; border-radius: 10px; background: var(--danger-deep); color: #fff; font-style: normal; font-family: var(--pixel); font-size: 9px; line-height: 18px; text-align: center; vertical-align: middle; }
-/* Phones: commands first, the party as one row of portraits, the summary last. */
-@media (max-width: 480px) {
+/* Phones and the 540px itch embed: commands first, the party as one row of portraits, the summary last. */
+@media (max-width: 600px) {
   .more-scene .menu-columns { display: contents; }
   .more-scene .more-grid { order: 1; }
-  .more-scene .menu-party { order: 2; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 6px; }
+  .more-scene .menu-party { order: 2; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 4px 8px; padding: 6px; }
   .more-scene .menu-summary { order: 3; }
   .menu-party .menu-hero { display: flex; flex-direction: column; align-items: center; gap: 0; width: 42px; }
   .menu-party .menu-hero img { width: 32px; height: 35px; }
   .menu-party .menu-hero > div:not(.menu-hero-stats), .menu-party .menu-hero .gauge { display: none; }
   .menu-party .menu-hero-stats { font-size: 7px; }
+  /* 'LV 11' fits under its own portrait (the 17px name size would run into the next hero's level). */
+  .menu-party .menu-hero-stats > span:first-child { gap: 3px; }
+  .menu-party .menu-hero-stats b { font-size: 10px; }
 }
 
 /* World map */

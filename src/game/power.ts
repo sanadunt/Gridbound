@@ -7,7 +7,7 @@ import type { Profile } from './profile';
 import { normalizeStoryParty } from './story-party';
 
 // Party power of the casual scripted player at the start of each chapter (scripts/power-curve.ts prints it).
-export const RECOMMENDED_POWER: number[] = [305, 453, 702, 1288, 1691, 1866, 2266, 2266, 2482, 3168, 3656, 3856, 4000, 4115, 4255, 4638];
+export const RECOMMENDED_POWER: number[] = [305, 473, 716, 1317, 1724, 1909, 2348, 2348, 2536, 3299, 3772, 3933, 4073, 4190, 4322, 4725];
 
 /** Damage a basic skill deals per second at base tempo: the unit that buffs, hastes and delays are converted into. */
 const BASE_DPS = 15;
@@ -83,7 +83,7 @@ export function recommendedPower(chapter: number): number {
 
 /** Heroic replays (heroicScale, one potion) need about this much more power than the Normal chapter's recommendation: the
  *  median, over the chapters, of the power the casual player needed to win half its Heroic attempts (scripts/power-curve.ts). */
-export const HEROIC_POWER_FACTOR = 1.29;
+export const HEROIC_POWER_FACTOR = 1.25;
 export function recommendedHeroicPower(chapter: number): number {
   return Math.round(recommendedPower(chapter) * HEROIC_POWER_FACTOR / 10) * 10;
 }

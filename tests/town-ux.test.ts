@@ -3,14 +3,15 @@ import assert from 'node:assert/strict';
 import { createProfile, completeZone, normalizeProfile } from '../src/game/profile';
 import { ROSTER } from '../src/game/content';
 import { QUESTS, questProgress } from '../src/game/quests';
-import { boardQuests, claimAllQuests, questGroup } from '../src/ui/quests';
+import { boardQuests, claimAllQuests, claimAllCount, gearOwner, questGroup } from '../src/ui/quests';
+import { normalizeStoryParty } from '../src/game/story-party';
 import { UNLOCKS, featureOpen, routeLocked, pendingIntros, isNew, markIntro, markVisited, noteModesInUse, resetUnlockFlags } from '../src/ui/unlocks';
 import { pushRoute, backRoute } from '../src/ui/route-stack';
 import { affordableUpgrade, heroNeeds, trainingBadge, menuBadge, dungeonBadge } from '../src/ui/badges';
 import { GEAR } from '../src/game/jobs';
 import { gearReason } from '../src/game/profile';
 import { defeatFixes } from '../src/ui/result-help';
-import { nextObjective, promotion } from '../src/ui/town';
+import { nextObjective, promotion, jobSkillSlot, noticeSeconds } from '../src/ui/town';
 import { startRun } from '../src/game/dungeon';
 import { HERO_LOOKS, heroKey } from '../src/art/pixels';
 import { COACH_STEPS, coachDone, coachEnabled, markCoach, resetCoach, setCoachEnabled, skipCoach } from '../src/ui/coach';
@@ -41,14 +42,52 @@ test('WP10 the Quest Board lists ready rewards first, then tracked, open, locked
 });
 
 test('WP10 Claim all claims every ready quest (chains included) for the chosen hero and reports the gold', () => {
-  const p = midGame(), ready = QUESTS.filter(q => questProgress(p, q).ready).length, gold = p.gold;
+  const p = midGame(), ready = QUESTS.filter(q => questProgress(p, q).ready).length, gold = p.gold, count = claimAllCount(p, 0), copy = structuredClone(p);
+  assert.deepEqual(p, copy, 'the button count is worked out on a copy');
   const out = claimAllQuests(p, 0);
   assert.ok(out.claimed.length >= ready && ready > 0, `${out.claimed.length} claimed of ${ready} ready`);
+  assert.equal(out.claimed.length, count, 'Claim all (n) names what it really claims, chains included');
   assert.equal(out.gold, p.gold - gold);
   assert.equal(QUESTS.filter(q => questProgress(p, q).ready).length, 0, 'nothing is left to claim');
   assert.deepEqual(out.gear.map(g => g.gear), out.claimed.map(id => QUESTS.find(q => q.id === id)?.gear).filter(Boolean), 'each gear reward is listed (the notice names who got it)');
-  assert.ok(out.gear.every(g => g.hero === (QUESTS.find(q => q.gear === g.gear)?.heroId ?? 0)), 'gear goes to the quest hero or the chosen recipient');
+  const party = normalizeStoryParty(p.storyActive, p.roster, p.cleared);
+  assert.ok(out.gear.every(g => g.hero === QUESTS.find(q => q.gear === g.gear)?.heroId || party.includes(g.hero) || g.hero === 0), 'gear goes to the quest hero, a deployed hero, or the chosen recipient');
   assert.deepEqual(claimAllQuests(p, 0), { claimed: [], gold: 0, gear: [] });
+});
+
+test('TOWN Claim all after chapter 1 spreads the hunt gear over the deployed party, equipped in empty slots; EXP stays with the recipient', () => {
+  const p = createProfile(); completeZone(p, 0); p.ledger.enemies = { wolf: 1, goblin: 1, spider: 1 };
+  const party = normalizeStoryParty(p.storyActive, p.roster, p.cleared), xp = Object.fromEntries(p.roster.map(id => [id, p.loadouts[id].xp ?? 0]));
+  const count = claimAllCount(p, 0), out = claimAllQuests(p, 0);
+  assert.equal(out.claimed.length, count);
+  assert.deepEqual(out.gear.map(g => g.gear).sort(), ['ember-charm', 'iron-edge', 'oak-plate']);
+  assert.ok(out.gear.every(g => g.equipped && party.includes(g.hero)), 'every piece is equipped on a deployed hero');
+  assert.equal(new Set(out.gear.map(g => g.hero)).size, 3, 'three pieces, three heroes: nobody gets all of it');
+  for (const g of out.gear) assert.equal(p.loadouts[g.hero].gear?.[GEAR.find(x => x.id === g.gear)!.slot], g.gear);
+  assert.ok((p.loadouts[0].xp ?? 0) > xp[0] && p.roster.filter(id => id !== 0).every(id => (p.loadouts[id].xp ?? 0) === xp[id]), 'quest EXP goes to the recipient');
+});
+test('TOWN gearOwner picks a deployed hero with the slot free and the fewest pieces, else nobody (the recipient keeps it)', () => {
+  const p = createProfile(); completeZone(p, 0);
+  const party = normalizeStoryParty(p.storyActive, p.roster, p.cleared);
+  assert.equal(gearOwner(p, 'iron-edge'), party[0]);
+  p.loadouts[party[0]].gear = { armor: 'oak-plate' }; p.loadouts[party[0]].inventory = ['oak-plate'];
+  assert.equal(gearOwner(p, 'iron-edge'), party[1], 'a hero already wearing a piece comes after one wearing none');
+  for (const id of party) { p.loadouts[id].gear = { ...p.loadouts[id].gear, weapon: 'oath-edge' }; }
+  assert.equal(gearOwner(p, 'iron-edge'), undefined, 'every weapon slot is taken');
+  assert.equal(gearOwner(p, 'nope'), undefined);
+});
+
+test('TOWN Equip {skill} now fills slot I, except it never pushes a healer\'s heal out for a skill that does not heal', () => {
+  const l = (skills: number[]) => ({ skills, talents: [], slot: 0 });
+  assert.equal(jobSkillSlot(l([0, 1]), 'warrior', 4), 0, 'a warrior job skill becomes the opening skill');
+  assert.equal(jobSkillSlot(l([0, 1]), 'healer', 4), 0, 'a heal replaces the heal');
+  assert.equal(jobSkillSlot(l([0, 1]), 'healer', 5), 1, 'a buff (War Cantor) goes to slot II, the heal stays');
+  assert.equal(jobSkillSlot(l([1, 0]), 'healer', 7), 0, 'with no heal in slot I the job skill takes it');
+});
+test('TOWN the notice toast stays long enough to read: 4 s for a short line, longer for a gear list, never past 12 s', () => {
+  assert.equal(noticeSeconds('Saved.'), 4);
+  assert.ok(noticeSeconds('x'.repeat(120)) > 8);
+  assert.equal(noticeSeconds('x'.repeat(1000)), 12);
 });
 
 test('WP10 modes open with the story: Undercroft after chapter 1, Raids after 2, Bell Trials after 4; saves that used a mode keep it', () => {
@@ -172,7 +211,7 @@ test('an under-powered party with a promotion in reach is pointed at the Trainin
   const n = normalizeProfile(p); n.claimedQuests = QUESTS.filter(q => questProgress(n, q).ready).map(q => q.id);
   const goal = nextObjective(n), promo = promotion(n);
   assert.ok(promo && promo.job.tier === 2 && n.storyActive.includes(promo.hero));
-  assert.deepEqual({ facility: goal.facility, tab: goal.tab }, { facility: 'party-advanced', tab: 'jobs' });
+  assert.deepEqual({ facility: goal.facility, tab: goal.tab, job: goal.job }, { facility: 'party-advanced', tab: 'jobs', job: { hero: promo.hero, job: promo.job.id } }, 'Go opens that job\'s inspector');
   assert.match(goal.text, new RegExp(`${ROSTER[promo.hero].name} can become a ${promo.job.name}`));
   n.gold = n.economy.gold = 0;
   assert.equal(promotion(n), undefined); assert.match(nextObjective(n).text, /^Party power .* Promote heroes/, 'without gold the guide still names promotion first');

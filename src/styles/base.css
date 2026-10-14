@@ -233,9 +233,16 @@ body[data-screen="battle"] .site-header { display: none; }
 body[data-screen="battle"] .storage-status[data-level="warn"] { top: 58px; bottom: auto; }
 
 /* Town notice */
-.town-notice { position: relative; z-index: 20; flex: 0 0 auto; margin: 8px 10px 0; padding: 8px 12px; border: 1px solid var(--gold-border); border-radius: var(--radius); background: var(--gold-bg); color: var(--gold-bright); box-shadow: 0 0 0 3px var(--win-shadow), 0 6px 18px #0008; animation: notice-in 0.25s ease-out; pointer-events: none; }
+/* A toast over the top of the route, never in the flow above the list: a re-render never moves a control under the finger, taps pass through it,
+   and it fades out by itself after a reading time set by its length (--notice-for, town.ts; contract §3.8) or at the player's next input. The text stays in the role=status region for screen readers. */
+.town-notice { position: absolute; top: 8px; left: 10px; right: 10px; z-index: 20; max-height: calc(100% - 16px); overflow: hidden; margin: 0; padding: 8px 12px; border: 1px solid var(--gold-border); border-radius: var(--radius); background: var(--gold-bg); color: var(--gold-bright); box-shadow: 0 0 0 3px var(--win-shadow), 0 6px 18px #0008; animation: notice-in 0.25s ease-out, notice-out 0.4s ease-in var(--notice-for, 5s) forwards; pointer-events: none; }
+body.reduced-motion .town-notice { animation: notice-gone 0s linear var(--notice-for, 5s) forwards; }
+/* The next tap, wheel turn, swipe or key dismisses it at once (main.ts dismissNotice). */
+.town-notice.dismissed { animation: notice-out 0.2s ease-in forwards; }
+body.reduced-motion .town-notice.dismissed { animation: notice-gone 0s linear forwards; }
 @keyframes notice-in { from { opacity: 0; transform: translateY(-6px); } }
-@keyframes notice-out { to { opacity: 0; transform: translateY(-20%); } }
+@keyframes notice-out { to { opacity: 0; visibility: hidden; transform: translateY(-20%); } }
+@keyframes notice-gone { to { opacity: 0; visibility: hidden; } }
 
 /* Generic layout helpers */
 .departure-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
@@ -286,6 +293,9 @@ dialog#modal:has(> .modal-exit) { scroll-padding-bottom: 84px; }
 .slot-summary { margin: 8px 0; padding: 8px 10px 8px 26px; border-radius: var(--radius); background: var(--inset); line-height: 1.5; }
 .journal-scene, .journal-chronicle { margin: 10px 0; padding-top: 8px; border-top: 1px solid var(--line); }
 .journal-outcome { color: var(--gold); }
+/* Reset confirmation: what the reset takes back and refunds. */
+.respec-list { margin: 8px 0; padding-left: 20px; }
+.respec-list li { margin: 3px 0; }
 .journal-entry-card { margin: 4px 0; }
 #profile-error:empty, #load-error:empty, #delete-error:empty, #continue-hint:empty { display: none; }
 #profile-error, #load-error, #delete-error { color: var(--danger); }

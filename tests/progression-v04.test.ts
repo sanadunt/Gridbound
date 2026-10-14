@@ -57,11 +57,11 @@ test('a quest gear reward goes to the named hero; one the hero already owns is s
   const p=createProfile(),q=QUESTS.find(q=>q.id==='hunt-goblin')!,gear=GEAR.find(g=>g.id===q.gear)!;
   p.ledger.enemies.goblin=1;p.loadouts[0].inventory=[gear.id];
   const before=p.gold,got=claimQuest(p,q.id,0);
-  assert.deepEqual(got,{hero:0,gear:gear.id,refund:gear.cost});
+  assert.deepEqual(got,{hero:0,gear:gear.id,owner:0,refund:gear.cost});
   assert.equal(p.gold,before+q.gold+gear.cost,'the duplicate is refunded');
   assert.deepEqual(p.loadouts[0].inventory,[gear.id]);
   const other=createProfile(),wolf=QUESTS.find(q=>q.id==='hunt-wolf')!;other.ledger.enemies.wolf=1;
-  assert.deepEqual(claimQuest(other,wolf.id,4),{hero:4,gear:wolf.gear,refund:0});
+  assert.deepEqual(claimQuest(other,wolf.id,4),{hero:4,gear:wolf.gear,owner:4,equipped:true,refund:0});
   assert.ok(other.loadouts[4].inventory?.includes(wolf.gear!),'the chosen recipient receives the gear');
 });
 test('normalization drops impossible points, wrong-class nodes and invalid quest records', () => {

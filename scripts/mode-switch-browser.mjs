@@ -33,9 +33,13 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
   await wait('document.querySelector("#storage-status")?.textContent.startsWith("Saved")');
   await evaluate('window.gridbound.hideTitle()');
   await wait('document.querySelector("#title-screen").hidden');
-  await click.nav('party');
+  // Reset lives on Jobs and asks first (Cancel focused); its confirm pays the refund.
+  await click.nav('party-advanced');
+  await click('[data-training-tab="jobs"]');
   await wait('document.querySelector(".party-scene [data-respec]")');
   await click('.party-scene [data-respec]');
+  await wait('Boolean(document.querySelector("#respec-confirm"))');
+  await click('#respec-confirm');
   await wait('window.gridbound.profile().gold === 2400 && window.gridbound.profile().loadouts[0].talents.length === 0');
   const respec = await evaluate(`(() => {
     const profile = window.gridbound.profile();

@@ -107,8 +107,9 @@
 .start-window p.story-beat { font-style: italic; color: #fff; }
 .start-window p.ready-tip { margin-top: -4px; font-size: 12px; color: var(--ink-dim); }
 .journal-replay { display: block; margin: 6px 0; min-height: 40px; }
-.journal-companions { display: flex; flex-wrap: wrap; gap: 6px; }
-.journal-companions .btn { min-height: 40px; }
+/* Companion replays: an even grid of equal buttons (the modal's '.btn + .btn' top margin would push every button after the first down). */
+.journal-companions { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); align-items: stretch; gap: 6px; }
+dialog#modal .journal-companions .btn { min-height: 44px; margin: 0; }
 .journal-epilogue p { margin: 6px 0; }
 
 /* Roguelike promotion between floors */

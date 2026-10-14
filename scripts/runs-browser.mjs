@@ -78,8 +78,10 @@ async function checks(name, { lang, spoof, trials }, { send, evaluate, wait, cli
     if (spoof) {
       // A real player (no automation shortcuts): pause CH 2 (a replay) at battle 2; the camp guide resumes it without replaying any intro;
       // then Abandon & enter CH 5, a first visit, plays CH 5's intro before its battle 1.
+      // The seeded party leaves slots free: a real player is asked first (Fill party / Depart anyway / Cancel) and departs anyway.
+      const departAnyway = async () => { await wait('Boolean(document.querySelector("dialog[open] #empty-go"))', 8000); await click('#empty-go'); };
       await dossier(1);
-      await click('.world-map-dossier [data-depart="adventure"]'); await wait('!window.gridbound.inTown && window.gridbound.battle.status === "ready"', 10000);
+      await click('.world-map-dossier [data-depart="adventure"]'); await departAnyway(); await wait('!window.gridbound.inTown && window.gridbound.battle.status === "ready"', 10000);
       await click('#start'); await wait('window.gridbound.battle.status === "fighting"'); await kill(); await wait(resultReady, 15000);
       // Save & suspend from the won wave's result (its Return opens the won-wave dialog).
       await click('#result-town'); await wait('Boolean(document.querySelector("dialog[open] #suspend-run"))');
@@ -96,6 +98,8 @@ async function checks(name, { lang, spoof, trials }, { send, evaluate, wait, cli
       await dossier(4);
       await click('.world-map-dossier [data-depart="adventure"]'); await wait('Boolean(document.querySelector("#paused-abandon"))');
       await click('#paused-abandon');
+      // Abandon & enter is a fresh departure too: the free-slot question comes before CH 5's intro.
+      await departAnyway();
       await wait('Boolean(document.querySelector(".dialogue-scene"))', 8000);
       await shot('abandon-enter-intro');
       await key('Escape'); await wait('!window.gridbound.inTown && window.gridbound.battle.status === "ready"', 8000);

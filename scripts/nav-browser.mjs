@@ -119,7 +119,11 @@ async function run(viewport, { spoof = false } = {}) {
       await screen('unlock card', { at: 's.layer === "modal"', enter: async () => { await evaluate('window.gridbound.unlockIntro(true)'); }, expect: 's.layer === "town" && s.route === "camp"' });
       // A first departure plays the chapter intro: Skip, Escape and Back skip it, onto a ready window whose Back is free.
       await toGate('campaign'); await tclick('dossier', '.map-selected [data-mission]'); await wait('document.querySelector(".town-game-shell")?.dataset.townRoute === "mission"');
-      await tclick('depart', '[data-depart="adventure"]');
+      // ACT_TWO_SAVE deploys 3 of 6 heroes: a real player is asked about the free slots first (Fill party, Depart anyway, Cancel);
+      // Escape and Back cancel it and stay on the dossier.
+      await screen('empty party slots', { at: 's.layer === "modal"', enter: () => tclick('depart', '[data-depart="adventure"]'), expect: 's.layer === "town" && s.route === "mission"' });
+      await tclick('depart', '[data-depart="adventure"]'); await wait('Boolean(document.querySelector("dialog[open] #empty-go"))');
+      await tclick('depart anyway', '#empty-go');
       await wait('Boolean(document.querySelector(".dialogue-scene"))', 5000);
       await exitsOk('chapter intro');
       await key('Escape'); await waitNav('chapter intro', 's.layer === "battle" && s.battle.status === "ready" && s.battle.freeBack', 'Escape');

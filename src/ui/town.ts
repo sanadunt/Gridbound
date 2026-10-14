@@ -1,9 +1,9 @@
 import { KITS, ROSTER } from '../game/content';
 import { CAMPAIGN, ENEMIES } from '../game/world';
-import { TALENTS, canEnterZone, talentReason, availablePoints, gearReason, profileModifiers, type Profile } from '../game/profile';
+import { TALENTS, canEnterZone, talentReason, availablePoints, gearReason, jobReason, profileModifiers, type Profile } from '../game/profile';
 import { JOBS, GEAR, GEAR_SETS, MAX_REFINE, REFINE_STEP, gearStats, legalSkill } from '../game/jobs';
 import { heroProgress, LEVEL_HP, LEVEL_POWER } from '../game/levels';
-import { storyPartyCap, normalizeStoryParty, storyPartyLocked } from '../game/story-party';
+import { storyPartyCap, normalizeStoryParty, storyPartyLocked, BENCH_XP } from '../game/story-party';
 import { BASIC_JOBS, createRogueBuild, type RogueBuild } from '../game/roguelike-build';
 import { Battle } from '../game/simulation';
 import { BANK_SHOP, BELL_TONIC, CHALLENGE_SHOP, RAID_MODIFIERS, RELIC_IDS, bankShopItem, getRaidContractForEnemy, raidModifierAvailable, raidReward, type RaidModifierId, type RaidSandbox, type RaidTier } from '../economy/challenge';
@@ -50,6 +50,10 @@ export type TownState = {
   talentBranch?: string;
   selectedTalent?: string;
   pendingGear?: PendingGear;
+  /** The job card being inspected on the Jobs tab (a tap only selects it; Promote in its inspector spends the gold). */
+  pendingJob?: { hero: number; job: string };
+  /** The Story party list on Formation, as the player left it open or closed (kept across re-renders; unset = open while slots are free). */
+  storyPartyOpen?: boolean;
   heroic?: boolean;
   dungeonOutcome?: string;
   /** Letter id a lore choice just found (shown under the outcome). */
@@ -91,7 +95,7 @@ export function routeTitle(tab: TownTab) {
 const SPOT_LABELS: Record<string, StringKey> = { gate: 'town.spot.gate', hall: 'town.spot.hall', guild: 'town.spot.guild', archive: 'town.spot.archive', merchant: 'town.spot.merchant', lodge: 'town.spot.lodge', well: 'town.spot.well', inn: 'town.spot.inn', chapel: 'town.spot.chapel' };
 
 /** Free story party slots that a benched hero could fill (0 when the party is full or nobody is benched). */
-function emptySlots(p: Profile) {
+export function emptySlots(p: Profile) {
   const party = normalizeStoryParty(p.storyActive, p.roster, p.cleared);
   return Math.min(storyPartyCap(p.cleared) - party.length, p.roster.filter(id => !party.includes(id)).length);
 }
@@ -101,13 +105,13 @@ function emptySlots(p: Profile) {
 export function promotion(p: Profile) {
   for (const hero of normalizeStoryParty(p.storyActive, p.roster, p.cleared)) {
     const h = p.loadouts[hero], cls = ROSTER[hero]?.classId;
-    const job = h && Object.values(JOBS).filter(j => j.base === cls && (j.tier === 2 ? !h.job : h.job === j.parent) && p.cleared.length + 1 >= j.level && p.gold >= j.cost).sort((a, b) => a.cost - b.cost || a.index - b.index)[0];
+    const job = h && Object.values(JOBS).filter(j => j.base === cls && !jobReason(p, hero, j.id)).sort((a, b) => a.cost - b.cost || a.index - b.index)[0];
     if (job) return { hero, job };
   }
   return undefined;
 }
 /** `paused`: a Story chapter left with Save & suspend; after an Undercroft run in progress it is the next step (the camp's Resume button). */
-export function nextObjective(p: Profile, paused?: PausedStory): { text: string; facility?: string; tab?: TrainingTab; action?: string; chapter?: number; resume?: number } {
+export function nextObjective(p: Profile, paused?: PausedStory): { text: string; facility?: string; tab?: TrainingTab; action?: string; chapter?: number; resume?: number; job?: { hero: number; job: string } } {
   const ready = QUESTS.filter(q => questProgress(p, q).ready).length;
   if (p.journey.run?.status === 'active') return { text: t('guide.run'), facility: 'dungeon' };
   if (paused) return { text: pausedTitle(paused), resume: paused.chapter };
@@ -126,7 +130,8 @@ export function nextObjective(p: Profile, paused?: PausedStory): { text: string;
   if (powerVerdict(power, rec) === 'under') {
     // A promotion is the biggest step a party can buy (the recommendation assumes promoted heroes): name it before training or gear.
     const promo = promotion(p);
-    if (promo) return { text: t('guide.promote', { name: ROSTER[promo.hero].name, job: promo.job.name, place: t('town.spot.hall') }), facility: 'party-advanced', tab: 'jobs' };
+    // Go opens that job's inspector (nothing is spent until Promote there).
+    if (promo) return { text: t('guide.promote', { name: ROSTER[promo.hero].name, job: promo.job.name, place: t('town.spot.hall') }), facility: 'party-advanced', tab: 'jobs', job: { hero: promo.hero, job: promo.job.id } };
     return { text: t('guide.underpowered', { n: power, rec, name: CAMPAIGN[next].name, place: t('town.spot.hall') }), facility: unlockedDepth(p.cleared, p.journey.depth) ? 'dungeon' : 'party' };
   }
   if (unlockedDepth(p.cleared, p.journey.depth) > p.journey.depth && p.journey.depth < DEPTHS.length) return { text: t('guide.dungeon'), facility: 'dungeon' };
@@ -173,7 +178,7 @@ function campScene(p: Profile, state: TownState) {
   const paused = state.suspended?.story, goal = nextObjective(p, paused), next = storyNext(p);
   // One tap from camp to the next chapter's dossier; when the guide's step is that chapter, this button is the guide's Go.
   // A paused chapter takes its place: Resume departs straight into it, Abandon (confirmed) ends it.
-  const go = goal.resume !== undefined || (goal.chapter !== undefined && next !== undefined) ? '' : goal.action ? `<button class="btn guide-go" data-open-action="${goal.action}">${t('common.go')} ▶</button>` : goal.facility ? `<button class="btn guide-go" data-facility="${goal.facility}"${goal.tab ? ` data-training-tab="${goal.tab}"` : ''}>${t('common.go')} ▶</button>` : '';
+  const go = goal.resume !== undefined || (goal.chapter !== undefined && next !== undefined) ? '' : goal.action ? `<button class="btn guide-go" data-open-action="${goal.action}">${t('common.go')} ▶</button>` : goal.facility ? `<button class="btn guide-go" data-facility="${goal.facility}"${goal.tab ? ` data-training-tab="${goal.tab}"` : ''}${goal.job ? ` data-pick-hero="${goal.job.hero}" data-pick-job="${goal.job.job}"` : ''}>${t('common.go')} ▶</button>` : '';
   // The guide's Abandon… sits beside its text when the paused chapter is the step (where Go would be), else beside Resume.
   const abandon = paused ? `<button class="btn danger continue-abandon" data-abandon-run="story" aria-label="${escape(t('run.abandon.story', { n: paused.chapter + 1 }))}">${t('run.abandon.short')}</button>` : '';
   const resume = paused ? `<button class="btn primary continue-story ${go ? '' : 'guide-go'}" data-resume-story="${paused.chapter}" data-resume-run>${escape(t('town.resume', { n: paused.chapter + 1, k: paused.battle }))} ▶</button>` : '';
@@ -242,9 +247,11 @@ export function expeditionModes(active: 'campaign' | 'dungeon' | 'raid' | 'endle
   }).join('')}</nav>`;
 }
 
+/** How long the notice toast stays: a short line 4 s, a long one (a gear list, a flee report) up to 12 s. */
+export const noticeSeconds = (notice: string) => Math.round(Math.min(12, Math.max(4, 2 + notice.length * 0.06)) * 10) / 10;
 export function renderTown(root: HTMLElement, p: Profile, state: TownState) {
   const content = state.tab === 'camp' ? campScene(p, state) : state.tab === 'dungeon' ? dungeonScene(p, state.dungeonOutcome, expeditionModes('dungeon', p), state.dungeonLetter) : state.tab === 'campaign' || state.tab === 'mission' ? renderWorldMap(p, state) : state.tab === 'party' || state.tab === 'party-advanced' ? training(p, state, state.tab === 'party-advanced') : state.tab === 'more' ? moreScene(p) : secondaryScene(p, state);
-  root.innerHTML = `<div class="town-game-shell" data-town-route="${state.tab}"><section class="town-scene" aria-label="${escape(routeTitle(state.tab))}"><p id="town-notice" class="town-notice" role="status" ${state.notice ? '' : 'hidden'}>${escape(state.notice)}</p>${content}</section></div>`;
+  root.innerHTML = `<div class="town-game-shell" data-town-route="${state.tab}"><section class="town-scene" aria-label="${escape(routeTitle(state.tab))}"><p id="town-notice" class="town-notice" role="status" ${state.notice ? `style="--notice-for:${noticeSeconds(state.notice)}s"` : 'hidden'}>${escape(state.notice)}</p>${content}</section></div>`;
 }
 
 function training(p: Profile, state: TownState, advanced: boolean) {
@@ -253,7 +260,7 @@ function training(p: Profile, state: TownState, advanced: boolean) {
   const preview = new Battle('raid', 1, profileModifiers(p), { roster: [state.hero], loadouts: p.loadouts }).hero(state.hero)!;
   const tabs: [TrainingTab, StringKey][] = advanced ? [['overview','party.tab.overview'],['jobs','party.tab.jobs'],['talents','party.tab.talents']] : [['formation','party.tab.formation'],['skills','party.tab.skills'],['gear','party.tab.gear']];
   const active = tabs.some(([id]) => id === state.trainingTab) ? state.trainingTab : advanced ? 'overview' : 'formation';
-  const panel = active === 'overview' ? trainingOverview(p, state, preview, progress) : active === 'skills' ? skillsPanel(loadout, kit, r.classId) : active === 'jobs' ? advancement(p, state.hero) : active === 'talents' ? talentsPanel(p, state, r, kit, loadout) : active === 'gear' ? forge(p, state.hero, state) : formation(p, state.hero, r, loadout) + storyPartyPanel(p);
+  const panel = active === 'overview' ? trainingOverview(p, state, preview, progress) : active === 'skills' ? skillsPanel(loadout, kit, r.classId) : active === 'jobs' ? advancement(p, state) : active === 'talents' ? talentsPanel(p, state, r, kit, loadout) : active === 'gear' ? forge(p, state.hero, state) : formation(p, state.hero, r, loadout) + storyPartyPanel(p, state.storyPartyOpen);
   const zone = CAMPAIGN[state.zone];
   const deployable = zone !== undefined && canEnterZone(p, state.zone);
   // A paused chapter keeps the party it started with: the note above the panel says so (with its Abandon; seen on arrival, out of the sticky
@@ -289,11 +296,12 @@ function heroSheet(p: Profile, id: number, preview: ReturnType<Battle['hero']> &
   </div>`;
 }
 
-function storyPartyPanel(p: Profile) {
+/** `open`: the list as the player left it (a bench/deploy re-render keeps it); unset, it opens while a slot is free. */
+function storyPartyPanel(p: Profile, open?: boolean) {
   const cap = storyPartyCap(p.cleared);
   // During an Undercroft run the party is locked: its heroes are marked, and a click explains why instead of toggling.
   const locked = storyPartyLocked(p), below = p.journey.run?.party ?? [];
-  return `<details class="story-party ${locked ? 'locked' : ''}" ${emptySlots(p) || locked ? 'open' : ''}><summary>${t('party.story', { n: p.storyActive.length, cap, total: p.roster.length })}</summary><p class="hint">${locked ? t('dungeon.party.locked') : t('party.story.hint')}</p><div class="departure-actions">${p.roster.map(id => { const active = p.storyActive.includes(id); return `<button class="btn ${active ? 'on' : ''}" data-story-toggle="${id}" aria-pressed="${active}" ${locked ? 'aria-disabled="true"' : active ? p.storyActive.length === 1 ? 'disabled' : '' : p.storyActive.length >= cap ? 'disabled' : ''}>${ROSTER[id].name}: ${locked && below.includes(id) ? t('party.story.undercroft') : active ? t('party.story.active') : t('party.story.bench')}</button>`; }).join('')}</div></details>`;
+  return `<details class="story-party ${locked ? 'locked' : ''}" ${locked || (open ?? emptySlots(p) > 0) ? 'open' : ''}><summary>${t('party.story', { n: p.storyActive.length, cap, total: p.roster.length })}</summary><p class="hint">${locked ? t('dungeon.party.locked') : t('party.story.hint', { n: Math.round(BENCH_XP * 100) })}</p><div class="departure-actions">${p.roster.map(id => { const active = p.storyActive.includes(id); return `<button class="btn ${active ? 'on' : ''}" data-story-toggle="${id}" aria-pressed="${active}" ${locked ? 'aria-disabled="true"' : active ? p.storyActive.length === 1 ? 'disabled' : '' : p.storyActive.length >= cap ? 'disabled' : ''}>${ROSTER[id].name}: ${locked && below.includes(id) ? t('party.story.undercroft') : active ? t('party.story.active') : t('party.story.bench')}</button>`; }).join('')}</div></details>`;
 }
 
 function trainingOverview(p: Profile, state: TownState, preview: ReturnType<Battle['hero']> & {}, progress: ReturnType<typeof heroProgress>) {
@@ -354,21 +362,40 @@ function talentCard(p: Profile, hero: number, kit: typeof KITS[keyof typeof KITS
   };
 }
 
-function advancement(p: Profile, id: number) {
-  const h = p.loadouts[id], base = ROSTER[id].classId, level = p.cleared.length + 1;
+/** Which skill slot 'Equip {skill} now' fills: the opening slot I, unless it holds the hero's heal and the job skill does not heal (slot II then). */
+export function jobSkillSlot(loadout: Profile['loadouts'][number], classId: keyof typeof KITS, index: number) {
+  const kind = (i: number) => KITS[classId].skills[i]?.kind ?? '', heals = (i: number) => kind(i) === 'heal' || kind(i) === 'regen';
+  return heals(loadout.skills[0]) && !heals(index) ? 1 : 0;
+}
+/** Job paths: a tap on a card only selects it (aria-pressed) and opens its inspector below the paths: what the job does, its signature skill,
+ *  its cost and why it is locked. Promote there spends the gold; once learned, the inspector offers to equip the signature skill. Its Close
+ *  only closes the panel (Escape and the phone's Back walk the route back, as everywhere: contract R5). Not a live region: it is re-rendered on every tap. */
+function advancement(p: Profile, state: TownState) {
+  const id = state.hero, h = p.loadouts[id], base = ROSTER[id].classId, level = p.cleared.length + 1;
+  const picked = state.pendingJob?.hero === id ? JOBS[state.pendingJob.job] : undefined, chosen = picked?.base === base ? picked : undefined;
   const paths = Object.values(JOBS).filter(j => j.base === base && j.tier === 2).map(j => {
     const third = Object.values(JOBS).find(job => job.parent === j.id);
     const jobs = [j, third].filter(Boolean) as typeof JOBS[string][];
     const cards = jobs.map(job => {
       const owned = h.job === job.id || JOBS[h.job ?? '']?.parent === job.id;
-      const eligible = job.tier === 2 ? !h.job : h.job === job.parent;
-      const disabled = owned || !eligible || level < job.level || p.gold < job.cost;
-      const state = owned ? t('talent.learned.short') : !eligible ? t('job.otherpath') : level < job.level ? t('job.rank', { n: job.level }) : `${fmtInt(job.cost)}G`;
-      return `<button data-promote="${job.id}" class="job-node ${owned ? 'learned' : ''}" ${disabled ? 'disabled' : ''}><small>${job.tier === 2 ? t('job.advanced') : t('job.third')} · ${t('job.rank', { n: job.level })}</small><b>${escape(job.name)}</b><span>${escape(job.description)}</span><em>${t('job.unlock', { name: escape(job.skill.name) })}</em><strong>${state}</strong></button>`;
+      const eligible = job.tier === 2 ? !h.job : h.job === job.parent, open = !jobReason(p, id, job.id);
+      const tag = owned ? t('talent.learned.short') : !eligible ? t('job.otherpath') : level < job.level ? t('job.rank', { n: job.level }) : `${fmtInt(job.cost)}G`;
+      return `<button data-promote="${job.id}" class="job-node ${owned ? 'learned' : open ? 'available' : 'locked'} ${chosen?.id === job.id ? 'chosen' : ''}" aria-pressed="${chosen?.id === job.id}"><small>${job.tier === 2 ? t('job.advanced') : t('job.third')} · ${t('job.rank', { n: job.level })}</small><b>${escape(job.name)}</b><span>${escape(job.description)}</span><em>${t('job.unlock', { name: escape(job.skill.name) })}</em><strong>${tag}</strong></button>`;
     });
     return `<section>${cards.join('<span class="job-connector" aria-hidden="true">▼</span>')}</section>`;
   }).join('');
-  return `<h3 class="subheading">${t('job.title')} <span>${t('job.sub')}</span></h3><div class="job-paths">${paths}</div><p class="hint">${t('job.hint')}</p><div class="departure-actions"><button class="btn" data-respec ${h.talents.length || h.job ? '' : 'disabled'}>${t('party.respec', { name: ROSTER[id].name })}</button></div>`;
+  return `<h3 class="subheading">${t('job.title')} <span>${t('job.sub')}</span></h3><div class="job-paths">${paths}</div>${chosen ? jobInspector(p, id, chosen) : ''}<p class="hint">${t('job.hint')}</p><div class="departure-actions"><button class="btn" data-respec ${h.talents.length || h.job ? '' : 'disabled'}>${t('party.respec', { name: ROSTER[id].name })}</button></div>`;
+}
+function jobInspector(p: Profile, id: number, job: typeof JOBS[string]) {
+  const h = p.loadouts[id], reason = jobReason(p, id, job.id), owned = reason?.code === 'learned', skill = job.skill, slot = h.skills.indexOf(job.index);
+  // Learned: the signature skill can go into a slot right here (the skill book does the same); otherwise Promote, enabled only when it would succeed.
+  const actions = owned
+    ? slot >= 0 ? `<p class="job-inspector-status">${t('job.equipped', { name: escape(skill.name), n: slot + 1 })}</p>` : `<button class="btn primary" data-equip-skill="${job.index}" data-skill-slot="${jobSkillSlot(h, ROSTER[id].classId, job.index)}">${t('job.equipNow', { name: escape(skill.name) })}</button>`
+    : `<button class="btn primary" data-confirm-job="${job.id}" ${reason ? 'disabled' : ''}>${t('job.confirm', { cost: job.cost })}</button>`;
+  return `<section class="job-inspector" data-job-inspector="${job.id}"><small>${job.tier === 2 ? t('job.advanced') : t('job.third')} · ${t('job.rank', { n: job.level })}</small><h3>${escape(job.name)}</h3><p>${escape(job.description)}</p>
+    <div class="job-inspector-skill"><span class="skill-emblem" aria-hidden="true">${escape(skill.label.slice(0, 2))}</span><div><small>${t('job.signature')}</small><b>${escape(skill.name)}</b><span>${escape(skill.label)} · ${fmtSec(skill.cooldown)}</span><p>${escape(skill.description)}</p></div></div>
+    <p class="job-inspector-status">${owned ? t('job.owned') : reason ? escape(lockText(reason)) : t('job.ready', { cost: job.cost })}</p>
+    <div class="gear-preview-actions">${actions}<button class="btn" data-cancel-job data-nav-exit="close">${t('common.close')}</button></div></section>`;
 }
 
 function forge(p: Profile, id: number, state: TownState) {
@@ -403,7 +430,7 @@ function formation(p: Profile, id: number, r: typeof ROSTER[number], loadout: Pr
   // The grid shows the deployed story party; a benched hero is previewed on its preferred tile.
   const deployed = normalizeStoryParty(p.storyActive, p.roster, p.cleared);
   const benched = !deployed.includes(id);
-  return `<h3 class="subheading">${t('formation.title')} <span>${t('formation.sub', { name: r.name })}</span></h3><div class="formation-grid" aria-label="${t('formation.title')}">${Array.from({ length: 9 }, (_, slot) => { const hero = deployed.find(heroId => heroId !== id && p.loadouts[heroId].slot === slot) ?? (loadout.slot === slot ? id : undefined); const row = slot < 3 ? t('formation.front') : slot < 6 ? t('formation.mid') : t('formation.back'); return `<button data-formation="${slot}" class="${loadout.slot === slot ? 'chosen' : ''}" aria-label="${t('formation.tile', { n: slot + 1 })}${hero !== undefined ? `, ${ROSTER[hero].name}` : ''}"><small>${row}</small>${hero !== undefined ? `<img src="${portrait(ROSTER[hero].classId, 0, hero)}" alt=""/><span>${ROSTER[hero].name}</span>` : `<span class="empty">${t('formation.empty')}</span>`}</button>`; }).join('')}</div><p class="hint">${benched ? t('formation.benched', { name: r.name }) : t('formation.hint')}</p><div class="departure-actions"><button class="btn" data-respec ${loadout.talents.length || loadout.job ? '' : 'disabled'}>${t('party.respec', { name: r.name })}</button></div>`;
+  return `<h3 class="subheading">${t('formation.title')} <span>${t('formation.sub', { name: r.name })}</span></h3><div class="formation-grid" aria-label="${t('formation.title')}">${Array.from({ length: 9 }, (_, slot) => { const hero = deployed.find(heroId => heroId !== id && p.loadouts[heroId].slot === slot) ?? (loadout.slot === slot ? id : undefined); const row = slot < 3 ? t('formation.front') : slot < 6 ? t('formation.mid') : t('formation.back'); return `<button data-formation="${slot}" class="${loadout.slot === slot ? 'chosen' : ''}" aria-label="${t('formation.tile', { n: slot + 1 })}${hero !== undefined ? `, ${ROSTER[hero].name}` : ''}"><small>${row}</small>${hero !== undefined ? `<img src="${portrait(ROSTER[hero].classId, 0, hero)}" alt=""/><span>${ROSTER[hero].name}</span>` : `<span class="empty">${t('formation.empty')}</span>`}</button>`; }).join('')}</div><p class="hint">${benched ? t('formation.benched', { name: r.name }) : t('formation.hint')}</p>`;
 }
 
 /** Bestiary families (archetypes); the ledger records kills per family, so a family is seen once one of its variants fell. */

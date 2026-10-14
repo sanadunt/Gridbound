@@ -3,7 +3,7 @@ import { withBrowser, seedSave, ACT_TWO_SAVE } from './browser-harness.mjs';
 
 const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5180/';
 
-for (const [width, height] of [[1440, 900], [390, 844], [360, 640]]) {
+for (const [width, height] of [[1440, 900], [540, 900], [390, 844], [360, 640]]) {
   await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors }) => {
     await send('Page.navigate', { url });
     await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")');
@@ -83,6 +83,8 @@ for (const [width, height] of [[1440, 900], [390, 844], [360, 640]]) {
       settings: Boolean(document.querySelector('.more-scene [data-open-action="settings"]'))
     }))()`);
     assert.ok(menu.journal && menu.profiles && menu.challengeShop && menu.settings, `More exposes journal, profile, challenge shop, and settings actions: ${JSON.stringify(menu)}`);
+    // Up to the 600px column (phones and the 540×900 itch embed) the commands come first, above the party row.
+    if (width <= 600) assert.ok(await evaluate('document.querySelector(".more-grid").getBoundingClientRect().top < document.querySelector(".menu-party").getBoundingClientRect().top'), `MENU commands first at ${width}px`);
     assert.deepEqual(errors, []);
     console.log(`PASS Town entry and navigation ${width}×${height}`);
   }, { width, height, mobile: width < 500 });

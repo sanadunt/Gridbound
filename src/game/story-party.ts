@@ -52,9 +52,11 @@ export function storyBattleOptions(p: Profile): BattleOptions {
   };
 }
 
+/** Share of a Story victory's EXP every benched hero receives; a hero who trails the party's median gets up to as much again (catch-up), never more than the full EXP. */
+export const BENCH_XP = .5;
 export function benchExperience(mode: Mode, victoryXP: number, currentXP: number, activeMedianXP: number) {
   if (mode !== 'adventure') return null;
-  const base = Number.isFinite(victoryXP) ? Math.max(0, Math.floor(victoryXP * .5)) : 0;
+  const base = Number.isFinite(victoryXP) ? Math.max(0, Math.floor(victoryXP * BENCH_XP)) : 0;
   const bonus = Math.min(base, Math.max(0, normalizedXP(activeMedianXP) - normalizedXP(currentXP) - base));
   return { base, bonus, total: base + bonus };
 }
