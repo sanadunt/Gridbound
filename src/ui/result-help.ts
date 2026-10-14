@@ -2,17 +2,20 @@ import { ROSTER } from '../game/content';
 import type { Profile } from '../game/profile';
 import { partyPower, powerVerdict, recommendedHeroicPower, recommendedPower } from '../game/power';
 import { unlockedDepth } from '../game/dungeon';
-import { normalizeStoryParty } from '../game/story-party';
-import { affordableUpgrade, heroNeeds } from './badges';
+import { normalizeStoryParty, storyPartyLocked } from '../game/story-party';
+import { affordableUpgrade, emptySlots, heroNeeds } from './badges';
 import { featureOpen } from './unlocks';
 import { t, fmtInt } from '../i18n';
 
-export type DefeatFix = { kind: 'dungeon' | 'jobs' | 'gear'; hero?: number; /** The gear fix: the slot and piece to open the inspector on. */ slot?: 'weapon' | 'armor' | 'charm'; gearId?: string };
-/** Up to two one-tap fixes after a Story defeat: the Undercroft when under-powered, talents/jobs to learn, an affordable gear upgrade. */
+export type DefeatFix = { kind: 'deploy' | 'dungeon' | 'jobs' | 'gear'; hero?: number; /** The gear fix: the slot and piece to open the inspector on. */ slot?: 'weapon' | 'armor' | 'charm'; gearId?: string; /** The deploy fix: free party slots. */ n?: number };
+/** Up to two one-tap fixes after a Story defeat: first a benched hero for a free party slot (the party fought short-handed), then the
+ *  Undercroft when under-powered, talents/jobs to learn, an affordable gear upgrade. */
 export function defeatFixes(p: Profile, chapter: number, heroic = false): DefeatFix[] {
   const fixes: DefeatFix[] = [], rec = heroic ? recommendedHeroicPower(chapter) : recommendedPower(chapter);
+  const party = normalizeStoryParty(p.storyActive, p.roster, p.cleared), empty = storyPartyLocked(p) ? 0 : emptySlots(p);
+  // The deploy fix opens Formation on the first benched hero (an Undercroft run locks the party, so it is not offered then).
+  if (empty > 0) fixes.push({ kind: 'deploy', n: empty, hero: p.roster.find(id => !party.includes(id)) });
   if (powerVerdict(partyPower(p), rec) === 'under' && featureOpen(p, 'dungeon') && unlockedDepth(p.cleared, p.journey.depth) > 0) fixes.push({ kind: 'dungeon' });
-  const party = normalizeStoryParty(p.storyActive, p.roster, p.cleared);
   const learner = party.find(id => heroNeeds(p, id).some(need => need !== 'gear'));
   if (learner !== undefined) fixes.push({ kind: 'jobs', hero: learner });
   const shopper = party.find(id => heroNeeds(p, id).includes('gear'));

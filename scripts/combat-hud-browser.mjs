@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { withBrowser } from './browser-harness.mjs';
+import { withBrowser, seedSave, ACT_TWO_SAVE } from './browser-harness.mjs';
 
 const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5180/';
 
@@ -331,3 +331,31 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   assert.deepEqual(errors, []);
   console.log('✓ 360x640 combat fit and target-size test passed');
 }, { width: 360, height: 640, mobile: true });
+
+// vet-08: a long variant subtitle (CH16 'Frostbound Hollow Choir': 'FROSTBOUND · PADUAN LONCENG' in Indonesian) never runs under the phase
+// badge or the name: when the header row is too narrow it wraps under the name. The HP/clock row stays one row; desktop keeps one line.
+for (const [width, height, lang] of [[360, 640, 'id'], [390, 844, 'id'], [390, 844, 'en'], [540, 900, 'id'], [1280, 900, 'id'], [1280, 900, 'en']]) {
+  await withBrowser(async ({ send, wait, evaluate, screenshot, errors }) => {
+    await seedSave(send, { ...ACT_TWO_SAVE, cleared: Array.from({ length: 15 }, (_, i) => i) }, lang);
+    await send('Page.navigate', { url });
+    await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")', 20000);
+    await evaluate('document.fonts.ready');
+    for (let chapter = 1; chapter <= 16; chapter++) {
+      await evaluate(`window.gridbound.boot("adventure", ${chapter})`);
+      await wait('window.gridbound.battle.status === "ready" && document.querySelector("#boss-title").textContent.length > 0');
+      await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+      // The subtitle is measured by its text (a Range), not its box: the bug was an unbreakable word overflowing a 43px box under the phase.
+      const h = await evaluate(`(() => { const box = b => ({ l: b.left, r: b.right, t: b.top, b: b.bottom }), r = sel => box(document.querySelector(sel).getBoundingClientRect());
+        const title = document.querySelector('#boss-title'), range = document.createRange(); range.selectNodeContents(title);
+        return { name: r('#boss-name'), title: box(range.getBoundingClientRect()), phase: r('#phase'), health: r('#boss-health'), clock: r('#clock'), hud: r('.boss-hud'), text: title.textContent, overflow: title.scrollWidth - title.clientWidth, scroll: document.documentElement.scrollWidth - innerWidth }; })()`);
+      const meet = (a, b) => a.l < b.r - .5 && b.l < a.r - .5 && a.t < b.b - .5 && b.t < a.b - .5, where = `CH${chapter} ${lang} ${width}×${height}: ${JSON.stringify(h)}`;
+      assert.ok(!meet(h.title, h.phase) && !meet(h.name, h.title) && !meet(h.name, h.phase), `the boss name, subtitle and phase never overlap (${where})`);
+      assert.ok(h.title.r <= h.hud.r + .5 && h.phase.r <= h.hud.r + .5 && h.overflow <= 1 && h.scroll <= 1, `the header stays inside its window (${where})`);
+      assert.ok(Math.abs(h.health.t - h.clock.t) < 2, `boss HP and the clock share their row (${where})`);
+      if (width >= 1280) assert.ok(h.title.t < h.name.b && h.phase.t < h.name.b, `desktop keeps name, subtitle and phase on one line (${where})`);
+      if (chapter === 16) await screenshot(`artifacts/boss-header-${lang}-${width}x${height}.png`);
+    }
+    assert.deepEqual(errors, []);
+    console.log(`✓ boss header ${lang} ${width}×${height}: chapters 1-16 without overlap`);
+  }, { width, height, mobile: width < 500 });
+}

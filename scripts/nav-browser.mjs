@@ -243,7 +243,10 @@ async function run(viewport, { spoof = false } = {}) {
     await tclick('abandon', '#abandon-run'); await wait('window.gridbound.inTown');
 
     // ---- Undercroft: the run map's free 'Back to Emberhollow (run saved)', a room's free Back, the flee dialog.
-    await toGate('dungeon'); await tclick('depth', '[data-dungeon-start="1"]'); await wait('Boolean(document.querySelector(".dungeon-run-exit"))');
+    // A depth opens its dossier first (nothing starts until Descend): Back is its labelled exit, Escape and the browser Back close it.
+    await screen('Undercroft depth dossier', { at: 's.layer === "modal" && Boolean(document.querySelector("#modal [data-depth-dossier]"))', enter: async () => { await toGate('dungeon'); await tclick('depth', '[data-dungeon-pick="1"]'); }, expect: 's.layer === "town" && s.route === "dungeon" && !s.modal && !document.querySelector(".dungeon-run-exit")' });
+    await tclick('depth', '[data-dungeon-pick="1"]'); await wait('Boolean(document.querySelector("#modal [data-dungeon-start]"))'); await sleep(650);
+    await tclick('descend', '[data-dungeon-start="1"]'); await wait('Boolean(document.querySelector(".dungeon-run-exit"))');
     await screen('Undercroft run map', { at: 's.route === "dungeon"', enter: () => toGate('dungeon'), expect: 's.route === "camp"' });
     const room = async () => { if (!(await nav()).battle) { await toGate('dungeon'); if (!await evaluate('Boolean(document.querySelector("[data-dungeon-fight]"))')) await tclick('room', '.room.room-battle.open'); await tclick('fight room', '[data-dungeon-fight]'); await wait('!window.gridbound.inTown'); } };
     await screen('Undercroft room ready (free)', { at: 's.layer === "battle" && s.battle.status === "ready"', enter: room, expect: 's.layer === "town" && s.route === "dungeon"' });

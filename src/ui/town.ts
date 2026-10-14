@@ -13,7 +13,7 @@ import { questBoard } from './quests';
 import { heroCanvas, heroKey } from '../art/pixels';
 import { itemIcon, type ItemSlot } from '../art/items';
 import { dungeonIcon } from '../art/dungeon-icons';
-import { monsterCanvas, monsterDataURL } from '../art/monsters';
+import { monsterDataURL, monsterShadowDataURL } from '../art/monsters';
 import { townSceneDataURL, campfireCanvas, smokeCanvas, TOWN_HOTSPOTS, TOWN_W, TOWN_H, PLAZA, CAMPFIRE, CHIMNEYS, SMOKE_SIZE } from '../art/town-scene';
 import { renderWorldMap } from './world-map';
 import { dungeonScene } from './dungeon';
@@ -23,7 +23,7 @@ import { pendingChoices } from '../game/narrative';
 import { DEPTHS, unlockedDepth } from '../game/dungeon';
 import { refineCost } from '../game/profile';
 import { UNLOCKS, featureOpen, isFeature, isNew, type Feature } from './unlocks';
-import { dungeonBadge, heroNeeds, trainingBadge } from './badges';
+import { dungeonBadge, emptySlots, heroNeeds, trainingBadge } from './badges';
 import { t, lockText, lang, fmtInt, fmtDec, fmtSec, type StringKey } from '../i18n';
 import { intentChips } from './intent';
 import { localizedRaidModifier } from '../i18n/content';
@@ -93,12 +93,6 @@ export function routeTitle(tab: TownTab) {
 }
 
 const SPOT_LABELS: Record<string, StringKey> = { gate: 'town.spot.gate', hall: 'town.spot.hall', guild: 'town.spot.guild', archive: 'town.spot.archive', merchant: 'town.spot.merchant', lodge: 'town.spot.lodge', well: 'town.spot.well', inn: 'town.spot.inn', chapel: 'town.spot.chapel' };
-
-/** Free story party slots that a benched hero could fill (0 when the party is full or nobody is benched). */
-export function emptySlots(p: Profile) {
-  const party = normalizeStoryParty(p.storyActive, p.roster, p.cleared);
-  return Math.min(storyPartyCap(p.cleared) - party.length, p.roster.filter(id => !party.includes(id)).length);
-}
 
 /** The single most useful next step, with the place it happens. */
 /** A deployed hero who can take a job now (rank reached, gold in hand), and the cheapest such job. */
@@ -437,16 +431,7 @@ function formation(p: Profile, id: number, r: typeof ROSTER[number], loadout: Pr
 const FAMILIES = Object.values(ENEMIES).filter(e => !e.archetype || e.archetype === e.id);
 const seenFamily = (p: Profile, id: string) => (p.ledger.enemies[id] ?? 0) > 0;
 /** The enemy as a dark silhouette for entries not met yet (cached by id). */
-function silhouette(id: string) {
-  const key = `shadow-${id}`;
-  if (!portraits.has(key)) {
-    const art = monsterCanvas(id), out = document.createElement('canvas');
-    out.width = art.width; out.height = art.height;
-    const c = out.getContext('2d', { willReadFrequently: true })!; c.imageSmoothingEnabled = false; c.drawImage(art, 0, 0); c.globalCompositeOperation = 'source-in'; c.fillStyle = '#0b1714'; c.fillRect(0, 0, out.width, out.height);
-    portraits.set(key, out.toDataURL());
-  }
-  return portraits.get(key)!;
-}
+const silhouette = monsterShadowDataURL;
 /** A grid of every enemy family (silhouettes until met) with a detail sheet for the picked one. */
 function bestiary(p: Profile, pick?: string) {
   const fallback = FAMILIES.find(e => seenFamily(p, e.id)) ?? FAMILIES[0];

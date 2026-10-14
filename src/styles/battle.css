@@ -38,7 +38,9 @@
 .boss-hud { padding: 6px 10px 8px; }
 .boss-title { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
 .boss-title h2 { font-size: 18px; color: #fff; white-space: nowrap; }
-#boss-title { flex: 1; min-width: 0; font-size: 12px; color: var(--ink-dim); line-height: 1.2; }
+/* The subtitle grows from its own width: when name + subtitle + phase do not fit one line (a phone, a long Frostbound/Gilded/Ashbound
+   variant), it wraps under the name with the phase beside it, instead of shrinking to a sliver that runs under the phase. */
+#boss-title { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--ink-dim); line-height: 1.2; overflow-wrap: anywhere; }
 .boss-phase-badge { margin-left: auto; font-family: var(--pixel); font-size: 10px; color: var(--gold); white-space: nowrap; }
 .boss-meter { position: relative; height: 14px; margin: 4px 0; border: 2px solid #fff; border-radius: 3px; background: #1a0610; box-shadow: 0 0 0 2px #000; overflow: hidden; }
 .boss-hp-ghost, #boss-hp { position: absolute; left: 0; top: 0; bottom: 0; }

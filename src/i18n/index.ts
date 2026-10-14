@@ -39,6 +39,8 @@ export const fmtInt = (n: number) => numberFormat(0, 0).format(Math.round(n));
 export const fmtDec = (n: number, digits = 1) => numberFormat(digits, digits).format(n);
 /** Seconds with the language's unit: EN '4.2s', ID '4,2d'. */
 export const fmtSec = (n: number, digits = 1) => `${fmtDec(n, digits)}${TABLES[current]['unit.s']}`;
+/** Names joined in the language's style: EN 'Lyra and Rowan' · ID 'Lyra dan Rowan'. */
+export const fmtList = (items: string[]) => new Intl.ListFormat(locale(), { type: 'conjunction' }).format(items);
 /** A date and time in the language's style. */
 export const fmtDateTime = (ms: number) => new Date(ms).toLocaleString(locale());
 /** A number as t() prints it: grouped, up to two decimals. */

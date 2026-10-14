@@ -91,6 +91,9 @@ for (const lang of ['en', 'id']) {
     await click.nav('quests'); await check('quests');
     await click.nav('bestiary'); await check('bestiary');
     await click.nav('dungeon'); await wait('Boolean(document.querySelector(".dungeon-scene"))'); await check('undercroft');
+    // The depth dossier (a tap on a depth; nothing starts until Descend).
+    await click('[data-dungeon-pick="4"]'); await wait('Boolean(document.querySelector("#modal[open] [data-depth-dossier]"))'); await check('undercroft-dossier', true);
+    await evaluate('document.querySelector("dialog[open]").close()');
     await click.nav('more');
     await click('.more-scene [data-open-action="journal"]');
     await wait('Boolean(document.querySelector("#modal .journal-epilogue"))');

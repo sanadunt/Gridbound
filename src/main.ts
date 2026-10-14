@@ -19,13 +19,14 @@ import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
 import { CAMPAIGN, BOONS, ENEMIES, boonChoices } from './game/world';
 import { promote, equipGear, buyTalent, equipSkill, respecHero, respecPreview, moveFormation, completeZone, profileModifiers, canEnterZone, settleProgress, claimQuest, syncProfileEconomy, buyChallengeUnlock, ownsChallengeUnlock, refineGear, bankPouch, claimStarChest, recordChapterResult, chapterReward } from './game/profile';
-import { DEPTHS, startRun, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fleeFight, interruptFight, noteFight, dungeonBattleOptions, type Outcome, type Pouch } from './game/dungeon';
+import { CAMP_REST, CAMP_REVIVE, startRun, unlockedDepth, enterNode, chooseEvent, openTreasure, campChoice, resolveFight, fleeFight, interruptFight, noteFight, dungeonBattleOptions, type Outcome, type Pouch } from './game/dungeon';
 import { chapterStars, STAR_PAR_SECONDS } from './game/journey';
-import { renderTown, routeTitle, portrait, emptySlots, type TownState, type TownTab } from './ui/town';
+import { renderTown, routeTitle, portrait, type TownState, type TownTab } from './ui/town';
+import { clearedText, depthDossier } from './ui/dungeon';
 import { partyPower, powerVerdict, recommendedHeroicPower, recommendedPower } from './game/power';
 import { claimAllQuests, questGearText } from './ui/quests';
 import { UNLOCKS, isFeature, markIntro, markVisited, noteModesInUse, pendingIntros, resetUnlockFlags, routeLocked, type Feature } from './ui/unlocks';
-import { menuBadge } from './ui/badges';
+import { emptySlots, menuBadge } from './ui/badges';
 import { pushRoute, backRoute } from './ui/route-stack';
 import { pausedStory, resumableEncounter, resumesPaused, type PausedStory } from './ui/runs';
 import { backAction, type BackSource, type NavSnapshot } from './ui/back';
@@ -49,7 +50,7 @@ import { JOBS, GEAR } from './game/jobs';
 import { defaultRaidBuild, setRaidJob, setRaidHero, setRaidPartySize, normalizeRaidBuild, openRaidQuarry, raidQuarryUnlocked } from './game/raid-build';
 import { QUESTS, questProgress } from './game/quests';
 import { BELL_TONIC, CHALLENGE_SHOP, RELIC_IDS, bankShopItem, createRunWallet, resetRunWallet, getRaidContractForEnemy, sandboxRaidContract, roguelikeMilestoneForFloor, buyRunItem, buyBellTonic, refundBellTonic, boonDraftSize, raidModifierAvailable, type RaidModifierId, type RaidSandbox, type RaidTier, type RunWallet } from './economy/challenge';
-import { t, lang, setLang, errorText, fmtInt, fmtDec, fmtSec, fmtDateTime, type Lang } from './i18n';
+import { t, lang, setLang, errorText, fmtInt, fmtDec, fmtSec, fmtDateTime, fmtList, type Lang } from './i18n';
 import { localizeContent, eventText } from './i18n/content';
 import { version } from '../package.json';
 
@@ -571,14 +572,7 @@ $('town-screen').addEventListener('click', event => {
     showTown('party',ok?t('notice.story.saved'):t('notice.story.invalid'), true);
     return;
   }
-  if (button.dataset.dungeonStart) {
-    const depth = Number(button.dataset.dungeonStart);
-    if (profile.journey.run?.status === 'active') return;
-    profile.journey.run = startRun(depth, Math.floor(Math.random() * 1e9), normalizeStoryParty(profile.storyActive, profile.roster, profile.cleared));
-    townState.dungeonOutcome = townState.dungeonLetter = undefined; sound.play('confirm');
-    showTown('dungeon', '', true);
-    return;
-  }
+  if (button.dataset.dungeonPick) { depthDossierModal(Number(button.dataset.dungeonPick)); return; }
   if (button.dataset.dungeonNode && profile.journey.run) {
     if (enterNode(profile.journey.run, Number(button.dataset.dungeonNode))) { townState.dungeonOutcome = townState.dungeonLetter = undefined; sound.play('cursor'); showDungeonRoom(); }
     return;
@@ -595,10 +589,12 @@ $('town-screen').addEventListener('click', event => {
     return;
   }
   if (button.dataset.dungeonCamp && profile.journey.run) {
-    const run = profile.journey.run, choice = button.dataset.dungeonCamp as 'rest' | 'extract';
+    const run = profile.journey.run, choice = button.dataset.dungeonCamp as 'rest' | 'extract', fallen = run.party.filter(id => ROSTER[id] && run.hp[id] <= 0);
     if (campChoice(run, choice)) {
       if (choice === 'extract') bankPouch(profile, run.pouch);
-      townState.dungeonOutcome = choice === 'rest' ? t('dungeon.out.rest') : undefined; townState.dungeonLetter = undefined;
+      // The rest says what it did: the heal, and who stands again (the party gauges above show the new HP).
+      const woke = fmtList(fallen.map(id => ROSTER[id].name));
+      townState.dungeonOutcome = choice === 'rest' ? [t('dungeon.out.rest', { n: Math.round(CAMP_REST * 100) }), woke ? t('dungeon.out.revive', { names: woke, count: fallen.length, n: Math.round(CAMP_REVIVE * 100) }) : ''].filter(Boolean).join(' ') : undefined; townState.dungeonLetter = undefined;
       sound.play(choice === 'rest' ? 'heal' : 'fanfare');
       showDungeonRoom();
     }
@@ -944,6 +940,29 @@ function settleInterruptedFight() {
   const run = profile.journey.run, lost = run && commander.mode === 'story' && !dungeonFightLive() ? interruptFight(run) : undefined;
   if (lost) { townState.dungeonOutcome = t('dungeon.interrupted', { lost: lostText(lost) }); townState.dungeonLetter = undefined; }
   return lost;
+}
+/** A tap on a depth opens its dossier (ui/dungeon depthDossier); nothing starts until Descend, so a look never locks the story party.
+ *  Back (focused), ×, Escape and the browser Back close it. */
+function depthDossierModal(depth: number) {
+  if (profile.journey.run?.status === 'active' || depth < 1 || depth > unlockedDepth(profile.cleared, profile.journey.depth)) return;
+  sound.play('cursor');
+  openModal(depthDossier(profile, depth));
+  // Opening focuses the dialog's first control (Descend, near the bottom) before Back takes the focus: start at the depth's name, on a small phone too.
+  modal.scrollTop = 0;
+  // On a phone Descend can open right under the finger that tapped the depth: a double tap (or a tap that lands as the dialog appears)
+  // is ignored, like a story choice, so it never starts a run and locks the party by itself.
+  const openedAt = performance.now();
+  modal.querySelector<HTMLButtonElement>('[data-dungeon-start]')?.addEventListener('click', () => {
+    if (performance.now() - openedAt < CHOICE_INPUT_DELAY_MS) return;
+    modal.close();
+    if (commander.stale) { staleModal(); return; }
+    if (!inTown || pendingSettlement || profile.journey.run?.status === 'active') return;
+    profile.journey.run = startRun(depth, Math.floor(Math.random() * 1e9), normalizeStoryParty(profile.storyActive, profile.roster, profile.cleared));
+    townState.dungeonOutcome = townState.dungeonLetter = undefined; sound.play('confirm');
+    showTown('dungeon', '', true);
+    // The depth card that opened the dossier is gone: the keyboard lands on the map's first open room, not on the page.
+    document.querySelector<HTMLElement>('.dungeon-scene .room.open')?.focus({ preventScroll: true });
+  });
 }
 /** Fight the pending dungeon room with the run's own party, its carried HP, potions and blessings. */
 function startDungeonFight() {
@@ -2385,7 +2404,7 @@ async function presentResult() {
     const enemy = ENEMIES[battle.enemyId], fall = firstFall?.battle === battle && firstFall.stage === battle.stage ? firstFall : queuedDown ? { name: heroLabel(queuedDown.source), cause: downCause(queuedDown) } : undefined;
     const fixes = !won && battle.mode === 'adventure' ? defeatFixes(profile, battle.floor - 1, battle.heroic) : [];
     const rec = battle.heroic ? recommendedHeroicPower(battle.floor - 1) : recommendedPower(battle.floor - 1), power = partyPower(profile), verdict = powerVerdict(power, rec);
-    const fixLabel = (fix: typeof fixes[number]) => fix.kind === 'dungeon' ? t('result.fix.dungeon') : t(fix.kind === 'jobs' ? 'result.fix.jobs' : 'result.fix.gear', { name: ROSTER[fix.hero!].name });
+    const fixLabel = (fix: typeof fixes[number]) => fix.kind === 'deploy' ? t('result.fix.deploy', { n: fix.n ?? 1 }) : fix.kind === 'dungeon' ? t('result.fix.dungeon') : t(fix.kind === 'jobs' ? 'result.fix.jobs' : 'result.fix.gear', { name: ROSTER[fix.hero!].name });
     const defeatHelp = won ? '' : `<section class="win defeat-help" aria-label="${t('result.fix.title')}">
         ${battle.mode === 'adventure' ? `<p class="power-line power-${verdict}" data-defeat-power>${t('result.defeat.power', { n: power, rec })} <em>${t(`power.verdict.${verdict}` as never)}</em></p>` : ''}
         ${fall ? `<p class="defeat-first">${escapeUI(fall.cause ? t('result.defeat.first', { name: fall.name, cause: fall.cause }) : t('result.defeat.first.plain', { name: fall.name }))}</p>` : ''}
@@ -2501,11 +2520,14 @@ async function presentResult() {
     townState.pendingGear = undefined;
     if (kind === 'jobs') townState.trainingTab = 'talents';
     if (kind === 'gear') townState.trainingTab = 'gear';
-    // The gear fix opens on the upgrade it found: its slot, with the piece in the inspector.
+    // The gear fix opens on the upgrade it found: its slot, with the piece in the inspector. The deploy fix opens Formation on a benched
+    // hero with the story party list open (also when Party is the route the departure left, whose list the re-render reads).
     leaveResult(kind === 'dungeon' ? 'dungeon' : kind === 'jobs' ? 'party-advanced' : 'party', () => {
       if (Number.isInteger(hero) && profile.roster.includes(hero)) townState.hero = hero;
       if (kind === 'gear' && slot && gearId) { townState.gearSlot = slot; townState.pendingGear = { hero: townState.hero, slot, gearId }; }
+      if (kind === 'deploy') { townState.trainingTab = 'formation'; townState.storyPartyOpen = true; const list = document.querySelector<HTMLDetailsElement>('details.story-party'); if (list) list.open = true; }
     });
+    if (kind === 'deploy') document.querySelector('details.story-party')?.scrollIntoView({ block: 'nearest' });
   }));
 }
 
@@ -2536,10 +2558,8 @@ async function presentDungeonResult() {
   loot = dungeonLoot;
   const run = profile.journey.run, cleared = run?.status === 'cleared';
   const xpRows = xpSummary(experienceRewards, id => portrait(ROSTER[id].classId, 0, id));
-  // A cleared depth says what the next stair needs: open now, behind a chapter, or none (the deepest depth).
-  const nextDepth = DEPTHS.find(d => d.id === (run?.depth ?? 0) + 1);
-  const clearedText = !nextDepth ? t('dungeon.end.cleared.last') : profile.cleared.includes(nextDepth.unlock - 1) ? t('dungeon.end.cleared') : t('dungeon.end.cleared.wait', { n: nextDepth.unlock });
-  const desc = !won ? t('dungeon.end.wiped') : cleared ? clearedText : loot ? `${t('dungeon.out.gold', { n: loot.gold })} ${Object.entries(loot.materials).map(([id, n]) => t('dungeon.out.material', { n, name: t(`material.${id}` as never) })).join(' ')}` : '';
+  // A cleared depth says what the next stair needs (open now, behind a chapter, or none), in the same words as the map afterwards.
+  const desc = !won ? t('dungeon.end.wiped') : cleared ? clearedText(profile, run!.depth) : loot ? `${t('dungeon.out.gold', { n: loot.gold })} ${Object.entries(loot.materials).map(([id, n]) => t('dungeon.out.material', { n, name: t(`material.${id}` as never) })).join(' ')}` : '';
   // A wipe names what the pouch held; with an empty pouch there is nothing to lose and nothing to say.
   const before = dungeonBefore, lost = !won && before && (before.pouch.gold > 0 || Object.values(before.pouch.materials).some(n => n > 0)) ? before.pouch : undefined;
   const pct = (ratio: number) => `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;

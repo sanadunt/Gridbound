@@ -4,15 +4,16 @@ import { createProfile, completeZone, normalizeProfile } from '../src/game/profi
 import { ROSTER } from '../src/game/content';
 import { QUESTS, questProgress } from '../src/game/quests';
 import { boardQuests, claimAllQuests, claimAllCount, gearOwner, questGroup } from '../src/ui/quests';
-import { normalizeStoryParty } from '../src/game/story-party';
+import { normalizeStoryParty, storyPartyCap } from '../src/game/story-party';
 import { UNLOCKS, featureOpen, routeLocked, pendingIntros, isNew, markIntro, markVisited, noteModesInUse, resetUnlockFlags } from '../src/ui/unlocks';
 import { pushRoute, backRoute } from '../src/ui/route-stack';
-import { affordableUpgrade, heroNeeds, trainingBadge, menuBadge, dungeonBadge } from '../src/ui/badges';
+import { affordableUpgrade, emptySlots, heroNeeds, trainingBadge, menuBadge, dungeonBadge } from '../src/ui/badges';
 import { GEAR } from '../src/game/jobs';
 import { gearReason } from '../src/game/profile';
 import { defeatFixes } from '../src/ui/result-help';
 import { nextObjective, promotion, jobSkillSlot, noticeSeconds } from '../src/ui/town';
 import { startRun } from '../src/game/dungeon';
+import { clearedText } from '../src/ui/dungeon';
 import { HERO_LOOKS, heroKey } from '../src/art/pixels';
 import { COACH_STEPS, coachDone, coachEnabled, markCoach, resetCoach, setCoachEnabled, skipCoach } from '../src/ui/coach';
 
@@ -183,6 +184,32 @@ test('WP10 a Story defeat suggests at most two fixes: the Undercroft when under-
   assert.ok(richFixes.length <= 2);
   const first = createProfile(); first.gold = 0;
   assert.deepEqual(defeatFixes(first, 0).filter(f => f.kind === 'dungeon'), [], 'no Undercroft before chapter 1 is cleared');
+});
+
+test('POLISH a defeat with a free party slot and a benched hero suggests deploying one first (still at most two fixes), and never otherwise', () => {
+  const short = midGame(1); short.roster = [0, 4, 3]; short.storyActive = [0, 4];
+  assert.equal(normalizeStoryParty(short.storyActive, short.roster, short.cleared).length < storyPartyCap(short.cleared), true);
+  const fixes = defeatFixes(short, 1);
+  assert.deepEqual(fixes[0], { kind: 'deploy', n: 1, hero: 3 }, JSON.stringify(fixes));
+  assert.ok(fixes.length <= 2 && fixes.slice(1).every(f => ['dungeon', 'jobs', 'gear'].includes(f.kind)), 'the existing kinds follow, in their order');
+  const two = midGame(3); two.storyActive = two.roster.slice(0, 3);
+  assert.equal(defeatFixes(two, 3)[0]?.kind, 'deploy'); assert.equal(defeatFixes(two, 3)[0]?.n, emptySlots(two));
+  // A full party, or free slots with nobody on the bench: no deploy fix.
+  const full = midGame(1); full.roster = [0, 4, 3]; full.storyActive = [0, 4, 3];
+  assert.ok(!defeatFixes(full, 1).some(f => f.kind === 'deploy'), 'a full party gets no deploy fix');
+  const alone = midGame(1); alone.roster = [0, 4]; alone.storyActive = [0, 4];
+  assert.ok(!defeatFixes(alone, 1).some(f => f.kind === 'deploy'), 'nobody on the bench: no deploy fix');
+  // An Undercroft run locks the story party, so the fix (which could not be followed) is not offered.
+  short.journey.run = startRun(1, 5, [0, 4]);
+  assert.ok(!defeatFixes(short, 1).some(f => f.kind === 'deploy'), 'no deploy fix while an Undercroft run locks the party');
+});
+
+test('POLISH a cleared depth names the next stair the same way on the map and on the result: open, behind a chapter, or the deepest', () => {
+  const p = midGame(2);
+  assert.equal(clearedText(p, 1), 'The guardian falls. The next stair waits behind Chapter 3. Everything in the pouch is yours.', 'depth 2 needs Chapter 3');
+  completeZone(p, 2);
+  assert.equal(clearedText(p, 1), 'The guardian falls and the next stair opens. Everything in the pouch is yours.');
+  assert.equal(clearedText(p, 8), 'The deepest guardian falls. Everything in the pouch is yours.');
 });
 
 test('the defeat gear fix names the slot and piece it found, so it opens on an affordable upgrade (not the Weapon list)', () => {

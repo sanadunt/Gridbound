@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { EN } from '../src/i18n/en';
 import { ID } from '../src/i18n/id';
-import { t, setLang, errorText, lockText, fmtInt, fmtDec, fmtSec, type StringKey } from '../src/i18n';
+import { t, setLang, errorText, lockText, fmtInt, fmtDec, fmtSec, fmtList, type StringKey } from '../src/i18n';
 import { CONTENT_TEXT } from '../src/i18n/content-text';
 import { EVENT_TEXT_ENTRIES, eventText, localizeContent, restoreContent } from '../src/i18n/content';
 import { ID_GLOSSARY } from '../src/i18n/glossary';
@@ -88,6 +88,7 @@ test('WP12 talent and gear lock reasons are codes rendered in the chosen languag
 
 test('WP12 numbers, seconds and plurals follow the game language, not the browser', () => {
   assert.equal(fmtInt(3000), '3,000'); assert.equal(fmtDec(4.25, 1), '4.3'); assert.equal(fmtSec(4.2), '4.2s'); assert.equal(fmtSec(4.2, 2), '4.20s');
+  assert.equal(t('dungeon.out.revive', { names: fmtList(['Lyra', 'Rowan']), count: 2, n: 25 }), 'Lyra and Rowan stand again at 25% HP.');
   assert.equal(t('quest.obj.chapters', { n: 1 }), 'Clear 1 chapter');
   assert.equal(t('quest.obj.chapters', { n: 16 }), 'Clear 16 chapters');
   assert.equal(t('journal.chronicle', { n: 1 }), 'Chronicle · 1 chapter');
@@ -97,6 +98,7 @@ test('WP12 numbers, seconds and plurals follow the game language, not the browse
   assert.equal(t('town.msg.quests', { n: 2 }), '2 quest rewards wait on the Quests board.');
   setLang('id');
   assert.equal(fmtInt(3000), '3.000'); assert.equal(fmtDec(4.25, 1), '4,3'); assert.equal(fmtSec(4.2), '4,2d');
+  assert.equal(fmtList(['Lyra', 'Rowan']), 'Lyra dan Rowan');
   assert.equal(t('quest.obj.chapters', { n: 1 }), 'Selesaikan 1 chapter');
   assert.equal(t('quest.obj.chapters', { n: 16 }), 'Selesaikan 16 chapter');
   assert.equal(t('party.overview.hint', { hp: 4.5, power: 3 }).slice(0, 40), 'Tiap level memberi +4,5% HP dasar dan +3');

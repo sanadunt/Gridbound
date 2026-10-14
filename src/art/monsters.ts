@@ -8,6 +8,8 @@ const ink='#102720';
 const portraits=new Map<string,string>();
 /** An enemy's first frame as a data URL, cached for the page (quarry tiles, the Bestiary, the chapter dossier). */
 export function monsterDataURL(id:string){let url=portraits.get(id);if(!url)portraits.set(id,url=monsterCanvas(id).toDataURL());return url;}
+/** The enemy as a dark silhouette, for an enemy the Bestiary has not met yet (Bestiary, raid setup, Undercroft depth dossier; cached). */
+export function monsterShadowDataURL(id:string){const key=`shadow-${id}`;let url=portraits.get(key);if(!url){const art=monsterCanvas(id),{el,c}=canvas(art.width,art.height);c.drawImage(art,0,0);c.globalCompositeOperation='source-in';c.fillStyle='#0b1714';c.fillRect(0,0,el.width,el.height);portraits.set(key,url=el.toDataURL());}return url;}
 export function monsterCanvas(id:string,frame=0) {
  if(id.includes('-')){const base=monsterCanvas(id.split('-')[0],frame),{el,c}=canvas(base.width,base.height);c.drawImage(base,0,0);c.globalCompositeOperation='source-atop';c.fillStyle=id.endsWith('frost')?'#8ccaff44':id.endsWith('auric')?'#ffbd6644':'#ff876644';c.fillRect(0,0,el.width,el.height);c.globalCompositeOperation='source-over';return el;}
   if(id==='dragon')return dragon(frame);

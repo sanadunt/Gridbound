@@ -4,8 +4,14 @@ import { TALENTS, gearReason, jobReason, talentReason, type Profile } from '../g
 import { QUESTS, questProgress } from '../game/quests';
 import { claimableChests } from '../game/journey';
 import { DEPTHS, unlockedDepth } from '../game/dungeon';
-import { normalizeStoryParty } from '../game/story-party';
+import { normalizeStoryParty, storyPartyCap } from '../game/story-party';
 
+/** Free story party slots that a benched hero could fill (0 when the party is full or nobody is benched): the camp guide, the
+ *  departure prompt and the defeat screen's Deploy fix. */
+export function emptySlots(p: Profile) {
+  const party = normalizeStoryParty(p.storyActive, p.roster, p.cleared);
+  return Math.min(storyPartyCap(p.cleared) - party.length, p.roster.filter(id => !party.includes(id)).length);
+}
 const score = (s: ReturnType<typeof gearStats>) => s.power + s.hp + s.tempo;
 /** The best piece a hero can equip right now (owned, or affordable) that beats what the slot holds, and its slot: the gear fix opens on it. */
 export function affordableUpgrade(p: Profile, id: number): { slot: 'weapon' | 'armor' | 'charm'; gearId: string } | undefined {

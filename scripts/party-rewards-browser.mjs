@@ -3,7 +3,7 @@
 // the missing job), the gear inspector says Equip for owned items and compares refined stats, the dossier
 // shows the real payout (first clear, Normal replay, Heroic) and a Heroic recommendation, the Heroic toggle
 // does not follow you to another chapter, result screens show exactly the gold credited, a cap increase
-// says the party grew, and the star bar says when every chest is open.
+// says the party grew, the star bar says when every chest is open, and a short-handed defeat offers Deploy a benched hero first.
 import assert from 'node:assert/strict';
 import { withBrowser } from './browser-harness.mjs';
 
@@ -172,5 +172,38 @@ await withBrowser(async ({ send, wait, evaluate, click }) => {
   assert.equal(await evaluate(text('.star-bar small')), 'All star chests opened');
   console.log('✓ star bar after the last chest');
 }, { width: 1280, height: 900 });
+
+// A Story defeat with a free party slot and a benched hero: the first fix deploys one. It opens Party → Formation on the benched
+// hero with the story party list open, and its toggle deploys them (phone).
+await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) => {
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: seed({ ...base, roster: [0, 4, 3], cleared: [0], storyActive: [0, 4], loadouts: { 0: loadout(1), 4: loadout(7), 3: loadout(6) }, journey: { stars: { 0: 1 }, chests: 0, heroic: [], depth: 0 } }) });
+  await send('Page.navigate', { url });
+  await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")');
+  await click.nav('campaign');
+  await click('[data-zone="1"]');
+  await wait('Boolean(document.querySelector(\'[data-depart="adventure"]\'))');
+  await click('[data-depart="adventure"]');
+  await wait('window.gridbound.battle.status === "ready" && Boolean(document.querySelector("#start:not([hidden]):not(:disabled)"))', 15000);
+  assert.deepEqual(await evaluate('window.gridbound.battle.heroes.map(h => h.id)'), [0, 4], 'the party departs one hero short');
+  await click('#start');
+  await wait('window.gridbound.battle.status === "fighting"');
+  await evaluate('window.gridbound.battle.heroes.forEach(h => { h.hp = 0; }); window.gridbound.step(.1)');
+  await wait('document.querySelector("#result-screen:not([hidden]) .defeat-help") && !document.querySelector("#result-town").disabled', 15000);
+  const fixes = await evaluate('[...document.querySelectorAll("[data-defeat-fix]")].map(b => [b.dataset.defeatFix, b.textContent, b.dataset.fixHero ?? null])');
+  assert.deepEqual(fixes[0], ['deploy', 'Deploy a benched hero (1 empty slot) ▶', '3'], JSON.stringify(fixes));
+  assert.ok(fixes.length <= 2, 'still at most two fixes');
+  await screenshot('artifacts/party-defeat-deploy.png');
+  await click('[data-defeat-fix="deploy"]');
+  await wait('document.querySelector(".town-game-shell")?.dataset.townRoute === "party" && Boolean(document.querySelector(\'[data-training-panel="formation"]\'))');
+  const view = await evaluate(`(() => { const toggle = document.querySelector('[data-story-toggle="3"]'), r = toggle.getBoundingClientRect();
+    return { open: document.querySelector('details.story-party').open, hero: document.querySelector('.party-roster .active')?.dataset.townHero, hint: document.querySelector('.formation-grid + .hint')?.textContent ?? '', bench: toggle.textContent, onScreen: r.top >= 0 && r.bottom <= innerHeight }; })()`);
+  assert.equal(view.open, true, 'the story party list is open'); assert.equal(view.hero, '3', 'Formation opens on the benched hero');
+  assert.match(view.hint, /on the bench/); assert.match(view.bench, /Benched/); assert.ok(view.onScreen, `the bench toggle is on screen: ${JSON.stringify(view)}`);
+  await screenshot('artifacts/party-deploy-fix.png');
+  await click('[data-story-toggle="3"]');
+  await wait('window.gridbound.profile().storyActive.includes(3)');
+  assert.deepEqual(errors, [], 'no page errors');
+  console.log('✓ a short-handed defeat offers Deploy a benched hero first, and it opens Formation on the bench');
+}, { width: 390, height: 844, mobile: true });
 
 console.log('PARTY & REWARDS BROWSER TESTS PASSED');

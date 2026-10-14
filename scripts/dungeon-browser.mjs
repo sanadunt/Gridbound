@@ -4,10 +4,15 @@
 // save there offers retry/export and the retry saves the same outcome once. The run's party is locked; fleeing a
 // fight keeps the wounds and drops half the pouch, and a reload mid-fight counts as a flee. The mode tabs keep
 // their height on the depth picker (fresh and mid-game saves), and on a phone a tapped room's action is on screen.
+// A tap on a depth opens its dossier first (foes as silhouettes until met, the party's power, the party-lock warning):
+// Escape and the browser Back close it without starting a run, Descend starts one (on a phone a double tap on the depth, whose second tap
+// lands on Descend as the dossier opens, starts nothing). The camp's Rest says what it heals
+// and that it closes the way out; a cleared depth whose next stair is behind a chapter says so on the map.
 import assert from 'node:assert/strict';
 import { withBrowser } from './browser-harness.mjs';
 
 const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5180/';
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const loadout = slot => ({ skills: [0, 1], talents: [], xp: 600, slot, gear: { weapon: 'iron-edge' }, inventory: ['iron-edge'] });
 const qaProfile = {
   version: 3, gold: 3000, economy: { gold: 3000, commanderCrystal: 0, materials: { 'ember-shard': 6 } },
@@ -20,7 +25,7 @@ const qaProfile = {
 
 for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop' }, { width: 390, height: 844, mobile: true, tag: 'mobile' }]) {
   console.log(`--- Undercroft & progress (${viewport.tag}) ---`);
-  await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) => {
+  await withBrowser(async ({ send, wait, evaluate, screenshot, click, key, errors }) => {
     // QA switch: while localStorage['qa.failPut'] is set, IndexedDB writes fail as if storage were full.
     await send('Page.addScriptToEvaluateOnNewDocument', { source: `{ const put = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function (...args) { if (localStorage.getItem('qa.failPut')) throw new DOMException('QA quota exceeded', 'QuotaExceededError'); return put.apply(this, args); }; }` });
     await send('Page.navigate', { url });
@@ -78,8 +83,66 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     assert.ok(await evaluate('document.querySelector(".dungeon-rules[open]") && document.querySelector(".dungeon-rules").compareDocumentPosition(document.querySelector(".depth-list")) & Node.DOCUMENT_POSITION_FOLLOWING'), 'How it works (with the pouch rule) comes before the depths');
     assert.equal(await evaluate('document.querySelectorAll(".dungeon-rules .dungeon-legend li").length'), 6, 'room key lists the six room kinds');
     await screenshot(`artifacts/dungeon-depths-${viewport.tag}.png`);
+    // A depth opens its dossier: nothing starts (the story party stays free) until Descend; Back is focused, Escape and the browser Back close it.
+    const dossier = 'Boolean(document.querySelector("#modal[open] [data-depth-dossier=\\"1\\"]"))', noModal = '!document.querySelector("#modal").open';
+    assert.deepEqual(await evaluate('(s => [s.firstChild.textContent, s.querySelector("[aria-hidden=true]")?.textContent, s.querySelector(".sr-only")?.textContent])(document.querySelector(".depth-card:not(.locked) small"))'), ['Guardian: ', '???', 'Unknown enemy'], 'a guardian the Bestiary has not met stays a secret on the depth card (read as Unknown enemy)');
+    await click('[data-dungeon-pick="1"]');
+    await wait(dossier);
+    const card = await evaluate('document.querySelector("#modal").innerText');
+    for (const part of [/Undercroft · Depth 1/, /The Cistern Stair/, /Guardian/, /In the rooms/, /This depth drops Ember Shard/, /Party power [\d,]+/, /Rec\. [\d,]+ · (Ready|A little under|Under-powered)/, /Wounds carry over/, /Your story party is locked to this run until you extract, beat the guardian or abandon\./, /Descend ▶/, /◀ Back/])
+      assert.match(card, part, `the dossier shows ${part}`);
+    assert.equal(await evaluate('document.querySelectorAll("#modal .dossier-foe.unseen").length'), 6, 'unmet foes are silhouettes (guardian, three room foes, two elites)');
+    assert.equal(await evaluate('[...document.querySelectorAll("#modal .dossier-foe.unseen b")].every(b => b.querySelector("[aria-hidden=true]")?.textContent === "???" && b.querySelector(".sr-only")?.textContent === "Unknown enemy")'), true, 'an unmet foe reads ??? on screen and Unknown enemy to a screen reader');
+    assert.equal(await evaluate('document.querySelectorAll("#modal .dossier-party img").length'), 4, 'the party that would go');
+    assert.equal(await evaluate('document.activeElement?.dataset.navExit'), 'close', 'Back is focused: a second Enter never starts a run');
+    assert.equal(await evaluate('window.gridbound.profile().journey.run ?? null'), null, 'opening the dossier starts no run');
+    await screenshot(`artifacts/dungeon-dossier-${viewport.tag}.png`);
+    await key('Escape');
+    await wait(noModal);
+    assert.equal(await evaluate('window.gridbound.navState().route'), 'dungeon', 'Escape closes the dossier onto the depth list');
+    await click('[data-dungeon-pick="1"]');
+    await wait(dossier);
+    const history = await evaluate('history.length');
+    await evaluate('history.back(), true');
+    await wait(noModal);
+    assert.deepEqual(await evaluate('[window.gridbound.navState().route, history.length, window.gridbound.profile().journey.run ?? null]'), ['dungeon', history, null], 'the browser Back closes it too, in the game');
+    if (viewport.mobile) {
+      // A double tap on a depth: on a phone Descend can open right under the finger, and the second tap lands on it. It is ignored
+      // (the dossier stays open, no run, the party stays free); a Descend tap a moment later still starts the run.
+      const touch = async point => { await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] }); await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); };
+      const centre = selector => evaluate(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+      await evaluate('document.querySelector("[data-dungeon-pick=\\"1\\"]").scrollIntoView({ block: "center" }), true');
+      await touch(await centre('[data-dungeon-pick="1"]'));
+      await sleep(150);
+      await wait(dossier, 2000);
+      const descend = await centre('#modal [data-dungeon-start="1"]');
+      assert.equal(await evaluate(`Boolean(document.elementFromPoint(${descend.x}, ${descend.y})?.closest("[data-dungeon-start]"))`), true, 'Descend is on screen, under the second tap');
+      await touch(descend);
+      await sleep(300);
+      assert.deepEqual(await evaluate(`[${dossier}, window.gridbound.profile().journey.run ?? null]`), [true, null], 'a second tap on Descend as the dossier opens starts no run');
+      await sleep(400);
+      await touch(descend);
+      await wait('window.gridbound.profile().journey.run?.status === "active"');
+      // Abandon it: the walk below starts its own run after visiting Party with a free story party.
+      await wait('Boolean(document.querySelector("[data-dungeon-leave]"))');
+      await click('[data-dungeon-leave]');
+      await wait('Boolean(document.querySelector("#dungeon-abandon"))');
+      await click('#dungeon-abandon');
+      await wait('document.querySelectorAll(".depth-card").length === 8 && !window.gridbound.profile().journey.run');
+    }
+    await click.nav('party');
+    await wait('Boolean(document.querySelector("details.story-party:not(.locked)"))');
+    await click.nav('camp');
+    await click('.town-spot[data-facility="dungeon"]');
+    await wait('document.querySelectorAll(".depth-card").length === 8');
+    await click('[data-dungeon-pick="1"]');
+    await wait(dossier);
+    // Descend ignores a tap that lands as the dossier appears (a double tap on the depth): a real press comes after a moment.
+    await sleep(650);
     await click('[data-dungeon-start="1"]');
     await wait('Boolean(document.querySelector(".dungeon-map .room.open"))');
+    assert.equal(await evaluate('document.querySelector("#modal").open'), false, 'Descend closes the dossier');
+    assert.equal(await evaluate('document.activeElement?.matches(".dungeon-scene .room.open")'), true, 'the keyboard lands on the map\'s first open room');
     assert.ok(await evaluate('document.querySelectorAll(".dungeon-map .room").length') >= 12, 'map has rooms');
     await screenshot(`artifacts/dungeon-map-${viewport.tag}.png`);
 
@@ -112,7 +175,7 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
         if (await evaluate('Boolean(document.querySelector("[data-dungeon-fight]"))')) return true;
         for (const sel of ['[data-dungeon-choice]:not(:disabled)', '[data-dungeon-open]', '[data-dungeon-camp="rest"]']) {
           if (await evaluate(`Boolean(document.querySelector(${JSON.stringify(sel)}))`)) {
-            if (sel.includes('camp')) assert.match(await evaluate(`document.querySelector('[data-dungeon-camp="rest"]').closest('.event-choices')?.previousElementSibling?.textContent ?? ''`), /25%/, 'the camp says its rest heals 25% (CAMP_REST)');
+            if (sel.includes('camp')) assert.match(await evaluate(`document.querySelector('[data-dungeon-camp="rest"]').textContent`), /25%/, 'the camp says its rest heals 25% (CAMP_REST)');
             await click(sel); await wait('Boolean(document.querySelector(".room-outcome")) || Boolean(document.querySelector("[data-dungeon-fight]"))', 5000).catch(() => {}); break; }
         }
         if (await evaluate('Boolean(document.querySelector("[data-dungeon-fight]"))')) return true;
@@ -235,6 +298,9 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     assert.equal(await evaluate('window.gridbound.profile().gold'), gold, 'abandoning banks nothing');
 
     // A wipe is saved with its result too: reloading cannot bring the run or the pouch back.
+    await click('[data-dungeon-pick="1"]');
+    await wait(dossier);
+    await sleep(650);
     await click('[data-dungeon-start="1"]');
     await wait('Boolean(document.querySelector(".dungeon-map .room.open"))');
     assert.ok(await walkToFight(), 'the new run reaches a fight');
@@ -247,6 +313,40 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     await reloadToDungeon();
     assert.deepEqual(await evaluate(saveState), wiped, 'the run stays wiped after a reload');
     assert.equal(await evaluate('Boolean(document.querySelector(".dungeon-result.wiped [data-dungeon-close]"))'), true, 'the Undercroft shows the wipe');
+    await click('[data-dungeon-close]');
+    await wait('document.querySelectorAll(".depth-card").length === 8');
+
+    // The camp: Rest names its heal, says it closes the way out and Extract ends the run; after Rest the outcome says what it did.
+    // A run walked to the room before the camp row (seeded), one hero down.
+    const campSeed = `(async () => { const { startRun, CAMP_ROW } = await import('/src/game/dungeon.ts'); const run = startRun(1, 4242, [0, 4, 3]);
+      let at = run.nodes.find(n => n.row === 0); run.visited.push(at.id); at.done = true;
+      while (at.row < CAMP_ROW - 1) { at = run.nodes[at.next[0]]; run.visited.push(at.id); at.done = true; }
+      run.at = at.id; run.hp = { 0: .5, 4: 0, 3: .8 }; run.pouch = { gold: 120, materials: { 'ember-shard': 2 } };
+      indexedDB.deleteDatabase('gridbound.commanders.r1'); localStorage.clear(); localStorage.setItem('gridbound.v3', JSON.stringify({ ...${JSON.stringify(qaProfile)}, journey: { ...${JSON.stringify(qaProfile.journey)}, run } })); return run; })()`;
+    const campRun = await evaluate(campSeed);
+    await reloadToDungeon();
+    await click('.dungeon-map .room.room-camp.open');
+    await wait('Boolean(document.querySelector("[data-dungeon-camp=rest]"))');
+    assert.equal(await evaluate('document.querySelector("[data-dungeon-camp=rest]").textContent'), 'Rest: heal 25% and wake the fallen');
+    assert.equal(await evaluate('document.querySelector("[data-dungeon-camp=extract]").textContent'), 'Extract now with the pouch (ends the run)');
+    assert.match(await evaluate('document.querySelector(".room-panel").innerText'), /serves one choice[^]*no climbing out until the guardian falls/, 'the camp says Rest closes the way out');
+    await screenshot(`artifacts/dungeon-camp-${viewport.tag}.png`);
+    await click('[data-dungeon-camp="rest"]');
+    await wait('Boolean(document.querySelector(".room-outcome"))');
+    assert.equal(await evaluate('document.querySelectorAll(".dungeon-hud .dungeon-hero.down").length'), 0, 'nobody is down after the rest');
+    const rested = await evaluate('window.gridbound.profile().journey.run.hp');
+    assert.deepEqual(rested, { 0: .75, 4: .25, 3: 1 }, 'the rest heals 25% (capped at full) and wakes the fallen at 25%');
+    assert.match(await evaluate('document.querySelector(".room-outcome").textContent'), /^The party rests by the fire: \+25% HP each, up to full\. \S+ stands again at 25% HP\.$/, 'the outcome names the heal and who got up');
+    assert.equal(await evaluate('Boolean(document.querySelector("[data-dungeon-camp]"))'), false, 'the fire served its one choice');
+    await screenshot(`artifacts/dungeon-camp-rested-${viewport.tag}.png`);
+
+    // A cleared depth whose next stair waits behind a chapter says so on the map (as its result did), not that the stair opens.
+    const clearedSave = { ...qaProfile, cleared: [0, 1], journey: { ...qaProfile.journey, depth: 1, run: { ...campRun, status: 'cleared' } } };
+    await evaluate(`indexedDB.deleteDatabase('gridbound.commanders.r1'); localStorage.clear(); localStorage.setItem('gridbound.v3', ${JSON.stringify(JSON.stringify(clearedSave))})`);
+    await reloadToDungeon();
+    await wait('Boolean(document.querySelector(".dungeon-result.cleared"))');
+    assert.equal(await evaluate('document.querySelector(".dungeon-end-text").textContent'), 'The guardian falls. The next stair waits behind Chapter 3. Everything in the pouch is yours.');
+    await screenshot(`artifacts/dungeon-cleared-wait-${viewport.tag}.png`);
     await click('[data-dungeon-close]');
     await wait('document.querySelectorAll(".depth-card").length === 8');
 

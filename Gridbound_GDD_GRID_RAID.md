@@ -319,7 +319,7 @@ The eighteen base silhouettes have ash/frost/auric palette variants (72 records 
 | Monster | Title | Pattern | Counter |
 | --- | --- | --- | --- |
 | Ashfang | CINDER WOLF | weakest → front → strongest | Marked mengikuti hero. Pulihkan target atau lindungi dengan Guard; hindari sapuan tanah. |
-| Scrap Marshal | GOBLIN WAR BAND | strongest → strongest → meteor → weakest | Strongest dihitung dari power skill per cooldown. Ganti stance sebelum mark untuk mengubah prioritas musuh. |
+| Scrap Marshal | GOBLIN WAR BAND | strongest → strongest → meteor → weakest | Ia menandai hero yang skill-nya saat ini paling kuat dibanding cooldown-nya. Sebelum tanda muncul, ganti hero itu ke skill yang lebih ringan agar incarannya pindah, atau beri shield dan heal pada hero yang ditandai. |
 | Silk Widow | VENOM BROOD | weakest → meteor → all | Keluar dari tile web sebelum impact. Simpan Guard untuk venom seluruh grid. |
 | Hollow Cantor | BELL CULT SHAMAN | all → weakest → breath | All-grid bisa diputus Shield Bash, Silence Arrow, atau Null Field. Tanpa skill itu, timing Party Guard. |
 | Ironroot | RUIN GOLEM | front → strongest → all | Front mengikuti ROW terdepan yang dihuni saat telegraph dimulai, bukan selalu row pertama. Reposisi setelah tanda muncul. |
@@ -339,9 +339,9 @@ The eighteen base silhouettes have ash/frost/auric palette variants (72 records 
 | Ashbound Ashfang | ASHBOUND · CINDER WOLF | weakest → front → strongest | Marked mengikuti hero. Pulihkan target atau lindungi dengan Guard; hindari sapuan tanah. |
 | Frostbound Ashfang | FROSTBOUND · CINDER WOLF | front → strongest → weakest | Marked mengikuti hero. Pulihkan target atau lindungi dengan Guard; hindari sapuan tanah. |
 | Gilded Ashfang | GILDED · CINDER WOLF | strongest → weakest → front | Marked mengikuti hero. Pulihkan target atau lindungi dengan Guard; hindari sapuan tanah. |
-| Ashbound Scrap Marshal | ASHBOUND · GOBLIN WAR BAND | strongest → strongest → meteor → weakest | Strongest dihitung dari power skill per cooldown. Ganti stance sebelum mark untuk mengubah prioritas musuh. |
-| Frostbound Scrap Marshal | FROSTBOUND · GOBLIN WAR BAND | strongest → meteor → weakest → strongest | Strongest dihitung dari power skill per cooldown. Ganti stance sebelum mark untuk mengubah prioritas musuh. |
-| Gilded Scrap Marshal | GILDED · GOBLIN WAR BAND | meteor → weakest → strongest → strongest | Strongest dihitung dari power skill per cooldown. Ganti stance sebelum mark untuk mengubah prioritas musuh. |
+| Ashbound Scrap Marshal | ASHBOUND · GOBLIN WAR BAND | strongest → strongest → meteor → weakest | Ia menandai hero yang skill-nya saat ini paling kuat dibanding cooldown-nya. Sebelum tanda muncul, ganti hero itu ke skill yang lebih ringan agar incarannya pindah, atau beri shield dan heal pada hero yang ditandai. |
+| Frostbound Scrap Marshal | FROSTBOUND · GOBLIN WAR BAND | strongest → meteor → weakest → strongest | Ia menandai hero yang skill-nya saat ini paling kuat dibanding cooldown-nya. Sebelum tanda muncul, ganti hero itu ke skill yang lebih ringan agar incarannya pindah, atau beri shield dan heal pada hero yang ditandai. |
+| Gilded Scrap Marshal | GILDED · GOBLIN WAR BAND | meteor → weakest → strongest → strongest | Ia menandai hero yang skill-nya saat ini paling kuat dibanding cooldown-nya. Sebelum tanda muncul, ganti hero itu ke skill yang lebih ringan agar incarannya pindah, atau beri shield dan heal pada hero yang ditandai. |
 | Ashbound Silk Widow | ASHBOUND · VENOM BROOD | weakest → meteor → all | Keluar dari tile web sebelum impact. Simpan Guard untuk venom seluruh grid. |
 | Frostbound Silk Widow | FROSTBOUND · VENOM BROOD | meteor → all → weakest | Keluar dari tile web sebelum impact. Simpan Guard untuk venom seluruh grid. |
 | Gilded Silk Widow | GILDED · VENOM BROOD | all → weakest → meteor | Keluar dari tile web sebelum impact. Simpan Guard untuk venom seluruh grid. |

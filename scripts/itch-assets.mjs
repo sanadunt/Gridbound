@@ -122,7 +122,10 @@ async function screenshots(url, lang) {
 
     // 05 · The Undercroft: a fresh Depth 4 run (its map seed is pinned so every run draws the same rooms).
     await click.nav('dungeon');
-    await wait('Boolean(document.querySelector(".dungeon-scene [data-dungeon-start]"))');
+    await wait('Boolean(document.querySelector(".dungeon-scene [data-dungeon-pick]"))');
+    await click('[data-dungeon-pick="4"]');
+    await wait('Boolean(document.querySelector("#modal [data-dungeon-start=\\"4\\"]"))');
+    await pause(650);
     await evaluate('window.__random = Math.random; Math.random = () => 0.4242');
     await click('[data-dungeon-start="4"]');
     await wait('Boolean(document.querySelector("[data-dungeon-node]"))');
