@@ -95,11 +95,25 @@ export class Battle {
     if (!['ready', 'victory', 'defeat'].includes(this.status)) throw new Error('Checkpoint requires an encounter boundary');
     return structuredClone({ ...this, events: [] });
   }
-  restoreCheckpoint(state: ReturnType<Battle['checkpoint']>) {
+  /** `rebuilt`: the same heroes built from the profile as it is now (a paused Story battle resumed after the player trained, re-geared or
+   *  promoted). A hero whose build changed takes the new one (level, gear, talents, job, skills, max HP) and keeps the checkpoint's place,
+   *  gauge, HP and shield shares; an unchanged hero, or one missing from `rebuilt`, is restored exactly. */
+  restoreCheckpoint(state: ReturnType<Battle['checkpoint']>, rebuilt?: readonly Hero[]) {
     if (!['ready', 'victory', 'defeat'].includes(state.status)) throw new Error('Not an encounter boundary');
     Object.assign(this, structuredClone(state));
     this.events = [];
     Reflect.deleteProperty(this, 'curse'); // pre-`curses` checkpoints carried one shared curse slot
+    const build = (h: Hero) => JSON.stringify([h.level, h.job ?? null, h.gear, h.talents, h.skills, h.maxHp, h.gearPower, h.gearTempo, h.perks, h.equipment]);
+    for (const h of rebuilt ? this.heroes : []) {
+      const n = rebuilt!.find(x => x.id === h.id);
+      if (!n || build(n) === build(h)) continue;
+      const hp = h.maxHp > 0 ? h.hp / h.maxHp : 0, shield = h.maxHp > 0 ? h.shield / h.maxHp : 0;
+      Object.assign(h, structuredClone({ level: n.level, perks: n.perks, equipment: n.equipment, gear: n.gear, gearPower: n.gearPower, gearTempo: n.gearTempo, talents: n.talents, skills: n.skills, maxHp: n.maxHp }));
+      if (n.job) h.job = n.job; else delete h.job;
+      if (!h.skills.includes(h.stance)) h.stance = h.skills[0];
+      h.hp = h.hp > 0 ? Math.max(1, n.maxHp * hp) : 0; h.shield = n.maxHp * shield;
+      h.total = this.cooldown(h); h.remaining = Math.min(h.remaining, h.total);
+    }
   }
   random() { this.seed=(Math.imul(1664525,this.seed)+1013904223)>>>0; return this.seed/4294967296; }
   reset(mode:Mode,floor=1,upgrades=defaultUpgrades,options:BattleOptions={}) {

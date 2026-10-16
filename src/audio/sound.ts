@@ -3,8 +3,14 @@
  * Short procedural combat and interface cues; background music is disabled.
  */
 
+/** A running context with no cue for this long is suspended (a phone keeps a running AudioContext's audio hardware awake). */
+export const SOUND_IDLE_MS = 20_000;
+
 export class Sound {
-  enabled = true;
+  private on = true;
+  /** Sound on or off (Config, the ♫ button). Off never creates a context, and a running one is suspended at once. */
+  get enabled() { return this.on; }
+  set enabled(value: boolean) { this.on = value; if (!value && this.ctx?.state === 'running') { this.idleSuspended = true; void this.ctx.suspend().catch(() => {}); } }
   private ctx?: AudioContext;
   private last = -Infinity;
   private lastSupport = -Infinity;
@@ -12,18 +18,54 @@ export class Sound {
   private noise?: AudioBuffer;
   /** The context was suspended because the page was hidden (so coming back resumes it, but never one the player muted or never unlocked). */
   private hiddenSuspend = false;
+  /** The context was suspended after SOUND_IDLE_MS of silence (or Sound turned off): the next cue resumes it. */
+  private idleSuspended = false;
+  private waking = false;
+  private idleTimer?: ReturnType<typeof setTimeout>;
 
   constructor() {
     // Phones keep a running AudioContext awake in the background: suspend it while the page is hidden.
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => this.visibility(document.hidden));
+    // iOS: game cues mix with the player's own music instead of stopping it (Safari 16.4+; elsewhere absent).
+    try { const session = (globalThis.navigator as Navigator & { audioSession?: { type: string } } | undefined)?.audioSession; if (session) session.type = 'ambient'; } catch { /* not settable */ }
   }
 
-  /** Suspend on hidden, resume on visible. Resuming needs an earlier user gesture; if the browser refuses, the next tap's unlock() resumes it. */
+  /** Suspend on hidden, resume on visible. Resuming needs an earlier user gesture; if the browser refuses, the next tap's unlock() resumes it.
+   *  iOS Safari leaves a context 'interrupted' after an app switch, a lock or a call: coming back resumes that one too. */
   visibility(hidden: boolean) {
     const c = this.ctx;
     if (!c) return;
     if (hidden) { if (c.state === 'running') { this.hiddenSuspend = true; void c.suspend().catch(() => {}); } return; }
-    if (this.hiddenSuspend) { this.hiddenSuspend = false; void c.resume().catch(() => {}); }
+    if (this.hiddenSuspend || (c.state as string) === 'interrupted') { this.hiddenSuspend = false; if (this.on) void c.resume().catch(() => {}); }
+  }
+
+  /** True when a cue may play now (the idle timer starts again). A context the idle timer suspended is resumed first: the cue that woke it
+   *  plays once it runs (`replay`), cues that arrive meanwhile are dropped. */
+  private live(replay?: () => void) {
+    const c = this.ctx;
+    if (!this.on || !c) return false;
+    if (c.state === 'running') { this.armIdle(); return true; }
+    if (this.idleSuspended && !this.waking && !this.hiddenSuspend && (c.state as string) !== 'closed') {
+      this.waking = true;
+      void c.resume().then(() => { this.waking = false; this.idleSuspended = false; if (c.state === 'running') replay?.(); }, () => { this.waking = false; });
+    }
+    return false;
+  }
+  /** One pending timer at most (a busy fight plays dozens of cues a second): each cue only moves `lastCue`, and the timer, when it fires
+   *  early, waits out the rest. */
+  private lastCue = 0;
+  private armIdle() {
+    this.lastCue = Date.now();
+    if (this.idleTimer !== undefined) return;
+    const check = () => {
+      const left = this.lastCue + SOUND_IDLE_MS - Date.now();
+      if (left > 0) { this.idleTimer = setTimeout(check, left); (this.idleTimer as { unref?: () => void }).unref?.(); return; }
+      this.idleTimer = undefined;
+      const c = this.ctx;
+      if (c?.state === 'running') { this.idleSuspended = true; void c.suspend().catch(() => {}); }
+    };
+    this.idleTimer = setTimeout(check, SOUND_IDLE_MS);
+    (this.idleTimer as { unref?: () => void }).unref?.();
   }
 
   private castCue(kind: string) {
@@ -113,12 +155,14 @@ export class Sound {
     });
   }
 
+  /** From a user activation (a click, a key, a finger lifted): create the context (only while Sound is on) and resume it from any stopped
+   *  state, iOS's 'interrupted' included. */
   unlock() {
+    if (!this.on) return;
     try {
       this.ctx ??= new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      if (this.ctx.state === 'suspended') {
-        void this.ctx.resume();
-      }
+      const state = this.ctx.state as string;
+      if (state !== 'running' && state !== 'closed') { this.hiddenSuspend = false; void this.ctx.resume().then(() => { this.idleSuspended = false; this.armIdle(); }, () => {}); }
     } catch {
       /* Audio remains optional on unsupported browsers. */
     }
@@ -126,7 +170,7 @@ export class Sound {
 
   /** Backwards-compatible raw tone generator */
   tone(freq: number, duration = 0.1, type: OscillatorType = 'triangle', volume = 0.025, slide = 0) {
-    if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
+    if (!this.live(() => this.tone(freq, duration, type, volume, slide)) || !this.ctx) return;
     const c = this.ctx;
     const osc = c.createOscillator();
     const gain = c.createGain();
@@ -229,12 +273,14 @@ export class Sound {
 
   /** Tactile metallic coin clink for UI clicks and tabs */
   clink() {
+    if (!this.live(() => this.clink())) return;
     this.synthNote(1480, 0.08, { type: 'sine', volume: 0.018, attack: 0.005 });
     this.synthNote(2220, 0.06, { type: 'triangle', volume: 0.012, attack: 0.003 });
   }
 
   /** Tarot card deal whoosh and chime */
   cardDeal() {
+    if (!this.live(() => this.cardDeal())) return;
     this.noiseBurst(0.12, 0.015, 2400, 'bandpass');
     [659, 880, 1046].forEach((n, i) => {
       setTimeout(() => this.synthNote(n, 0.14, { type: 'sine', volume: 0.015, attack: 0.01 }), i * 35);
@@ -243,18 +289,21 @@ export class Sound {
 
   /** Heavy stone tablet latch click for Pact modifiers */
   pactToggle() {
+    if (!this.live(() => this.pactToggle())) return;
     this.synthNote(120, 0.06, { type: 'square', volume: 0.025, slide: -60 });
     this.noiseBurst(0.05, 0.018, 800, 'lowpass');
   }
 
   /** Deep ethereal Underworld modal reveal */
   modalReveal() {
+    if (!this.live(() => this.modalReveal())) return;
     this.synthNote(98, 0.35, { type: 'triangle', volume: 0.028, attack: 0.04, filterFreq: 400 });
     this.synthNote(587, 0.25, { type: 'sine', volume: 0.014, attack: 0.02 });
   }
 
   /** Visceral critical strike gong */
   critHit() {
+    if (!this.live(() => this.critHit())) return;
     this.synthNote(1050, 0.3, { type: 'sawtooth', volume: 0.035, slide: -300, filterFreq: 3200 });
     this.synthNote(2100, 0.22, { type: 'triangle', volume: 0.025 });
     this.noiseBurst(0.15, 0.03, 1600, 'highpass');
@@ -262,6 +311,7 @@ export class Sound {
 
   /** Shattering crystalline obsidian resonance for armor break */
   armorBreak() {
+    if (!this.live(() => this.armorBreak())) return;
     this.noiseBurst(0.2, 0.035, 2200, 'bandpass');
     [1200, 950, 720, 480].forEach((n, i) => {
       setTimeout(() => this.synthNote(n, 0.22, { type: 'sawtooth', volume: 0.025, slide: -120 }), i * 30);
@@ -269,6 +319,7 @@ export class Sound {
   }
 
   play(kind: string) {
+    if (!this.live(() => this.play(kind))) return;
     const now = performance.now();
     const combatHit = kind === 'hit' || kind === 'hit-heavy' || kind === 'hit-magic' || kind === 'hit-slash';
     if (combatHit) {

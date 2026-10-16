@@ -2,7 +2,8 @@
 // Commander' asks before starting from zero and keeps the existing file, 'Download save backup' always writes
 // an importable file that 'Import save' restores (fresh id, bank kept only when it cannot duplicate one, three
 // files max), a reload keeps the progress, re-rendering the town does not commit revisions or flash the unsaved
-// warning, a Journal choice re-renders the Journal, and another tab's commit makes this tab read-only.
+// warning, a Journal choice re-renders the Journal, and another tab's commit makes this tab read-only. On a phone (390×844, touch) Save
+// files offers Copy backup as text and Paste backup on the web build too, notes the backup time, and the backup reminder closes with 'Not now'.
 import assert from 'node:assert/strict';
 import { withBrowser } from './browser-harness.mjs';
 
@@ -396,4 +397,53 @@ await withBrowser(async ({ send, wait, evaluate }) => {
   assert.equal(files.length, 1, 'the save is migrated once');
   assert.equal(files[0].crystal, 40, 'with its one bank');
 }, { width: 900, height: 900 });
-console.log('PASS save safety browser: boot migration with backup, guarded New Commander, importable export and import, reload, quiet saves, legacy fallback and Continue my progress, session-only mirror, retry prompts after a failed save, stalled-IndexedDB fallback, Continue for a protected save, one migration across tabs');
+// Phone contract I5/I6 (SAFE): backups on every build, on a phone (390×844, touch, Android Chrome, the normal web build). Save files says
+// where the saves live and offers Download, Copy backup as text and Paste backup; a copy or a download notes the backup time per viewer
+// (gridbound.ui.backupAt); the pasted text restores the file as a second Commander; the backup reminder opens on request and 'Not now' closes it.
+await withBrowser(async ({ send, wait, evaluate, click, touch }) => {
+  await send('Browser.setDownloadBehavior', { behavior: 'deny' }).catch(() => {});
+  await send('Page.navigate', { url });
+  await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")', 20000);
+  await evaluate(`new Promise(resolve => { const request = indexedDB.deleteDatabase('gridbound.commanders.r1'); request.onsuccess = request.onerror = request.onblocked = () => resolve(); })`);
+  await evaluate(`localStorage.clear(); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(seed)}))`);
+  await send('Page.reload');
+  await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
+  await wait(`${status()}.startsWith("Saved")`, 15000);
+  const saveFiles = async () => { await click('#menu-button'); await wait('Boolean(document.querySelector(".more-scene"))'); await touch.tap('.more-scene [data-open-action="profiles"]'); await wait('Boolean(document.querySelector("dialog[open] #import-text-button"))'); };
+  await saveFiles();
+  assert.ok(await evaluate('Boolean(document.querySelector("dialog[open] #export-text-commander")) && Boolean(document.querySelector("dialog[open] #export-commander"))'), 'Save files offers Download and Copy backup as text on the web build');
+  assert.match(await evaluate('document.querySelector("#storage-note")?.textContent ?? ""'), /\S/, 'Save files says where the saves live');
+  assert.equal(await evaluate("localStorage.getItem('gridbound.ui.backupAt')"), null, 'no backup yet');
+  await touch.tap('#export-text-commander');
+  await wait('Boolean(document.querySelector("dialog[open] #backup-text"))');
+  const text = await evaluate('document.querySelector("#backup-text").value');
+  assert.equal(typeof JSON.parse(text).commanderId, 'string', 'the text is the Commander document');
+  assert.match(await evaluate('document.querySelector("dialog[open] .hint").textContent'), /Paste backup/, 'the copy view says how to restore it');
+  await send('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] }).catch(() => {});
+  await touch.tap('#backup-copy');
+  await wait('document.querySelector("#backup-note").textContent.length > 0');
+  if (await evaluate('document.querySelector("#backup-note").textContent.startsWith("Copied")')) assert.ok(Number(await evaluate("localStorage.getItem('gridbound.ui.backupAt')")) > 0, 'a copy notes the backup time');
+  await touch.tap('#backup-back');
+  await wait('Boolean(document.querySelector("dialog[open] #export-commander"))');
+  await evaluate("localStorage.removeItem('gridbound.ui.backupAt')");
+  await touch.tap('#export-commander');
+  await wait("Number(localStorage.getItem('gridbound.ui.backupAt')) > 0");
+  // Paste backup restores the copied text as a second file.
+  await touch.tap('#import-text-button');
+  await wait('Boolean(document.querySelector("dialog[open] #import-text"))');
+  await touch.tap('#import-text');
+  await send('Input.insertText', { text });
+  await wait('!document.querySelector("#import-text-confirm").disabled');
+  await touch.tap('#import-text-confirm');
+  await wait('Boolean(document.querySelector("dialog[open] [data-import-note]"))', 15000);
+  await wait(`${docs}.then(list => list.length === 2)`, 10000);
+  await evaluate('document.querySelector("dialog[open] [data-close]").click()');
+  await wait('!document.querySelector("dialog[open]")');
+  // The reminder (forced: automation skips it) offers Copy backup first and focuses 'Not now', which closes it.
+  await evaluate('window.gridbound.backupReminder(true)');
+  await wait('Boolean(document.querySelector("dialog[open] #reminder-copy"))');
+  assert.equal(await evaluate('document.activeElement?.textContent'), 'Not now', "'Not now' takes the focus");
+  await touch.tap('dialog[open] [data-close]:not(.modal-close)');
+  await wait('!document.querySelector("dialog[open]")');
+}, { phone: { width: 390, height: 844, dpr: 3, ua: 'android' } });
+console.log('PASS save safety browser: boot migration with backup, guarded New Commander, importable export and import, reload, quiet saves, legacy fallback and Continue my progress, session-only mirror, retry prompts after a failed save, stalled-IndexedDB fallback, Continue for a protected save, one migration across tabs, phone backups (copy, download, paste, reminder)');

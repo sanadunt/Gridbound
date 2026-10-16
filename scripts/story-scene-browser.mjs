@@ -6,7 +6,7 @@ const camp = 'Boolean(window.gridbound && document.querySelector(".camp-scene"))
 const nameplate = 'document.querySelector(".dialogue-speaker b").textContent';
 const portraitShown = '!document.querySelector(".dialogue-speaker img").hidden';
 /** Seed a legacy save with `chapters` cleared (journey queues and choices patched by `patch`) and boot it as a fresh Commander. */
-const seed = (chapters, patch = '') => `(async()=>{await new Promise(r=>{const q=indexedDB.deleteDatabase('gridbound.commanders.r1');q.onsuccess=q.onerror=q.onblocked=()=>r();});const {createProfile,completeZone}=await import('/src/game/profile.ts');const p=createProfile();p.motion=false;for(let i=0;i<${chapters};i++)completeZone(p,i);${patch}localStorage.setItem('gridbound.v3',JSON.stringify(p));})()`;
+const seed = (chapters, patch = '') => `(async()=>{await new Promise(r=>{const q=indexedDB.deleteDatabase('gridbound.commanders.r1');q.onsuccess=q.onerror=q.onblocked=()=>r();});const {createProfile,completeZone}=await import('/src/game/profile.ts');const p=createProfile();p.motion=false;for(let i=0;i<${chapters};i++)completeZone(p,i);${patch}localStorage.setItem('gridbound.v3',JSON.stringify(p));localStorage.setItem('gridbound.ui.backupReminderAt',String(Date.now()));})()`;
 /** Picks are ignored for a moment after the choices appear (CHOICE_INPUT_DELAY_MS in dialogue.ts). */
 const settle = () => new Promise(resolve => setTimeout(resolve, 700));
 const guideText = 'document.querySelector(".camp-copy")?.textContent ?? ""';

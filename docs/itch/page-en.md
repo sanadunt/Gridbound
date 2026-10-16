@@ -103,8 +103,9 @@ Keyboard (click the game once so it has the keyboard):
 - Progress saves automatically in **this browser's storage** for itch.io. It does not follow you to another browser or
   device, and a private or incognito window forgets it when the window closes. Some browsers keep the storage of an
   embedded game only until the tab closes (Brave's default, for example): download a backup there before you leave.
-- Clearing site data, or a browser's storage clean-up, deletes it. **Download a backup now and then**: Config → Download
-  save backup. The game also shows the backup as text to copy, in case the browser blocks downloads inside the page.
+- Clearing site data, or a browser's storage clean-up, deletes it. **Keep a backup now and then**: Config → Download
+  save backup, or Copy backup as text and keep the text in a note (handy on a phone). The game also shows the backup as
+  text after a download, in case the browser blocks downloads inside the page, and reminds you after each act.
 - Restore a backup with Import save or Paste backup, from Load Game on the title screen or from MENU → Save (the Inn in
   town opens it too).
 

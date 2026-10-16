@@ -27,6 +27,7 @@ const SEED = lang => `(async () => {
   await new Promise(done => { const q = indexedDB.deleteDatabase('gridbound.commanders.r1'); q.onsuccess = q.onerror = q.onblocked = () => done(); });
   localStorage.clear(); localStorage.setItem('gridbound.lang', ${JSON.stringify(lang)});
   localStorage.setItem('gridbound.ui.unlocks', JSON.stringify({ intro: ['dungeon', 'raid', 'endless'], visited: ['dungeon', 'raid', 'endless'] }));
+  localStorage.setItem('gridbound.ui.backupReminderAt', String(Date.now()));
   const { createProfile, completeZone, recordChapterResult, claimStarChest, claimQuest, promote, equipSkill, equipGear, buyTalent } = await import('/src/game/profile.ts');
   const { xpForLevel } = await import('/src/game/levels.ts'), { JOBS, GEAR } = await import('/src/game/jobs.ts'), { ROSTER } = await import('/src/game/content.ts'), { QUESTS, questProgress } = await import('/src/game/quests.ts');
   const p = createProfile(); p.sound = false; p.motion = false;

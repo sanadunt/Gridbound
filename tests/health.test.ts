@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { Sound } from '../src/audio/sound';
+import { Sound, SOUND_IDLE_MS } from '../src/audio/sound';
 
 /** A minimal Web Audio stand-in: counts the buffers and sources a cue creates and records suspend/resume. */
 function fakeContext(state: AudioContextState = 'running') {
@@ -12,7 +12,7 @@ function fakeContext(state: AudioContextState = 'running') {
     createBuffer: (_channels: number, length: number, sampleRate: number) => { log.buffers++; const data = new Float32Array(length); return { sampleRate, duration: length / sampleRate, getChannelData: () => data }; },
     createBufferSource: () => ({ ...node(), buffer: null, start: (...args: number[]) => log.starts.push(args) }),
     createBiquadFilter: node, createGain: node, createOscillator: node,
-    suspend: async () => { log.suspend++; ctx.state = 'suspended'; }, resume: async () => { log.resume++; ctx.state = 'running'; },
+    suspend: async () => { log.suspend++; ctx.state = 'suspended'; }, resume: async () => { log.resume++; await null; ctx.state = 'running'; },
   };
   return { ctx, log };
 }
@@ -37,6 +37,39 @@ test('a hidden page suspends a running AudioContext and coming back resumes only
   const idle = fakeContext('suspended'), quiet = withContext(new Sound(), idle.ctx);
   quiet.visibility(true); quiet.visibility(false);
   assert.deepEqual([idle.log.suspend, idle.log.resume], [0, 0]);
+});
+
+test('P11/plat-07: iOS\'s interrupted context comes back on the next tap and on return; Sound off never creates a context', async () => {
+  const tapped = fakeContext('interrupted' as AudioContextState), sound = withContext(new Sound(), tapped.ctx);
+  sound.unlock(); await Promise.resolve();
+  assert.equal(tapped.log.resume, 1, 'a tap resumes an interrupted context');
+  const back = fakeContext('interrupted' as AudioContextState), returning = withContext(new Sound(), back.ctx);
+  returning.visibility(false); assert.equal(back.log.resume, 1, 'coming back to the page resumes it too');
+  const g = globalThis as unknown as { window?: unknown }, saved = g.window;
+  let made = 0;
+  g.window = { AudioContext: class { state = 'running'; constructor() { made++; } resume() { return Promise.resolve(); } } };
+  try {
+    const off = new Sound(); off.enabled = false; off.unlock(); off.play('cursor');
+    assert.equal(made, 0, 'no AudioContext while Sound is off');
+    const on = new Sound(); on.unlock(); assert.equal(made, 1, 'Sound on creates one at the first activation');
+  } finally { g.window = saved; }
+  // Turning Sound off suspends a running context at once.
+  const running = fakeContext(), muted = withContext(new Sound(), running.ctx);
+  muted.enabled = false; assert.equal(running.log.suspend, 1);
+});
+
+test('P11: a context is suspended after SOUND_IDLE_MS of silence, and the next cue resumes it and plays', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const { ctx, log } = fakeContext(), sound = withContext(new Sound(), ctx);
+  sound.play('move');
+  const played = log.starts.length;
+  t.mock.timers.tick(SOUND_IDLE_MS - 1); assert.equal(log.suspend, 0, 'not before the idle time');
+  sound.play('move'); t.mock.timers.tick(SOUND_IDLE_MS - 1); assert.equal(log.suspend, 0, 'a cue starts the idle time again');
+  t.mock.timers.tick(1); assert.equal(log.suspend, 1, 'silence suspends the context');
+  sound.play('move'); sound.play('move');
+  assert.equal(log.starts.length, played + 1, 'the cue that wakes it waits for the resume; the one meanwhile is dropped');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(log.resume, 1); assert.equal(log.starts.length, played + 2, 'the waking cue plays once the context runs');
 });
 
 test('pixel-font readouts in result and Undercroft screens are at least 10px', () => {
@@ -91,4 +124,11 @@ test('phone shell: safe-area insets pad the game, form controls are 16px on a co
   assert.ok(base.some(r => r.selector.includes('#app input') && /user-select:\s*text/.test(r.body)), 'text fields stay selectable under #app { user-select: none }');
   const viewport = readFileSync('index.html', 'utf8').match(/name="viewport" content="([^"]+)"/)![1];
   assert.equal(viewport, 'width=device-width,initial-scale=1,viewport-fit=cover', 'L1: no maximum-scale or user-scalable=no (pinch-zoom stays possible)');
+});
+
+test('C7: no unload handler anywhere (the back/forward cache stays usable); the page-hide path is pagehide/visibilitychange/freeze', () => {
+  const files = readdirSync('src', { recursive: true }).map(String).filter(f => f.endsWith('.ts')).map(f => readFileSync(`src/${f}`, 'utf8'));
+  for (const source of files) assert.doesNotMatch(source, /addEventListener\(\s*['"]unload['"]|\bonunload\s*=/, 'an unload handler makes the page ineligible for bfcache');
+  const main = readFileSync('src/main.ts', 'utf8');
+  for (const event of ['pagehide', 'freeze', 'visibilitychange']) assert.match(main, new RegExp(`addEventListener\\('${event}', pageHidden|'${event}'.*pageHidden|pageHidden\\(\\); else pageShown`), event);
 });

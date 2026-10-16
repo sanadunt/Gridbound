@@ -145,10 +145,15 @@ Kalau semua lolos: **Edit game** → **Visibility & access** → **Public** → 
   ditutup); atau game lain di origin CDN yang sama menghapus localStorage bersama. Kalau IndexedDB diblokir, game tetap bisa dimainkan dan
   bilah status menampilkan peringatan ("Browser storage limited — …" atau, kalau semua penyimpanan diblokir, "Session only —
   export before closing this tab").
-- Karena itu deskripsi halaman sudah menganjurkan pemain mengunduh cadangan sesekali. Di dalam frame, sebagian browser
-  memblokir unduhan atau akses clipboard; karena itu di dalam frame (seperti di itch.io) game selalu juga menampilkan
-  cadangan sebagai teks yang bisa disalin manual, dan Muat Game (atau MENU → Save) → Tempel cadangan memulihkannya. Tombol
-  Tempel cadangan hanya ada saat game berjalan di dalam frame; di halaman biasa cukup Impor save.
+- Karena itu deskripsi halaman sudah menganjurkan pemain menyimpan cadangan sesekali, dan game sendiri mengingatkan setelah
+  setiap babak (dan bila seminggu tanpa cadangan). Pengaturan dan File save menawarkan **Salin cadangan sebagai teks** dan
+  File save menawarkan **Tempel cadangan** di setiap build. Di dalam frame, sebagian browser memblokir unduhan atau akses
+  clipboard; karena itu di dalam frame (seperti di itch.io) game juga membuka teks cadangan otomatis setelah Unduh cadangan
+  save, dan Muat Game (atau MENU → Save) → Tempel cadangan memulihkannya. Baris di atas Pengaturan dan File save menyebut
+  bahwa save ada di penyimpanan browser untuk itch.io. Di dalam frame game tidak meminta penyimpanan permanen
+  (`navigator.storage.persist()`; penyimpanan frame terpartisi) dan tidak meminta Screen Wake Lock (daftar `allow` iframe
+  itch.io tidak memuat `screen-wake-lock`): layar ponsel bisa redup saat pertarungan menunggu, dan pertarungan dijeda saat
+  layar terkunci.
 
 ## Update versi
 

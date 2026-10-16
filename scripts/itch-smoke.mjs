@@ -67,6 +67,7 @@ body.mobile .game_frame{position:fixed;inset:0;width:100vw;height:100dvh;margin:
 <div class="game_frame"><iframe id="game_drop" src="${gameOrigin}${PREFIX}index.html" allowtransparency="true" frameborder="0"${noFullscreen ? '' : ' allowfullscreen="true"'} scrolling="no" allow="${allow}"></iframe></div>
 <section class="description"><h1>Gridbound: Ashes of the Bell</h1><p>The page below the game is long, so any scroll that leaks out of the game frame moves it.</p></section></body></html>`;
 };
+const PERSIST_SPY = `(() => { window.__persistCalls = 0; const s = navigator.storage; if (!s) return; for (const name of ['persist', 'persisted']) { const own = s[name] && s[name].bind(s); if (own) s[name] = () => { window.__persistCalls++; return own(); }; } })();`;
 const host = createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   hostLog.push(url.pathname);
@@ -87,7 +88,8 @@ async function session({ name, width, height, mobile = false, query = '', previo
       if (message.method === 'Target.attachedToTarget') {
         const { sessionId, targetInfo } = message.params;
         // A phone: the out-of-process frame gets its own touch emulation (the page's does not reach it).
-        const setup = targetInfo.type === 'iframe' ? Promise.all([...['Runtime.enable', 'Network.enable', 'Log.enable', 'Page.enable'].map(method => send(method, {}, sessionId)), ...(mobile ? [send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 }, sessionId)] : [])]) : Promise.resolve();
+        // The frame also counts calls to navigator.storage.persist()/persisted(): a frame's storage is partitioned, so the game never asks (I4).
+        const setup = targetInfo.type === 'iframe' ? Promise.all([...['Runtime.enable', 'Network.enable', 'Log.enable', 'Page.enable'].map(method => send(method, {}, sessionId)), send('Page.addScriptToEvaluateOnNewDocument', { source: PERSIST_SPY }, sessionId), ...(mobile ? [send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 }, sessionId)] : [])]) : Promise.resolve();
         void setup.then(() => send('Runtime.runIfWaitingForDebugger', {}, sessionId)).then(() => { if (targetInfo.type === 'iframe') frame = sessionId; }).catch(() => {});
       }
       if (message.method === 'Target.detachedFromTarget' && message.params.sessionId === frame) frame = undefined;
@@ -151,7 +153,12 @@ async function session({ name, width, height, mobile = false, query = '', previo
       }
       throw Error(`a click at ${Math.round(x)},${Math.round(y)} never reached the game frame`);
     };
-    const click = async selector => clickAt(await point(selector));
+    // A control that just appeared or moved under the pointer ignores presses for a moment (phone contract G7): wait that out first.
+    const click = async selector => {
+      const held = await inFrame(`(() => { const held = document.querySelector(${JSON.stringify(selector)})?.closest('[data-input-until]'); return held ? Math.max(0, Number(held.dataset.inputUntil) - performance.now()) : 0; })()`).catch(() => 0);
+      if (held > 0) await sleep(held + 40);
+      return clickAt(await point(selector));
+    };
     /** A one-finger swipe at a point of the host page over the frame (dy < 0: the finger moves up), as a phone sends it, dispatched
      *  through the game frame's own session: headless Chrome routes a synthetic touch on an out-of-process frame by stale geometry once
      *  the frame changed a lot (a battle starting) and hands it to the host page instead. The frame's own gesture still bubbles a scroll
@@ -262,7 +269,18 @@ async function leaveFight(t) {
   await t.waitFrame('document.querySelector("#town-screen:not([hidden]) .town-game-shell")?.dataset.townRoute === "mission"', 15000);
 }
 /** Ⅱ Menu → Leave battle… → Leave the chapter: back on the dossier the chapter departed from. */
-const retreat = async ({ click, waitFrame }) => { await click('#pause'); await waitFrame('Boolean(document.querySelector("#pause-retreat"))'); await click('#pause-retreat'); await waitFrame('Boolean(document.querySelector("dialog[open] #abandon-run"))'); await click('#abandon-run'); await waitFrame('document.querySelector("#town-screen:not([hidden]) .town-game-shell")?.dataset.townRoute === "mission"', 15000); };
+// The pause menu may already be up (a swipe on the host page blurred the frame: the fight paused and its menu waits for the return) and the
+// fight may end meanwhile (its result then offers the way out): Ⅱ Menu is pressed only while neither shows, and again if a press was lost.
+const retreat = async t => {
+  const { click, waitFrame, inFrame } = t, menu = 'Boolean(document.querySelector("dialog[open] #pause-retreat"))', result = 'Boolean(document.querySelector("#result-screen:not([hidden]) #result-town:not(:disabled)"))';
+  for (let i = 0; !await inFrame(menu); i++) {
+    if (await inFrame(result)) return leaveFight(t);
+    if (i >= 3) { console.error('RETREAT STATE', await inFrame('JSON.stringify({ status: window.gridbound?.battle.status, modal: document.querySelector("#modal").open, content: document.querySelector("#modal").textContent.slice(0, 120), result: !document.querySelector("#result-screen").hidden })')); throw new Error('Ⅱ Menu never showed the pause menu'); }
+    await click('#pause');
+    await waitFrame(`${menu} || ${result}`, 3000).catch(() => {});
+  }
+  await click('#pause-retreat'); await waitFrame('Boolean(document.querySelector("dialog[open] #abandon-run"))'); await click('#abandon-run'); await waitFrame('document.querySelector("#town-screen:not([hidden]) .town-game-shell")?.dataset.townRoute === "mission"', 15000);
+};
 
 try {
   // The recommended embed on a desktop page: everything the frame changes.
@@ -300,6 +318,11 @@ try {
     assert.equal(await inFrame(`document.elementFromPoint(${canvasHit.x - outer.x}, ${canvasHit.y - outer.y})?.tagName`), 'CANVAS', 'the click lands on the engine canvas');
     await clickAt(canvasHit);
     await waitFrame('document.hasFocus()', 3000);
+    // The host page took the focus mid-fight, so the fight paused (phone contract C2) without a menu that would have pulled the focus back;
+    // the player's return shows it, and nothing goes on until Resume (here Escape).
+    await waitFrame('Boolean(document.querySelector("dialog[open] #pause-retreat"))', 3000);
+    await press('Escape');
+    await waitFrame('!document.querySelector("dialog[open]")');
     for (const [code, key] of [['ArrowDown', 'ArrowDown'], ['PageDown', 'PageDown'], ['End', 'End']]) { await press(code, key); await sleep(250); assert.equal(await hostScroll(), 0, `${code} in the game does not scroll the host page`); }
     // Headless Chrome routes a synthetic wheel over the animated arena to the host page unreliably, so the arena's guard is checked
     // with a WheelEvent in the frame: nothing in the arena scrolls, so the game cancels it (the camp and the dialog get real wheels).
@@ -393,6 +416,8 @@ try {
     await closeModal(t);
     await saveMenu(t);
     assert.deepEqual(await inFrame('[...document.querySelectorAll("dialog[open] [data-commander]")].map(button => button.closest(".save-file").querySelector("b").textContent).sort()'), ['itch smoke', 'itch smoke (imported)'], 'the pasted backup became a second file (the open one)');
+    assert.match(await inFrame('document.querySelector("#storage-note")?.textContent ?? ""'), /itch\.io/, 'Save files says the saves live in the browser\'s storage for itch.io');
+    assert.equal(await inFrame('window.__persistCalls'), 0, 'the frame never asks for persistent storage (I4)');
     await closeModal(t);
 
     // The language switch reloads inside the frame and keeps the save.

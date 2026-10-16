@@ -110,9 +110,10 @@ Keyboard (klik game sekali supaya keyboard masuk ke game):
 - Progres tersimpan otomatis di **penyimpanan browser ini** untuk itch.io. Save tidak ikut pindah ke browser atau perangkat
   lain, dan jendela privat/incognito melupakannya saat jendela ditutup. Sebagian browser hanya menyimpan data game yang
   tertanam sampai tab ditutup (misalnya pengaturan bawaan Brave): di sana, unduh cadangan sebelum pergi.
-- Menghapus data situs, atau pembersihan penyimpanan oleh browser, ikut menghapus save. **Unduh cadangan sesekali**:
-  Pengaturan → Unduh cadangan save. Game juga menampilkan cadangan itu sebagai teks untuk disalin, kalau browser memblokir
-  unduhan dari dalam halaman.
+- Menghapus data situs, atau pembersihan penyimpanan oleh browser, ikut menghapus save. **Simpan cadangan sesekali**:
+  Pengaturan → Unduh cadangan save, atau Salin cadangan sebagai teks lalu simpan teksnya di catatan (praktis di ponsel).
+  Game juga menampilkan cadangan sebagai teks setelah unduhan, kalau browser memblokir unduhan dari dalam halaman, dan
+  mengingatkanmu setelah setiap babak.
 - Pulihkan cadangan dengan Impor save atau Tempel cadangan, dari Muat Game di layar judul atau dari MENU → Save
   (Penginapan di kota juga membukanya).
 

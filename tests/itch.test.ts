@@ -213,8 +213,12 @@ test('main.ts turns the iframe features on only when framed: the normal web buil
   const main = readFileSync('src/main.ts', 'utf8');
   assert.match(main, /const embedded = installEmbedGuards\(\);/);
   assert.match(main, /\$\{embedded && fullscreenAvailable\(\) \? `<label class="setting-row">/, 'Config → Fullscreen');
-  assert.match(main, /\$\{embedded \? `<button id="import-text-button"/, 'Save → Paste backup');
+  // Paste backup and Copy backup as text are on every build (phone contract I5); only the text after a download is the frame's.
+  assert.match(main, /<button id="import-text-button" class="btn"/, 'Save → Paste backup, every build');
+  assert.doesNotMatch(main, /\$\{embedded \? `<button id="import-text-button"/, 'Paste backup is not frame-only');
+  assert.match(main, /<button id="export-text-commander" class="btn">/, 'Save → Copy backup as text, every build');
   assert.match(main, /if \(embedded\) backupText\(text, filename\);/, 'the backup as text after a download');
+  assert.match(main, /async function keepSavesPersistent\(force = false\) \{\s*if \(embedded\) return false;/, 'persistent storage is asked for only outside a frame');
   assert.match(main, /if \(embedded\) \{\s*document\.addEventListener\('close'/, 'the fullscreen modal fix');
   assert.doesNotMatch(main, /\bframed\(\)/, 'decided once, by installEmbedGuards()');
 });

@@ -59,3 +59,31 @@ test('RUNS: Depart resumes the paused chapter only at its own chapter and diffic
   assert.equal(resumesPaused(paused, 5, true), false, 'the same chapter on Heroic asks first');
   assert.equal(resumesPaused({ ...paused, heroic: true }, 5, true), true);
 });
+test('RUNS: a paused Story battle resumes with the build the heroes have now, at the HP shares, potions, stage and seed it began with', () => {
+  const loadouts = { 0: { skills: [0, 1], talents: [], xp: 600 }, 4: { skills: [0, 1], talents: [], xp: 600 }, 3: { skills: [0, 1], talents: [], xp: 600 } };
+  const options = (l: typeof loadouts) => ({ roster: [0, 4, 3], loadouts: structuredClone(l), storyCleared: [], storyRecruited: [0, 4, 3] });
+  const fight = new Battle('adventure', 1, undefined, options(loadouts));
+  fight.start(); for (let i = 0; i < 600 && fight.status === 'fighting'; i++) fight.tick(1 / 60);
+  fight.bossHp = 0; for (let i = 0; i < 5 && fight.status === 'fighting'; i++) fight.tick(1 / 60);
+  assert.equal(fight.status, 'victory'); fight.nextWave();
+  fight.heroes[0].hp = fight.heroes[0].maxHp * .4; fight.potions = 1;
+  const checkpoint = fight.checkpoint(), before = checkpoint.heroes.find(h => h.id === 0)!;
+  // The same loadouts restore exactly (a Retry right after the defeat replays the same battle).
+  const same = new Battle('adventure', 1, undefined, options(loadouts)), again = new Battle('adventure', 1);
+  again.restoreCheckpoint(checkpoint, same.heroes);
+  assert.deepEqual(again.checkpoint(), checkpoint, 'an unchanged build restores the checkpoint as it was');
+  // Vigor learned during the detour: the new max HP applies, at the same HP share.
+  const trained = new Battle('adventure', 1, undefined, options({ ...loadouts, 0: { ...loadouts[0], talents: ['vigor'] } as never }));
+  const resumed = new Battle('adventure', 1); resumed.restoreCheckpoint(checkpoint, trained.heroes);
+  const hero = resumed.heroes.find(h => h.id === 0)!, fresh = trained.heroes.find(h => h.id === 0)!;
+  assert.ok(hero.maxHp > before.maxHp, 'the talent raises max HP'); assert.equal(hero.maxHp, fresh.maxHp);
+  assert.deepEqual(hero.talents, ['vigor']);
+  assert.ok(Math.abs(hero.hp / hero.maxHp - .4) < 1e-9, 'the HP share is kept');
+  assert.equal(hero.slot, before.slot, 'the hero keeps its place');
+  assert.deepEqual([resumed.stage, resumed.potions, resumed.floor, resumed.status], [checkpoint.stage, 1, 1, 'ready']);
+  for (const id of [4, 3]) assert.deepEqual(resumed.heroes.find(h => h.id === id), checkpoint.heroes.find(h => h.id === id), 'untouched heroes restore exactly');
+  // Determinism: two resumes of the same checkpoint on the same build play out identically.
+  const twin = new Battle('adventure', 1); twin.restoreCheckpoint(checkpoint, trained.heroes);
+  for (const b of [resumed, twin]) { b.start(); for (let i = 0; i < 900 && b.status === 'fighting'; i++) b.tick(1 / 60); }
+  assert.deepEqual(twin.snapshot(), resumed.snapshot());
+});

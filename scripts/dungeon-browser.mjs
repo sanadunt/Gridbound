@@ -2,7 +2,8 @@
 // Heroic toggle, a dungeon run (map, rooms, a fight and its result) and forge refinement. Room results are
 // saved the moment they appear: a reload on the result screen keeps a win and cannot undo a wipe, and a failed
 // save there offers retry/export and the retry saves the same outcome once. The run's party is locked; fleeing a
-// fight keeps the wounds and drops half the pouch, and a reload mid-fight counts as a flee. The mode tabs keep
+// fight keeps the wounds and drops half the pouch, and a reload mid-fight counts as a flee, unless the OS closed the game in the background
+// (phone contract C4: the room then waits at the HP noted when the page was hidden, with the pouch intact). The mode tabs keep
 // their height on the depth picker (fresh and mid-game saves), and on a phone a tapped room's action is on screen.
 // A tap on a depth opens its dossier first (foes as silhouettes until met, the party's power, the party-lock warning):
 // Escape and the browser Back close it without starting a run, Descend starts one (on a phone a double tap on the depth, whose second tap
@@ -288,6 +289,30 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     for (const id of fled.party) assert.ok(Math.abs(interrupted.hp[id] - Math.min(fled.hp[id] > 0 ? Math.max(.05, fled.hp[id] - .25) : 0, seen.hp[id] ?? 1)) < 1e-9, `hero ${id} takes the worse of the noted HP and the interrupted-fight wound`);
     assert.match(await evaluate('document.querySelector(".room-outcome")?.textContent ?? ""'), /cut short/, 'the Undercroft says why');
     await screenshot(`artifacts/dungeon-interrupted-${viewport.tag}.png`);
+
+    // Phone contract C1/C4: the page going to the background (another app, a locked screen) pauses the fight and saves its state at once with
+    // a background stamp; when the OS then discards the tab (the next load comes a minute or more after the hide), the room waits at the
+    // noted HP and potions and the pouch stays: no flee. (The hide is stamped 61 s in the past, as if the phone had sat that long.)
+    await enterFight();
+    await wait('window.gridbound.profile().journey.run.pendingFight?.started === true');
+    await evaluate('for (const h of window.gridbound.battle.heroes) if (h.hp > 0) h.hp = Math.max(1, Math.round(h.maxHp * .6))');
+    const beforeHide = await evaluate(runState);
+    await evaluate(`(() => { const now = Date.now; Date.now = () => now() - 61000; Object.defineProperty(document, 'hidden', { get: () => true, configurable: true }); Object.defineProperty(document, 'visibilityState', { get: () => 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); return true; })()`);
+    await wait('window.gridbound.battle.status === "paused" && Boolean(window.gridbound.profile().journey.run.pendingFight?.hiddenAt)');
+    await wait('document.querySelector("#storage-status").textContent.startsWith("Saved")', 10000);
+    const atHide = (await evaluate(runState)).pendingFight;
+    for (const id of beforeHide.party) if (beforeHide.hp[id] > 0) assert.ok(Math.abs(atHide.seen.hp[id] - .6) < .02, `hero ${id}'s HP was noted at the hide`);
+    await send('Page.reload');
+    await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
+    await click('.town-spot[data-facility="dungeon"]');
+    await wait('Boolean(document.querySelector(".dungeon-scene"))');
+    const discarded = await evaluate(runState);
+    assert.deepEqual(discarded.pouch, beforeHide.pouch, 'a background discard keeps the whole pouch');
+    for (const id of beforeHide.party) assert.equal(discarded.hp[id], atHide.seen.hp[id], `hero ${id} keeps the HP noted at the hide, with no extra wound`);
+    assert.equal(discarded.potions, atHide.seen.potions, 'potions as noted');
+    assert.deepEqual(discarded.pendingFight, { kind: beforeHide.pendingFight.kind, enemy: beforeHide.pendingFight.enemy }, 'the fight waits in the room');
+    assert.match(await evaluate('document.querySelector(".room-outcome")?.textContent ?? ""'), /closed in the background/, 'the Undercroft says the game closed in the background');
+    await screenshot(`artifacts/dungeon-background-${viewport.tag}.png`);
 
     // Abandon keeps nothing from the pouch.
     const gold = await evaluate('window.gridbound.profile().gold');

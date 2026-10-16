@@ -8,8 +8,11 @@ import { once } from 'node:events';
 export const ACT_TWO_SAVE = { version: 3, gold: 500, claimedQuests: [], ledger: { raids: 0, victories: 4, enemies: { wolf: 1 } }, roster: [0, 4, 3], cleared: [0, 1, 2, 3], storyActive: [0, 4, 3], loadouts: { 0: { skills: [0, 1], talents: [], xp: 0, slot: 1 }, 4: { skills: [0, 1], talents: [], xp: 0, slot: 7 }, 3: { skills: [0, 1], talents: [], xp: 0, slot: 6 } }, bestFloor: 0, wins: 4, sound: false, motion: true };
 /** Start the tab on a seeded legacy save (migrated into a new Commander on the first boot; reloads keep that Commander). Call before Page.navigate
  *  (a data: page opened first, as the page a player came from, is left alone).
- *  `profile: null` starts a fresh save; `lang` ('en' | 'id') picks the language after the storage is cleared. */
-export const seedSave = (send, profile = ACT_TWO_SAVE, lang) => send('Page.addScriptToEvaluateOnNewDocument', { source: `if (location.protocol.startsWith('http') && !sessionStorage.getItem('qa.seeded')) { sessionStorage.setItem('qa.seeded', '1'); localStorage.clear();${lang ? ` localStorage.setItem('gridbound.lang', ${JSON.stringify(lang)});` : ''}${profile ? ` localStorage.setItem('gridbound.v3', ${JSON.stringify(JSON.stringify(profile))});` : ''} }` });
+ *  `profile: null` starts a fresh save; `lang` ('en' | 'id') picks the language after the storage is cleared. The backup reminder is
+ *  marked as just shown (a per-viewer flag), so a test that spoofs navigator.webdriver does not meet it on its camp visits
+ *  (scripts/safe-browser.mjs checks the reminder itself). */
+export const REMINDER_SEEN = "localStorage.setItem('gridbound.ui.backupReminderAt', String(Date.now()));";
+export const seedSave = (send, profile = ACT_TWO_SAVE, lang) => send('Page.addScriptToEvaluateOnNewDocument', { source: `if (location.protocol.startsWith('http') && !sessionStorage.getItem('qa.seeded')) { sessionStorage.setItem('qa.seeded', '1'); localStorage.clear(); ${REMINDER_SEEN}${lang ? ` localStorage.setItem('gridbound.lang', ${JSON.stringify(lang)});` : ''}${profile ? ` localStorage.setItem('gridbound.v3', ${JSON.stringify(JSON.stringify(profile))});` : ''} }` });
 
 /** Phone user agents (Android Chrome, iPhone Safari) for `withBrowser`'s `phone` option. */
 export const PHONE_UA = {
@@ -83,7 +86,12 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
       }
       throw new Error(`Wait timeout: ${expression}`);
     };
+    // A control that just appeared or moved under the pointer ignores pointer presses for a moment (phone contract G7, `data-input-until`):
+    // a click waits that out like a player's next deliberate tap would.
+    const heldFor = selector => `(() => { const held = document.querySelector(${JSON.stringify(selector)})?.closest('[data-input-until]'); return held ? Math.max(0, Number(held.dataset.inputUntil) - performance.now()) : 0; })()`;
+    const waitInput = async selector => { const ms = await evaluate(heldFor(selector)); if (ms > 0) await new Promise(resolve => setTimeout(resolve, ms + 40)); };
     const click = async selector => {
+      await waitInput(selector);
       const point = await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) throw Error('Missing control: '+${JSON.stringify(selector)}); el.scrollIntoView({block:'center'}); const r=el.getBoundingClientRect(); if (!r.width || !r.height || el.disabled) throw Error('Inactive control: '+${JSON.stringify(selector)}); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
       await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
       await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
@@ -139,9 +147,19 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
     const finger = (x, y, id = 1) => ({ x, y, id, radiusX: 4, radiusY: 4, force: 1 });
     const touch = {
       point: pointOf,
-      async tap(target, hold = 50) { const { x, y } = await pointOf(target); await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger(x, y)] }); await sleep(hold); await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); },
-      async doubleTap(target, gapMs = 120) { const point = await pointOf(target); await touch.tap(point, 40); await sleep(gapMs); await touch.tap(point, 40); },
+      async tap(target, hold = 50) { if (typeof target === 'string') await waitInput(target); const { x, y } = await pointOf(target); await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger(x, y)] }); await sleep(hold); await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); },
+      async doubleTap(target, gapMs = 120) { if (typeof target === 'string') await waitInput(target); const point = await pointOf(target); await touch.tap(point, 40); await sleep(gapMs); await touch.tap(point, 40); },
       async longPress(target, ms = 600) { await touch.tap(target, ms); },
+      /** A double tap the way a quick finger lands it: the four touch events are queued without waiting for the page between them (a busy
+       *  page, e.g. a WebGL arena under software rendering, would otherwise stretch the gap far past `gapMs`). The target's tap hold is waited
+       *  out first, like a player's first deliberate tap. */
+      async rapidDoubleTap(target, gapMs = 120) {
+        if (typeof target === 'string') await waitInput(target);
+        const { x, y } = await pointOf(target), sent = [send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger(x, y)] }), send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })];
+        await sleep(gapMs);
+        sent.push(send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger(x, y)] }), send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }));
+        await Promise.all(sent);
+      },
       /** A finger from `from` to `to` in `steps` moves (16ms apart), then lifted. */
       async drag(from, to, steps = 12, stepMs = 16) {
         const a = await pointOf(from), b = await pointOf(to);

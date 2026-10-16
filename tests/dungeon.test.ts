@@ -125,6 +125,33 @@ test('a reload never costs less than fleeing at the last noted moment: falls, po
   assert.equal(saved.potions, 1, 'potions used stay used'); assert.equal(saved.pendingFight?.seen, undefined);
 });
 
+test('a fight the OS closed in the background waits at its noted HP with the pouch intact; the foreground path still flees', () => {
+  const setup = () => { const run = startRun(2, 8, [0, 4, 3]); enterNode(run, reachable(run)[0]); run.hp = { 0: .9, 4: .9, 3: .9 }; run.potions = 2; run.pouch = { gold: 40, materials: { 'ember-shard': 3 } }; run.pendingFight!.started = true; noteFight(run, { 0: .6, 4: 0, 3: .85 }, 1); run.pendingFight!.hiddenAt = 1_700_000_000_000; return normalizeJourney(JSON.parse(JSON.stringify({ run })), [0, 1, 2]).run!; };
+  const saved = setup();
+  assert.equal(saved.pendingFight?.hiddenAt, 1_700_000_000_000, 'the background stamp survives the save');
+  assert.deepEqual(interruptFight(saved, true), { gold: 0, materials: {} }, 'nothing is lost');
+  assert.deepEqual(saved.pouch, { gold: 40, materials: { 'ember-shard': 3 } }, 'the pouch is untouched');
+  assert.deepEqual(saved.hp, { 0: .6, 4: 0, 3: .85 }, 'each hero keeps its noted HP, with no extra wound');
+  assert.equal(saved.potions, 1, 'potions used stay used');
+  assert.deepEqual(saved.pendingFight, { kind: 'battle', enemy: saved.nodes[saved.at].enemy }, 'the fight waits, no longer in progress');
+  assert.equal(interruptFight(saved, true), undefined, 'resolved once');
+  // Nothing noted yet: the run's own HP stands.
+  const quiet = startRun(2, 8, [0, 4, 3]); enterNode(quiet, reachable(quiet)[0]); quiet.hp = { 0: .7, 4: .5, 3: 0 }; quiet.pendingFight!.started = true;
+  interruptFight(quiet, true); assert.deepEqual(quiet.hp, { 0: .7, 4: .5, 3: 0 }); assert.equal(quiet.potions, 2);
+  // The same cut without the background (a reload while the tab was visible) is still a flee.
+  const fore = setup(), lost = interruptFight(fore)!;
+  assert.equal(lost.gold, 20); assert.equal(fore.pouch.gold, 20);
+  assert.equal(fore.hp[0], .6); assert.equal(fore.hp[4], 0); assert.ok(Math.abs(fore.hp[3] - (.9 - INTERRUPT_WOUND)) < 1e-9);
+});
+
+test('normalizeRun keeps the background stamp only on a started fight with a finite positive time', () => {
+  const run = startRun(1, 3, [0, 4, 3]); enterNode(run, reachable(run)[0]);
+  const raw = (fight: object) => normalizeRun(JSON.parse(JSON.stringify({ ...run, pendingFight: { ...run.pendingFight, ...fight } })))!.pendingFight;
+  assert.equal(raw({ started: true, hiddenAt: 1234 })?.hiddenAt, 1234);
+  assert.equal(raw({ hiddenAt: 1234 })?.hiddenAt, undefined, 'a fight that has not begun has no background stamp');
+  for (const hiddenAt of [0, -5, 'soon', null]) assert.equal(raw({ started: true, hiddenAt })?.hiddenAt, undefined, String(hiddenAt));
+});
+
 test('normalizeRun repairs corrupted runs: unknown enemies, non-numeric blessings and a fight room without its fight', () => {
   const run = startRun(2, 9, [0, 4]); const room = run.nodes.find(n => n.row === 0)!; enterNode(run, room.id);
   const raw = JSON.parse(JSON.stringify(run)); raw.pendingFight = { kind: 'battle', enemy: 'removed-enemy', started: true }; raw.blessing = { power: 'x', vitality: NaN };

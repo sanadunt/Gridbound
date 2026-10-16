@@ -35,6 +35,7 @@ import { defeatFixes, xpSummary } from './ui/result-help';
 import { COACH_STEPS, Coach, coachEnabled, coachDone, markCoach, resetCoach, setCoachEnabled, skipCoach, type CoachStep } from './ui/coach';
 import { actArt, starRow } from './ui/world-map';
 import { playDialogue, paginate, CHOICE_INPUT_DELAY_MS, type DialoguePage } from './ui/dialogue';
+import { DANGER_CONTROLS, INPUT_DELAY_MS, TOWN_HELD, TOWN_SPEND, holdInput, inputHeld, keepDangerOff, pressHeld } from './ui/input-guard';
 import { fullscreenAvailable, fullscreenOn, installEmbedGuards, toggleFullscreen } from './ui/embed';
 import { BattleScene, ARENA, cell } from './render/BattleScene';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
@@ -236,6 +237,8 @@ let chapterResult: { stars: number; improved: boolean; heroic?: { gold: number; 
 let resultReward: { gold: number; crystal: number; partyCap: number; firstClear?: boolean } | undefined;
 /** The current adventure battle's start checkpoint ('Retry this battle'); cleared whenever a new battle is booted. */
 let stageStart: NonNullable<typeof encounter> | undefined;
+/** The control the player last activated (tap, click or key) and where it was (K6, openModal): recorded before its handler swaps any content. */
+let lastPress: { rect: DOMRect; at: number } | undefined;
 let experienceRewards:NonNullable<ReturnType<typeof settleProgress>>=[];
 let lastStatus = battle.status;
 let drawIn = 0;
@@ -319,6 +322,12 @@ let departureSave: Promise<unknown> = Promise.resolve();
 let navBusy = 0;
 /** The browser/phone Back guard (ui/history), installed once the boot step has settled. */
 let backGuard: BackGuard | undefined;
+/** A page hidden at least this long before the next page load was closed by the OS in the background (a tab discard), not by the player. */
+const DISCARD_GRACE_MS = 60_000;
+/** The fight was paused while the player looked away, without its menu yet: the menu opened later resumes it on close. */
+let awayPaused = false;
+/** The screen wake lock held while a battle is on screen (keepAwake). */
+let wakeLock: WakeLockSentinel | null = null, wakeWanted = false, wakeAsking = false;
 /** First-battle coach state (see coachFrame). */
 let coachForced = false, coachThreat = -1, coachHero = -1, coachUntil = 0;
 const coach = new Coach(document.body, () => { skipCoach(); endCoachStep(); });
@@ -478,7 +487,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   if ((tab === 'raid' && townState.suspended.raid) || (tab === 'endless' && townState.suspended.roguelike)) townState.tonic = false;
   $('town-screen').hidden = false;
   $('battle-screen').hidden = true;
-  engineAwake(false);
+  engineAwake(false); void keepAwake(false);
   document.body.dataset.screen = tab === 'camp' ? 'camp' : 'town';
   routeStack = pushRoute(routeStack, tab);
   if (isFeature(tab)) markVisited(tab);
@@ -503,6 +512,9 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   const partyList = routeChanged ? null : $('town-screen').querySelector<HTMLDetailsElement>('details.story-party:not(.locked)');
   if (partyList) townState.storyPartyOpen = partyList.open;
   renderTown($('town-screen'), profile, townState);
+  // G7: the controls a re-render can put under the finger (the next gear piece, Equip now after Promote) ignore taps for a moment.
+  const renderedAt = performance.now(), held = Array.from($('town-screen').querySelectorAll<HTMLElement>(TOWN_HELD));
+  holdInput(held.filter(el => !el.matches(TOWN_SPEND)), INPUT_DELAY_MS, renderedAt); holdInput(held.filter(el => el.matches(TOWN_SPEND)), CHOICE_INPUT_DELAY_MS, renderedAt);
   if (notice) noticeAt = performance.now();
   $('town-screen').querySelectorAll<HTMLElement>(scrollers).forEach(el => { const old = kept.find(k => k.key === (el.dataset.trainingPanel ?? el.className)); if (old && (!el.dataset.trainingPanel || el.dataset.trainingPanel === keptPanel)) el.scrollTop = old.top; });
   if (routeChanged) {
@@ -528,7 +540,8 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
     else if (tab === 'raid') animatePactRaid();
     else if (tab === 'endless') animateSunkenDescent();
   }
-  if (tab === 'camp') void playCampScenes().then(() => unlockIntro());
+  // The camp's chain: owed scenes, then a mode's unlock card, else the backup reminder when one is due (one dialog per visit).
+  if (tab === 'camp') void playCampScenes().then(() => { if (!unlockIntro()) backupReminder(); });
 }
 /** The notice toast steps aside on the player's next tap, wheel turn, swipe or key, so it never keeps the gate tabs, the Quest Board's filters or
  *  Claim all hidden for its whole reading time. The tap that showed it came first (its pointerdown precedes the re-render); the first 400 ms are ignored. */
@@ -542,17 +555,18 @@ const lockNotice = (feature: Feature) => t('unlock.locked', { name: routeTitle(f
 /** A one-time card when the story opens a mode (Undercroft, Raids, Bell Trials); skipped under automation like the camp scenes. */
 function unlockIntro(force = false) {
   // An open dialog (this card included) keeps it from opening twice; no separate flag that a stray close event could leave set.
-  if ((!force && navigator.webdriver) || !commanderChecked || !inTown || townState.tab !== 'camp' || playingScene || campScenesRunning || modal.open || commander.stale || pendingSettlement || $('title-screen')?.hidden === false) return;
+  if ((!force && navigator.webdriver) || !commanderChecked || !inTown || townState.tab !== 'camp' || playingScene || campScenesRunning || modal.open || commander.stale || pendingSettlement || $('title-screen')?.hidden === false) return false;
   const features = pendingIntros(profile);
-  if (!features.length) return;
+  if (!features.length) return false;
   features.forEach(markIntro);
   openModal(`<div class="unlock-card"><small class="unlock-kicker">${t('unlock.kicker')}</small>${features.map((f, i) => `<section class="unlock-entry" data-unlock="${f}"><h2 ${i ? '' : 'id="modal-title"'}>${t(`unlock.${f}.title` as never)}</h2><p>${t(`unlock.${f}.body` as never)}</p><button class="btn primary" data-unlock-go="${f}">${t('unlock.go')} ▶</button></section>`).join('')}<button class="btn" data-close>${t('unlock.later')}</button></div>`);
   modal.querySelectorAll<HTMLButtonElement>('[data-unlock-go]').forEach(button => button.addEventListener('click', () => { modal.close(); void navigateTown(button.dataset.unlockGo as TownTab); }));
+  return true;
 }
 $('town-screen').addEventListener('click', event => {
   if (modal.open) modal.close();
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
-  if (!button || button.disabled || !inTown) return;
+  if (!button || button.disabled || !inTown || inputHeld(event)) return;
   // A read-only tab (another tab saved) refuses every town action with the dialog that says why (contract R6).
   if (commander.stale) { staleModal(); return; }
   if (pendingSettlement) return;
@@ -602,7 +616,7 @@ $('town-screen').addEventListener('click', event => {
     return;
   }
   if (button.hasAttribute('data-dungeon-leave')) {
-    openModal(`<h2 id="modal-title">${t('dungeon.leave.title')}</h2><p>${t('dungeon.leave.copy')}</p><button id="dungeon-abandon" class="btn danger">${t('dungeon.leave.yes')}</button><button class="btn" data-close data-autofocus>${t('common.cancel')}</button>`);
+    openModal(`<h2 id="modal-title">${t('dungeon.leave.title')}</h2><p>${t('dungeon.leave.copy')}</p><div class="leave-actions"><button class="btn" data-close data-autofocus>${t('common.cancel')}</button><button id="dungeon-abandon" class="btn danger">${t('dungeon.leave.yes')}</button></div>`);
     $('dungeon-abandon').addEventListener('click', () => { modal.close(); delete profile.journey.run; showTown('dungeon'); });
     return;
   }
@@ -815,7 +829,7 @@ function abandonSuspended(mode: 'raid' | 'roguelike' | 'story') {
   const paused = mode === 'story' ? pausedStory(commander.document) : undefined;
   if (mode === 'story' && !paused) { showTown(townState.tab); return; }
   const tab: TownTab = mode === 'raid' ? 'raid' : mode === 'roguelike' ? 'endless' : townState.tab, n = (paused?.chapter ?? 0) + 1;
-  openModal(`<h2 id="modal-title">${paused ? t('run.abandon.story.title', { n }) : t('run.abandon.title')}</h2><p>${paused ? paused.gold ? t('run.abandon.story.copy', { gold: paused.gold }) : t('run.abandon.story.copy.nogold') : t('run.abandon.copy')}</p><button id="abandon-suspended" class="btn danger">${paused ? t('run.abandon.story', { n }) : t('run.abandon')}</button><button class="btn" data-close data-autofocus>${t('common.cancel')}</button>`);
+  openModal(`<h2 id="modal-title">${paused ? t('run.abandon.story.title', { n }) : t('run.abandon.title')}</h2><p>${paused ? paused.gold ? t('run.abandon.story.copy', { gold: paused.gold }) : t('run.abandon.story.copy.nogold') : t('run.abandon.copy')}</p><div class="leave-actions"><button class="btn" data-close data-autofocus>${t('common.cancel')}</button><button id="abandon-suspended" class="btn danger">${paused ? t('run.abandon.story', { n }) : t('run.abandon')}</button></div>`);
   $('abandon-suspended').addEventListener('click', () => {
     modal.close();
     if (!ensureMode(mode, () => abandonSuspended(mode))) return;
@@ -828,7 +842,7 @@ function respecModal(hero: number) {
   if (!r || (!r.job && !r.talents)) { showTown(townState.tab, t('notice.respec.fail')); return; }
   const job = r.job ? JOBS[r.job]?.name ?? r.job : '', parent = r.parentJob ? JOBS[r.parentJob]?.name ?? r.parentJob : '';
   const lines = [job ? (parent ? t('respec.confirm.jobs', { job, parent }) : t('respec.confirm.job', { job })) : '', r.talents ? t('respec.confirm.talents', { n: r.talents }) : '', t('respec.confirm.gold', { gold: r.gold })].filter(Boolean);
-  openModal(`<h2 id="modal-title">${t('respec.confirm.title', { name: escapeUI(name) })}</h2><ul class="respec-list">${lines.map(line => `<li>${escapeUI(line)}</li>`).join('')}</ul><p>${t('respec.confirm.body')}</p><div class="leave-actions"><button id="respec-confirm" class="btn danger">${t('respec.confirm.ok', { name: escapeUI(name) })}</button><button class="btn" data-close data-autofocus>${t('common.cancel')}</button></div>`);
+  openModal(`<h2 id="modal-title">${t('respec.confirm.title', { name: escapeUI(name) })}</h2><ul class="respec-list">${lines.map(line => `<li>${escapeUI(line)}</li>`).join('')}</ul><p>${t('respec.confirm.body')}</p><div class="leave-actions"><button class="btn" data-close data-autofocus>${t('common.cancel')}</button><button id="respec-confirm" class="btn danger">${t('respec.confirm.ok', { name: escapeUI(name) })}</button></div>`);
   $('respec-confirm').addEventListener('click', () => {
     modal.close();
     if (!inTown || commander.stale) { if (commander.stale) staleModal(); return; }
@@ -936,10 +950,16 @@ function noteDungeonFight() {
   if (!pendingSettlement && !commander.stale && noteFight(run, heroRatios(), battle.potions)) persist();
 }
 /** A fight still marked in progress outside a live battle was cut short (reload, closed tab): it resolves as a flee
- *  once, when the Undercroft is opened (not at boot, so a second tab does not flee the first tab's fight). */
+ *  once, when the Undercroft is opened (not at boot, so a second tab does not flee the first tab's fight). One the OS closed in
+ *  the background (Chrome says the tab was discarded, or the page went hidden at least DISCARD_GRACE_MS before) is no flee:
+ *  the room waits at the noted HP and potions with the pouch intact (contract C4). */
 function settleInterruptedFight() {
-  const run = profile.journey.run, lost = run && commander.mode === 'story' && !dungeonFightLive() ? interruptFight(run) : undefined;
-  if (lost) { townState.dungeonOutcome = t('dungeon.interrupted', { lost: lostText(lost) }); townState.dungeonLetter = undefined; }
+  const run = profile.journey.run, fight = run?.pendingFight;
+  if (!run || commander.mode !== 'story' || dungeonFightLive() || !fight?.started) return undefined;
+  // Measured against this page's load, not against now: a reload followed by a minute in camp is still the player's reload.
+  const background = (document as Document & { wasDiscarded?: boolean }).wasDiscarded === true || (fight.hiddenAt !== undefined && performance.timeOrigin - fight.hiddenAt > DISCARD_GRACE_MS);
+  const lost = interruptFight(run, background);
+  if (lost) { townState.dungeonOutcome = background ? t('dungeon.interrupted.background') : t('dungeon.interrupted', { lost: lostText(lost) }); townState.dungeonLetter = undefined; }
   return lost;
 }
 /** A tap on a depth opens its dossier (ui/dungeon depthDossier); nothing starts until Descend, so a look never locks the story party.
@@ -980,7 +1000,7 @@ function startDungeonFight() {
 }
 /** Flee a dungeon fight in progress: wounds and potions used carry over, the room's fight waits and half the pouch is lost. */
 function fleeDungeonModal() {
-  openModal(`<h2 id="modal-title">${t('dungeon.flee.title')}</h2><p>${t('dungeon.flee.copy')}</p><button id="dungeon-flee" class="btn danger">${t('dungeon.flee.yes')}</button><button class="btn" data-close data-autofocus>${t('common.cancel')}</button>`);
+  openModal(`<h2 id="modal-title">${t('dungeon.flee.title')}</h2><p>${t('dungeon.flee.copy')}</p><div class="leave-actions"><button class="btn" data-close data-autofocus>${t('common.cancel')}</button><button id="dungeon-flee" class="btn danger">${t('dungeon.flee.yes')}</button></div>`);
   $('dungeon-flee').addEventListener('click', () => {
     const run = profile.journey.run;
     if (commander.stale) { staleLeaveModal(); return; }
@@ -1210,7 +1230,7 @@ function freshDeparture(mode: Mode) {
 function pausedStoryModal(paused: PausedStory, existing: Parameters<typeof restoreEncounter>[0]) {
   const label = (zone: number, heroic: boolean) => heroic ? `${zone + 1} · ${t('heroic.heroic')}` : String(zone + 1);
   const n = label(paused.chapter, paused.heroic), m = label(townState.zone, heroicPick());
-  openModal(`<h2 id="modal-title">${t('story.paused.title', { n, k: paused.battle, total: paused.total })}</h2><p>${paused.gold ? t('story.paused.copy', { gold: paused.gold, m }) : t('story.paused.copy.nogold', { m })}</p><div class="leave-actions"><button id="paused-resume" class="btn primary" data-resume-run data-autofocus>${t('story.paused.resume', { n })} ▶</button><button id="paused-abandon" class="btn danger">${t('story.paused.abandonEnter', { n, m })}</button><button class="btn" data-close>${t('common.cancel')}</button></div>`);
+  openModal(`<h2 id="modal-title">${t('story.paused.title', { n, k: paused.battle, total: paused.total })}</h2><p>${paused.gold ? t('story.paused.copy', { gold: paused.gold, m }) : t('story.paused.copy.nogold', { m })}</p><div class="leave-actions"><button id="paused-resume" class="btn primary" data-resume-run data-autofocus>${t('story.paused.resume', { n })} ▶</button><button class="btn" data-close>${t('common.cancel')}</button><button id="paused-abandon" class="btn danger">${t('story.paused.abandonEnter', { n, m })}</button></div>`);
   let busy = false;
   $('paused-resume').addEventListener('click', () => {
     if (busy) return;
@@ -1286,7 +1306,7 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   recorded = false;
   chapterResult = undefined; resultReward = undefined; stageStart = undefined; firstFall = undefined;
   // A booted battle starts guarded; fresh departures, Retry and Undercroft rooms make their ready window's Back free (callers set it after).
-  freeBack = false; tonicPaid = undefined;
+  freeBack = false; tonicPaid = undefined; awayPaused = false;
   if (coach.step) endCoachStep();
   experienceRewards=[];
   offeredBoons = [];
@@ -1362,6 +1382,7 @@ function updateExpedition() {
 }
 function showReady() {
   $('start-overlay').hidden = false;
+  void keepAwake(true);
   $('ready-label').textContent = battle.stageCount > 1 ? `${t('map.wave', { n: battle.stage + 1 })}/${battle.stageCount} · ${stageLabel()}` : stageLabel();
   $('ready-title').textContent = battle.stage > 0 ? t('ready.title.next') : t('ready.title.first', { name: battle.enemyName });
   const beat = battle.mode === 'adventure' ? CAMPAIGN[battle.floor - 1]?.stages[battle.stage]?.beat : undefined;
@@ -2019,6 +2040,10 @@ function openModal(content: string, options: boolean | ModalOptions = true) {
   modalParent = parent;
   modal.dataset.blocking = dismissable ? '' : '1';
   modal.innerHTML = `${content}${dismissable ? `<button ${parent ? 'data-nav-parent' : 'data-close'} class="modal-close icon-button" aria-label="${t(parent ? 'common.back' : 'common.close')}">×</button>` : ''}`;
+  // G7: a dialog that opens or changes under the finger ignores taps for a moment (its destructive choices a little longer), so a double tap
+  // on 'Leave battle…' never lands on 'Leave the chapter'.
+  const shownAt = performance.now();
+  holdInput([modal], INPUT_DELAY_MS, shownAt); holdInput(modal.querySelectorAll<HTMLElement>(DANGER_CONTROLS), CHOICE_INPUT_DELAY_MS, shownAt);
   // Text exits are tagged for the navigation checks: a close/cancel closes, a parent link goes back.
   modal.querySelectorAll<HTMLElement>('[data-close]:not(.modal-close):not([data-nav-exit])').forEach(el => { el.dataset.navExit = 'close'; });
   modal.querySelectorAll<HTMLElement>('[data-nav-parent]:not(.modal-close):not([data-nav-exit])').forEach(el => { el.dataset.navExit = 'back'; });
@@ -2039,14 +2064,20 @@ function openModal(content: string, options: boolean | ModalOptions = true) {
     else if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
     else modal.querySelector<HTMLElement>('button:not([disabled]), input, select, textarea, [href]')?.focus({ preventScroll: true });
   }
+  // K6: a destructive option never lands where the control that opened this content was (Leave battle…, Flee the room…, Delete…).
+  keepDangerOff(modal, lastPress && shownAt - lastPress.at < 4000 ? lastPress.rect : undefined);
   modal.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => modal.close()));
   modal.querySelectorAll('[data-nav-parent]').forEach(el => el.addEventListener('click', modalBack));
 }
+document.addEventListener('click', event => { const el = (event.target as Element | null)?.closest?.('button, [role="button"], a, summary'); if (el) lastPress = { rect: el.getBoundingClientRect(), at: performance.now() }; }, true);
 /** One step back inside the modal: its parent content, or close. */
 function modalBack() { const parent = modalParent; if (parent) parent(); else modal.close(); }
 /** Escape and Android's Back close a <dialog> natively: every such request runs the Back step instead (a sub-view returns to its parent, a
  *  blocking dialog stays). A browser that refuses to keep it open (repeated requests without a user activation) closes it; a blocking one is shown again. */
 let escapeHandled = false, reopenBlocking = false;
+modal.addEventListener('click', event => { if (inputHeld(event)) { event.preventDefault(); event.stopImmediatePropagation(); } }, true);
+// The held tap's press is cancelled too: it never moves the focus off the safe option onto what the finger landed on.
+for (const type of ['pointerdown', 'mousedown']) modal.addEventListener(type, event => { if (pressHeld(event)) event.preventDefault(); }, true);
 modal.addEventListener('cancel', event => {
   event.preventDefault();
   if (!event.cancelable && modal.dataset.blocking === '1') reopenBlocking = true;
@@ -2080,12 +2111,13 @@ function help(fromPause = false) {
 function settings(fromPause = false) {
   openModal(`<h2 id="modal-title">${t('settings.title')}</h2>
     <div class="setting-row" role="group" aria-label="${t('settings.language')}"><span><b>${t('settings.language')}</b><small>${inTown ? t('settings.language.sub') : t('settings.language.town')}</small></span><span class="lang-switch">${(['en', 'id'] as Lang[]).map(code => `<button type="button" class="btn" data-lang="${code}" aria-pressed="${lang() === code}" ${inTown ? '' : 'disabled'}>${code === 'en' ? 'English' : 'Indonesia'}</button>`).join('')}</span></div>
-    <label class="setting-row"><span><b>${t('settings.sound')}</b><small>${t('settings.sound.sub')}</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label>
+    <label class="setting-row"><span><b>${t('settings.sound')}</b><small>${t('settings.sound.sub')}${/iP(hone|ad|od)/.test(navigator.userAgent) ? ` ${t('settings.sound.ios')}` : ''}</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.motion')}</b><small>${reduceMotionQuery.matches ? t('settings.motion.device') : t('settings.motion.sub')}</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.coach')}</b><small>${t('settings.coach.sub')}</small></span><input id="setting-coach" type="checkbox" ${coachEnabled() ? 'checked' : ''}></label>
     ${embedded && fullscreenAvailable() ? `<label class="setting-row"><span><b>${t('settings.fullscreen')}</b><small>${t('settings.fullscreen.sub')}</small></span><input id="setting-fullscreen" type="checkbox" ${fullscreenOn() ? 'checked' : ''}></label>` : ''}
-    <p class="hint">${t('settings.save.note')}</p><button id="export-save" class="btn">${t('settings.export')}</button><button class="btn primary" ${fromPause ? 'data-nav-parent' : 'data-close'}>${t('common.back')}</button>`, { parent: fromPause ? renderPause : undefined });
+    ${storageNoteMarkup()}<p class="hint">${t('settings.save.note')}</p><div class="departure-actions backup-actions"><button id="export-save" class="btn">${t('settings.export')}</button><button id="export-text" class="btn">${t('profiles.export.text')}</button></div><button class="btn primary" ${fromPause ? 'data-nav-parent' : 'data-close'}>${t('common.back')}</button>`, { parent: fromPause ? renderPause : undefined });
   $('export-save').addEventListener('click',exportCommander);
+  $('export-text').addEventListener('click',copyBackup);
   $('setting-sound').addEventListener('change', e => { profile.sound = (e.target as HTMLInputElement).checked; updateSound(); });
   $('setting-coach').addEventListener('change', e => { setCoachEnabled((e.target as HTMLInputElement).checked); if (coach.step) endCoachStep(); });
   $('setting-motion').addEventListener('change', e => { profile.motion = (e.target as HTMLInputElement).checked; applyMotion(); persist(); });
@@ -2097,7 +2129,9 @@ function pauseMenu() {
   if (inTown) return;
   // An ended battle shows its result; in a read-only tab (no result can be saved) the menu stays reachable for its Leave entry.
   if (['victory', 'defeat'].includes(battle.status) && !commander.stale) { result(); return; }
-  if (modal.open) { modal.close(); return; }
+  // A dialog still in its tap hold (G7) stays: the tap that brought the player back opened the waiting pause menu (showAwayMenu), and the
+  // same tap on Ⅱ Menu must not close it again.
+  if (modal.open) { if (Number(modal.dataset.inputUntil) <= performance.now()) modal.close(); return; }
   renderPause();
 }
 /** The pause menu (also the parent of its Controls and Config views): Resume first and focused, the exit last, labelled with what it does. */
@@ -2108,6 +2142,9 @@ function renderPause() {
   $('pause-help').addEventListener('click', () => help(true));
   $('pause-settings').addEventListener('click', () => settings(true));
   $('pause-retreat').addEventListener('click', leaveBattle);
+  // A fight paused while the player looked away goes on when this menu closes (Resume), like one this menu paused itself.
+  if (awayPaused && battle.status === 'paused') resumeOnClose = true;
+  awayPaused = false;
 }
 /** Nothing of this departure has been played: leaving from the ready window costs nothing (an Undercroft room is free until FIGHT!). */
 const readyBackFree = () => !inTown && battle.status === 'ready' && (freeBack || battle.mode === 'dungeon');
@@ -2178,7 +2215,7 @@ function clearResultState() {
   $('battle-screen').inert = false;
 }
 function showResultScreen(content: string) {
-  clearResultState();
+  clearResultState(); void keepAwake(false);
   resultScreen.innerHTML = content;
   resultScreen.hidden = false;
   resultScreen.tabIndex = -1;
@@ -2286,12 +2323,15 @@ function result() {
       hint.remove();
     }, RESULT_INPUT_DELAY_MS);
   };
-  if (battle.status === 'victory') {
-    const readiness = scene?.waitForEnemyDeathAnimation?.();
-    if (readiness) readiness.then(show, show);
-    else show();
-  } else show();
+  // The boss's death animation runs on animation frames, which stop while the page is hidden: a page hidden meanwhile (or already hidden)
+  // settles the result at once (resultNow), so an OS discard in the background never loses a won battle.
+  let started = false;
+  const once = () => { if (started) return; started = true; resultNow = undefined; void show(); };
+  const readiness = battle.status === 'victory' && !document.hidden ? scene?.waitForEnemyDeathAnimation?.() : undefined;
+  if (readiness) { resultNow = once; readiness.then(once, once); } else once();
 }
+/** A result waiting for the boss's death animation; the page going to the background settles it without waiting. */
+let resultNow: (() => void) | undefined;
 /** The outcome could not be saved: navigation stays locked until a retry succeeds; the outcome can be exported meanwhile. The dialog is
  *  blocking (no ×; Escape and Back keep it), so the battle behind it is never left without a way on (contract §5.3). */
 function unsavedResultModal() {
@@ -2350,11 +2390,19 @@ async function presentResult() {
       encounter = makeEncounter(true);
     } else if (moreWaves) {
       encounter = makeEncounter(false);
+    } else if (!won && retryStart() && !weakCheckpoint(retryStart()!)) {
+      // A lost Story battle k > 1 stays resumable (contract C8): its start checkpoint is saved as the paused chapter, so leaving through a
+      // defeat fix, Return, the phone's Back or a reload keeps 'Resume CH n · battle k' (Restart chapter drops it). It resumes with the
+      // build the heroes have by then (resumeEncounter), so a talent or gear bought on the way counts. A weak start (a hero down, the party
+      // under 40% HP) is not kept: the result advises Restart chapter, and Return or a fix then leads to a fresh chapter.
+      encounter = { ...structuredClone(stageStart!), seq: Math.max(stageStart!.seq, encounter?.seq ?? 0) + 1, played: true };
     } else if (!encounter?.settled) encounter = makeEncounter(true);
     const ok = await checkpoint(true);
     if (!ok && commander.document) { unsavedResultModal(); return false; }
     pendingSettlement = false;
     recorded = true;
+    // A first chapter clear is progress worth keeping: the web build asks the browser to keep its storage (I4).
+    if (resultReward?.firstClear) void keepSavesPersistent(true);
   }
   // The draft is rebuilt from the run's saved seed, so a draft left with Save & suspend (or a reload, a closed tab, Back) and resumed from the
   // Bell Trials offers the same boons: resumeEncounter restores the run seed, the boons taken and the Fate Rerolls bought for this floor. Promotions
@@ -2395,11 +2443,11 @@ async function presentResult() {
     // Gold or bank Crystal actually credited ('—' when the result is shown again after a reload and the amount is no longer known).
     const credited = !won ? 0 : resultReward ? (battle.mode === 'adventure' ? resultReward.gold : resultReward.crystal) : undefined;
     const rewardPlaque = moreWaves ? [t('result.carried'), `${fmtInt(battle.gold)}G`] : battle.mode === 'adventure' ? [t('result.gold'), credited === undefined ? '—' : `${fmtInt(credited)}G`] : [t('currency.crystal'), credited === undefined ? '—' : `+${fmtInt(credited)}`];
-    const retryBattle = !won && battle.mode === 'adventure' && battle.stage > 0 && stageStart?.battle.stage === battle.stage && stageStart.battle.floor === battle.floor;
+    const retryBattle = !won && Boolean(retryStart());
     // HP carries between battles and nothing revives in between: a checkpoint that began with a hero down (or the party under 40% HP)
     // would replay the same loss, so restarting the chapter becomes the main button and the hint says why.
-    const startHeroes = retryBattle ? stageStart!.battle.heroes : [], startDown = startHeroes.filter(h => h.hp <= 0).map(h => heroName(h));
-    const weakStart = retryBattle && (startDown.length > 0 || startHeroes.reduce((n, h) => n + Math.max(0, h.hp), 0) < .4 * startHeroes.reduce((n, h) => n + h.maxHp, 0));
+    const startDown = retryBattle ? stageStart!.battle.heroes.filter(h => h.hp <= 0).map(h => heroName(h)) : [];
+    const weakStart = retryBattle && weakCheckpoint(stageStart!), kept = retryBattle && !weakStart;
     // A Raid hero keeps the class the slot fielded (its colours stay its own); everyone else shows their roster class.
     const xpRows = xpSummary(experienceRewards, id => { const h = battle.mode === 'raid' ? battle.hero(id) : undefined; return h ? face(h) : portrait(ROSTER[id].classId, 0, id); });
     // A Story defeat says why and what to do: power vs the recommendation, who fell first, the enemy's counter, up to two one-tap fixes.
@@ -2408,12 +2456,13 @@ async function presentResult() {
     const enemy = ENEMIES[battle.enemyId], fall = firstFall?.battle === battle && firstFall.stage === battle.stage ? firstFall : queuedDown ? { name: heroLabel(queuedDown.source), cause: downCause(queuedDown) } : undefined;
     const fixes = !won && battle.mode === 'adventure' ? defeatFixes(profile, battle.floor - 1, battle.heroic) : [];
     const rec = battle.heroic ? recommendedHeroicPower(battle.floor - 1) : recommendedPower(battle.floor - 1), power = partyPower(profile), verdict = powerVerdict(power, rec);
-    const fixLabel = (fix: typeof fixes[number]) => fix.kind === 'deploy' ? t('result.fix.deploy', { n: fix.n ?? 1 }) : fix.kind === 'dungeon' ? t('result.fix.dungeon') : t(fix.kind === 'jobs' ? 'result.fix.jobs' : 'result.fix.gear', { name: ROSTER[fix.hero!].name });
+    // A kept battle resumes with the party it began with, so the deploy fix says it restarts the chapter (and does: see its click).
+    const fixLabel = (fix: typeof fixes[number]) => fix.kind === 'deploy' ? t(kept ? 'result.fix.deploy.restart' : 'result.fix.deploy', { n: fix.n ?? 1, chapter: battle.floor }) : fix.kind === 'dungeon' ? t('result.fix.dungeon') : t(fix.kind === 'jobs' ? 'result.fix.jobs' : 'result.fix.gear', { name: ROSTER[fix.hero!].name });
     const defeatHelp = won ? '' : `<section class="win defeat-help" aria-label="${t('result.fix.title')}">
         ${battle.mode === 'adventure' ? `<p class="power-line power-${verdict}" data-defeat-power>${t('result.defeat.power', { n: power, rec })} <em>${t(`power.verdict.${verdict}` as never)}</em></p>` : ''}
         ${fall ? `<p class="defeat-first">${escapeUI(fall.cause ? t('result.defeat.first', { name: fall.name, cause: fall.cause }) : t('result.defeat.first.plain', { name: fall.name }))}</p>` : ''}
         ${enemy?.counter ? `<p class="counter-note defeat-tip"><b>${escapeUI(t('result.defeat.tip', { name: eventText(battle.enemyName, lang()) }))}:</b> ${escapeUI(enemy.counter)}</p>` : ''}
-        ${fixes.length ? `<h3 class="subheading">${t('result.fix.title')}</h3><div class="defeat-fixes">${fixes.map(fix => `<button class="btn" data-defeat-fix="${fix.kind}" ${fix.hero !== undefined ? `data-fix-hero="${fix.hero}"` : ''} ${fix.slot ? `data-fix-slot="${fix.slot}" data-fix-gear="${fix.gearId}"` : ''}>${escapeUI(fixLabel(fix))} ▶</button>`).join('')}</div>` : ''}
+        ${fixes.length ? `<h3 class="subheading">${t('result.fix.title')}</h3><div class="defeat-fixes">${fixes.map(fix => `<button class="btn" data-defeat-fix="${fix.kind}" ${fix.kind === 'deploy' && kept ? 'data-fix-restart' : ''} ${fix.hero !== undefined ? `data-fix-hero="${fix.hero}"` : ''} ${fix.slot ? `data-fix-slot="${fix.slot}" data-fix-gear="${fix.gearId}"` : ''}>${escapeUI(fixLabel(fix))} ▶</button>`).join('')}</div>` : ''}
       </section>`;
     // Details: the real breakdown (the fight's numbers and which star goals this clear met).
     const starGoals = won && !moreWaves && battle.mode === 'adventure' && !battle.heroic ? ([['stars.goal.clear', true], ['stars.goal.standing', battle.living().length === battle.heroes.length], ['stars.goal.par', battle.stageTime <= STAR_PAR_SECONDS]] as const) : [];
@@ -2433,7 +2482,7 @@ async function presentResult() {
         <dl class="stat-table result-stats"><div class="stat-plaque"><dt>${t('result.survivors')}</dt><dd>${battle.living().length}/${battle.heroes.length}</dd></div><div class="stat-plaque gold"><dt>${rewardPlaque[0]}</dt><dd data-result-reward>${rewardPlaque[1]}</dd></div><div class="stat-plaque"><dt>${t('result.time')}</dt><dd>${formatTime(battle.time)}</dd></div></dl>
         ${xpRows}
         ${readyQuests && !moreWaves && won ? `<p class="hint">${t('result.quests', { n: readyQuests })}</p>` : ''}
-        ${retryBattle ? `<p class="hint retry-battle-hint">${t('result.retry.battle.hint')}</p>` : ''}
+        ${retryBattle ? `<p class="hint retry-battle-hint">${t('result.retry.battle.hint')}</p>${kept ? `<p class="hint retry-kept-hint" data-retry-kept>${t('result.retry.kept', { n: battle.floor, k: battle.stage + 1 })}</p>` : ''}` : ''}
         ${weakStart ? `<p class="hint retry-weak-hint" data-weak-checkpoint>${escapeUI(startDown.length ? t('result.retry.battle.down', { names: startDown.join(' & ') }) : t('result.retry.battle.low'))}</p>` : ''}
       </section>
       ${defeatHelp}
@@ -2518,7 +2567,9 @@ async function presentResult() {
     if (won && battle.mode === 'endless') { void leaveSafely(goOrigin, { draft: true }); return; }
     leaveResult(undefined);
   });
-  resultScreen.querySelectorAll<HTMLButtonElement>('[data-defeat-fix]').forEach(button => button.addEventListener('click', () => {
+  resultScreen.querySelectorAll<HTMLButtonElement>('[data-defeat-fix]').forEach(button => button.addEventListener('click', async () => {
+    // The deploy fix of a kept battle restarts the chapter (its label says so): the paused battle would resume without the new hero.
+    if (button.hasAttribute('data-fix-restart')) { if (commander.stale) { staleModal(); return; } if (!await clearEncounter()) { unsavedTownModal(() => button.click()); return; } }
     const kind = button.dataset.defeatFix, hero = Number(button.dataset.fixHero), slot = button.dataset.fixSlot as TownState['gearSlot'] | undefined, gearId = button.dataset.fixGear;
     if (Number.isInteger(hero) && profile.roster.includes(hero)) townState.hero = hero;
     townState.pendingGear = undefined;
@@ -2535,6 +2586,10 @@ async function presentResult() {
   }));
 }
 
+/** A start checkpoint that would replay the same loss: HP carries between battles and nothing revives, so a hero down or the party under 40% HP. */
+const weakCheckpoint = (start: NonNullable<typeof stageStart>) => { const heroes = start.battle.heroes; return heroes.some(h => h.hp <= 0) || heroes.reduce((n, h) => n + Math.max(0, h.hp), 0) < .4 * heroes.reduce((n, h) => n + h.maxHp, 0); };
+/** The start checkpoint of a lost Story battle after the first ('Retry this battle'), while that battle is the one on screen. */
+const retryStart = () => !inTown && battle.status === 'defeat' && battle.mode === 'adventure' && battle.stage > 0 && stageStart?.battle.stage === battle.stage && stageStart.battle.floor === battle.floor ? stageStart : undefined;
 /** Result of one Undercroft room: XP, carried HP and the pouch update, then back to the map. */
 async function presentDungeonResult() {
   const won = battle.status === 'victory';
@@ -2643,7 +2698,10 @@ function advanceWave() {
 function resumeEncounter(savedEncounter: NonNullable<typeof encounter>) {
   const frozen = structuredClone(savedEncounter);
   boot(frozen.battle.mode, frozen.battle.floor);
-  battle.restoreCheckpoint(frozen.battle);
+  // A paused Story battle keeps its party, places, HP shares, potions and enemy pattern, but its heroes fight with the build they have now
+  // (a talent, gear or job bought meanwhile, e.g. through a defeat fix); an unchanged build restores exactly.
+  const rebuilt = frozen.battle.mode === 'adventure' ? new Battle('adventure', frozen.battle.floor, profileModifiers(profile), { ...storyBattleOptions(profile), roster: frozen.battle.heroes.map(h => h.id) }).heroes : undefined;
+  battle.restoreCheckpoint(frozen.battle, rebuilt);
   encounter = frozen;
   runWallet = createRunWallet(); runWallet.crystal = frozen.purse; battle.runWallet = runWallet;
   runBoons = [...frozen.boons]; runSeed = frozen.seed; boonReroll = Number.isInteger(frozen.reroll) && frozen.reroll! > 0 ? frozen.reroll! : 0;
@@ -2676,7 +2734,7 @@ function staleModal() {
 /** Leaving a battle (or a result still to be saved) in a read-only tab: confirmed, then the route it departed from (`action`), with nothing
  *  written. The profile is rebuilt from the file as this tab last saved it, so the town never shows the unsaved fight. */
 function staleLeaveModal(action: () => void | Promise<void> = goOrigin) {
-  openModal(`<h2 id="modal-title">${t('storage.stale.title')}</h2><p>${t('storage.stale.leave')}</p><div class="leave-actions"><button id="stale-leave" class="btn danger">${t('storage.stale.leave.confirm')}</button><button id="stale-reload" class="btn">${t('storage.stale.reload')}</button><button class="btn" data-close data-autofocus>${t('common.cancel')}</button></div>`);
+  openModal(`<h2 id="modal-title">${t('storage.stale.title')}</h2><p>${t('storage.stale.leave')}</p><div class="leave-actions"><button class="btn" data-close data-autofocus>${t('common.cancel')}</button><button id="stale-reload" class="btn">${t('storage.stale.reload')}</button><button id="stale-leave" class="btn danger">${t('storage.stale.leave.confirm')}</button></div>`);
   $('stale-reload').onclick = staleReload;
   $('stale-leave').onclick = () => {
     if (inTown) { modal.close(); return; }
@@ -2758,8 +2816,8 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
   updateTitleStatus();
   if (inTown && renderTownAfterActivation) showTown(mode === 'story' ? 'camp' : mode === 'raid' ? 'raid' : 'endless');
 }
-/** Leave a battle (or switch files) through the mode's leave dialog: Save & suspend (focused), a destructive option that says what is lost,
- *  and Cancel (contract §4.4). `wave`: a won Story battle with more to come (its own copy: nothing is lost by suspending). */
+/** Leave a battle (or switch files) through the mode's leave dialog: Save & suspend (focused), Cancel, and last a destructive option that
+ *  says what is lost (contract §4.4; phone contract K6: the danger never first, never where the opening tap was). `wave`: a won Story battle with more to come (its own copy: nothing is lost by suspending). */
 async function leaveSafely(action: () => void | Promise<void>, context: { wave?: { n: number; total: number; next: number; gold: number }; draft?: boolean } = {}) {
   // A read-only tab (another tab saved) leaves a battle without saving, after a confirmation; in town it explains itself (contract R6).
   if (commander.stale) { if (inTown) staleModal(); else staleLeaveModal(action); return; }
@@ -2775,7 +2833,7 @@ async function leaveSafely(action: () => void | Promise<void>, context: { wave?:
   const title = wave ? t('leave.wave.title') : battle.mode === 'adventure' ? t('leave.story.title', { n: battle.floor }) : battle.mode === 'raid' ? t('leave.raid.title') : t('leave.trials.title');
   const copy = !canSuspend ? t('leave.copy.none') : draft ? t('leave.draft.copy') : wave ? t('leave.wave.copy', wave) : battle.mode === 'adventure' ? t('leave.story.copy', { k: battle.stage + 1, total: battle.stageCount }) : t('leave.copy');
   const abandon = battle.mode === 'adventure' ? t('leave.story.abandon') : battle.mode === 'raid' ? t('leave.raid.abandon') : t('leave.trials.abandon');
-  openModal(`<h2 id="modal-title">${title}</h2><p>${copy}</p><div class="leave-actions">${canSuspend ? `<button id="suspend-run" class="btn primary" data-autofocus>${t('leave.suspend')}</button>` : ''}<button id="abandon-run" class="btn danger">${abandon}</button><button data-close class="btn" ${canSuspend ? '' : 'data-autofocus'}>${t('common.cancel')}</button></div>`);
+  openModal(`<h2 id="modal-title">${title}</h2><p>${copy}</p><div class="leave-actions">${canSuspend ? `<button id="suspend-run" class="btn primary" data-autofocus>${t('leave.suspend')}</button>` : ''}<button data-close class="btn" ${canSuspend ? '' : 'data-autofocus'}>${t('common.cancel')}</button><button id="abandon-run" class="btn danger">${abandon}</button></div>`);
   // A save already in flight (the battle-start checkpoint) is queued behind, not a reason to drop the click; `leaving` only stops a double tap.
   let leaving = false;
   $('suspend-run')?.addEventListener('click', async () => {
@@ -2801,19 +2859,38 @@ async function leaveSafely(action: () => void | Promise<void>, context: { wave?:
     } finally { leaving = false; }
   });
 }
+const backupJson = (data: unknown) => typeof data === 'string' ? data : data === undefined || data === null ? undefined : JSON.stringify(data, null, 2);
+/** Never hand the player an empty or 'undefined' file that looks like a backup. */
+const emptyBackupModal = () => openModal(`<h2 id="modal-title">${t('export.empty.title')}</h2><p>${t('export.empty.copy')}</p><button data-close class="btn primary">${t('common.close')}</button>`, false);
 function download(data: unknown, filename: string) {
-  const text = typeof data === 'string' ? data : data === undefined || data === null ? undefined : JSON.stringify(data, null, 2);
-  // Never hand the player an empty or 'undefined' file that looks like a backup.
-  if (!text) { openModal(`<h2 id="modal-title">${t('export.empty.title')}</h2><p>${t('export.empty.copy')}</p><button data-close class="btn primary">${t('common.close')}</button>`, false); return false; }
+  const text = backupJson(data);
+  if (!text) { emptyBackupModal(); return false; }
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url),1000);
+  // iOS Safari asks 'Download?' first and reads the file only after the answer: the URL lives a minute, not a second.
+  const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  markBackup();
   // Embedded in another page (itch.io), a browser may block the download without telling the page: the backup is also shown as text.
   if (embedded) backupText(text, filename);
   return true;
 }
+const BACKUP_AT_KEY = 'gridbound.ui.backupAt', REMINDER_AT_KEY = 'gridbound.ui.backupReminderAt', REMINDER_ACTS_KEY = 'gridbound.ui.backupReminderActs';
+const readNumber = (key: string) => { try { const n = Number(localStorage.getItem(key)); return Number.isFinite(n) ? n : 0; } catch { return 0; } };
+const writeNumber = (key: string, n: number) => { try { localStorage.setItem(key, String(n)); } catch { /* storage blocked: the reminder may come again */ } };
+/** Acts cleared (chapters 4/8/12/16): an act clear is a moment to keep a copy. */
+const actsCleared = () => [3, 7, 11, 15].filter(chapter => profile.cleared.includes(chapter)).length;
+/** A backup was handed over (a download started, or the text was copied): kept per viewer, it quiets the reminder. */
+function markBackup() { writeNumber(BACKUP_AT_KEY, Date.now()); writeNumber(REMINDER_ACTS_KEY, Math.max(readNumber(REMINDER_ACTS_KEY), actsCleared())); }
+/** What to back up: the open Commander (a recovery file while a save is pending), or the legacy profile when no Commander exists yet. */
+function backupPayload(): { data: unknown; filename: string } {
+  if (!commander.document) return { data: legacyBackup(legacyProfile() as Profile), filename: 'Gridbound-Save.json' };
+  return { data: commander.dirty || pendingSettlement ? { kind:'gridbound-recovery', mode:commander.mode, document:commander.document, pendingProfile:profile, pendingEncounter:encounter } : commander.document, filename: 'Gridbound-Commander.json' };
+}
+/** 'Copy backup as text' (every build): the backup in a text box to copy into a note; Save files → Paste backup restores it. */
+function copyBackup() { const { data, filename } = backupPayload(), text = backupJson(data); if (text) backupText(text, filename, true); else emptyBackupModal(); }
 /** The backup as text to copy (Paste backup in the Save menu restores it). Copy tries the clipboard, then the selection; the text stays selected
- *  for a manual copy. Opened over another dialog (Config, Save files, a 'Not saved' prompt), Back puts that dialog back as it was, controls included. */
-function backupText(text: string, filename: string) {
+ *  for a manual copy. Opened over another dialog (Config, Save files, a 'Not saved' prompt), Back puts that dialog back as it was, controls included.
+ *  `direct`: asked for as text (not the fallback of a download an embedding page may have blocked). */
+function backupText(text: string, filename: string, direct = false) {
   const previous = modal.open ? Array.from(modal.childNodes) : [], opener = document.activeElement instanceof HTMLElement && modal.contains(document.activeElement) ? document.activeElement : null;
   const previousParent = modalParent, previousBlocking = modal.dataset.blocking ?? '';
   // Back (its button, ×, Escape, the phone's Back) puts the dialog underneath back as it was: its nodes, listeners, parent and blocking state.
@@ -2822,7 +2899,7 @@ function backupText(text: string, filename: string) {
     const title = modal.querySelector<HTMLElement>('#modal-title');
     if (opener?.isConnected) opener.focus(); else if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
   };
-  openModal(`<h2 id="modal-title">${t('export.text.title')}</h2><p class="hint">${t('export.text.copy', { file: escapeUI(filename) })}</p><textarea id="backup-text" class="backup-text" readonly rows="8" spellcheck="false" aria-label="${t('export.text.label')}">${escapeUI(text)}</textarea><div class="departure-actions backup-actions"><button id="backup-select" class="btn">${t('export.text.select')}</button><button id="backup-copy" class="btn primary">${t('export.text.clipboard')}</button></div><p id="backup-note" role="status"></p>${previous.length ? `<button id="backup-back" class="btn" data-nav-parent>${t('common.back')}</button>` : `<button data-close class="btn">${t('common.close')}</button>`}`, { pause: false, parent: previous.length ? restore : undefined });
+  openModal(`<h2 id="modal-title">${t('export.text.title')}</h2><p class="hint">${direct ? t('export.text.direct') : t('export.text.copy', { file: escapeUI(filename) })}</p><textarea id="backup-text" class="backup-text" readonly rows="8" spellcheck="false" aria-label="${t('export.text.label')}">${escapeUI(text)}</textarea><div class="departure-actions backup-actions"><button id="backup-select" class="btn">${t('export.text.select')}</button><button id="backup-copy" class="btn primary">${t('export.text.clipboard')}</button></div><p id="backup-note" role="status"></p>${previous.length ? `<button id="backup-back" class="btn" data-nav-parent>${t('common.back')}</button>` : `<button data-close class="btn">${t('common.close')}</button>`}`, { pause: false, parent: previous.length ? restore : undefined });
   const area = $<HTMLTextAreaElement>('backup-text'), note = $('backup-note'), select = () => { area.focus({ preventScroll: true }); area.select(); area.setSelectionRange(0, text.length); };
   $('backup-select').onclick = select;
   $('backup-copy').onclick = async () => {
@@ -2833,7 +2910,7 @@ function backupText(text: string, filename: string) {
     if (navigator.clipboard && policy?.allowsFeature('clipboard-write') !== false) try { await navigator.clipboard.writeText(text); copied = true; } catch { /* refused: the selection below */ }
     if (!area.isConnected) return;
     if (!copied) try { copied = document.execCommand('copy'); } catch { copied = false; }
-    if (!copied) select();
+    if (!copied) select(); else markBackup();
     note.textContent = t(copied ? 'export.text.copied' : 'export.text.manual');
   };
 }
@@ -2844,9 +2921,52 @@ function legacyProfile() {
   return structuredClone(profile);
 }
 /** Every backup is importable from the Save dialog: the Commander document, a recovery file while a save is pending, or the legacy profile when no Commander exists yet. */
-function exportCommander() {
-  if (!commander.document) { download(legacyBackup(legacyProfile() as Profile), 'Gridbound-Save.json'); return; }
-  download(commander.dirty || pendingSettlement ? { kind:'gridbound-recovery', mode:commander.mode, document:commander.document, pendingProfile:profile, pendingEncounter:encounter } : commander.document, 'Gridbound-Commander.json');
+function exportCommander() { const { data, filename } = backupPayload(); download(data, filename); }
+/** I4: the web build (not in a frame) asks the browser to keep its storage (best effort, never throws; a frame is partitioned and refused,
+ *  so it relies on the reminder). The last answer feeds the storage line. */
+let persistence: boolean | undefined;
+let persistAskedAt = -Infinity;
+async function keepSavesPersistent(force = false) {
+  if (embedded) return false;
+  // Asked at most once a minute (a Save files re-render, Config right after it): Firefox prompts on every request. A first clear asks anyway.
+  const ask = force || performance.now() - persistAskedAt > 60000;
+  try { persistence = Boolean((await navigator.storage?.persisted?.()) || (ask && (persistAskedAt = performance.now(), await navigator.storage?.persist?.()))); } catch { persistence = false; }
+  const note = document.getElementById('storage-note');
+  if (note) { note.textContent = storageNote(); note.dataset.persistent = String(persistence); }
+  return persistence;
+}
+const iosSafariTab = () => (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) && !(matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true);
+/** I6: where the saves live and how safe they are, at the top of Config's save part and of Save files. */
+function storageNote() { return embedded ? t('storage.embedded') : persistence ? t('storage.persistent') : iosSafariTab() ? t('storage.ios') : t('storage.besteffort'); }
+function storageNoteMarkup() { void keepSavesPersistent(); return `<p id="storage-note" class="hint storage-note" data-persistent="${persistence === true}">${storageNote()}</p>`; }
+/** Keep `target` (a field's buttons) above the on-screen keyboard: scrolled into the dialog's view and, where the visual viewport is known,
+ *  above its bottom (iOS shrinks only the visual viewport). It follows the keyboard until the field's view is gone. */
+function keepAboveKeyboard(target: HTMLElement) {
+  const vv = window.visualViewport;
+  const fit = () => {
+    if (!target.isConnected || !modal.open) { vv?.removeEventListener('resize', fit); return; }
+    target.scrollIntoView({ block: 'nearest' });
+    const over = vv ? target.getBoundingClientRect().bottom - (vv.offsetTop + vv.height) + 12 : 0;
+    if (over > 0) modal.scrollTop += over;
+  };
+  requestAnimationFrame(fit);
+  vv?.addEventListener('resize', fit);
+}
+/** I6: 'Keep a copy of your progress', on a camp visit with no scene or unlock card to show: once an act was cleared since the last one,
+ *  or when a chapter is cleared and neither a backup nor this reminder came in BACKUP_REMINDER_DAYS (a player who never backs up hears it
+ *  once a week, not every day); at most once a day. Never over a scene or another dialog; skipped under automation unless forced
+ *  (window.gridbound.backupReminder). */
+const BACKUP_REMINDER_DAYS = 7, DAY_MS = 86_400_000;
+function backupReminder(force = false) {
+  if (!force && (navigator.webdriver || !commanderChecked || !inTown || townState.tab !== 'camp' || playingScene || campScenesRunning || modal.open || commander.stale || pendingSettlement || $('title-screen')?.hidden === false)) return false;
+  const now = Date.now(), acts = actsCleared(), last = readNumber(BACKUP_AT_KEY);
+  const actDue = acts > readNumber(REMINDER_ACTS_KEY), staleDue = profile.cleared.length > 0 && now - Math.max(last, readNumber(REMINDER_AT_KEY)) > BACKUP_REMINDER_DAYS * DAY_MS;
+  if (!force && (!(actDue || staleDue) || now - readNumber(REMINDER_AT_KEY) < DAY_MS)) return false;
+  writeNumber(REMINDER_AT_KEY, now); writeNumber(REMINDER_ACTS_KEY, Math.max(readNumber(REMINDER_ACTS_KEY), acts));
+  openModal(`<h2 id="modal-title">${t('backup.reminder.title')}</h2>${actDue ? `<p class="backup-reminder-act">${t('backup.reminder.act')}</p>` : ''}<p>${t('backup.reminder.copy')}</p>${storageNoteMarkup()}<p class="hint" data-backup-last>${last ? t('backup.reminder.last', { time: fmtDateTime(last) }) : t('backup.reminder.never')}</p><div class="leave-actions"><button id="reminder-copy" class="btn primary">${t('backup.reminder.copyButton')}</button><button id="reminder-download" class="btn">${t('settings.export')}</button><button class="btn" data-close data-autofocus>${t('backup.reminder.later')}</button></div>`);
+  $('reminder-copy').addEventListener('click', copyBackup);
+  $('reminder-download').addEventListener('click', exportCommander);
+  return true;
 }
 import { STORY_CHOICES, narrativeChoice, epilogue, storyOutro, choiceOpen, pendingChoices } from './game/narrative';
 function chapterChronicle() {
@@ -2949,12 +3069,12 @@ async function profilesMenu(notice = '') {
     // 'Retry save' only when a save failed or a result waits to be saved; 'Old save' only when there is an old save to look at.
     const retryable = commander.failed || pendingSettlement, legacyHere = Boolean(rawV3());
     const noCheckpoint = !current?.encounters?.[commander.mode];
-    openModal(`<h2 id="modal-title">${t('profiles.title')}</h2><p class="hint">${t('profiles.intro')}</p>${notice ? `<p class="profiles-notice" aria-hidden="true">${escapeUI(notice)}</p>` : ''}<p id="profiles-notice" class="sr-only" role="status"></p>
+    openModal(`<h2 id="modal-title">${t('profiles.title')}</h2>${notice ? `<p class="profiles-notice" aria-hidden="true">${escapeUI(notice)}</p>` : ''}<p id="profiles-notice" class="sr-only" role="status"></p>${storageNoteMarkup()}<p class="hint">${t('profiles.intro')}</p>
       <div class="save-files">${documents.map((doc,index) => `<div class="save-file ${current?.commanderId === doc.commanderId ? 'current' : ''}"><div><b>${escapeUI(doc.name)}</b><small>${t('profiles.file', { ch: doc.story.slots[3].state?.cleared.length ?? 0, total: CAMPAIGN.length, crystal: doc.shared.bankCrystal })}</small></div><button data-commander="${index}" class="btn">${current?.commanderId === doc.commanderId ? t('profiles.current') : t('profiles.switch')}</button></div>`).join('') || (unheld ? '' : `<p>${t('profiles.empty')}</p>`)}</div>
-      <label class="name-field">${t('profiles.name')} <input id="commander-name" maxlength="32" value="${escapeUI(current?.name ?? t('profiles.default.name'))}"></label>
+      <form id="rename-form" class="name-form"><label class="name-field">${t('profiles.name')} <input id="commander-name" maxlength="32" enterkeyhint="done" autocomplete="off" value="${escapeUI(current?.name ?? t('profiles.default.name'))}"></label></form>
       ${unheld ? `<p class="hint" id="continue-summary">${t('profiles.continue.summary', progressSummary(profile))}</p>` : ''}
       <p id="profile-error" role="status">${commander.error || commander.repository?.warning ? escapeUI(errorText(commander.error || commander.repository?.warning)) : ''}</p>
-      <div class="departure-actions">${unheld ? `<button id="continue-mine" class="btn primary" ${full ? 'disabled' : ''}>${t('profiles.continue.mine')}</button>` : ''}<button id="new-commander" class="btn" ${full ? 'disabled' : ''}>${t('profiles.new')}</button>${current ? `<button id="rename-commander" class="btn">${t('profiles.rename')}</button><button id="export-commander" class="btn">${t('profiles.export')}</button><button id="delete-commander" class="btn danger">${t('profiles.delete')}</button>${retryable ? `<button id="save-retry" class="btn">${t('result.unsaved.retry')}</button>` : ''}` : ''}${legacyHere ? `<button id="legacy-preview" class="btn">${t('profiles.legacy')}</button>` : ''}<button id="import-save-button" class="btn" ${full ? 'disabled' : ''}>${t('profiles.import')}</button>${embedded ? `<button id="import-text-button" class="btn" ${full ? 'disabled' : ''}>${t('profiles.import.paste')}</button>` : ''}<input id="import-save" type="file" accept="application/json,.json" hidden></div>
+      <div class="departure-actions">${unheld ? `<button id="continue-mine" class="btn primary" ${full ? 'disabled' : ''}>${t('profiles.continue.mine')}</button>` : ''}<button id="new-commander" class="btn" ${full ? 'disabled' : ''}>${t('profiles.new')}</button>${current ? `<button id="rename-commander" class="btn" type="submit" form="rename-form">${t('profiles.rename')}</button><button id="export-commander" class="btn">${t('profiles.export')}</button><button id="export-text-commander" class="btn">${t('profiles.export.text')}</button>${retryable ? `<button id="save-retry" class="btn">${t('result.unsaved.retry')}</button>` : ''}` : ''}${legacyHere ? `<button id="legacy-preview" class="btn">${t('profiles.legacy')}</button>` : ''}<button id="import-save-button" class="btn" ${full ? 'disabled' : ''}>${t('profiles.import')}</button><button id="import-text-button" class="btn" ${full ? 'disabled' : ''}>${t('profiles.import.paste')}</button>${current ? `<button id="delete-commander" class="btn danger">${t('profiles.delete')}</button>` : ''}<input id="import-save" type="file" accept="application/json,.json" hidden></div>
       ${current ? `<h3 class="subheading">${t('profiles.slots', { mode: modeName(commander.mode) })}</h3><p class="hint">${t('profiles.slots.hint')}</p><div class="save-files">${slots.map(slot => `<div class="save-file"><div><b>${slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) })}</b><small>${t(`profiles.status.${slot.status}` as never)}${slot.savedAt ? ` · ${fmtDateTime(slot.savedAt)}` : ''}</small></div><span>${slot.slotId !== 'auto' ? `<button data-save-slot="${slot.slotId}" class="btn">${t('profiles.save')}</button>` : ''}<button data-load-slot="${slot.slotId}" class="btn" ${!slot.state ? 'disabled' : ''}>${t('profiles.load')}</button></span></div>`).join('')}</div><p id="continue-hint" class="hint" role="status">${noCheckpoint ? t('profiles.nocheckpoint') : ''}</p><button id="continue-latest" class="btn primary" aria-describedby="continue-hint" ${noCheckpoint ? 'disabled' : ''}>${t('profiles.continue')}</button>` : ''}
       <button data-close class="btn">${t('common.close')}</button>`);
     // Feedback for every action: a success note at the top, an error above the buttons (scrolled into view, so a long list never hides it).
@@ -2971,12 +3091,12 @@ async function profilesMenu(notice = '') {
     $('new-commander').onclick = () => {
       const name = typedName(), create = () => void leaveSafely(() => creatingCommander(async () => { activateCommander(await commander.create(name)); }));
       if (!hasProgress(profile)) { create(); return; }
-      openModal(`<h2 id="modal-title">${t('profiles.new.confirm.title')}</h2><p>${t('profiles.new.confirm.copy')}</p><p class="hint">${current ? t('profiles.new.confirm.kept', { name: escapeUI(current.name) }) : t('profiles.new.confirm.unheld')}</p><button id="new-confirm" class="btn danger">${t('profiles.new.confirm')}</button><button id="new-cancel" class="btn primary" data-nav-parent data-autofocus>${t('common.cancel')}</button><p id="profile-error" role="status"></p>`, { parent: backToProfiles });
+      openModal(`<h2 id="modal-title">${t('profiles.new.confirm.title')}</h2><p>${t('profiles.new.confirm.copy')}</p><p class="hint">${current ? t('profiles.new.confirm.kept', { name: escapeUI(current.name) }) : t('profiles.new.confirm.unheld')}</p><p id="profile-error" role="status"></p><div class="leave-actions"><button id="new-cancel" class="btn primary" data-nav-parent data-autofocus>${t('common.cancel')}</button><button id="new-confirm" class="btn danger">${t('profiles.new.confirm')}</button></div>`, { parent: backToProfiles });
       $('new-confirm').onclick = create;
     };
     $('import-save-button').onclick = () => $<HTMLInputElement>('import-save').click();
     $('import-save').onchange = () => { const file = $<HTMLInputElement>('import-save').files?.[0]; if (file) void attempt(async () => importSave(await file.text().catch(() => ''), documents)); };
-    // Where a file picker is awkward or a download was blocked (an embedded page), the backup text can be pasted instead.
+    // On a phone (a file picker is awkward, a download may never land) and in an embedded page, the backup text can be pasted instead.
     document.getElementById('import-text-button')?.addEventListener('click', () => {
       openModal(`<h2 id="modal-title">${t('profiles.import.paste.title')}</h2><p class="hint">${t('profiles.import.paste.hint')}</p><textarea id="import-text" class="backup-text" rows="8" spellcheck="false" aria-label="${t('export.text.label')}"></textarea><p id="profile-error" role="status"></p><div class="departure-actions backup-actions"><button id="import-text-confirm" class="btn primary" disabled>${t('profiles.import.paste.confirm')}</button><button id="import-text-back" class="btn" data-nav-parent>${t('common.back')}</button></div>`, { parent: backToProfiles });
       const area = $<HTMLTextAreaElement>('import-text');
@@ -2984,16 +3104,23 @@ async function profilesMenu(notice = '') {
       area.focus({ preventScroll: true });
       $('import-text-confirm').onclick = () => { void attempt(() => importSave(area.value.trim(), documents)); };
     });
-    // Rename is offered once the field holds another name; it says what it did.
+    // Rename is offered once the field holds another name; it says what it did. The field and Rename are one form, so the keyboard's
+    // Done/Go (Enter) renames too, while Rename is enabled.
     const nameField = $<HTMLInputElement>('commander-name'), rename = document.getElementById('rename-commander') as HTMLButtonElement | null;
     const syncRename = () => { if (rename) rename.disabled = !nameField.value.trim() || nameField.value.trim().slice(0, 32) === current?.name; };
     nameField.addEventListener('input', syncRename); syncRename();
-    rename?.addEventListener('click', () => { const name = nameField.value.trim().slice(0,32); void attempt(async () => { if (!name) throw new CommanderError('name-required', 'Enter a name.'); if (commander.stale) { staleModal(); return; } if (await persist('auto', doc => { doc.name=name; })) await profilesMenu(t('profiles.renamed', { name })); else refused(); }); });
+    $('rename-form').addEventListener('submit', event => { event.preventDefault(); if (!rename || rename.disabled) return; const name = nameField.value.trim().slice(0,32); void attempt(async () => { if (!name) throw new CommanderError('name-required', 'Enter a name.'); if (commander.stale) { staleModal(); return; } if (await persist('auto', doc => { doc.name=name; })) await profilesMenu(t('profiles.renamed', { name })); else refused(); }); });
     $('export-commander')?.addEventListener('click',exportCommander);
+    $('export-text-commander')?.addEventListener('click',copyBackup);
     $('save-retry')?.addEventListener('click', () => { if (pendingSettlement) retryResultSave(); else void persist().then(ok => { if (ok) void profilesMenu(t('storage.saved')); else refused(); }); });
     $('delete-commander')?.addEventListener('click', () => {
-      openModal(`<h2 id="modal-title">${t('profiles.delete.title', { name: escapeUI(current!.name) })}</h2><p>${t('profiles.delete.copy', { crystal: current!.shared.bankCrystal, receipts: current!.shared.settlementReceipts.length })}</p><input id="delete-word" aria-label="DELETE"><p id="delete-error" class="profile-error" role="status"></p><button id="delete-confirm" class="btn danger" disabled>${t('profiles.delete.confirm')}</button><button data-nav-parent class="btn">${t('common.cancel')}</button>`, { parent: backToProfiles });
-      $('delete-word').oninput = () => { $<HTMLButtonElement>('delete-confirm').disabled = $<HTMLInputElement>('delete-word').value !== 'DELETE'; };
+      // The word is checked as typed in any case (a phone keyboard capitalises 'Delete'); Done/Enter closes the keyboard, and the
+      // buttons are scrolled above it when the field is focused (K6: Cancel first and focused, the danger last).
+      openModal(`<h2 id="modal-title">${t('profiles.delete.title', { name: escapeUI(current!.name) })}</h2><p>${t('profiles.delete.copy', { crystal: current!.shared.bankCrystal, receipts: current!.shared.settlementReceipts.length })}</p><input id="delete-word" aria-label="DELETE" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done"><p id="delete-error" class="profile-error" role="status"></p><div class="leave-actions" id="delete-actions"><button data-nav-parent class="btn" data-autofocus>${t('common.cancel')}</button><button id="delete-confirm" class="btn danger" disabled>${t('profiles.delete.confirm')}</button></div>`, { parent: backToProfiles });
+      const word = $<HTMLInputElement>('delete-word');
+      word.oninput = () => { $<HTMLButtonElement>('delete-confirm').disabled = word.value.trim().toUpperCase() !== 'DELETE'; };
+      word.onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); word.blur(); } };
+      word.onfocus = () => keepAboveKeyboard($('delete-actions'));
       // Always-on Commander: the next file takes over, or a fresh one when the last is deleted (gridbound.v3 is never overwritten with a fresh profile).
       $('delete-confirm').onclick = async () => { if (commander.stale) { staleModal(); return; } if (!inTown || pendingSettlement) return; try { await commander.flush(); await commander.repository!.remove(current!.commanderId,commander.document!.revision); commander.document=undefined; profile=createProfile(); const rest=(await commander.open()).sort((a,b)=>b.lastPlayed-a.lastPlayed); activateCommander(rest[0] ?? await commander.create(t('profiles.default.name'), createCommanderDocument(createProfile(), t('profiles.default.name')))); await profilesMenu(t('profiles.deleted', { name: current!.name })); } catch(error) { storageError(error); showError(errorText(error), 'delete-error'); } };
     });
@@ -3107,7 +3234,7 @@ function switchLang(next: Lang) {
     const apply = () => { setLang(next); location.reload(); };
     if (commander.document && !commander.repository?.persistent) {
       const kept = legacyMirrored();
-      openModal(`<h2 id="modal-title">${t('lang.session.title')}</h2><p>${t(kept ? 'lang.session.kept' : 'lang.session.copy')}</p><button id="lang-export" class="btn">${t('profiles.export')}</button><button id="lang-anyway" class="btn danger">${t(kept ? 'lang.session.anyway' : 'lang.session.confirm')}</button><button data-close class="btn primary">${t('common.cancel')}</button>`, false);
+      openModal(`<h2 id="modal-title">${t('lang.session.title')}</h2><p>${t(kept ? 'lang.session.kept' : 'lang.session.copy')}</p><div class="leave-actions"><button data-close class="btn primary" data-autofocus>${t('common.cancel')}</button><button id="lang-export" class="btn">${t('profiles.export')}</button><button id="lang-anyway" class="btn danger">${t(kept ? 'lang.session.anyway' : 'lang.session.confirm')}</button></div>`, false);
       $('lang-export').addEventListener('click', exportCommander);
       $('lang-anyway').addEventListener('click', apply);
       return;
@@ -3115,10 +3242,14 @@ function switchLang(next: Lang) {
     apply();
   });
 }
-document.addEventListener('pointerdown', event => {
-  const target = (event.target as HTMLElement).closest('button,[role="button"]');
-  if (target && !(target as HTMLButtonElement).disabled && !target.closest('#unit-layer')) sound.play('cursor');
-}, true);
+// G10: the UI cue plays on press for a mouse, and on the click for a finger or pen, so a swipe that starts on a button (scrolling the
+// roster, the Quest Board, Save files) never clicks audibly. A held tap (G7) plays nothing.
+const cueTarget = (event: Event) => { const target = (event.target as HTMLElement | null)?.closest?.('button,[role="button"]'); return Boolean(target && !(target as HTMLButtonElement).disabled && !target.closest('#unit-layer')); };
+let pressPointer = 'mouse';
+document.addEventListener('pointerdown', event => { pressPointer = event.pointerType; if (event.pointerType === 'mouse' && cueTarget(event)) sound.play('cursor'); }, true);
+document.addEventListener('click', event => { if (event.detail > 0 && pressPointer !== 'mouse' && cueTarget(event) && !inputHeld(event)) sound.play('cursor'); }, true);
+// Audio starts (and comes back from iOS's 'interrupted') on user-activation events: a lifted finger, a click, a key. Never while Sound is off.
+for (const type of ['pointerup', 'click', 'keydown']) document.addEventListener(type, () => { if (profile.sound) sound.unlock(); }, { capture: true, passive: true });
 const titleScreenEl = $('title-screen');
 const leavePressPhase = () => { if (!titleScreenEl.classList.contains('press-phase')) return false; titleScreenEl.classList.remove('press-phase'); sound.unlock(); sound.play('confirm'); requestAnimationFrame(() => $('title-enter').focus({ preventScroll: true })); return true; };
 // PRESS START ends on the click itself, not on pointerdown: a touch's compatibility click lands where the finger was, and leaving on
@@ -3149,7 +3280,7 @@ document.querySelectorAll<HTMLElement>('[data-lane]').forEach(el => el.addEventL
   document.querySelectorAll<HTMLElement>('[data-lane]').forEach(button => { const active = Number(button.dataset.lane) === battle.targetLane; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
 }));
 window.addEventListener('keydown', e => {
-  const target = e.target as HTMLElement, typing = target.matches('input,textarea,select,[contenteditable="true"]');
+  const target = e.target as HTMLElement, typing = target.matches('input:not([type="checkbox"]):not([type="radio"]),textarea,select,[contenteditable="true"]');
   // Escape typed in a field (rename, DELETE, Paste backup) or held down is no Back step: the dialog's native cancel that follows is ignored too.
   if (e.code === 'Escape' && (typing || e.repeat)) { if (e.repeat) e.preventDefault(); escapeHandled = true; window.setTimeout(() => { escapeHandled = false; }, 0); return; }
   if (e.repeat || typing) return;
@@ -3197,7 +3328,65 @@ window.addEventListener('keydown', e => {
   if (/^Digit[1-9]$/.test(e.code)) { const h = battle.heroes.find(h => h.slot === Number(e.code.slice(-1)) - 1); if (h) { sound.unlock(); tapHero(h.id); } }
   if (e.code === 'KeyQ' || e.code === 'KeyE') cycleSkill(battle.selected, e.code === 'KeyE' ? 1 : -1);
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden && !inTown && battle.status === 'fighting') pauseMenu(); });
+// ── The phone life-cycle (contract §6) ──
+/** The player looked away (another app, a locked screen: `menu`; the notification shade, Control Center, a tap on the itch page: a blur)
+ *  and a live fight pauses (C1/C2); only Resume goes on. A blur pauses without opening the menu yet: a dialog opened now would take the
+ *  focus back from the page the player turned to (the itch page's own fields), so the menu waits for the player's return (showAwayMenu),
+ *  as it does under a dialog already open. */
+function pauseAway(menu = true) {
+  if (inTown || battle.status !== 'fighting') return;
+  if (modal.open || !menu) { battle.pause(); awayPaused = true; return; }
+  renderPause();
+}
+/** Back from a blur (the window has the focus again, or the page is shown): the pause menu that waited for the player. */
+function showAwayMenu() { if (awayPaused && !inTown && battle.status === 'paused' && !modal.open) renderPause(); }
+// A browser that gives the window no focus event on return: the player's first touch shows the waiting menu (its tap hold drops that tap).
+document.addEventListener('pointerdown', () => { if (awayPaused) showAwayMenu(); }, true);
+/** The page went to the background (visibilitychange → hidden, pagehide, freeze): pause, settle a won or lost battle whose result waited
+ *  on animation frames, save a started Undercroft fight's state with its background stamp at once, and retry a failed save. The OS may
+ *  kill the page from here on without another event. */
+function pageHidden() {
+  pauseAway();
+  if (!inTown) { frame(1); resultNow?.(); }
+  const run = profile.journey.run, fight = run?.pendingFight;
+  if (dungeonFightLive() && fight?.started && !pendingSettlement && !commander.stale) {
+    // hidden, pagehide and freeze can follow each other: the first stamp (and its save) stands.
+    if (fight.hiddenAt && !commander.failed) return;
+    noteFight(run!, heroRatios(), battle.potions); fight.hiddenAt = Date.now(); fightNote = fightNoteKey();
+    void persist();
+  } else if (commander.document && !commander.stale && (inTown || commander.failed)) void persist();
+}
+/** Back on the page: nothing resumes by itself (the pause menu waits), the screen stays awake again while a battle is on screen, and a
+ *  live Undercroft fight drops its background stamp (a reload from here is the player's, with the flee's cost). */
+function pageShown() {
+  if (inTown || document.hidden) return;
+  showAwayMenu();
+  if (resultScreen.hidden) void keepAwake(true);
+  const fight = profile.journey.run?.pendingFight;
+  if (dungeonFightLive() && fight?.hiddenAt && !pendingSettlement && !commander.stale) { delete fight.hiddenAt; void persist(); }
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) pageHidden(); else pageShown(); });
+window.addEventListener('pagehide', pageHidden);
+document.addEventListener('freeze', pageHidden);
+window.addEventListener('pageshow', pageShown);
+document.addEventListener('resume', pageShown);
+// A blur that leaves no element of this document focused (focus moves inside the page refocus it at once) is the player looking away.
+window.addEventListener('blur', () => { window.setTimeout(() => { if (!document.hasFocus()) pauseAway(false); }, 0); });
+window.addEventListener('focus', showAwayMenu);
+/** C6: while a battle is on screen (ready, fighting or paused) the screen stays on where the browser allows it; refused in the itch frame
+ *  (no screen-wake-lock in its allow list: not even asked), on battery saver or a hidden page, silently. The browser drops it on hide. */
+async function keepAwake(on: boolean) {
+  wakeWanted = on;
+  const policy = (document as Document & { featurePolicy?: { allowsFeature(feature: string): boolean } }).featurePolicy;
+  try {
+    if (on && !wakeLock && !wakeAsking && document.visibilityState === 'visible' && 'wakeLock' in navigator && policy?.allowsFeature('screen-wake-lock') !== false) {
+      wakeAsking = true;
+      const lock = await navigator.wakeLock.request('screen').finally(() => { wakeAsking = false; });
+      if (!wakeWanted) { void lock.release().catch(() => {}); return; }
+      wakeLock = lock; lock.addEventListener('release', () => { if (wakeLock === lock) wakeLock = null; });
+    } else if (!on && wakeLock) { const lock = wakeLock; wakeLock = null; await lock.release(); }
+  } catch { /* refused: nothing to undo */ }
+}
 scene = new BattleScene(battle, sound, frame);
 /** Push the effective motion setting to the arena (no flashes, shake, hit-stop or boss bob) and the CSS (body.reduced-motion). */
 function applyMotion() { if (scene) scene.reducedMotion = !motionOn(); document.body.classList.toggle('reduced-motion', !motionOn()); }
@@ -3234,6 +3423,8 @@ const exposeQaHook = () => { if (import.meta.env.DEV) Object.assign(window, { gr
   emptySlotPrompt: (on = true) => { emptySlotPrompt = on; },
   /** `reset`: forget the per-viewer unlock flags first, so the card can play again. */
   get coachStep() { return coach.step ?? null; }, unlockIntro: (reset = false) => { if (reset) resetUnlockFlags(); unlockIntro(true); },
+  /** Open the backup reminder now (`force`), or run its real check (false: due, once a day, never under automation's webdriver flag). */
+  backupReminder: (force = true) => backupReminder(force),
   /** The navigation contract's view of the screen (R8): the top layer, the route, the battle's exit state, the open dialog and the history guard. */
   navState: () => {
     const s = navSnapshot();

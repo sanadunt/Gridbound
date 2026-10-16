@@ -8,7 +8,8 @@
 // - the MENU shows its commands first and all on screen at the 540×900 itch embed (8 heroes);
 // - the Journal's companion buttons line up;
 // - no 'GSAP target … not found' warning during a real (webdriver spoofed) town walk, where the free-slot question also shows unforced.
-// TOWN_ONLY=party|depart|jobs|claim|menu|journal|gsap|shots runs one part; screenshots go to artifacts/town-flows/.
+// - a quick double tap on Promote or on Buy & equip (Pixel 7, real touches) acts once (phone contract G7);
+// TOWN_ONLY=party|depart|jobs|doubletap|claim|menu|journal|gsap|shots runs one part; screenshots go to artifacts/town-flows/.
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { withBrowser, seedSave, ACT_TWO_SAVE } from './browser-harness.mjs';
@@ -215,6 +216,48 @@ if (runs('jobs')) await withBrowser(async tools => {
   assert.deepEqual(errors, [], 'no console errors');
   console.log('PASS guide: the promotion step opens on that job\'s inspector');
 }, { width: 390, height: 844, mobile: true });
+
+// Phone contract G7 (SAFE), on a Pixel 7 with real touches: a quick double tap on Promote learns the job once and leaves the skills alone
+// (the re-rendered inspector's 'Equip … now' sits where Promote was), and one on 'Buy & equip' buys once and opens no other item.
+if (runs('doubletap')) await withBrowser(async tools => {
+  const { wait, evaluate, touch, screenshot, errors } = tools;
+  await boot(tools, JOBS_SAVE);
+  await tools.click.nav('party-advanced');
+  await touch.tap('[data-training-tab="jobs"]');
+  await wait('Boolean(document.querySelector(\'[data-promote="paladin"]\'))');
+  await touch.tap('[data-promote="paladin"]');
+  await wait('Boolean(document.querySelector("[data-confirm-job]:not([disabled])"))');
+  const before = await evaluate('(() => { const p = window.gridbound.profile(); return { gold: p.gold, skills: p.loadouts[0].skills.join("/") }; })()');
+  await touch.rapidDoubleTap('[data-confirm-job]', 120);
+  await wait('window.gridbound.profile().loadouts[0].job === "paladin"');
+  await sleep(900);
+  const after = await evaluate('(() => { const p = window.gridbound.profile(); return { gold: p.gold, skills: p.loadouts[0].skills.join("/") }; })()');
+  assert.equal(after.gold, before.gold - 180, 'Promote spent its cost once');
+  assert.equal(after.skills, before.skills, 'the second tap did not press Equip now');
+  assert.ok(await evaluate('Boolean(document.querySelector("[data-job-inspector] [data-equip-skill]"))'), 'Equip now waits for its own tap');
+  await screenshot(`${out}/promote-double-tap-p7.png`);
+  // Gear: the first piece the hero can buy, then a double tap on Buy & equip.
+  await tools.click.nav('party');
+  await touch.tap('[data-training-tab="gear"]');
+  await wait('Boolean(document.querySelector("[data-gear-item]"))');
+  let bought;
+  for (const id of await evaluate('[...document.querySelectorAll("[data-gear-item]:not(.equipped):not(.unavailable)")].map(b => b.dataset.gearItem)')) {
+    await touch.tap(`[data-gear-item="${id}"]`);
+    await wait(`document.querySelector("[data-gear-preview]")?.dataset.gearPreview === ${JSON.stringify(id)}`);
+    if (await evaluate('!document.querySelector("[data-confirm-gear]").disabled')) { bought = id; break; }
+  }
+  assert.ok(bought, 'a piece to buy');
+  const gold0 = await gold(evaluate);
+  await touch.rapidDoubleTap('[data-confirm-gear]', 120);
+  await wait(`!document.querySelector("[data-gear-preview]")`);
+  await sleep(900);
+  const owned = await evaluate('(() => { const l = window.gridbound.profile().loadouts[0]; return { gear: l.gear, inventory: l.inventory ?? [] }; })()');
+  assert.ok(Object.values(owned.gear).includes(bought), 'the piece is equipped');
+  assert.ok(await gold(evaluate) < gold0, 'it was paid for');
+  assert.equal(await evaluate('Boolean(document.querySelector("[data-gear-preview]"))'), false, 'the second tap opened no other item');
+  assert.deepEqual(errors, [], 'no console errors');
+  console.log('PASS double tap: Promote learns once and equips nothing; Buy & equip buys once and opens nothing');
+}, { phone: { width: 412, height: 915, dpr: 2.625, ua: 'android' } });
 
 if (runs('claim')) await withBrowser(async tools => {
   const { wait, evaluate, click, screenshot, errors } = tools;

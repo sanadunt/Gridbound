@@ -18,8 +18,10 @@ export type DungeonRun = {
   /** Map generator version the run was drawn with (older saves keep their layout after an update). */
   layout: number;
   /** `started`: the fight began and has no result yet; a reload resolves it as a flee (`interruptFight`). `seen`: the
-   *  fight's last saved state (HP ratios, potions left), so a reload never costs less than fleeing at that moment. */
-  pendingFight?: { kind: 'battle' | 'elite' | 'guardian'; enemy: string; started?: boolean; seen?: FightState };
+   *  fight's last saved state (HP ratios, potions left), so a reload never costs less than fleeing at that moment.
+   *  `hiddenAt`: when the page went to the background during the fight (a wall-clock ms stamp the UI writes, never read by a Battle);
+   *  a later load that finds it old enough treats the cut as the OS closing the game, not a flee (`interruptFight(run, true)`). */
+  pendingFight?: { kind: 'battle' | 'elite' | 'guardian'; enemy: string; started?: boolean; seen?: FightState; hiddenAt?: number };
 };
 export type FightState = { hp: Record<number, number>; potions: number };
 export type DepthDef = { id: number; unlock: number; enemies: string[]; elite: string[]; guardian: string; material: string };
@@ -230,11 +232,19 @@ export function noteFight(run: DungeonRun, hp: Record<number, number>, potions: 
 
 /** A fight that began but never got a result (the page was closed or reloaded) is a flee. Each hero ends at the worse
  *  of its last noted HP (a hero who fell stays down) and a flat wound that never fells a standing hero; potions used
- *  by then stay used. */
-export function interruptFight(run: DungeonRun): Pouch | undefined {
+ *  by then stay used. `background`: the game was closed while it sat in the background (the OS discarded the tab), not
+ *  by the player: each hero keeps its noted HP (the run's HP when nothing was noted) with no extra wound, potions as
+ *  noted, the pouch untouched, and the fight waits in the room. It returns an empty pouch (nothing was lost). */
+export function interruptFight(run: DungeonRun, background = false): Pouch | undefined {
   const fight = run.pendingFight;
   if (!fight?.started) return undefined;
-  const seen = fight.seen, wound = (id: number) => run.hp[id] > 0 ? Math.max(.05, run.hp[id] - INTERRUPT_WOUND) : 0;
+  const seen = fight.seen;
+  if (background) {
+    carryHp(run, Object.fromEntries(run.party.map(id => [id, seen?.hp[id] ?? run.hp[id]])), Math.min(run.potions, seen?.potions ?? run.potions));
+    run.pendingFight = { kind: fight.kind, enemy: fight.enemy };
+    return { gold: 0, materials: {} };
+  }
+  const wound = (id: number) => run.hp[id] > 0 ? Math.max(.05, run.hp[id] - INTERRUPT_WOUND) : 0;
   return fleeFight(run, Object.fromEntries(run.party.map(id => [id, Math.min(wound(id), seen?.hp[id] ?? 1)])), Math.min(run.potions, seen?.potions ?? run.potions));
 }
 
@@ -350,7 +360,8 @@ export function normalizeRun(raw: unknown): DungeonRun | undefined {
   if (run.status === 'active' && fight && ['battle', 'elite', 'guardian'].includes(fight.kind)) {
     const enemy = typeof fight.enemy === 'string' && ENEMIES[fight.enemy] ? fight.enemy : room?.enemy ?? (room?.kind === 'event' ? depthDef(r.depth).elite[0] : undefined);
     const seen = fight.started === true && fight.seen && typeof fight.seen === 'object' ? { hp: Object.fromEntries(run.party.filter(id => Number.isFinite(fight.seen!.hp?.[id])).map(id => [id, ratio(fight.seen!.hp[id])])), potions: Number.isInteger(fight.seen.potions) ? Math.max(0, Math.min(run.potions, fight.seen.potions)) : run.potions } : undefined;
-    if (enemy) run.pendingFight = { kind: fight.kind, enemy, ...(fight.started === true ? { started: true } : {}), ...(seen ? { seen } : {}) };
+    const hiddenAt = fight.started === true && typeof fight.hiddenAt === 'number' && Number.isFinite(fight.hiddenAt) && fight.hiddenAt > 0 ? fight.hiddenAt : undefined;
+    if (enemy) run.pendingFight = { kind: fight.kind, enemy, ...(fight.started === true ? { started: true } : {}), ...(seen ? { seen } : {}), ...(hiddenAt ? { hiddenAt } : {}) };
   }
   // A fight room that was entered but never won always has its fight waiting, so the run cannot get stuck.
   if (run.status === 'active' && !run.pendingFight && room?.enemy && !room.done && (room.kind === 'battle' || room.kind === 'elite' || room.kind === 'guardian')) run.pendingFight = { kind: room.kind, enemy: room.enemy };

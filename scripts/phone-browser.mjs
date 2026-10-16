@@ -58,6 +58,9 @@ const CHECKS = {
   'L8-town': { rule: 'the primary action is on screen on arrival (town, dialogs)', owner: 'TOWN', mode: 'report' },
   'L8-battle': { rule: 'the primary action is on screen on arrival (battle, results)', owner: 'BATTLE', mode: 'report' },
   L10: { rule: 'nothing covers a hero card before FIGHT!', owner: 'BATTLE', mode: 'report' },
+  G7: { rule: 'a quick double tap never presses what the first tap opened (Ⅱ Menu → Leave battle…)', owner: 'SAFE', mode: 'gate' },
+  K6: { rule: 'the leave dialog puts the danger last, never where its opener was, and keeps the focus on the safe option', owner: 'SAFE', mode: 'gate' },
+  C2: { rule: 'a blur that leaves the page (notification shade, Control Center) pauses a live fight behind its menu', owner: 'SAFE', mode: 'gate' },
 };
 const BATTLE_SCREENS = /^(battle|result|raid-(ready|fight|result)|undercroft-(fight|result)|trials)/;
 
@@ -69,7 +72,8 @@ function pageLib(cfg) {
   try {
     if (sessionStorage.getItem('phone.gen') !== cfg.gen) {
       sessionStorage.setItem('phone.gen', cfg.gen);
-      if (!cfg.restored) { localStorage.clear(); localStorage.setItem('gridbound.lang', cfg.lang); if (cfg.save) localStorage.setItem('gridbound.v3', cfg.save); }
+      // The backup reminder (SAFE, checked in safe-browser) is marked as just shown, so it never stands between the tour and a screen.
+      if (!cfg.restored) { localStorage.clear(); localStorage.setItem('gridbound.lang', cfg.lang); localStorage.setItem('gridbound.ui.backupReminderAt', String(Date.now())); if (cfg.save) localStorage.setItem('gridbound.v3', cfg.save); }
     }
   } catch {}
   const Q = window.__phoneQA = { last: performance.now(), lastStyle: performance.now(), clicks: 0 };
@@ -171,7 +175,8 @@ function pageLib(cfg) {
       const r = el.getBoundingClientRect();
       return { x: Math.min(innerWidth - 2, Math.max(1, r.left + r.width / 2)), y: Math.min(innerHeight - 2, Math.max(1, r.top + r.height / 2)) };
     },
-    ready(sel) { const el = document.querySelector(sel); return Boolean(el && visible(el) && !el.disabled && !el.closest('[inert]')); },
+    // ready also means past its tap hold (G7): a control that just appeared or moved under the finger ignores taps for a moment.
+    ready(sel) { const el = document.querySelector(sel), held = el?.closest('[data-input-until]'); return Boolean(el && visible(el) && !el.disabled && !el.closest('[inert]') && !(held && performance.now() < Number(held.dataset.inputUntil))); },
     /** Red translucent bands over the safe-area insets, for the screenshots only. */
     tint(bands) {
       document.querySelectorAll('.qa-band').forEach(e => e.remove());
@@ -324,7 +329,9 @@ const restoreJs = snap => `(async (snap) => {
 
 /** One emulated phone (a browser from withBrowser) on one save and language. */
 class Phone {
-  constructor(h, combo) { Object.assign(this, h); this.combo = combo; this.prof = PROFILES[combo.profile]; this.gen = 0; this.variant = combo.variants[0]; this.notes = []; }
+  constructor(h, combo) { Object.assign(this, h); this.combo = combo; this.prof = PROFILES[combo.profile]; this.gen = 0; this.variant = combo.variants[0]; this.notes = []; this.checks = {}; }
+  /** A failure of a check the screen's `go` made itself (G7, K6, C2): reported with the screen like the measured ones. */
+  fail(id, text) { (this.checks[id] ??= []).push({ text }); }
   get tag() { return `${this.combo.profile}-${this.combo.save}-${this.combo.lang}`; }
   async eval(expression) { return this.evaluate(expression); }
   async waitFor(expression, timeout = 10000) {
@@ -487,9 +494,39 @@ const TOUR = [
     if ((await p.state()).inTown) { await toCamp(p); await departStory(p); await skipScene(p); }
     await p.waitFor(`window.gridbound.battle.status === 'ready' && window.__phone.ready('#start')`, 15000); await sleep(800); await p.settle(); return true; }, after: 'none', battle: 'ready', primary: [{ sel: '#start' }, { sel: '#ready-back' }] },
   { id: 'battle-fight', needs: ['story-intro', 'battle-ready'], go: async p => { await fightStart(p); await sleep(1500); return true; }, after: 'none', battle: 'fight', primary: [{ sel: '#guard' }, { sel: '#potion' }, { sel: '#ultimate' }, { sel: '#pause' }] },
-  { id: 'battle-pause', needs: ['story-intro', 'battle-ready', 'battle-fight'], go: async p => { await p.tap('#pause'); return (await p.state()).layer === 'modal'; }, after: 'none', primary: DIALOG },
+  // C2: the pause menu is reached the way a pulled-down notification shade reaches it (a blur that leaves the page unfocused).
+  { id: 'battle-pause', needs: ['story-intro', 'battle-ready', 'battle-fight'], go: async p => {
+    // The fight pauses at once; its menu waits for the return (the window's focus), so it never pulls the focus from where the player went.
+    await p.evaluate("Object.defineProperty(document, 'hasFocus', { value: () => false, configurable: true, writable: true }); window.dispatchEvent(new Event('blur')); true");
+    try { await p.waitFor(`window.gridbound.battle.status === 'paused'`, 3000); } catch { p.fail('C2', `a blur away left the fight ${await p.evaluate('window.gridbound.battle.status')}`); }
+    await p.evaluate("document.hasFocus = () => true; window.dispatchEvent(new Event('focus')); true");
+    try { await p.waitFor(`window.gridbound.battle.status === 'paused' && Boolean(document.querySelector('dialog[open] #pause-retreat'))`, 3000); } catch { p.fail('C2', 'coming back did not show the pause menu'); }
+    if ((await p.state()).layer !== 'modal') await p.tap('#pause');
+    await p.settle();
+    return (await p.state()).layer === 'modal'; }, after: 'none', primary: DIALOG },
   { id: 'battle-help', needs: ['story-intro', 'battle-ready', 'battle-fight'], go: async p => { if ((await p.state()).layer !== 'modal') await p.tap('#pause'); return await p.tap('#pause-help', { optional: true, timeout: 1500 }) || 'skip'; }, after: 'none', primary: DIALOG },
-  { id: 'battle-leave-dialog', needs: ['story-intro', 'battle-ready', 'battle-fight'], go: async p => { if ((await p.state()).layer === 'modal' && !await p.evaluate(`window.__phone.ready('#pause-retreat')`)) await p.press('Escape'); if ((await p.state()).layer !== 'modal') await p.tap('#pause'); await p.tap('#pause-retreat'); return (await p.state()).layer === 'modal' || 'skip'; }, after: 'escape', primary: DIALOG },
+  // G7/K6: a quick double tap on 'Leave battle…' (queued like a fast finger) opens the leave dialog and nothing else; its danger is last.
+  { id: 'battle-leave-dialog', needs: ['story-intro', 'battle-ready', 'battle-fight'], go: async p => {
+    if ((await p.state()).layer === 'modal' && !await p.evaluate(`window.__phone.ready('#pause-retreat')`)) await p.press('Escape');
+    if ((await p.state()).layer !== 'modal') await p.tap('#pause');
+    await p.waitFor(`window.__phone.ready('#pause-retreat')`);
+    const opener = await p.evaluate(`(() => { const r = document.querySelector('dialog[open] #pause-retreat').getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })()`);
+    await p.touch.rapidDoubleTap('#pause-retreat', 130);
+    await p.waitFor(`Boolean(document.querySelector('dialog[open] #abandon-run, dialog[open] #dungeon-flee')) || window.gridbound.inTown`, 8000).catch(() => {});
+    await p.settle();
+    // K6 also means placement: the danger is never where 'Leave battle…' was (a deliberate second tap there after the hold), and the held
+    // tap's press left the focus on the safe option.
+    const s = await p.evaluate(`(() => { const o = ${J(opener)}, xs = [o.left + 2, (o.left + o.right) / 2, o.right - 2], ys = [o.top + 2, (o.top + o.bottom) / 2, o.bottom - 2];
+      const buttons = [...document.querySelectorAll('dialog[open] .leave-actions button')], id = b => b?.id || b?.dataset.navExit || null;
+      return { inTown: window.gridbound.inTown, status: window.gridbound.battle.status, order: buttons.map(id), focus: id(document.activeElement),
+        onDanger: xs.flatMap(x => ys.map(y => document.elementFromPoint(x, y)?.closest('.btn.danger') ? [Math.round(x), Math.round(y)] : null)).filter(Boolean) }; })()`);
+    if (s.inTown || !s.order.length) p.fail('G7', `the double tap left the battle or closed its dialog: ${J(s)}`);
+    else {
+      if (!/^(abandon-run|dungeon-flee)$/.test(s.order.at(-1))) p.fail('K6', `the danger is not last: ${s.order.join(', ')}`);
+      if (s.onDanger.length) p.fail('K6', `the danger sits where 'Leave battle…' was: ${J(s.onDanger)}`);
+      if (s.focus !== s.order[0]) p.fail('K6', `the focus left the safe option after the double tap: ${s.focus}`);
+    }
+    return (await p.state()).layer === 'modal' || 'skip'; }, after: 'escape', primary: DIALOG },
   { id: 'battle-status', needs: ['story-intro', 'battle-ready', 'battle-fight'], go: async p => { while ((await p.state()).layer === 'modal') await p.press('Escape'); await p.tap('.battle-view-tabs [data-battle-view="hero"]'); return true; }, after: 'none', battle: 'fight' },
   { id: 'battle-log', needs: ['story-intro', 'battle-ready', 'battle-fight'], go: async p => { await p.tap('.battle-view-tabs [data-battle-view="log"]'); return true; }, after: 'none', battle: 'fight' },
   { id: 'result-wave', needs: ['story-intro', 'battle-ready', 'battle-fight'], go: async p => { await p.tap('.battle-view-tabs [data-battle-view="arena"]'); await p.evaluate(DEV_WIN); await waitResult(p); return true; }, after: 'none', name: async p => (await p.evaluate(`Boolean(document.getElementById('next-wave'))`)) ? 'result-wave' : 'result-victory', primary: RESULT },
@@ -566,7 +603,7 @@ async function runCombo(combo) {
         const measure = selected(screen.id);
         const rec = { id: screen.id };
         const errorsBefore = h.errors.length;
-        p.notes.length = 0;
+        p.notes.length = 0; p.checks = {};
         try {
           if (screen.reset || needReset) { await p.reset(); needReset = false; if (!/^title/.test(screen.id)) await toCamp(p); }
           const ok = await screen.go(p);
@@ -581,6 +618,7 @@ async function runCombo(combo) {
           needReset = true;
         }
         if (p.notes.length) rec.notes = [...p.notes];
+        if (Object.keys(p.checks).length) rec.checks = p.checks;
         rec.errors = h.errors.slice(errorsBefore).map(e => String(e.text ?? e.exception?.description ?? e.args?.map(a => a.value ?? a.description).join(' ') ?? JSON.stringify(e)).slice(0, 200));
         if (measure) { out.screens.push(rec); printScreen(tag, rec); }
         try {
@@ -603,6 +641,7 @@ function verdicts(rec) {
   if (rec.error) add('tour', [{ text: rec.error }]);
   if (rec.skipped === 'not reached') add('tour', [{ text: 'not reached' }]);
   add('errors', (rec.errors ?? []).map(text => ({ text })));
+  for (const [id, items] of Object.entries(rec.checks ?? {})) add(id, items);
   for (const v of rec.variants ?? []) {
     if (v.error) add('tour', [{ text: `measure: ${v.error}` }]);
     for (const [raw, items] of Object.entries(v.results ?? {})) add(checkId(raw, rec.id), items.map(item => ({ variant: v.variant, ...item })));
