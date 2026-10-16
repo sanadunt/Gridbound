@@ -15,6 +15,7 @@ Working title: Gridbound: Ashes of the Bell. Baseline implementasi adalah kandid
 - [Release, save safety dan operasi](production/RELEASE-OPERATIONS.md)
 - [Diagram index dan editable sources](production/DIAGRAMS.md)
 - [Template keputusan dan evidence](production/TEMPLATES.md)
+- [Kontrak ponsel (phone-first)](production/PHONE-CONTRACT.md)
 
 ## 1. Definisi full production
 

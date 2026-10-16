@@ -91,7 +91,7 @@ export function renderWorldMap(p: Profile, state: TownState): string {
       <div class="map-stepper-wrap"><button class="btn map-stepper-btn" data-campaign-page="-1" ${state.zone <= 0 ? 'disabled' : ''} aria-label="${t('map.prevch')}">◀</button><span class="chapter-counter">CH ${state.zone + 1}/${CAMPAIGN.length}</span><button class="btn map-stepper-btn" data-campaign-page="1" ${state.zone >= CAMPAIGN.length - 1 ? 'disabled' : ''} aria-label="${t('map.nextch')}">▶</button></div></div>
     <div class="win star-bar"><span>${t('stars.total', { n: total, max: MAX_STARS })}</span>${chests ? `<button class="btn primary" data-star-chest>${t('stars.chest.open')}</button>` : allChests ? `<small>${t('stars.allchests')}</small>` : `<small>${t('stars.next', { n: STARS_PER_CHEST - total % STARS_PER_CHEST })}</small>`}</div>
     <nav class="map-act-nav" aria-label="${t('map.acts')}">${acts}</nav>
-    <section class="world-map-canvas-card" aria-label="${t('map.title')}"><div class="map-chart-viewport"><img class="overworld-art" src="${art}" alt=""/><div class="map-nodes-layer">${nodes}</div></div></section>
+    <section class="world-map-canvas-card" aria-label="${t('map.title')}"><div class="map-chart-viewport"><img draggable="false" class="overworld-art" src="${art}" alt=""/><div class="map-nodes-layer">${nodes}</div></div></section>
     <article class="msg-window mission-brief map-selected"><small>CH ${state.zone + 1} · ${escape(zone.subtitle)}</small><h3>${escape(zone.name)}</h3>${powerLine}<p class="map-hint">${t('map.hint')}</p>${canEnter ? `<button class="btn primary" data-mission="${state.zone}">${t('map.view')} ▶</button>` : ''}</article>`}
     ${mission ? dossier : ''}
   </div>`;

@@ -17,10 +17,11 @@ export function scrollsWithin(from: Element | null, axis: Axis, sign: number) {
   }
   return false;
 }
-/** In a frame, a wheel or key scroll that nothing in the game takes chains to the host page (it jumps away mid-battle), and a first
- *  click whose default is prevented (the arena canvas) leaves the keyboard on the host page. The wheel is held only while the whole
- *  frame is on screen: a frame that the host page's window cuts off (an embed taller than a laptop window, or a page scrolled half
- *  past it) still lets the wheel scroll the page, so the player can bring the game into view. Returns whether the guards were installed. */
+/** In a frame, a wheel, key or one-finger swipe that nothing in the game takes chains to the host page (it jumps away mid-battle, or a
+ *  phone pulls it to refresh), and a first click whose default is prevented (the arena canvas) leaves the keyboard on the host page.
+ *  The wheel and swipes are held only while the whole frame is on screen: a frame that the host page's window cuts off (an embed taller
+ *  than a laptop window, or a page scrolled half past it) still lets them scroll the page, so the player can bring the game into view.
+ *  Returns whether the guards were installed. */
 export function installEmbedGuards() {
   if (!framed()) return false;
   document.documentElement.classList.add('embedded');
@@ -35,6 +36,25 @@ export function installEmbedGuards() {
     const axis: Axis = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? 'y' : 'x', delta = axis === 'y' ? event.deltaY : event.deltaX;
     if (delta && !scrollsWithin(event.target instanceof Element ? event.target : null, axis, Math.sign(delta))) event.preventDefault();
   }, { passive: false });
+  // The same for a finger: a one-finger swipe that nothing in the game can scroll would scroll the itch page (mid-fight the game slides
+  // away) or, at its top, pull it to refresh (the game reloads). It is cancelled on its first cancelable move, which decides the whole
+  // swipe (once the browser starts a scroll, later moves cannot be cancelled). A pinch, a cut-off frame and text fields keep the browser's way.
+  let swipe: { x: number; y: number; target: Element | null; hold?: boolean } | null = null;
+  window.addEventListener('touchstart', event => {
+    const touch = event.touches.length === 1 ? event.touches[0] : undefined;
+    swipe = touch ? { x: touch.clientX, y: touch.clientY, target: event.target instanceof Element ? event.target : null } : null;
+  }, { capture: true, passive: true });
+  window.addEventListener('touchmove', event => {
+    if (!swipe || event.touches.length !== 1 || event.defaultPrevented || !event.cancelable || !wholeFrameShown) return;
+    if (swipe.hold === undefined) {
+      if (swipe.target?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) { swipe.hold = false; return; }
+      const touch = event.touches[0], dx = touch.clientX - swipe.x, dy = touch.clientY - swipe.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 2) return;
+      const axis: Axis = Math.abs(dy) >= Math.abs(dx) ? 'y' : 'x', delta = axis === 'y' ? dy : dx;
+      swipe.hold = !scrollsWithin(swipe.target, axis, -Math.sign(delta)); // a finger moving up asks to scroll the content down
+    }
+    if (swipe.hold) event.preventDefault();
+  }, { capture: true, passive: false });
   window.addEventListener('keydown', event => {
     const key = SCROLL_KEYS[event.code];
     if (!key || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || !(event.target instanceof Element)) return;

@@ -167,7 +167,7 @@ function campScene(p: Profile, state: TownState) {
   }).join('');
   const heroes = party.map((id, i) => {
     const offset = (i - (party.length - 1) / 2) * 7;
-    return `<img class="plaza-hero" src="${portrait(ROSTER[id].classId, 0, id)}" alt="" style="left:${PLAZA.x + offset * 1.6}%;top:${PLAZA.y + (i % 2 ? 1.5 : 0)}%;width:${26 / TOWN_W * 100}%;animation-delay:${i * -0.37}s"/>`;
+    return `<img draggable="false" class="plaza-hero" src="${portrait(ROSTER[id].classId, 0, id)}" alt="" style="left:${PLAZA.x + offset * 1.6}%;top:${PLAZA.y + (i % 2 ? 1.5 : 0)}%;width:${26 / TOWN_W * 100}%;animation-delay:${i * -0.37}s"/>`;
   }).join('');
   const paused = state.suspended?.story, goal = nextObjective(p, paused), next = storyNext(p);
   // One tap from camp to the next chapter's dossier; when the guide's step is that chapter, this button is the guide's Go.
@@ -180,7 +180,7 @@ function campScene(p: Profile, state: TownState) {
     : next !== undefined ? `<button class="btn primary continue-story ${go ? '' : 'guide-go'}" data-continue-story="${next}">${escape(t('town.continue', { n: next + 1, name: CAMPAIGN[next].name }))} ▶</button>` : '';
   return `<section class="camp-scene" aria-labelledby="camp-title">
     <div class="town-map-frame" style="--town-w:${TOWN_W};--town-h:${TOWN_H}"><div class="town-map">
-      <img class="town-map-art camp-art" src="${townImage}" alt="${escape(t('town.alt'))}"/>
+      <img draggable="false" class="town-map-art camp-art" src="${townImage}" alt="${escape(t('town.alt'))}"/>
       <span class="town-fire" style="left:${CAMPFIRE.x}%;top:${CAMPFIRE.y}%;width:${CAMPFIRE.w / TOWN_W * 100}%;height:${CAMPFIRE.h / TOWN_H * 100}%;background-image:url(${fireStrip})" aria-hidden="true"></span>
       ${CHIMNEYS.slice(1).map((c, i) => `<span class="town-smoke" style="left:${c.x}%;top:${c.y}%;width:${SMOKE_SIZE.w / TOWN_W * 100}%;height:${SMOKE_SIZE.h / TOWN_H * 100}%;background-image:url(${smokeStrip});animation-delay:${i * -0.5}s" aria-hidden="true"></span>`).join('')}
       ${heroes}
@@ -211,7 +211,7 @@ function moreScene(p: Profile) {
   const party = p.storyActive.length ? p.storyActive : p.roster.slice(0, 3);
   return `<section class="more-scene" aria-labelledby="more-title">
     <h1 id="more-title" class="sr-only">${t('route.menu')}</h1>
-    <div class="win menu-party">${party.map(id => { const r = ROSTER[id], lv = heroProgress(p.loadouts[id].xp); return `<div class="menu-hero" title="${escape(r.name)}"><img src="${portrait(r.classId, 0, id)}" alt=""/><div><b>${r.name}</b><small>${escape(JOBS[p.loadouts[id].job ?? '']?.name ?? className(r.classId))}</small></div><div class="menu-hero-stats"><span>LV <b>${lv.level}</b></span><span class="gauge xp" aria-hidden="true"><i style="width:${lv.needed ? lv.current / lv.needed * 100 : 100}%"></i></span></div></div>`; }).join('')}</div>
+    <div class="win menu-party">${party.map(id => { const r = ROSTER[id], lv = heroProgress(p.loadouts[id].xp); return `<div class="menu-hero" title="${escape(r.name)}"><img draggable="false" src="${portrait(r.classId, 0, id)}" alt=""/><div><b>${r.name}</b><small>${escape(JOBS[p.loadouts[id].job ?? '']?.name ?? className(r.classId))}</small></div><div class="menu-hero-stats"><span>LV <b>${lv.level}</b></span><span class="gauge xp" aria-hidden="true"><i style="width:${lv.needed ? lv.current / lv.needed * 100 : 100}%"></i></span></div></div>`; }).join('')}</div>
     <div class="menu-columns">
       <nav class="win menu-list more-grid" aria-label="${t('route.menu')}">${items.map(([attr, title, detail, badge]) => `<button class="menu-item more-card" ${attr}><b>${t(title)}${badge ? ` <i class="menu-badge" aria-hidden="true">${badge}</i><span class="sr-only">${t('menu.badge', { n: badge })}</span>` : ''}</b><span>${t(detail)}</span></button>`).join('')}</nav>
       <div class="win menu-summary"><dl class="stat-table"><div><dt>${t('menu.seals')}</dt><dd>${p.cleared.length}/${CAMPAIGN.length}</dd></div><div><dt>${t('menu.heroes')}</dt><dd>${p.roster.length}/${ROSTER.length}</dd></div><div><dt>${t('menu.victories')}</dt><dd>${p.wins}</dd></div><div><dt>${t('menu.quests.done')}</dt><dd>${p.claimedQuests.length}/${QUESTS.length}</dd></div><div><dt>${t('menu.bestfloor')}</dt><dd>${p.bestFloor}</dd></div></dl></div>
@@ -263,7 +263,7 @@ function training(p: Profile, state: TownState, advanced: boolean) {
   const pausedNote = paused ? `<div class="paused-note" data-paused-note><p>${escape(t('story.paused.party', { n: paused.chapter + 1 }))}</p><button class="btn danger" data-abandon-run="story" aria-label="${escape(t('run.abandon.story', { n: paused.chapter + 1 }))}">${t('run.abandon.short')}</button></div>` : '';
   return `<section class="party-scene" aria-labelledby="party-title" style="--class-color:${kit.color}">
     <h1 id="party-title" class="sr-only">${advanced ? t('route.progression') : t('route.party')}</h1>
-    <nav class="party-roster" aria-label="${t('party.choose')}">${p.roster.map(id => { const needs = heroNeeds(p, id).length > 0; return `<button data-town-hero="${id}" class="${state.hero === id ? 'active' : ''}" aria-pressed="${state.hero === id}"${needs ? ` title="${escape(t('party.dot'))}"` : ''}><img src="${portrait(ROSTER[id].classId, 0, id)}" alt=""/><span>${ROSTER[id].name}</span><small>LV ${heroProgress(p.loadouts[id].xp).level}</small>${needs ? `<i class="hero-dot" aria-label="${escape(t('party.dot'))}"></i>` : ''}</button>`; }).join('')}</nav>
+    <nav class="party-roster" aria-label="${t('party.choose')}">${p.roster.map(id => { const needs = heroNeeds(p, id).length > 0; return `<button data-town-hero="${id}" class="${state.hero === id ? 'active' : ''}" aria-pressed="${state.hero === id}"${needs ? ` title="${escape(t('party.dot'))}"` : ''}><img draggable="false" src="${portrait(ROSTER[id].classId, 0, id)}" alt=""/><span>${ROSTER[id].name}</span><small>LV ${heroProgress(p.loadouts[id].xp).level}</small>${needs ? `<i class="hero-dot" aria-label="${escape(t('party.dot'))}"></i>` : ''}</button>`; }).join('')}</nav>
     <div class="party-sticky">${heroSheet(p, state.hero, preview, progress)}
     <nav class="tabs training-tabs" aria-label="${t('party.sections')}">${tabs.map(([id,key]) => `<button data-training-tab="${id}" class="${active === id ? 'active' : ''}" aria-current="${active === id ? 'page' : 'false'}">${t(key)}</button>`).join('')}<button class="party-advanced-link" data-facility="${advanced ? 'party' : 'party-advanced'}">${advanced ? `⇄ ${t('route.party')}` : `${t('route.progression')} ▶`}</button></nav></div>
     ${pausedNote}<section class="win training-panel" data-training-panel="${active}">${panel}</section>
@@ -281,7 +281,7 @@ function heroSheet(p: Profile, id: number, preview: ReturnType<Battle['hero']> &
   const exp = progress.needed ? progress.current / progress.needed * 100 : 100;
   const stats: [string, string][] = [[t('power.hero'), fmtInt(heroPower(preview, normalizeStoryParty(p.storyActive, p.roster, p.cleared).length))], ['HP', fmtInt(preview.maxHp)], [t('party.cd'), fmtSec(preview.total, 2)], ['SP', String(availablePoints(p, id))]];
   return `<div class="win hero-sheet training-identity" style="--class-color:${kit.color}">
-    <div class="sheet-portrait"><img src="${portrait(r.classId, 0, id)}" alt=""/><span>LV ${progress.level}</span></div>
+    <div class="sheet-portrait"><img draggable="false" src="${portrait(r.classId, 0, id)}" alt=""/><span>LV ${progress.level}</span></div>
     <div class="sheet-body"><small>${escape(job?.name ?? kit.name)} · ${escape(kit.role)}</small><h2>${r.name}<span class="sheet-line" aria-hidden="true">LV ${progress.level} · ${stats[0][0]} ${stats[0][1]} · SP ${stats[3][1]}</span></h2>
       <div class="sheet-exp"><span class="gauge xp" aria-hidden="true"><i style="width:${exp}%"></i></span><small>${progress.needed ? `EXP ${fmtInt(progress.current)}/${fmtInt(progress.needed)}` : t('party.xp.cap')}</small></div>
       <dl class="sheet-stats">${stats.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>
@@ -424,7 +424,7 @@ function formation(p: Profile, id: number, r: typeof ROSTER[number], loadout: Pr
   // The grid shows the deployed story party; a benched hero is previewed on its preferred tile.
   const deployed = normalizeStoryParty(p.storyActive, p.roster, p.cleared);
   const benched = !deployed.includes(id);
-  return `<h3 class="subheading">${t('formation.title')} <span>${t('formation.sub', { name: r.name })}</span></h3><div class="formation-grid" aria-label="${t('formation.title')}">${Array.from({ length: 9 }, (_, slot) => { const hero = deployed.find(heroId => heroId !== id && p.loadouts[heroId].slot === slot) ?? (loadout.slot === slot ? id : undefined); const row = slot < 3 ? t('formation.front') : slot < 6 ? t('formation.mid') : t('formation.back'); return `<button data-formation="${slot}" class="${loadout.slot === slot ? 'chosen' : ''}" aria-label="${t('formation.tile', { n: slot + 1 })}${hero !== undefined ? `, ${ROSTER[hero].name}` : ''}"><small>${row}</small>${hero !== undefined ? `<img src="${portrait(ROSTER[hero].classId, 0, hero)}" alt=""/><span>${ROSTER[hero].name}</span>` : `<span class="empty">${t('formation.empty')}</span>`}</button>`; }).join('')}</div><p class="hint">${benched ? t('formation.benched', { name: r.name }) : t('formation.hint')}</p>`;
+  return `<h3 class="subheading">${t('formation.title')} <span>${t('formation.sub', { name: r.name })}</span></h3><div class="formation-grid" aria-label="${t('formation.title')}">${Array.from({ length: 9 }, (_, slot) => { const hero = deployed.find(heroId => heroId !== id && p.loadouts[heroId].slot === slot) ?? (loadout.slot === slot ? id : undefined); const row = slot < 3 ? t('formation.front') : slot < 6 ? t('formation.mid') : t('formation.back'); return `<button data-formation="${slot}" class="${loadout.slot === slot ? 'chosen' : ''}" aria-label="${t('formation.tile', { n: slot + 1 })}${hero !== undefined ? `, ${ROSTER[hero].name}` : ''}"><small>${row}</small>${hero !== undefined ? `<img draggable="false" src="${portrait(ROSTER[hero].classId, 0, hero)}" alt=""/><span>${ROSTER[hero].name}</span>` : `<span class="empty">${t('formation.empty')}</span>`}</button>`; }).join('')}</div><p class="hint">${benched ? t('formation.benched', { name: r.name }) : t('formation.hint')}</p>`;
 }
 
 /** Bestiary families (archetypes); the ledger records kills per family, so a family is seen once one of its variants fell. */

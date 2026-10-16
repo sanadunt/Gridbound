@@ -16,7 +16,7 @@ Use this page to find current runtime documentation without treating proposals o
 
 - [Next production checkpoint](NEXT-PRODUCTION.md): historical implementation handoff, release gates, and current evidence pointers. Check its status notes before relying on an older entry.
 - [Production masterplan](PRODUCTION-MASTERPLAN.md): planning document, not production approval or deployment evidence.
-- [Production planning folder](production/): proposed milestones, QA acceptance targets, release operations, and diagrams.
+- [Production planning folder](production/): proposed milestones, QA acceptance targets, release operations, and diagrams. The [phone contract](production/PHONE-CONTRACT.md) is the phone-first acceptance target checked by `scripts/phone-browser.mjs` (only its gate checks describe shipped behaviour).
 - [Static hosting](HOSTING.md), [Hostinger GitHub deployment](HOSTINGER-GITHUB.md), and [Hostinger manual upload](HOSTINGER.md): deployment instructions. A documented procedure does not prove that a remote deployment occurred.
 
 ## Historical and alternate-engine material

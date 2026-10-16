@@ -120,6 +120,9 @@ Halaman Draft hanya bisa dilihat olehmu. Tes di desktop (Chrome atau Edge, Firef
 - [ ] Pengaturan → Unduh cadangan save: file terunduh, dan teks cadangan juga tampil untuk disalin. Lalu Muat Game (atau
       MENU → Save) → Tempel cadangan untuk memastikan cadangan bisa dipulihkan (jadi Commander file baru).
 - [ ] Ponsel: orientasi potret, semua tombol terjangkau, kota dan pertarungan tidak terpotong pada ukuran embed yang dipilih.
+- [ ] Ponsel: usap game ke atas dan ke bawah (peta kota, bilah HUD, panel ancaman dan Guard saat bertarung, ujung daftar
+      Quest) → halaman itch.io tidak bergulir dan tidak dimuat ulang (tarik-untuk-muat-ulang di Android), sedangkan daftar
+      Quest sendiri tetap bisa digulir. Ini baru dicek di Chromium headless dengan sentuhan emulasi (`npm run test:itch`).
 - [ ] Cek ukuran embed 540 × 900 di laptop; ubah kalau perlu (lihat Langkah 2).
 
 Kalau semua lolos: **Edit game** → **Visibility & access** → **Public** → Save.

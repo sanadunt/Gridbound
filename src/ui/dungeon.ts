@@ -53,7 +53,7 @@ function depthPicker(p: Profile): string {
   }).join('');
   // The rules come before the depths (open until the first guardian falls), so nobody descends without knowing a wipe loses the pouch.
   return `<article class="win dungeon-intro"><small>${t('dungeon.kicker')}</small><h2>${t('route.dungeon')}</h2><p>${t('dungeon.intro')}</p>
-    <div class="dungeon-party">${party.map(id => `<img src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}" title="${escape(ROSTER[id].name)}"/>`).join('')}<span>${t('power.party', { n: power })}</span></div></article>
+    <div class="dungeon-party">${party.map(id => `<img draggable="false" src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}" title="${escape(ROSTER[id].name)}"/>`).join('')}<span>${t('power.party', { n: power })}</span></div></article>
     <details class="win dungeon-rules" ${p.journey.depth ? '' : 'open'}><summary>${t('dungeon.howto')}</summary><p><b>${t('dungeon.rule.map.title')}</b> ${t('dungeon.rule.map')}</p><p><b>${t('dungeon.rule.hp.title')}</b> ${t('dungeon.rule.hp')}</p><p><b>${t('dungeon.rule.pouch.title')}</b> ${t('dungeon.rule.pouch')}</p>${legend()}</details>
     ${open ? `<div class="depth-list">${cards}</div>` : `<p class="win hint">${t('dungeon.locked')}</p>`}`;
 }
@@ -68,7 +68,7 @@ export function depthDossier(p: Profile, depth: number): string {
     <h3 class="subheading">${t('dungeon.guardian')}</h3><ul class="dossier-foes guardian">${foe(d.guardian)}</ul>
     <h3 class="subheading">${t('dungeon.dossier.rooms')}</h3><ul class="dossier-foes">${d.enemies.map(id => foe(id)).join('')}${d.elite.map(id => foe(id, 'elite')).join('')}</ul>
     <p class="dossier-material"><img src="${dungeonIcon(d.material as 'ember-shard')}" alt=""/>${t('dungeon.material.hint', { name: materialName(d.material) })}</p>
-    <div class="dungeon-party dossier-party">${party.map(id => `<img src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}" title="${escape(ROSTER[id].name)}"/>`).join('')}<span>${t('power.party', { n: power })}</span><em class="power-${verdict}">${t('power.rec.short', { n: rec })} · ${t(`power.verdict.${verdict}` as StringKey)}</em></div>
+    <div class="dungeon-party dossier-party">${party.map(id => `<img draggable="false" src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}" title="${escape(ROSTER[id].name)}"/>`).join('')}<span>${t('power.party', { n: power })}</span><em class="power-${verdict}">${t('power.rec.short', { n: rec })} · ${t(`power.verdict.${verdict}` as StringKey)}</em></div>
     <p class="dossier-rules"><b>${t('dungeon.rule.hp.title')}</b> ${t('dungeon.rule.hp')} <b>${t('dungeon.rule.pouch.title')}</b> ${t('dungeon.rule.pouch')}</p>
     <p class="dossier-warn">${t('dungeon.lock.warn')}</p></div>
     <button class="btn primary" data-dungeon-start="${d.id}">${t('dungeon.descend')} ▶</button><button class="btn" data-close data-nav-exit="close" data-autofocus>◀ ${t('common.back')}</button>`;
@@ -130,7 +130,7 @@ function activeRun(run: DungeonRun, outcome?: string, letter?: string): string {
   const def = depthDef(run.depth);
   const party = run.party.filter(id => ROSTER[id]).map(id => {
     const ratio = run.hp[id] ?? 0;
-    return `<span class="dungeon-hero ${ratio <= 0 ? 'down' : ratio < .35 ? 'low' : ''}" title="${escape(ROSTER[id].name)}"><img src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}"/><span class="gauge"><i style="width:${Math.round(ratio * 100)}%"></i></span></span>`;
+    return `<span class="dungeon-hero ${ratio <= 0 ? 'down' : ratio < .35 ? 'low' : ''}" title="${escape(ROSTER[id].name)}"><img draggable="false" src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}"/><span class="gauge"><i style="width:${Math.round(ratio * 100)}%"></i></span></span>`;
   }).join('');
   const blessing = run.blessing.power > 1 || run.blessing.vitality > 1 ? `<span class="dungeon-blessing">${t('dungeon.blessing', { p: Math.round((run.blessing.power - 1) * 100), v: Math.round((run.blessing.vitality - 1) * 100) })}</span>` : '';
   // The free way out comes first, above the map: the run waits, saved, and the Bell Tower picks it up again ('Abandon run' is the costly exit).

@@ -815,6 +815,7 @@ export const ID: Record<keyof typeof EN, string> = {
   // navigation
   'hud.back': 'Kembali',
   'hud.back.to': 'Kembali ke {name}',
+  'rotate.hint': 'Putar ponselmu tegak untuk tampilan terbaik.',
   'battle.menu': 'Menu',
   'ready.back': 'Kembali',
   'ready.back.hint': 'Belum ada yang terpakai sebelum {begin}',

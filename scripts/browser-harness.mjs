@@ -11,7 +11,18 @@ export const ACT_TWO_SAVE = { version: 3, gold: 500, claimedQuests: [], ledger: 
  *  `profile: null` starts a fresh save; `lang` ('en' | 'id') picks the language after the storage is cleared. */
 export const seedSave = (send, profile = ACT_TWO_SAVE, lang) => send('Page.addScriptToEvaluateOnNewDocument', { source: `if (location.protocol.startsWith('http') && !sessionStorage.getItem('qa.seeded')) { sessionStorage.setItem('qa.seeded', '1'); localStorage.clear();${lang ? ` localStorage.setItem('gridbound.lang', ${JSON.stringify(lang)});` : ''}${profile ? ` localStorage.setItem('gridbound.v3', ${JSON.stringify(JSON.stringify(profile))});` : ''} }` });
 
-export async function withBrowser(run, { width = 1440, height = 1000, mobile = false } = {}) {
+/** Phone user agents (Android Chrome, iPhone Safari) for `withBrowser`'s `phone` option. */
+export const PHONE_UA = {
+  android: { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36', platform: 'Linux armv8l' },
+  iphone: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1', platform: 'iPhone' },
+};
+
+/** `phone`: { width, height, dpr, ua: 'android' | 'iphone', insets: { top, right, bottom, left }, landscape } emulates a phone: mobile
+ *  metrics, touch (5 points), the phone's user agent, safe-area insets (`env(safe-area-inset-*)`; `run` gets `phone.insetsOverride`:
+ *  true, or the reason the override failed), and a real window large enough for the viewport (headless Chrome hit-tests touches
+ *  against its 780×580 window: a swipe starting outside it scrolls nothing). `run` also gets `setPhone(changes)` to change the
+ *  viewport in place (the browser bars shown: a shorter height; a rotation) and `touch` helpers (Input.dispatchTouchEvent). */
+export async function withBrowser(run, { width = 1440, height = 1000, mobile = false, phone } = {}) {
   let child, socket, profile;
   const pending = new Map();
   const errors = [];
@@ -122,6 +133,35 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
       await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, text: key === 'Enter' ? '\r' : key === ' ' ? ' ' : undefined, windowsVirtualKeyCode:virtual, nativeVirtualKeyCode:virtual });
       await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode:virtual, nativeVirtualKeyCode:virtual });
     };
+    // Real touches (Input.dispatchTouchEvent). A target is a selector (its centre, scrolled into view like `click`) or a point {x, y}.
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const pointOf = async target => typeof target === 'string' ? evaluate(`(() => { const el = document.querySelector(${JSON.stringify(target)}); if (!el) throw Error('Missing control: '+${JSON.stringify(target)}); el.scrollIntoView({block:'nearest'}); const r=el.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`) : target;
+    const finger = (x, y, id = 1) => ({ x, y, id, radiusX: 4, radiusY: 4, force: 1 });
+    const touch = {
+      point: pointOf,
+      async tap(target, hold = 50) { const { x, y } = await pointOf(target); await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger(x, y)] }); await sleep(hold); await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); },
+      async doubleTap(target, gapMs = 120) { const point = await pointOf(target); await touch.tap(point, 40); await sleep(gapMs); await touch.tap(point, 40); },
+      async longPress(target, ms = 600) { await touch.tap(target, ms); },
+      /** A finger from `from` to `to` in `steps` moves (16ms apart), then lifted. */
+      async drag(from, to, steps = 12, stepMs = 16) {
+        const a = await pointOf(from), b = await pointOf(to);
+        await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger(a.x, a.y)] });
+        for (let i = 1; i <= steps; i++) { await sleep(stepMs); await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [finger(a.x + (b.x - a.x) * i / steps, a.y + (b.y - a.y) * i / steps)] }); }
+        await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      },
+      /** A vertical swipe from the target's centre: dy < 0 moves the finger up (asks to scroll the content down). */
+      async swipe(target, dy, steps = 12) { const a = await pointOf(target); await touch.drag(a, { x: a.x, y: a.y + dy }, steps); },
+      /** One finger rests on `holdTarget` while a second finger taps `tapTarget`. */
+      async twoFinger(holdTarget, tapTarget, hold = 60) {
+        const a = await pointOf(holdTarget), b = await pointOf(tapTarget);
+        await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger(a.x, a.y, 1)] });
+        await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger(a.x, a.y, 1), finger(b.x, b.y, 2)] });
+        await sleep(hold);
+        await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [finger(a.x, a.y, 1)] });
+        await sleep(30);
+        await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      },
+    };
     const screenshot = async path => {
       const result = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
       await mkdir('artifacts', { recursive: true });
@@ -130,9 +170,26 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
     await send('Runtime.enable');
     await send('Log.enable');
     await send('Page.enable');
-    await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
-    if (mobile) await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
-    await run({ send, evaluate, wait, click, key, screenshot, errors, on });
+    let setPhone;
+    if (phone) {
+      const current = { dpr: 3, ua: 'android', insets: {}, landscape: false, ...phone };
+      const { windowId } = await send('Browser.getWindowForTarget');
+      await send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'normal' } }).catch(() => {});
+      await send('Browser.setWindowBounds', { windowId, bounds: { width: Math.max(current.width, 400) + 40, height: Math.max(current.height, 400) + 140 } });
+      await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+      await send('Emulation.setUserAgentOverride', PHONE_UA[current.ua] ?? PHONE_UA.android);
+      setPhone = async (changes = {}) => {
+        Object.assign(current, changes);
+        await send('Emulation.setDeviceMetricsOverride', { width: current.width, height: current.height, deviceScaleFactor: current.dpr, mobile: true, screenOrientation: current.landscape ? { type: 'landscapePrimary', angle: 90 } : { type: 'portraitPrimary', angle: 0 } });
+        const insets = { top: 0, right: 0, bottom: 0, left: 0, ...current.insets };
+        try { await send('Emulation.setSafeAreaInsetsOverride', { insets }); phone.insetsOverride = true; } catch (error) { phone.insetsOverride = String(error.message).slice(0, 160); }
+      };
+      await setPhone();
+    } else {
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
+      if (mobile) await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
+    }
+    await run({ send, evaluate, wait, click, key, screenshot, errors, on, touch, setPhone, phone });
   } finally {
     for (const request of pending.values()) clearTimeout(request.timer);
     socket?.close();

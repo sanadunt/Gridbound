@@ -59,7 +59,7 @@
 .dungeon-party > span:not(.dungeon-hero) { margin-left: 6px; font-family: var(--pixel); font-size: 10px; color: var(--gold); }
 .depth-list { display: grid; gap: 6px; }
 .depth-card { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 10px; min-height: 56px; padding: 6px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: linear-gradient(180deg, var(--win-top), var(--win-bot)); color: var(--ink); text-align: left; }
-.depth-card:hover:not(:disabled) { border-color: var(--gold-border); }
+@media (hover: hover) { .depth-card:hover:not(:disabled) { border-color: var(--gold-border); } }
 .depth-card.locked { opacity: .55; }
 .depth-card.beaten { border-color: var(--hp-deep); }
 .depth-num { display: grid; place-items: center; width: 34px; height: 34px; border: 2px solid var(--gold-border); border-radius: 50%; background: #0008; font-family: var(--pixel); font-size: 12px; color: var(--gold); }
@@ -111,7 +111,7 @@ dialog#modal .depth-dossier h3 { margin: 12px 0 6px; font-size: 10px; color: var
 .dungeon-hero.down img { filter: grayscale(1) brightness(.5); }
 
 /* Undercroft: room map (rows climb from the entrance at the bottom to the guardian at the top) */
-.dungeon-map { position: relative; height: min(64vh, 470px); max-height: 55vh; min-height: 280px; border: 1px solid var(--win-edge); border-radius: var(--radius); background:
+.dungeon-map { position: relative; height: min(64dvh, 470px); max-height: 55dvh; min-height: 280px; border: 1px solid var(--win-edge); border-radius: var(--radius); background:
   radial-gradient(ellipse at 50% 100%, #2b1f17 0%, transparent 60%),
   repeating-linear-gradient(0deg, #0000 0 22px, #ffffff06 22px 23px),
   linear-gradient(180deg, #120d10, #1b1612 55%, #221a13); overflow: hidden; }

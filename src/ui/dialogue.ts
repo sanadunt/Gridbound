@@ -36,10 +36,10 @@ export function playDialogue(host: HTMLElement, options: DialogueOptions): Promi
     scene.setAttribute('role', 'dialog');
     scene.setAttribute('aria-modal', 'true');
     scene.setAttribute('aria-label', options.title ?? t('dialogue.label'));
-    scene.innerHTML = `${options.backdrop ? `<img class="dialogue-backdrop" src="${options.backdrop}" alt=""/>` : ''}<div class="dialogue-shade"></div>
+    scene.innerHTML = `${options.backdrop ? `<img draggable="false" class="dialogue-backdrop" src="${options.backdrop}" alt=""/>` : ''}<div class="dialogue-shade"></div>
       <button class="btn dialogue-skip" type="button" data-nav-exit="skip">${t('dialogue.skip')} ▶▶</button>
       ${options.title ? `<div class="dialogue-card"><small>${escape(options.kicker ?? '')}</small><h2>${escape(options.title)}</h2>${options.subtitle ? `<p>${escape(options.subtitle)}</p>` : ''}</div>` : ''}
-      <div class="dialogue-box msg-window" hidden><div class="dialogue-speaker" hidden><img alt=""/><span><b></b><small></small></span></div><p class="dialogue-text" aria-hidden="true"></p><nav class="dialogue-choices menu-list" hidden></nav><span class="msg-caret" aria-hidden="true">▼</span><span class="dialogue-count"></span></div>
+      <div class="dialogue-box msg-window" hidden><div class="dialogue-speaker" hidden><img draggable="false" alt=""/><span><b></b><small></small></span></div><p class="dialogue-text" aria-hidden="true"></p><nav class="dialogue-choices menu-list" hidden></nav><span class="msg-caret" aria-hidden="true">▼</span><span class="dialogue-count"></span></div>
       <div class="dialogue-card dialogue-end" hidden><small></small><h2></h2><p></p></div>
       <p class="dialogue-live sr-only" role="status" aria-live="polite" aria-atomic="true"></p>`;
     // The rest of the page is inert while the scene plays (no Tab or click into the town behind it); only what this scene made inert is restored.

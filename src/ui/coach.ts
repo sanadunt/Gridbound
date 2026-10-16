@@ -49,17 +49,20 @@ export class Coach {
     this.place();
   }
   hide() { this.step = undefined; this.target = undefined; this.el.hidden = true; }
-  /** Sit above the target (below it when there is no room) with the arrow pointing at its centre. */
+  /** Sit above the target (below it when there is no room) with the arrow pointing at its centre, inside the game's safe rectangle
+   *  (#app's content box: the viewport less the notch, the home indicator and a landscape phone's sides). */
   place() {
     const target = this.target?.();
     if (this.el.hidden || !target) return;
     const host = this.el.offsetParent?.getBoundingClientRect() ?? new DOMRect(0, 0, innerWidth, innerHeight), box = target.getBoundingClientRect();
-    const width = Math.min(280, host.width - 16), cx = box.left + box.width / 2 - host.left;
-    const left = Math.max(8, Math.min(host.width - width - 8, cx - width / 2));
+    const app = document.getElementById('app'), frame = app?.getBoundingClientRect() ?? host, pad = app ? getComputedStyle(app) : undefined, px = (v?: string) => parseFloat(v ?? '') || 0;
+    const minX = Math.max(0, frame.left + px(pad?.paddingLeft) - host.left), maxX = Math.min(host.width, frame.right - px(pad?.paddingRight) - host.left), minY = Math.max(0, frame.top + px(pad?.paddingTop) - host.top);
+    const width = Math.min(280, maxX - minX - 16), cx = box.left + box.width / 2 - host.left;
+    const left = Math.max(minX + 8, Math.min(maxX - width - 8, cx - width / 2));
     this.el.style.width = `${width}px`;
     this.el.style.left = `${Math.round(left)}px`;
     const above = box.top - host.top - this.el.offsetHeight - 14;
-    const below = above < 4;
+    const below = above < minY + 4;
     this.el.classList.toggle('below', below);
     this.el.style.top = `${Math.round(below ? box.bottom - host.top + 14 : above)}px`;
     this.el.style.setProperty('--arrow-x', `${Math.round(Math.max(14, Math.min(width - 14, cx - left)))}px`);

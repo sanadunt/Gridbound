@@ -813,6 +813,8 @@ export const EN = {
   // navigation
   'hud.back': 'Back',
   'hud.back.to': 'Back to {name}',
+  // a landscape phone (town and title only, fades by itself)
+  'rotate.hint': 'Turn your phone upright for the best view.',
   'battle.menu': 'Menu',
   'ready.back': 'Back',
   'ready.back.hint': 'Nothing is spent until you press {begin}',

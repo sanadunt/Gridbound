@@ -93,7 +93,7 @@ function updateTitleStatus() {
   setText(enter.querySelector('.menu-subtext')!, t(fresh ? 'title.begin.sub' : 'title.enter.sub'));
 }
 function titleMarkup() {
-  return `<div class="title-backdrop" aria-hidden="true"><img class="title-world-art" alt="" /><div class="title-vignette"></div></div>
+  return `<div class="title-backdrop" aria-hidden="true"><img class="title-world-art" alt="" draggable="false" /><div class="title-vignette"></div></div>
   <div class="title-content">
     <div class="title-brand"><span class="title-eyebrow">${t('title.eyebrow')}</span><h1 class="title-logo">GRIDBOUND</h1><div class="title-subtitle-wrap"><span class="title-flourish"></span><span>${t('title.subtitle')}</span><span class="title-flourish right"></span></div></div>
     <p class="title-press" aria-hidden="true">${t('title.press')}</p>
@@ -391,7 +391,7 @@ $('app').innerHTML = `
         </section>
       </div>
       </div>
-      <button id="focus-bar" type="button" class="win focus-bar" aria-label="${t('battle.focus.aria')}"><img class="focus-face" alt=""/><span class="focus-id"><b class="focus-name"></b><small class="focus-skill"></small></span><span class="focus-stats"><span class="focus-hp">HP <b></b></span><span class="focus-status"></span></span></button>
+      <button id="focus-bar" type="button" class="win focus-bar" aria-label="${t('battle.focus.aria')}"><img class="focus-face" alt="" draggable="false"/><span class="focus-id"><b class="focus-name"></b><small class="focus-skill"></small></span><span class="focus-stats"><span class="focus-hp">HP <b></b></span><span class="focus-status"></span></span></button>
       <div class="action-bar">
         <button id="guard" class="cmd guard-button"><span>${t('battle.guard')}<small><kbd class="key-hint">G</kbd><span id="guard-label"></span></small></span></button>
         <button id="potion" class="cmd potion-button"><span>${t('battle.potion')}<small><kbd class="key-hint">H</kbd></small></span><b>2</b></button>
@@ -409,6 +409,7 @@ $('app').innerHTML = `
     </aside>
   </main>
   <main id="result-screen" class="result-screen" aria-labelledby="result-title" hidden></main>
+  <p class="rotate-hint" aria-hidden="true">${t('rotate.hint')}</p>
   <footer id="storage-status" class="storage-status" role="status"></footer>
   <div id="battle-announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <dialog id="modal" aria-labelledby="modal-title"></dialog>`;
@@ -1485,7 +1486,7 @@ function renderPartyHealthTray() {
     const host = $(trayId);
     host.dataset.count = String(battle.heroes.length);
     host.innerHTML = battle.heroes.map(h => `<button type="button" class="party-health-card" data-party-hero="${h.id}" aria-pressed="false" aria-label="${heroName(h)}">
-      <img class="party-face" src="${face(h)}" alt=""/>
+      <img draggable="false" class="party-face" src="${face(h)}" alt=""/>
       <span class="party-hero-name">${heroName(h)}</span>
       <span class="party-health-values"><span class="party-hp"><small>HP</small> <b class="party-hp-value">${Math.ceil(h.hp)}</b><small>/${h.maxHp}</small></span><span class="party-sh">SH <b class="party-shield-value">${Math.round(h.shield)}</b></span></span>
       <span class="party-health-meter" aria-hidden="true"><i></i><em></em></span>
@@ -1776,7 +1777,7 @@ function renderInspector() {
   const key = `${h.id}-${h.stance}-${moveMode}-${battle.status}`;
   if (key === selectedKey) return;
   selectedKey = key;
-  $('inspector').innerHTML = `<div class="hero-identity"><div class="portrait-frame"><img src="${face(h)}" alt="${heroName(h)}"/><span>LV ${h.level}</span></div><div><small class="hero-class">${k.name}</small><h2>${heroName(h)}</h2><p>${k.role}</p></div></div><div class="hero-stats"><span>HP <b id="selected-hp"></b></span><span>SH <b id="selected-shield"></b></span></div><h4 class="subheading stance-label">${t('battle.skills')} <span>${t('battle.autocast')}</span></h4><div class="stance-options">${battle.availableSkills(h.id).map(i => { const s = k.skills[i]; return `<button data-select-stance="${i}" class="stance-option ${h.stance === i ? 'chosen' : ''}" aria-pressed="${h.stance === i}" ${!['ready', 'fighting'].includes(battle.status) || h.hp <= 0 ? 'disabled' : ''}><span><b>${s.name}</b><small>${s.label} · ${fmtSec(s.cooldown)}</small></span><i>${h.stance === i ? '●' : '○'}</i></button>`; }).join('')}</div><p class="skill-description">${k.skills[h.stance].description}</p><div class="focus-meter"><div><span>${t('battle.fatigue')}</span><span id="fatigue-label"></span></div><span class="gauge"><i id="fatigue-fill"></i></span></div><button id="move-selected" class="btn move-button">${moveMode ? t('battle.move.pick') : t('battle.move')}<small>+${fmtSec(MOVE_PENALTY)}</small></button><div class="move-grid" ${moveMode ? '' : 'hidden'}>${Array.from({ length: 9 }, (_, i) => `<button data-move-slot="${i}" aria-label="${t('formation.tile', { n: i + 1 })}" ${i === h.slot ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>`;
+  $('inspector').innerHTML = `<div class="hero-identity"><div class="portrait-frame"><img draggable="false" src="${face(h)}" alt="${heroName(h)}"/><span>LV ${h.level}</span></div><div><small class="hero-class">${k.name}</small><h2>${heroName(h)}</h2><p>${k.role}</p></div></div><div class="hero-stats"><span>HP <b id="selected-hp"></b></span><span>SH <b id="selected-shield"></b></span></div><h4 class="subheading stance-label">${t('battle.skills')} <span>${t('battle.autocast')}</span></h4><div class="stance-options">${battle.availableSkills(h.id).map(i => { const s = k.skills[i]; return `<button data-select-stance="${i}" class="stance-option ${h.stance === i ? 'chosen' : ''}" aria-pressed="${h.stance === i}" ${!['ready', 'fighting'].includes(battle.status) || h.hp <= 0 ? 'disabled' : ''}><span><b>${s.name}</b><small>${s.label} · ${fmtSec(s.cooldown)}</small></span><i>${h.stance === i ? '●' : '○'}</i></button>`; }).join('')}</div><p class="skill-description">${k.skills[h.stance].description}</p><div class="focus-meter"><div><span>${t('battle.fatigue')}</span><span id="fatigue-label"></span></div><span class="gauge"><i id="fatigue-fill"></i></span></div><button id="move-selected" class="btn move-button">${moveMode ? t('battle.move.pick') : t('battle.move')}<small>+${fmtSec(MOVE_PENALTY)}</small></button><div class="move-grid" ${moveMode ? '' : 'hidden'}>${Array.from({ length: 9 }, (_, i) => `<button data-move-slot="${i}" aria-label="${t('formation.tile', { n: i + 1 })}" ${i === h.slot ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>`;
   $('inspector').querySelectorAll<HTMLButtonElement>('[data-select-stance]').forEach(el => {
     el.disabled = !canModify || h.hp <= 0;
     el.addEventListener('click', () => {
@@ -2566,7 +2567,7 @@ async function presentDungeonResult() {
   // A wipe names what the pouch held; with an empty pouch there is nothing to lose and nothing to say.
   const before = dungeonBefore, lost = !won && before && (before.pouch.gold > 0 || Object.values(before.pouch.materials).some(n => n > 0)) ? before.pouch : undefined;
   const pct = (ratio: number) => `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
-  const hpRows = run && before ? run.party.filter(id => ROSTER[id]).map(id => { const from = before.hp[id] ?? 0, to = run.hp[id] ?? 0; return `<li class="${to <= 0 ? 'down' : to < .35 ? 'low' : ''}"><img src="${portrait(ROSTER[id].classId, 0, id)}" alt=""/><b>${ROSTER[id].name}</b><span class="gauge" aria-hidden="true"><i style="width:${pct(to)}"></i></span><small>${pct(from)} <span class="hp-arrow">→</span> ${pct(to)}</small></li>`; }).join('') : '';
+  const hpRows = run && before ? run.party.filter(id => ROSTER[id]).map(id => { const from = before.hp[id] ?? 0, to = run.hp[id] ?? 0; return `<li class="${to <= 0 ? 'down' : to < .35 ? 'low' : ''}"><img draggable="false" src="${portrait(ROSTER[id].classId, 0, id)}" alt=""/><b>${ROSTER[id].name}</b><span class="gauge" aria-hidden="true"><i style="width:${pct(to)}"></i></span><small>${pct(from)} <span class="hp-arrow">→</span> ${pct(to)}</small></li>`; }).join('') : '';
   showAfterOverlay(false);
   showResultScreen(`<div class="result-ceremony-modal ${won ? 'victory' : 'defeat'}">
     <p class="result-banner" aria-hidden="true">${won ? cleared ? t('dungeon.end.cleared.banner') : t('result.banner.win') : t('dungeon.end.wiped.banner')}</p>

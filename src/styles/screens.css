@@ -303,7 +303,7 @@
 .item-icon { width: 36px; height: 36px; padding: 4px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: #07120f; image-rendering: pixelated; }
 .item-list { display: flex; flex-direction: column; gap: 4px; }
 .item-card { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 52px; padding: 6px 10px; border: 1px solid var(--win-edge); border-left: 3px solid var(--rarity, var(--win-edge)); border-radius: var(--radius); background: var(--inset); color: var(--ink); text-align: left; }
-.item-card:hover { background: #224238; }
+@media (hover: hover) { .item-card:hover { background: #224238; } }
 .item-card.chosen { border-color: var(--gold-border); border-left-color: var(--rarity); background: var(--gold-bg); }
 .item-card.unavailable { opacity: 0.6; }
 .item-main { min-width: 0; }

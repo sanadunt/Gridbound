@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { Sound } from '../src/audio/sound';
 
 /** A minimal Web Audio stand-in: counts the buffers and sources a cue creates and records suspend/resume. */
@@ -46,4 +46,49 @@ test('pixel-font readouts in result and Undercroft screens are at least 10px', (
       if (size) assert.ok(Number(size[1]) >= 10, `${file}: ${rule.trim().slice(0, 80)}`);
     }
   }
+});
+
+/** Every style rule of a stylesheet with the at-rule blocks around it (comments stripped; a brace-depth scan, no CSS parser). */
+function cssRules(file: string) {
+  const css = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules: { selector: string; body: string; within: string[] }[] = [], stack: string[] = [];
+  let prelude = '';
+  for (let i = 0; i < css.length; i++) {
+    const c = css[i];
+    if (c === '{') {
+      const head = prelude.trim(); prelude = '';
+      if (head.startsWith('@')) { stack.push(head); continue; }
+      const end = css.indexOf('}', i);
+      rules.push({ selector: head, body: css.slice(i + 1, end), within: [...stack] });
+      i = end;
+    } else if (c === '}') { stack.pop(); prelude = ''; }
+    else if (c === ';' && !stack.length) prelude = '';
+    else prelude += c;
+  }
+  return rules;
+}
+const STYLES = readdirSync('src/styles').filter(name => name.endsWith('.css')).map(name => `src/styles/${name}`);
+
+test('phone shell: the root (not body) stops overscroll, sizes never use vh, hover lives inside (hover: hover)', () => {
+  assert.ok(STYLES.length >= 7 && STYLES.includes('src/styles/base.css'), 'every stylesheet is checked');
+  const base = cssRules('src/styles/base.css');
+  assert.ok(base.some(r => r.selector.split(',').map(s => s.trim()).includes('html') && /overscroll-behavior:\s*none/.test(r.body) && !r.within.length), 'html { overscroll-behavior: none } (Android pull-to-refresh follows the root)');
+  assert.ok(base.some(r => r.selector.trim() === 'html' && /touch-action:\s*manipulation/.test(r.body) && /text-size-adjust:\s*100%/.test(r.body)), 'html { touch-action: manipulation; text-size-adjust: 100% }');
+  for (const file of STYLES) {
+    const css = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.doesNotMatch(css, /\b\d+(\.\d+)?vh\b/, `${file}: vh is the large viewport on phones; use dvh, svh, % or container units`);
+    for (const rule of cssRules(file).filter(r => r.selector.includes(':hover'))) assert.ok(rule.within.some(at => /^@media[^{]*\(hover:\s*hover\)/.test(at)), `${file}: ${rule.selector.slice(0, 80)} sticks after a tap unless it is inside @media (hover: hover)`);
+  }
+});
+
+test('phone shell: safe-area insets pad the game, form controls are 16px on a coarse pointer, the viewport stays zoomable', () => {
+  const base = cssRules('src/styles/base.css');
+  const root = base.find(r => r.selector === ':root')!.body;
+  for (const side of ['top', 'right', 'bottom', 'left']) assert.match(root, new RegExp(`--safe-${side[0]}:\\s*env\\(safe-area-inset-${side},\\s*0px\\)`), `:root --safe-${side[0]}`);
+  assert.ok(base.some(r => r.selector === '#app' && /padding:\s*var\(--safe-t\)\s+var\(--inset-r\)\s+var\(--safe-b\)\s+var\(--inset-l\)/.test(r.body)), '#app is padded by the insets');
+  const coarse = base.filter(r => r.within.some(at => /\(pointer:\s*coarse\)/.test(at)) && /font-size:\s*16px/.test(r.body)).map(r => r.selector);
+  for (const control of ['select', 'textarea', '.backup-text', 'input:not(']) assert.ok(coarse.some(selector => selector.includes(control)), `(pointer: coarse) ${control} is 16px (iOS Safari zooms on a smaller field)`);
+  assert.ok(base.some(r => r.selector.includes('#app input') && /user-select:\s*text/.test(r.body)), 'text fields stay selectable under #app { user-select: none }');
+  const viewport = readFileSync('index.html', 'utf8').match(/name="viewport" content="([^"]+)"/)![1];
+  assert.equal(viewport, 'width=device-width,initial-scale=1,viewport-fit=cover', 'L1: no maximum-scale or user-scalable=no (pinch-zoom stays possible)');
 });

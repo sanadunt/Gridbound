@@ -8,7 +8,9 @@
 // is also shown as text (the fallback when a browser blocks downloads from a frame; Back returns to Config), Paste backup imports
 // it, fullscreen toggles (and is hidden when the frame may not use it), and the browser's Back (top-level history, as a phone's Back
 // gesture) performs one in-game Back step from a route, a dialog, a story scene (whose keys never scroll the host), the ready window
-// and a fight without leaving the itch page, while Back on the bare title screen leaves it.
+// and a fight without leaving the itch page, while Back on the bare title screen leaves it. On a phone (itch's full-screen overlay and an
+// inline frame on a long page), one-finger swipes that nothing in the game scrolls (camp map, HUD, the intent panel, Guard, a skill
+// chip, the ends of the Quests list) never scroll or pull the host page, from its top and scrolled down, while the list itself scrolls.
 //
 //   node scripts/itch-smoke.mjs                 # npm run package:itch (build + ZIP), then the smoke
 //   node scripts/itch-smoke.mjs --skip-build    # use artifacts/Gridbound-itch-<version>.zip (packaged from dist/ when missing)
@@ -84,7 +86,8 @@ async function session({ name, width, height, mobile = false, query = '', previo
     on(message => {
       if (message.method === 'Target.attachedToTarget') {
         const { sessionId, targetInfo } = message.params;
-        const setup = targetInfo.type === 'iframe' ? Promise.all(['Runtime.enable', 'Network.enable', 'Log.enable', 'Page.enable'].map(method => send(method, {}, sessionId))) : Promise.resolve();
+        // A phone: the out-of-process frame gets its own touch emulation (the page's does not reach it).
+        const setup = targetInfo.type === 'iframe' ? Promise.all([...['Runtime.enable', 'Network.enable', 'Log.enable', 'Page.enable'].map(method => send(method, {}, sessionId)), ...(mobile ? [send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 }, sessionId)] : [])]) : Promise.resolve();
         void setup.then(() => send('Runtime.runIfWaitingForDebugger', {}, sessionId)).then(() => { if (targetInfo.type === 'iframe') frame = sessionId; }).catch(() => {});
       }
       if (message.method === 'Target.detachedFromTarget' && message.params.sessionId === frame) frame = undefined;
@@ -114,8 +117,9 @@ async function session({ name, width, height, mobile = false, query = '', previo
       throw Error(`Wait timeout (game frame): ${expression}${last ? ` (${last.message.split('\n')[0]})` : ''}`);
     };
     /** A real click: the element's centre inside the frame, offset by the frame's box on the host page, dispatched to the page. */
-    const point = async selector => {
-      const inner = await inFrame(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) throw Error('Missing control: ' + ${JSON.stringify(selector)}); el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(); if (!r.width || !r.height || el.disabled) throw Error('Inactive control: ' + ${JSON.stringify(selector)}); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    //  `still`: no scrollIntoView (which also scrolls the host page), for the swipe checks that start from a given host scroll.
+    const point = async (selector, still = false) => {
+      const inner = await inFrame(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) throw Error('Missing control: ' + ${JSON.stringify(selector)}); ${still ? '' : "el.scrollIntoView({ block: 'nearest' });"} const r = el.getBoundingClientRect(); if (!r.width || !r.height || el.disabled) throw Error('Inactive control: ' + ${JSON.stringify(selector)}); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
       const outer = await evaluate('(() => { const r = document.querySelector("#game_drop").getBoundingClientRect(); return { x: r.x, y: r.y }; })()');
       return { x: outer.x + inner.x, y: outer.y + inner.y };
     };
@@ -148,6 +152,21 @@ async function session({ name, width, height, mobile = false, query = '', previo
       throw Error(`a click at ${Math.round(x)},${Math.round(y)} never reached the game frame`);
     };
     const click = async selector => clickAt(await point(selector));
+    /** A one-finger swipe at a point of the host page over the frame (dy < 0: the finger moves up), as a phone sends it, dispatched
+     *  through the game frame's own session: headless Chrome routes a synthetic touch on an out-of-process frame by stale geometry once
+     *  the frame changed a lot (a battle starting) and hands it to the host page instead. The frame's own gesture still bubbles a scroll
+     *  it does not consume to the host page (a build without the swipe guard scrolls it). Resolves to the host page's scrollY after it. */
+    const swipeAt = async ({ x, y }, dy) => {
+      const seen = await inFrame('window.__itchTouches');
+      const outer = await evaluate('(() => { const r = document.querySelector("#game_drop").getBoundingClientRect(); return { x: r.x, y: r.y }; })()');
+      const finger = fy => ({ x: x - outer.x, y: fy - outer.y, id: 1, radiusX: 4, radiusY: 4, force: 1 });
+      await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger(y)] }, frame);
+      for (let i = 1; i <= 12; i++) { await sleep(16); await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [finger(y + dy * i / 12)] }, frame); }
+      await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }, frame);
+      await sleep(450);
+      assert.notEqual(await inFrame('window.__itchTouches'), seen, 'the swipe reached the game');
+      return hostScroll();
+    };
     const press = async (code, key = code, extra = {}) => {
       const vk = { Space: 32, ArrowDown: 40, ArrowUp: 38, PageDown: 34, End: 35, Escape: 27, KeyG: 71 }[code] ?? 0;
       await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, ...(key === ' ' ? { text: ' ' } : {}), ...extra });
@@ -158,7 +177,7 @@ async function session({ name, width, height, mobile = false, query = '', previo
     /** Boot (or reboot after a reload) and wait for the camp with a saved Commander; the title screen only shows outside automation. */
     const boot = async () => {
       await waitFrame(`!window.__itchSeen && ${booted}`, 30000);
-      await inFrame("window.__itchSeen = true; window.__itchDowns = 0; addEventListener('pointerdown', () => window.__itchDowns++, true); window.__itchWheels = []; addEventListener('wheel', event => setTimeout(() => window.__itchWheels.push(event.defaultPrevented)), { passive: true })");
+      await inFrame("window.__itchSeen = true; window.__itchDowns = 0; addEventListener('pointerdown', () => window.__itchDowns++, true); window.__itchTouches = 0; addEventListener('touchstart', () => window.__itchTouches++, { capture: true, passive: true }); window.__itchWheels = []; addEventListener('wheel', event => setTimeout(() => window.__itchWheels.push(event.defaultPrevented)), { passive: true })");
       if (await inFrame('Boolean(document.querySelector("#title-screen:not([hidden])"))')) { await click('#title-enter'); await waitFrame('Boolean(document.querySelector("#town-screen:not([hidden]) .town-spot"))'); }
     };
     const shot = async file => { await sleep(250); await screenshot(join(shots, `${name}-${file}.png`)); };
@@ -168,7 +187,7 @@ async function session({ name, width, height, mobile = false, query = '', previo
       if (previous) { await send('Page.navigate', { url: 'data:text/html,previous-page' }); await sleep(300); }
       await send('Page.navigate', { url: `${hostOrigin}/game.html${query}` });
       await boot();
-      try { await run({ send, evaluate, wait, inFrame, waitFrame, click, clickAt, point, wheel, press, hostScroll, boot, shot, allowDownloads, downloads, errors, requests, fitWindow }); }
+      try { await run({ send, evaluate, wait, inFrame, waitFrame, click, clickAt, point, wheel, swipeAt, press, hostScroll, boot, shot, allowDownloads, downloads, errors, requests, fitWindow }); }
       catch (error) { await screenshot(join(shots, `${name}-failure.png`)).catch(() => {}); console.error('FAILURE EVIDENCE', JSON.stringify(await inFrame('({ dialog: document.querySelector("dialog[open]")?.innerText.slice(0, 400), route: document.querySelector(".town-game-shell")?.dataset.townRoute, battle: !document.querySelector("#battle-screen").hidden, status: document.querySelector("#storage-status").textContent })').catch(e => e.message))); throw error; }
       // Nothing but the game's own files (and the host page) was requested, by the browser or by the game.
       const foreign = requests.filter(r => !/^(data|blob):/.test(r.url) && !r.url.startsWith(gameOrigin + PREFIX) && !(r.url.startsWith(hostOrigin) && !r.frame));
@@ -197,6 +216,50 @@ async function battle(t) {
   const before = await inFrame('document.querySelector("#boss-hp").style.width');
   await click('[data-tap="0"]'); await click('[data-tap="3"]');
   await waitFrame(`document.querySelector("#boss-hp").style.width !== ${JSON.stringify(before)}`, 15000);
+}
+/** Swipes up and down on `selector` (its centre, on the host page) leave the host page's scrollY where it was (`from`). */
+async function swipesKeep({ point, swipeAt, evaluate }, selector, from) {
+  await evaluate(`scrollTo(0, ${from})`); await sleep(300);
+  assert.equal(await evaluate('scrollY'), from, 'the host page can scroll');
+  const at = await point(selector, true);
+  for (const dy of [-220, 220]) assert.equal(await swipeAt(at, dy), from, `a swipe ${dy < 0 ? 'up' : 'down'} on ${selector} (host page at ${from}) does not scroll the host page`);
+}
+/** MENU → Quests: a swipe inside the list scrolls the list; at its ends a swipe never reaches the host page. */
+async function questSwipes(t) {
+  const { click, waitFrame, inFrame, point, swipeAt, evaluate } = t;
+  await clickUntil(t, '#menu-button', 'Boolean(document.querySelector(".more-scene"))');
+  await click('.more-scene [data-facility="quests"]');
+  await waitFrame('document.querySelector(".town-game-shell")?.dataset.townRoute === "quests"');
+  const list = '.secondary-scene > .secondary-content';
+  assert.ok(await inFrame(`(() => { const l = document.querySelector(${JSON.stringify(list)}); return l.scrollHeight > l.clientHeight + 40; })()`), 'the Quests list is longer than the screen');
+  await evaluate('scrollTo(0, 0)'); await sleep(250);
+  const at = await point(list, true);
+  await inFrame(`document.querySelector(${JSON.stringify(list)}).scrollTop = 0`);
+  assert.equal(await swipeAt(at, 220), 0, 'a swipe down at the top of the Quests list does not pull the host page');
+  assert.equal(await swipeAt(at, -220), 0, 'a swipe up in the Quests list does not scroll the host page');
+  assert.ok(await inFrame(`document.querySelector(${JSON.stringify(list)}).scrollTop`) > 20, 'the swipe scrolled the Quests list itself');
+  await inFrame(`(() => { const l = document.querySelector(${JSON.stringify(list)}); l.scrollTop = l.scrollHeight; })()`); await sleep(200);
+  for (const from of [0, 300]) { await evaluate(`scrollTo(0, ${from})`); await sleep(250); assert.equal(await swipeAt(at, -220), from, `a swipe up at the end of the Quests list (host page at ${from}) does not scroll the host page`); }
+  await evaluate('scrollTo(0, 0)');
+  await clickUntil(t, '#home', 'document.querySelector(".town-game-shell")?.dataset.townRoute !== "quests"');
+}
+const FIGHTING = '!document.querySelector("#battle-screen").hidden && document.querySelector("#result-screen").hidden && document.querySelector("#start-overlay").hidden && !document.querySelector("dialog[open]")';
+/** Keep a fight on screen for the next swipes: a battle the party won meanwhile (it fights by itself) moves on to the next one. */
+async function inFight(t) {
+  if (await t.inFrame(FIGHTING)) return;
+  await t.waitFrame('Boolean(document.querySelector("#result-screen:not([hidden]) #next-wave:not(:disabled)"))', 15000); // the result's buttons wake after a moment
+  await clickUntil(t, '#next-wave', 'document.querySelector("#result-screen").hidden && !document.querySelector("#start-overlay").hidden', 5);
+  await t.click('#start');
+  await t.waitFrame(FIGHTING, 10000);
+}
+/** Leave the fight for the chapter's dossier: Ⅱ Menu → Leave battle…, or the won wave's 'Leave for now…' when the battle ended meanwhile. */
+async function leaveFight(t) {
+  const result = 'Boolean(document.querySelector("#result-screen:not([hidden]) #result-town:not(:disabled)"))'; // the result's buttons wake after a moment
+  await t.waitFrame(`(${FIGHTING}) || ${result}`, 15000);
+  if (!await t.inFrame(result)) return retreat(t);
+  await clickUntil(t, '#result-town', 'Boolean(document.querySelector("dialog[open] #abandon-run"))', 5);
+  await t.click('#abandon-run');
+  await t.waitFrame('document.querySelector("#town-screen:not([hidden]) .town-game-shell")?.dataset.townRoute === "mission"', 15000);
 }
 /** Ⅱ Menu → Leave battle… → Leave the chapter: back on the dossier the chapter departed from. */
 const retreat = async ({ click, waitFrame }) => { await click('#pause'); await waitFrame('Boolean(document.querySelector("#pause-retreat"))'); await click('#pause-retreat'); await waitFrame('Boolean(document.querySelector("dialog[open] #abandon-run"))'); await click('#abandon-run'); await waitFrame('document.querySelector("#town-screen:not([hidden]) .town-game-shell")?.dataset.townRoute === "mission"', 15000); };
@@ -410,13 +473,30 @@ try {
 
   // Phone: itch's mobile view runs the game over the whole screen (Mobile friendly, portrait).
   await session({ name: 'phone-390x844', width: 390, height: 844, mobile: true, query: '?mobile=1' }, async t => {
-    const { inFrame, waitFrame, click, shot, send, boot } = t;
+    const { inFrame, waitFrame, click, shot, send, boot, evaluate } = t;
     assert.equal(await inFrame('innerWidth'), 390);
     assert.equal(await inFrame('document.documentElement.scrollWidth <= innerWidth'), true, 'no horizontal overflow on a phone');
     await shot('camp');
+    // Swipes on the game never move itch's page under the overlay (or pull it to refresh), from its top and scrolled down.
+    const still = (what, from) => swipesKeep(t, what, from);
+    for (const from of [0, 300]) { await still('.town-map', from); await still('.site-header', from); }
     await battle(t);
     await shot('battle');
-    await retreat(t);
+    for (const what of ['.unit-skill:not(:disabled)', '#guard', '#intent']) for (const from of [0, 300]) { await inFight(t); await still(what, from); }
+    await leaveFight(t);
+    await questSwipes(t);
+    // An inline frame on a long page (no full-screen overlay): fully on screen, a swipe keeps the page still; scrolled so far that the
+    // window cuts the frame off, a swipe moves the page, so the player can bring the game back into view (as the wheel does).
+    await send('Page.navigate', { url: `${hostOrigin}/game.html?w=390&h=700` });
+    await boot();
+    await evaluate('scrollTo(0, 0)'); await sleep(300);
+    await still('.town-map', 0); await still('.site-header', 0);
+    await evaluate('scrollTo(0, 300)'); await sleep(400);
+    const map = await t.point('.town-map', true), scrolled = await t.hostScroll();
+    assert.ok(scrolled > 100, 'the inline frame is cut off by the window');
+    assert.ok(await t.swipeAt(map, 200) < scrolled - 20, 'a cut-off inline frame lets a swipe scroll the page towards the game');
+    await send('Page.navigate', { url: `${hostOrigin}/game.html?mobile=1` });
+    await boot();
     await config(t);
     await click('#setting-motion');
     await waitFrame('document.querySelector("#storage-status").dataset.level === "ok" && !document.querySelector("#setting-motion").checked');
@@ -429,7 +509,7 @@ try {
     await boot();
     await config(t);
     assert.equal(await inFrame('document.querySelector("#setting-motion").checked'), false, 'the setting survived the reload on a phone');
-    console.log('PASS itch phone 390x844: boot, battle, backup text, reload persistence');
+    console.log('PASS itch phone 390x844: boot, swipes never scroll the host page (overlay from 0 and 300, inline frame; the Quests list still scrolls), battle, backup text, reload persistence');
   });
   const strays = gameLog.filter(path => !path.startsWith(PREFIX));
   assert.deepEqual(strays, [], 'the game requested files outside its upload path');

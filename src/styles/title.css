@@ -1,10 +1,11 @@
 .title-screen { position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; overflow: hidden; background: #08110f; transition: opacity 0.25s; }
 .title-screen.dismissing { opacity: 0; }
-.title-backdrop { position: absolute; inset: 0; }
+.title-backdrop { position: absolute; inset: 0; overflow: hidden; }
 .title-world-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(1.1) brightness(0.8); animation: title-pan 30s linear infinite alternate; }
 @keyframes title-pan { from { transform: scale(1.15) translateY(0); } to { transform: scale(1.15) translateY(-5%); } }
 .title-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 35%, transparent 20%, #08110fcc 75%), linear-gradient(180deg, #08110faa 0%, transparent 30%, #08110f 92%); }
-.title-content { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 24px 20px; }
+/* The backdrop fills the screen; the menu and the footer stay inside the safe rectangle (notch, home indicator, a landscape phone's sides). */
+.title-content { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: calc(24px + var(--safe-t)) calc(20px + var(--inset-r)) 24px calc(20px + var(--inset-l)); }
 .title-brand { text-align: center; }
 .title-eyebrow { font-family: var(--text); font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--gold); letter-spacing: 3px; text-shadow: 0 1px 4px #000; }
 .title-logo {
@@ -27,8 +28,23 @@
 .title-lang { display: flex; gap: 6px; }
 .title-lang button { min-height: 36px; padding: 4px 12px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: #0e1e19cc; color: var(--ink-soft); font-size: 13px; }
 .title-lang button[aria-pressed="true"] { border-color: var(--gold-border); background: var(--gold-bg); color: var(--gold); }
-.title-footer { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 8px; padding: 10px 14px; font-size: 13px; color: var(--ink-dim); text-shadow: 2px 2px 0 #000; }
+.title-footer { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 8px; padding: 10px calc(14px + var(--inset-r)) calc(10px + var(--safe-b)) calc(14px + var(--inset-l)); font-size: 13px; color: var(--ink-dim); text-shadow: 2px 2px 0 #000; }
 .title-footer b { color: var(--gold); font-weight: 600; }
 .title-meta-info { display: flex; gap: 10px; }
+/* A short landscape screen (a phone held sideways, with or without the browser bars): the brand and the language switch on the left, the
+   menu on the right without its visible sub-lines (a screen reader still reads them), so every entry fits above the home indicator; the
+   screen scrolls if it still cannot. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .title-screen { overflow-y: auto; }
+  .title-content { flex: 1 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 260px); grid-template-areas: 'brand menu' 'lang menu'; align-content: center; align-items: center; justify-items: center; gap: 10px 16px; padding-top: calc(12px + var(--safe-t)); padding-bottom: 8px; }
+  .title-brand { grid-area: brand; align-self: end; }
+  .title-logo { margin: 6px 0; font-size: 26px; }
+  .title-flourish { display: none; }
+  .title-press, .title-lang { grid-area: lang; align-self: start; }
+  .title-menu { grid-area: menu; padding: 4px; }
+  .title-menu .menu-item { padding-top: 4px; padding-bottom: 4px; justify-content: center; }
+  .title-menu .menu-subtext { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* still read by a screen reader */
+  .title-footer { padding-top: 6px; }
+}
 .title-screen.press-phase .title-press { display: block; }
 .title-screen.press-phase .title-menu, .title-screen.press-phase .title-lang { display: none; }

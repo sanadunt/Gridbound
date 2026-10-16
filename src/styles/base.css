@@ -33,9 +33,17 @@
   --radius: 3px;
   --touch: 44px;
   --col: 600px;
+  /* Safe areas: the notch and status bar, the home indicator or Android gesture bar, a landscape phone's sides (0 on desktop and in a frame). */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
 }
 *, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; }
+/* The root (not body: browsers take the viewport's overscroll from the root) never hands a swipe on: no Android pull-to-refresh, no rubber band. */
+html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; }
+/* A mouse or trackpad keeps the sideways overscroll on the root: a trackpad's swipe-back is a browser Back, which the history guard turns into one step back. */
+@media (hover: hover) and (pointer: fine) { html { overscroll-behavior-x: auto; } }
 body {
   background: radial-gradient(ellipse at 50% 0%, #17302a 0%, var(--night) 65%, #08110f 100%);
   background-color: var(--night);
@@ -45,7 +53,6 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior: none;
   scrollbar-color: #5a4725 #0d1b15;
 }
 * { scrollbar-width: thin; scrollbar-color: #6e5831 #0a1410; }
@@ -61,8 +68,27 @@ body {
   box-shadow: 0 0 0 1px var(--line), 0 0 60px #000c;
   overflow: hidden;
 }
-img { image-rendering: pixelated; }
-button, select, input { font: inherit; color: inherit; }
+/* ── Safe areas ── #app shrinks into the safe rectangle, so the HUD, the town routes and the battle screen never sit under the notch,
+   the home indicator or the gesture bar. A side inset counts only where it reaches the column (a landscape phone's sides fall outside
+   the 600px town column, not outside the wide landscape battle: --app-max). The overlays that fill #app (title, result, story scene)
+   keep their art full-bleed and pad their content with --safe-t/--safe-b and --inset-l/--inset-r. */
+#app {
+  --app-max: var(--col);
+  --inset-l: max(0px, calc(var(--safe-l) - (100vw - min(100vw, var(--app-max))) / 2));
+  --inset-r: max(0px, calc(var(--safe-r) - (100vw - min(100vw, var(--app-max))) / 2));
+  padding: var(--safe-t) var(--inset-r) var(--safe-b) var(--inset-l);
+}
+/* ── Touch ── No double-tap zoom (a pinch still zooms the page), no text selection, callout or image drag ghost in the game. Text fields
+   stay selectable: on iOS a field under user-select: none cannot be typed in. A finger never lands on an image (Android's long-press
+   Download/Share image menu needs one): the touch goes to the button or panel around it. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; }
+#app { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#app input, #app textarea, #app select, #app [contenteditable], .backup-text { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+/* With a mouse, a dialog's text (a save error, 'Not saved') can still be selected and copied into a bug report. */
+@media (hover: hover) and (pointer: fine) { dialog#modal p { -webkit-user-select: text; user-select: text; } }
+img { image-rendering: pixelated; -webkit-user-drag: none; }
+@media (pointer: coarse) { #app img { pointer-events: none; } }
+button, select, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 [hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -102,12 +128,13 @@ b, strong { font-weight: 600; }
   line-height: 1.2;
   transition: background 0.12s, border-color 0.12s, transform 60ms;
 }
-.btn:hover:not(:disabled), .icon-button:hover:not(:disabled), .tabs > button:hover:not(:disabled), .page-controls button:hover:not(:disabled) { background: var(--win-top); border-color: var(--win-hi); color: var(--gold-bright); }
+/* Hover styles only where a pointer can hover (a tapped button keeps no hover colours on a phone); a pressed toggle (MENU) keeps its own. */
+@media (hover: hover) { .btn:hover:not(:disabled):not([aria-pressed="true"]), .icon-button:hover:not(:disabled):not([aria-pressed="true"]), .tabs > button:hover:not(:disabled), .page-controls button:hover:not(:disabled) { background: var(--win-top); border-color: var(--win-hi); color: var(--gold-bright); } }
 .btn:active:not(:disabled), .icon-button:active:not(:disabled), .cmd:active:not(:disabled) { transform: translateY(1px); }
 .btn small { display: block; font-size: 11px; font-weight: 600; color: var(--ink-dim); }
 .btn.primary { background: #e6c88d; border-color: #f9e5b6; color: #263329; font-weight: 700; box-shadow: 0 3px 0 #a48b5c; }
 .btn.primary small { color: #4a4a32; }
-.btn.primary:hover:not(:disabled) { background: #f2dca9; border-color: #fff1cf; color: #1b261d; box-shadow: 0 3px 0 #b7a477, 0 0 22px #e6c88d22; }
+@media (hover: hover) { .btn.primary:hover:not(:disabled) { background: #f2dca9; border-color: #fff1cf; color: #1b261d; box-shadow: 0 3px 0 #b7a477, 0 0 22px #e6c88d22; } }
 .btn.primary:active:not(:disabled) { box-shadow: 0 1px 0 #a48b5c; transform: translateY(2px); }
 .btn.danger { background: var(--danger-deep); border-color: var(--danger); color: #ffe2dc; }
 .btn.on, .btn[aria-pressed="true"] { border-color: var(--gold-border); background: var(--gold-bg); color: var(--gold); }
@@ -134,16 +161,21 @@ b, strong { font-weight: 600; }
 .menu-item b, .menu-item .menu-title { font-weight: 600; font-size: 15px; }
 .menu-item span, .menu-item .menu-subtext { color: var(--ink-dim); font-size: 12px; }
 .menu-item::before { content: '▶'; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--gold); font-size: 10px; opacity: 0; }
-.menu-item:hover::before, .menu-item:focus-visible::before { opacity: 1; animation: cursor 0.6s steps(2) infinite; }
-.menu-item:hover, .menu-item:focus-visible { background: #224238; border-color: var(--win-edge); outline: none; }
-.menu-item:hover b, .menu-item:focus-visible b, .menu-item:hover .menu-title, .menu-item:focus-visible .menu-title { color: var(--gold-bright); }
+.menu-item:focus-visible::before { opacity: 1; animation: cursor 0.6s steps(2) infinite; }
+.menu-item:focus-visible { background: #224238; border-color: var(--win-edge); outline: none; }
+.menu-item:focus-visible b, .menu-item:focus-visible .menu-title { color: var(--gold-bright); }
+@media (hover: hover) {
+  .menu-item:hover::before { opacity: 1; animation: cursor 0.6s steps(2) infinite; }
+  .menu-item:hover { background: #224238; border-color: var(--win-edge); outline: none; }
+  .menu-item:hover b, .menu-item:hover .menu-title { color: var(--gold-bright); }
+}
 @keyframes cursor { 50% { transform: translate(3px, -50%); } }
 
 /* Tabs */
 .tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 6px; scrollbar-width: none; }
 .tabs > button { flex: 1 0 auto; min-height: 44px; padding: 6px 10px; font-size: 13px; }
-.tabs > button.active, .tabs > button[aria-current="page"], .tabs > button[aria-pressed="true"],
-.tabs > button.active:hover, .tabs > button[aria-current="page"]:hover, .tabs > button[aria-pressed="true"]:hover { background: var(--gold-bg); border-color: var(--gold-border); color: var(--gold); box-shadow: inset 0 -2px 0 var(--gold); }
+.tabs > button.active, .tabs > button[aria-current="page"], .tabs > button[aria-pressed="true"] { background: var(--gold-bg); border-color: var(--gold-border); color: var(--gold); box-shadow: inset 0 -2px 0 var(--gold); }
+@media (hover: hover) { .tabs > button.active:hover, .tabs > button[aria-current="page"]:hover, .tabs > button[aria-pressed="true"]:hover { background: var(--gold-bg); border-color: var(--gold-border); color: var(--gold); box-shadow: inset 0 -2px 0 var(--gold); } }
 
 /* Gauges */
 .gauge { display: block; height: 6px; border: 1px solid var(--win-edge); border-radius: 1px; background: var(--inset); overflow: hidden; }
@@ -226,11 +258,11 @@ details > summary::-webkit-details-marker { display: none; }
 body[data-screen="battle"] .site-header { display: none; }
 
 /* Status toast */
-.storage-status { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); max-width: calc(100% - 24px); padding: 4px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: #0e1e19ee; font-size: 12px; color: var(--ink-soft); pointer-events: none; z-index: 30; opacity: 0; transition: opacity 0.3s; }
+.storage-status { position: absolute; left: 50%; bottom: calc(8px + var(--safe-b)); transform: translateX(-50%); max-width: calc(100% - 24px); padding: 4px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: #0e1e19ee; font-size: 12px; color: var(--ink-soft); pointer-events: none; z-index: 30; opacity: 0; transition: opacity 0.3s; }
 .storage-status:not([data-level="warn"]) { display: none; }
-.storage-status[data-level="warn"] { opacity: 1; top: 64px; bottom: auto; border-color: var(--hp-low); color: var(--gold-bright); }
+.storage-status[data-level="warn"] { opacity: 1; top: calc(64px + var(--safe-t)); bottom: auto; border-color: var(--hp-low); color: var(--gold-bright); }
 /* In battle the warning sits below the top bar (Menu, Arena/Status/Log), never over it. */
-body[data-screen="battle"] .storage-status[data-level="warn"] { top: 58px; bottom: auto; }
+body[data-screen="battle"] .storage-status[data-level="warn"] { top: calc(58px + var(--safe-t)); bottom: auto; }
 
 /* Town notice */
 /* A toast over the top of the route, never in the flow above the list: a re-render never moves a control under the finger, taps pass through it,
@@ -263,9 +295,10 @@ body.reduced-motion .town-notice.dismissed { animation: notice-gone 0s linear fo
 /* Dialog */
 dialog#modal {
   border-color: var(--gold-border);
-  width: min(calc(100vw - 24px), 540px);
-  max-height: calc(100dvh - 32px);
+  width: min(calc(100vw - 24px - var(--safe-l) - var(--safe-r)), 540px);
+  max-height: calc(100dvh - 32px - var(--safe-t) - var(--safe-b));
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 18px 16px 16px;
   transform-origin: center top;
 }
@@ -302,6 +335,11 @@ dialog#modal:has(> .modal-exit) { scroll-padding-bottom: 84px; }
 /* What the last Save files action did (Renamed to…, Saved to Slot n), at the top of the dialog. */
 .profiles-notice { margin: 6px 0; padding: 6px 10px; border: 1px solid var(--gold-border); border-radius: var(--radius); background: var(--gold-bg); color: var(--gold-bright); }
 .backup-text { display: block; width: 100%; min-height: 140px; max-height: 40dvh; margin: 8px 0; padding: 8px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
+/* ── Phone form controls ── iOS Safari zooms the page when a field under 16px gets the focus, and stays zoomed (the HUD slides away):
+   on a finger-first device every select, text field and the backup text is 16px (the backup keeps its monospace face). */
+@media (pointer: coarse) {
+  select, textarea, .backup-text, input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]) { font-size: 16px; }
+}
 #backup-note:empty { display: none; }
 dialog#modal .backup-actions .btn { margin-top: 0; }
 /* Leave dialogs: Save & suspend, the costly option, Cancel — stacked, full width. */
@@ -310,7 +348,20 @@ dialog#modal .leave-actions .btn { margin-top: 0; }
 /* A menu's exit entry (the pause menu's Back / Leave battle…) is set apart from the rest. */
 .menu-item.menu-exit { margin-top: 6px; border-top: 1px solid var(--line); }
 /* Embedded in another page (itch.io's iframe): a list scrolled to its end never hands the scroll on to the host page. */
+html.embedded { overscroll-behavior: none; }
 html.embedded * { overscroll-behavior: contain; }
+
+/* ── Rotate hint ── A phone held sideways gets one thin line under the town's HUD (at the top of the title screen), never over a fight:
+   it ignores taps, fades by itself after 6s (shown again on the next turn to landscape) and is aria-hidden, since every screen still works sideways.
+   A fight only hides it (visibility): its display stays, so the fade keeps its finished state and a fight never starts it again. */
+.rotate-hint { display: none; }
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+  body[data-screen="battle"] .rotate-hint { visibility: hidden; }
+  .rotate-hint { display: block; position: absolute; z-index: 55; top: calc(var(--safe-t) + 60px); left: 0; right: 0; margin: 0; padding: 4px calc(12px + var(--inset-r)) 4px calc(12px + var(--inset-l)); border-bottom: 1px solid var(--gold-border); background: #0e1e19ee; color: var(--gold-bright); font-size: 13px; font-weight: 600; line-height: 1.3; text-align: center; pointer-events: none; animation: rotate-hint-out 0.5s ease-in 6s forwards; }
+  #title-screen:not([hidden]) ~ .rotate-hint { top: var(--safe-t); }
+  body.reduced-motion .rotate-hint { animation: notice-gone 0s linear 6s forwards; }
+}
+@keyframes rotate-hint-out { to { opacity: 0; visibility: hidden; } }
 
 body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; } }
