@@ -237,7 +237,8 @@ async function questSwipes(t) {
   await clickUntil(t, '#menu-button', 'Boolean(document.querySelector(".more-scene"))');
   await click('.more-scene [data-facility="quests"]');
   await waitFrame('document.querySelector(".town-game-shell")?.dataset.townRoute === "quests"');
-  const list = '.secondary-scene > .secondary-content';
+  // On a phone the whole Quests route scrolls as one page (contract L7); a wider frame scrolls its content panel.
+  const list = await inFrame(`getComputedStyle(document.querySelector('.town-scene > .secondary-scene')).overflowY === 'auto' ? '.town-scene > .secondary-scene' : '.secondary-scene > .secondary-content'`);
   assert.ok(await inFrame(`(() => { const l = document.querySelector(${JSON.stringify(list)}); return l.scrollHeight > l.clientHeight + 40; })()`), 'the Quests list is longer than the screen');
   await evaluate('scrollTo(0, 0)'); await sleep(250);
   const at = await point(list, true);

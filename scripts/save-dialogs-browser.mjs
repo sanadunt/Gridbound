@@ -157,7 +157,7 @@ await withBrowser(async ({ send, evaluate, wait, click, key, screenshot, errors 
     await wait('!document.querySelector(".dialogue-scene")');
     // After the camp's scenes comes its unlock card (once per viewer): Later.
     await sleep(500);
-    if (await evaluate('Boolean(document.querySelector("#modal[open] .unlock-card"))')) { await click('#modal .unlock-card > [data-close]'); await wait('!document.querySelector("#modal").open'); }
+    if (await evaluate('Boolean(document.querySelector("#modal[open] .unlock-card"))')) { await click('#modal .unlock-card ~ [data-close]'); await wait('!document.querySelector("#modal").open'); }
   };
 
   // Import: 'Backup imported' stays usable (never inert), the join scene waits for its Close.

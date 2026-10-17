@@ -88,7 +88,7 @@ async function checks(name, { lang, spoof, trials }, { send, evaluate, wait, cli
       await click('#suspend-run'); await wait('window.gridbound.inTown', 10000); await sleep(300);
       await click.nav('camp');
       // The camp's one-time unlock card (Undercroft, Raids, Bell Trials) comes first for a real player: Later.
-      await sleep(800); if (await evaluate('Boolean(document.querySelector("#modal[open] .unlock-card"))')) { await click('#modal .unlock-card [data-close]'); await wait('!document.querySelector("#modal").open'); }
+      await sleep(800); if (await evaluate('Boolean(document.querySelector("#modal[open] .unlock-card"))')) { await click('#modal .unlock-card ~ [data-close]'); await wait('!document.querySelector("#modal").open'); }
       assert.match(await label('.camp-copy [data-resume-story]'), /^Resume CH 2 · battle 2 ▶$/);
       await click('.camp-copy [data-resume-story]'); await wait('!window.gridbound.inTown', 10000); await sleep(400);
       assert.equal(await evaluate('Boolean(document.querySelector(".dialogue-scene"))'), false, 'a resumed battle never replays a chapter intro');

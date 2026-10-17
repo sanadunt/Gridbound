@@ -9,11 +9,16 @@
 // Escape and the browser Back close it without starting a run, Descend starts one (on a phone a double tap on the depth, whose second tap
 // lands on Descend as the dossier opens, starts nothing). The camp's Rest says what it heals
 // and that it closes the way out; a cleared depth whose next stair is behind a chapter says so on the map.
+// Phone contract L8/L9 (TOWN): the run map's open rooms are on screen after Descend, after a room's result and after 'Choose the next room'
+// under an outcome; the depth dossier's Back and Descend sit in one sticky row, both hit at their centre on arrival at 375×667, 393×782 and
+// 360×640 (depths 1 and 5), and a touch on Descend (after its 600 ms hold) starts the run.
 import assert from 'node:assert/strict';
-import { withBrowser } from './browser-harness.mjs';
+import { withBrowser, seedSave } from './browser-harness.mjs';
 
 const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5180/';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+/** Every open room of the run map is fully on screen and hit at its centre (contract L8). */
+const openRoomsInView = `[...document.querySelectorAll('.dungeon-map .room.open')].every(el => { const r = el.getBoundingClientRect(), h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return r.top >= 0 && r.bottom <= innerHeight && Boolean(h && el.contains(h)); })`;
 const loadout = slot => ({ skills: [0, 1], talents: [], xp: 600, slot, gear: { weapon: 'iron-edge' }, inventory: ['iron-edge'] });
 const qaProfile = {
   version: 3, gold: 3000, economy: { gold: 3000, commanderCrystal: 0, materials: { 'ember-shard': 6 } },
@@ -81,7 +86,7 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     await wait('document.querySelectorAll(".depth-card").length === 8');
     assert.equal(await evaluate('document.querySelectorAll(".depth-card:not(.locked)").length'), 1, 'only depth 1 is open after chapter 3');
     assert.ok(await evaluate(navHeight) >= 40, `mid-game save: mode tabs ${await evaluate(navHeight)}px tall`);
-    assert.ok(await evaluate('document.querySelector(".dungeon-rules[open]") && document.querySelector(".dungeon-rules").compareDocumentPosition(document.querySelector(".depth-list")) & Node.DOCUMENT_POSITION_FOLLOWING'), 'How it works (with the pouch rule) comes before the depths');
+    assert.ok(await evaluate('document.querySelector(".dungeon-rules[open]") && document.querySelector(".depth-list").compareDocumentPosition(document.querySelector(".dungeon-rules")) & Node.DOCUMENT_POSITION_FOLLOWING'), 'the depths come first, How it works (open on a first visit, with the pouch rule) after them');
     assert.equal(await evaluate('document.querySelectorAll(".dungeon-rules .dungeon-legend li").length'), 6, 'room key lists the six room kinds');
     await screenshot(`artifacts/dungeon-depths-${viewport.tag}.png`);
     // A depth opens its dossier: nothing starts (the story party stays free) until Descend; Back is focused, Escape and the browser Back close it.
@@ -89,7 +94,9 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     assert.deepEqual(await evaluate('(s => [s.firstChild.textContent, s.querySelector("[aria-hidden=true]")?.textContent, s.querySelector(".sr-only")?.textContent])(document.querySelector(".depth-card:not(.locked) small"))'), ['Guardian: ', '???', 'Unknown enemy'], 'a guardian the Bestiary has not met stays a secret on the depth card (read as Unknown enemy)');
     await click('[data-dungeon-pick="1"]');
     await wait(dossier);
-    const card = await evaluate('document.querySelector("#modal").innerText');
+    // On a phone (≤ 420px) the wounds/pouch rules fold under 'How it works' (still in the dialog, one tap away).
+    const card = await evaluate('document.querySelector("#modal").innerText + " " + document.querySelector("#modal .dossier-howto").textContent');
+    assert.equal(await evaluate('document.querySelector("#modal .dossier-howto").open'), !viewport.mobile, 'the rules are folded on a phone, open on a desktop');
     for (const part of [/Undercroft · Depth 1/, /The Cistern Stair/, /Guardian/, /In the rooms/, /This depth drops Ember Shard/, /Party power [\d,]+/, /Rec\. [\d,]+ · (Ready|A little under|Under-powered)/, /Wounds carry over/, /Your story party is locked to this run until you extract, beat the guardian or abandon\./, /Descend ▶/, /◀ Back/])
       assert.match(card, part, `the dossier shows ${part}`);
     assert.equal(await evaluate('document.querySelectorAll("#modal .dossier-foe.unseen").length'), 6, 'unmet foes are silhouettes (guardian, three room foes, two elites)');
@@ -143,6 +150,7 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     await click('[data-dungeon-start="1"]');
     await wait('Boolean(document.querySelector(".dungeon-map .room.open"))');
     assert.equal(await evaluate('document.querySelector("#modal").open'), false, 'Descend closes the dossier');
+    await wait(openRoomsInView, 2000).catch(() => assert.fail('after Descend the open rooms are on screen'));
     assert.equal(await evaluate('document.activeElement?.matches(".dungeon-scene .room.open")'), true, 'the keyboard lands on the map\'s first open room');
     assert.ok(await evaluate('document.querySelectorAll(".dungeon-map .room").length') >= 12, 'map has rooms');
     await screenshot(`artifacts/dungeon-map-${viewport.tag}.png`);
@@ -177,7 +185,13 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
         for (const sel of ['[data-dungeon-choice]:not(:disabled)', '[data-dungeon-open]', '[data-dungeon-camp="rest"]']) {
           if (await evaluate(`Boolean(document.querySelector(${JSON.stringify(sel)}))`)) {
             if (sel.includes('camp')) assert.match(await evaluate(`document.querySelector('[data-dungeon-camp="rest"]').textContent`), /25%/, 'the camp says its rest heals 25% (CAMP_REST)');
-            await click(sel); await wait('Boolean(document.querySelector(".room-outcome")) || Boolean(document.querySelector("[data-dungeon-fight]"))', 5000).catch(() => {}); break; }
+            await click(sel); await wait('Boolean(document.querySelector(".room-outcome")) || Boolean(document.querySelector("[data-dungeon-fight]"))', 5000).catch(() => {});
+            // Under an outcome, 'Choose the next room' brings the open rooms back on screen and the keyboard to the first.
+            if (await evaluate('Boolean(document.querySelector("[data-dungeon-next]"))')) {
+              await click('[data-dungeon-next]');
+              await wait(`(${openRoomsInView}) && document.activeElement?.matches('.room.open')`, 2000).catch(() => assert.fail('Choose the next room shows the open rooms and focuses the first'));
+            }
+            break; }
         }
         if (await evaluate('Boolean(document.querySelector("[data-dungeon-fight]"))')) return true;
         const before = await evaluate('window.gridbound.profile().journey.run?.at');
@@ -230,6 +244,7 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
       } else {
         await click('#result-dungeon');
         await wait('Boolean(document.querySelector(".dungeon-scene"))');
+        if (await evaluate('window.gridbound.profile().journey.run?.status === "active" && !document.querySelector(".room-outcome")')) await wait(openRoomsInView, 2000).catch(() => assert.fail('back from a room\'s result, the open rooms are on screen'));
       }
       fights++;
     }
@@ -406,4 +421,33 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
     assert.deepEqual(errors, [], 'no console errors');
   }, viewport);
 }
+
+// The depth dossier on short phones (the browser bars shown): Back and Descend share one sticky row, both on screen and hit at their centre
+// when it opens (no scrolling), on depths 1 and 5; a touch on Descend after its hold starts the run. The row stays one button tall even when
+// the tapped depth card sat where the row lands (K6 never puts a margin on Descend there: it stretched the row to 130px held sideways).
+const PHONES = [[375, 667], [393, 782], [360, 640], [393, 852, { top: 59, bottom: 34 }], [852, 343, { left: 59, right: 59, bottom: 21 }, true]];
+const late = { ...qaProfile, roster: [0, 4, 3, 2], cleared: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], journey: { ...qaProfile.journey, depth: 4 } };
+for (const [width, height, insets = {}, landscape = false] of PHONES) for (const depth of [1, 5]) {
+  await withBrowser(async ({ send, wait, evaluate, click, touch, screenshot, errors }) => {
+    await seedSave(send, late, 'en');
+    await send('Page.navigate', { url });
+    await wait('window.gridbound && document.querySelector(".town-game-shell")?.dataset.townRoute === "camp"', 20000);
+    await click.nav('dungeon');
+    await wait('document.querySelectorAll(".depth-card").length === 8');
+    await touch.tap(`[data-dungeon-pick="${depth}"]`);
+    await wait('Boolean(document.querySelector("#modal[open] .modal-actions.modal-exit [data-dungeon-start]"))');
+    const row = await evaluate(`[...document.querySelectorAll('#modal .modal-actions button')].map(b => { const r = b.getBoundingClientRect(), h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { which: b.dataset.dungeonStart ? 'descend' : b.dataset.navExit, on: r.top >= 0 && r.bottom <= innerHeight && r.height >= 44, hit: Boolean(h && b.contains(h)) }; })`);
+    assert.deepEqual(row, [{ which: 'close', on: true, hit: true }, { which: 'descend', on: true, hit: true }], `${width}×${height} depth ${depth}: Back then Descend, on screen and uncovered on arrival`);
+    assert.equal(await evaluate('document.querySelector("#modal").scrollTop'), 0, 'nothing scrolled to get there');
+    const size = await evaluate(`(() => { const [back, go] = document.querySelectorAll('#modal .modal-actions button'); return { row: document.querySelector('#modal .modal-actions').getBoundingClientRect().height, back: back.getBoundingClientRect().height, go: go.getBoundingClientRect().height, margin: go.style.marginTop + go.style.marginBottom }; })()`);
+    assert.ok(size.row <= 48 && Math.abs(size.back - size.go) < 1 && !size.margin, `${width}×${height} depth ${depth}: the sticky row stays one button tall (${JSON.stringify(size)})`);
+    await screenshot(`artifacts/dungeon-dossier-${width}x${height}-d${depth}.png`);
+    await sleep(650);
+    await touch.tap('#modal [data-dungeon-start]');
+    await wait('window.gridbound.profile().journey.run?.status === "active"');
+    await wait(openRoomsInView, 2000).catch(() => assert.fail(`${width}×${height}: after Descend the open rooms are on screen`));
+    assert.deepEqual(errors, []);
+  }, { phone: { width, height, dpr: 2, ua: width === 360 ? 'android' : 'iphone', insets, landscape } });
+}
+console.log('PASS Undercroft dossier and run map on short phones (L8/L9)');
 console.log('PASS dungeon browser');

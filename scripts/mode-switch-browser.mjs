@@ -165,7 +165,11 @@ await withBrowser(async ({ send, wait, evaluate, click, errors }) => {
   })()`);
   assert.deepEqual(shopButton, { disabled: false, label: '24 ◆' },
     'Challenge shop opened from Story uses the shared bank');
+  // A ware only opens its inspector (nothing is spent); its Buy spends the Crystal.
   await click('.secondary-scene [data-bank-buy="bank-relic-ward"]');
+  await wait('Boolean(document.querySelector("[data-confirm-bank=\\"bank-relic-ward\\"]"))');
+  assert.equal(await evaluate('window.gridbound.profile().economy.commanderCrystal'), 57, 'a tap on a ware spends nothing');
+  await click('[data-confirm-bank="bank-relic-ward"]');
   await wait(`(async () => {
     const { openCommanderRepository } = await import('/src/game/commander.ts');
     const repository = await openCommanderRepository();

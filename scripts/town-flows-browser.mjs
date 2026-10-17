@@ -9,7 +9,11 @@
 // - the Journal's companion buttons line up;
 // - no 'GSAP target … not found' warning during a real (webdriver spoofed) town walk, where the free-slot question also shows unforced.
 // - a quick double tap on Promote or on Buy & equip (Pixel 7, real touches) acts once (phone contract G7);
-// TOWN_ONLY=party|depart|jobs|doubletap|claim|menu|journal|gsap|shots runs one part; screenshots go to artifacts/town-flows/.
+// - phone contract L8/L9/G8 (TOWN, part `phone`): at 375×553 a tapped job card's Promote and a tapped item's Buy & equip are on screen and hit
+//   at their centre above the sticky Depart bar; at 390×844 a tab switch starts at the top while an equip keeps the scroll; at 852×393
+//   (landscape) Party scrolls as one page and Depart is hit-testable at its end; a Crystal Exchange ware only opens its inspector (nothing
+//   spent) and its Buy spends once;
+// TOWN_ONLY=party|depart|jobs|doubletap|claim|menu|journal|gsap|phone|shots runs one part; screenshots go to artifacts/town-flows/.
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { withBrowser, seedSave, ACT_TWO_SAVE } from './browser-harness.mjs';
@@ -367,4 +371,92 @@ if (runs('shots')) for (const lang of ['en', 'id']) for (const [width, height, m
   await screenshot(`${out}/quests-${tag}.png`);
   console.log('shots', tag);
 }, { width, height, mobile });
+
+/** The control is fully on screen and the element at its centre is it (or inside it): not under the sticky Depart bar or header. */
+const hitAtCentre = (evaluate, selector) => evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return 'missing'; const r = el.getBoundingClientRect(), h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return r.top >= 0 && r.bottom <= innerHeight && Boolean(h && el.contains(h)) || ('covered by ' + (h?.className || h?.tagName) + ' at ' + Math.round(r.top)); })()`);
+const phoneSave = { ...JOBS_SAVE, gold: 4000, economy: { gold: 4000, commanderCrystal: 60, materials: {} } };
+if (runs('phone')) await withBrowser(async tools => {
+  const { wait, evaluate, click, touch, screenshot, errors } = tools;
+  await boot(tools, phoneSave);
+  // Jobs: a tapped card's inspector brings its Promote on screen, above Depart.
+  await click.nav('party-advanced');
+  await touch.tap('[data-training-tab="jobs"]');
+  await wait('Boolean(document.querySelector("[data-promote]"))');
+  await touch.tap('[data-promote]');
+  await wait('Boolean(document.querySelector("[data-confirm-job]"))');
+  await sleep(150);
+  assert.equal(await hitAtCentre(evaluate, '[data-confirm-job]'), true, '375×553: Promote is on screen above Depart after the tap');
+  await screenshot(`${out}/job-inspector-375x553.png`);
+  // Gear: the same for Buy & equip.
+  await click.nav('party');
+  await touch.tap('[data-training-tab="gear"]');
+  await wait('Boolean(document.querySelector("[data-gear-item]:not(.equipped)"))');
+  await touch.tap('[data-gear-item]:not(.equipped)');
+  await wait('Boolean(document.querySelector("[data-confirm-gear]"))');
+  await sleep(150);
+  assert.equal(await hitAtCentre(evaluate, '[data-confirm-gear]'), true, '375×553: Buy & equip is on screen above Depart after the tap');
+  await screenshot(`${out}/gear-inspector-375x553.png`);
+  // The Crystal Exchange: a tap on a ware selects it and spends nothing; its Buy spends once.
+  await click.nav('challenge-shop');
+  const crystal = () => evaluate('window.gridbound.profile().economy.commanderCrystal');
+  const before = await crystal();
+  await touch.tap('[data-bank-buy="bank-relic-ward"]');
+  await wait('Boolean(document.querySelector("[data-confirm-bank=\\"bank-relic-ward\\"]"))');
+  assert.equal(await crystal(), before, 'a tap on a ware spends no Crystal');
+  assert.equal(await evaluate('document.querySelector("[data-bank-buy=\\"bank-relic-ward\\"]").getAttribute("aria-pressed")'), 'true');
+  assert.equal(await hitAtCentre(evaluate, '[data-confirm-bank]'), true, 'its Buy is on screen');
+  await touch.tap('[data-confirm-bank]');
+  await wait('window.gridbound.profile().challengeUnlocks.includes("bank-relic-ward")');
+  assert.equal(await crystal(), before - 24, 'Buy spends the ware\'s price once');
+  assert.equal(await evaluate('document.querySelector("[data-bank-buy=\\"bank-relic-ward\\"]").disabled'), true, 'an owned ware is no longer offered');
+  assert.deepEqual(errors, []);
+  console.log('PASS phone: inspector confirms in view and the Crystal Exchange asks first (375×553)');
+}, { phone: { width: 375, height: 553, dpr: 2, ua: 'iphone' } });
+
+if (runs('phone')) await withBrowser(async tools => {
+  const { wait, evaluate, click, touch, errors } = tools;
+  await boot(tools, phoneSave);
+  await click.nav('party');
+  const scene = '.town-scene > .party-scene';
+  // Equip is the longest tab: scrolled down to its item list, a tap on Skills starts Skills at the top (np-05).
+  await touch.tap('[data-training-tab="gear"]');
+  await wait('Boolean(document.querySelector("[data-training-panel=\\"gear\\"]"))');
+  await evaluate(`document.querySelector('${scene}').scrollTop = 500, true`);
+  await sleep(100);
+  assert.ok(await evaluate(`document.querySelector('${scene}').scrollTop`) > 100, 'Equip scrolled');
+  await touch.tap('[data-training-tab="skills"]');
+  await wait('Boolean(document.querySelector("[data-training-panel=\\"skills\\"]"))');
+  assert.equal(await evaluate(`document.querySelector('${scene}').scrollTop`), 0, 'np-05: Skills starts at the top, not at Equip\'s scroll');
+  await touch.tap('[data-training-tab="gear"]');
+  await wait('Boolean(document.querySelector("[data-training-panel=\\"gear\\"]"))');
+  assert.equal(await evaluate(`document.querySelector('${scene}').scrollTop`), 0, 'Equip starts at the top too');
+  // An equip keeps the scroll (an in-tab re-render).
+  await evaluate(`document.querySelector('[data-gear-item]:not(.equipped)').scrollIntoView({ block: 'center' }), true`);
+  const kept = await evaluate(`document.querySelector('${scene}').scrollTop`);
+  await touch.tap('[data-gear-item]:not(.equipped)');
+  await wait('Boolean(document.querySelector("[data-confirm-gear]:not(:disabled)"))');
+  await touch.tap('[data-confirm-gear]');
+  await wait('!document.querySelector("[data-confirm-gear]")');
+  assert.ok(Math.abs(await evaluate(`document.querySelector('${scene}').scrollTop`) - kept) < 200, 'equipping keeps the Equip tab where it was');
+  assert.deepEqual(errors, []);
+  console.log('PASS phone: a tab switch starts at the top, an equip keeps the scroll (390×844)');
+}, { phone: { width: 390, height: 844, dpr: 2, ua: 'android' } });
+
+if (runs('phone')) await withBrowser(async tools => {
+  const { wait, evaluate, click, touch, screenshot, errors } = tools;
+  await boot(tools, phoneSave);
+  for (const [route, tab] of [['party', 'gear'], ['party-advanced', 'jobs']]) {
+    await click.nav(route);
+    await touch.tap(`[data-training-tab="${tab}"]`);
+    await wait(`Boolean(document.querySelector('[data-training-panel="${tab}"]'))`);
+    // Landscape: the route scrolls as one page (no nested panel), and Depart stays reachable at its end.
+    assert.deepEqual(await evaluate(`(() => { const s = document.querySelector('.town-scene > .party-scene'), p = document.querySelector('[data-training-panel]'); return [getComputedStyle(s).overflowY, getComputedStyle(p).overflowY]; })()`), ['auto', 'visible'], `852×393 ${tab}: the route scrolls as one`);
+    await evaluate(`document.querySelector('.town-scene > .party-scene').scrollTop = 1e6, true`);
+    await sleep(150);
+    assert.equal(await hitAtCentre(evaluate, '.party-deploy-button'), true, `852×393 ${tab}: Depart is reachable`);
+  }
+  await screenshot(`${out}/party-landscape-852x393.png`);
+  assert.deepEqual(errors, []);
+  console.log('PASS phone: Party and Jobs scroll as one page in landscape, Depart reachable (852×393)');
+}, { phone: { width: 852, height: 393, dpr: 2, ua: 'iphone', landscape: true, insets: { left: 59, right: 59, bottom: 21 } } });
 console.log('PASS town flows');

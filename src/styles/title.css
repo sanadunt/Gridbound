@@ -26,7 +26,7 @@
 .title-menu { width: min(100%, 340px); padding: 8px; }
 .title-menu-item { width: 100%; }
 .title-lang { display: flex; gap: 6px; }
-.title-lang button { min-height: 36px; padding: 4px 12px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: #0e1e19cc; color: var(--ink-soft); font-size: 13px; }
+.title-lang button { min-height: 44px; padding: 4px 14px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: #0e1e19cc; color: var(--ink-soft); font-size: 13px; }
 .title-lang button[aria-pressed="true"] { border-color: var(--gold-border); background: var(--gold-bg); color: var(--gold); }
 .title-footer { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 8px; padding: 10px calc(14px + var(--inset-r)) calc(10px + var(--safe-b)) calc(14px + var(--inset-l)); font-size: 13px; color: var(--ink-dim); text-shadow: 2px 2px 0 #000; }
 .title-footer b { color: var(--gold); font-weight: 600; }

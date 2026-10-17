@@ -6,8 +6,8 @@ export const INPUT_DELAY_MS = 450;
 /** Controls that spend, abandon or destroy: held as long as a story choice (CHOICE_INPUT_DELAY_MS). */
 export const DANGER_CONTROLS = '.btn.danger, #abandon-run, #dungeon-flee, #respec-confirm, #delete-confirm, [data-dungeon-start]';
 /** Town controls that a re-render can put under the finger, and those of them that spend or change a build. */
-export const TOWN_HELD = '[data-equip-skill], [data-confirm-gear], [data-confirm-job], [data-gear-item], [data-bank-buy], [data-promote]';
-export const TOWN_SPEND = '[data-equip-skill], [data-confirm-gear], [data-confirm-job], [data-bank-buy]';
+export const TOWN_HELD = '[data-equip-skill], [data-confirm-gear], [data-confirm-job], [data-gear-item], [data-bank-buy], [data-confirm-bank], [data-promote]';
+export const TOWN_SPEND = '[data-equip-skill], [data-confirm-gear], [data-confirm-job], [data-confirm-bank]';
 export function holdInput(elements: ArrayLike<HTMLElement>, ms: number, now = performance.now()) { for (let i = 0; i < elements.length; i++) elements[i].dataset.inputUntil = String(now + ms); }
 /** The event is a pointer activation (a tap or a click) on something still held. It is timed by when the finger landed (the event's
  *  timeStamp: a busy page may deliver a quick second tap long after it happened), or by now where a browser gives no usable stamp. */

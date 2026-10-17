@@ -376,6 +376,7 @@ export const ID: Record<keyof typeof EN, string> = {
   'dungeon.lost': 'Hilang: {lost}',
   'dungeon.lost.none': 'tidak ada',
   'dungeon.result.hp': 'HP party',
+  'dungeon.next.room': 'Pilih ruangan berikutnya',
   'dungeon.howto': 'Cara kerjanya',
   'dungeon.legend': 'Keterangan ruangan',
   'material.ember-shard': 'Serpih Bara',
@@ -508,6 +509,10 @@ export const ID: Record<keyof typeof EN, string> = {
   'shop.purse': '{n} ◆ tersimpan',
   'shop.bank': 'Barang bank',
   'shop.owned': 'DIMILIKI',
+  'shop.hint': 'Pilih barang untuk dilihat gratis. Crystal baru terpakai setelah kamu konfirmasi.',
+  'shop.confirm': 'Beli · {cost} ◆',
+  'shop.ready': 'Siap: {cost} ◆ baru terpakai saat kamu menekan Beli.',
+  'shop.short': 'Crystal-mu kurang {n}.',
   'shop.journey': 'Toko perjalanan',
   'shop.journey.hint': 'Buka di dalam run Ujian Lonceng. Dibeli pakai Crystal perjalanan ◇, yang hangus saat run selesai.',
 

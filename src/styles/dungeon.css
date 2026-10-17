@@ -51,13 +51,16 @@
    short, no squashing when long), so the mode tabs never collapse under the intro. */
 .dungeon-scene { display: grid; align-content: start; grid-auto-rows: max-content; gap: 10px; padding: 10px 12px 18px; }
 .dungeon-scene > .tabs { min-height: max-content; flex-shrink: 0; }
-.dungeon-intro small, .dungeon-hud small { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+.dungeon-intro small, .dungeon-hud small { font-family: var(--text); font-weight: 600; font-size: 12px; letter-spacing: 0.3px; color: var(--gold); text-transform: uppercase; }
 .dungeon-intro h2, .dungeon-hud h2, .dungeon-result h2 { margin: 6px 0; font-family: var(--pixel); font-size: 14px; line-height: 1.5; color: var(--gold); }
 .dungeon-intro p { margin: 6px 0; color: var(--ink-soft); }
-.dungeon-party { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-.dungeon-party > img { width: 32px; height: 32px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); }
-.dungeon-party > span:not(.dungeon-hero) { margin-left: 6px; font-family: var(--pixel); font-size: 10px; color: var(--gold); }
-.depth-list { display: grid; gap: 6px; }
+.dungeon-party { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+/* Each portrait shows its hero's name under it (a touch screen shows no title tooltip: contract G9); a long name is cut, never ellipsized. */
+.dungeon-face { display: inline-grid; justify-items: center; gap: 1px; width: 46px; }
+.dungeon-face img { width: 32px; height: 32px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); }
+.dungeon-face b, .dungeon-hero b { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: clip; font-size: 12px; font-weight: 600; line-height: 1.2; color: var(--ink-soft); text-align: center; }
+.dungeon-power { margin-left: 6px; font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+.depth-list { display: grid; gap: 8px; }
 .depth-card { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 10px; min-height: 56px; padding: 6px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: linear-gradient(180deg, var(--win-top), var(--win-bot)); color: var(--ink); text-align: left; }
 @media (hover: hover) { .depth-card:hover:not(:disabled) { border-color: var(--gold-border); } }
 .depth-card.locked { opacity: .55; }
@@ -66,26 +69,28 @@
 .depth-body b { display: block; font-size: 14px; }
 .depth-body small { display: block; font-size: 12px; color: var(--ink-dim); }
 .depth-meta { display: flex; align-items: center; gap: 6px; }
-.depth-meta em { padding: 1px 5px; border-radius: var(--radius); font-style: normal; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.depth-meta em { padding: 1px 5px; border-radius: var(--radius); font-style: normal; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .depth-meta i { font-style: normal; color: var(--hp); }
 /* Depth dossier (a tap on a depth, in the modal): the foes (silhouettes until met), the material, the party and its power, the rules, the party lock. */
 .dossier-kicker { display: block; margin-bottom: 4px; color: var(--ink-dim); font-size: 12px; }
-dialog#modal .depth-dossier h3 { margin: 12px 0 6px; font-size: 10px; color: var(--gold); }
+dialog#modal .depth-dossier h3 { margin: 12px 0 6px; font-family: var(--pixel); font-size: 10px; color: var(--gold); }
 .dossier-foes { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .dossier-foe { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 2px 8px 2px 2px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); font-size: 13px; line-height: 1.2; }
 .dossier-foe img { width: 38px; height: 36px; object-fit: contain; image-rendering: pixelated; }
 .dossier-foes.guardian .dossier-foe img { width: 56px; height: 52px; }
-.dossier-foe small { display: block; font-size: 11px; color: var(--gold); }
+.dossier-foe small { display: block; font-weight: 600; font-size: 12px; color: var(--gold); }
 .dossier-foe.unseen b { color: var(--ink-dim); }
 .dossier-material { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 13px; }
 .dossier-material img { width: 18px; height: 18px; image-rendering: pixelated; }
 .dossier-party { margin: 8px 0 0; }
 .dossier-party em { padding: 1px 6px; border-radius: var(--radius); font-style: normal; font-size: 12px; font-weight: 700; }
+.dossier-howto { margin: 6px 0 0; }
 .dossier-rules { margin: 8px 0 0; font-size: 13px; color: var(--ink-soft); }
+.dossier-howto .dossier-rules { margin: 0 0 4px; }
 .dossier-rules b { color: var(--gold); font-weight: 600; }
 .dossier-warn { margin: 10px 0 2px; padding: 8px 10px; border: 1px solid var(--gold-border); border-radius: var(--radius); background: var(--gold-bg); color: var(--gold-bright); font-size: 13px; }
 .dungeon-rules { padding: 8px 12px; }
-.dungeon-rules summary { min-height: 32px; display: flex; align-items: center; gap: 8px; font-family: var(--pixel); font-size: 10px; color: var(--gold); cursor: pointer; list-style: none; }
+.dungeon-rules summary { min-height: var(--touch); display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: var(--gold); cursor: pointer; list-style: none; }
 .dungeon-rules summary::-webkit-details-marker { display: none; }
 /* The marker points right when closed; base.css turns it down when open. */
 .dungeon-rules summary::before { content: '▸'; font-family: var(--text); font-size: 14px; }
@@ -96,6 +101,7 @@ dialog#modal .depth-dossier h3 { margin: 12px 0 6px; font-size: 10px; color: var
 .dungeon-legend li { display: inline-flex; align-items: center; gap: 4px; }
 .dungeon-legend img { width: 16px; height: 16px; image-rendering: pixelated; }
 .dungeon-scene > .dungeon-legend { margin: -4px 2px 0; }
+.room-panel [data-dungeon-next] { margin-top: 6px; }
 
 /* Undercroft: run HUD */
 .dungeon-hud { display: grid; gap: 6px; padding: 8px 12px; }
@@ -104,14 +110,14 @@ dialog#modal .depth-dossier h3 { margin: 12px 0 6px; font-size: 10px; color: var
 .pouch-gold { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
 .pouch-potions { font-size: 12px; color: var(--mana); }
 .dungeon-blessing { padding: 1px 6px; border-radius: var(--radius); background: #23304a; font-size: 12px; color: var(--mana); }
-.dungeon-hero { display: inline-grid; gap: 2px; width: 40px; }
+.dungeon-hero { display: inline-grid; justify-items: center; gap: 2px; width: 46px; }
 .dungeon-hero img { width: 40px; height: 40px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: var(--radius); background: var(--inset); }
-.dungeon-hero .gauge { height: 5px; }
+.dungeon-hero .gauge { justify-self: stretch; height: 5px; }
 .dungeon-hero.low .gauge i { background: var(--hp-low); }
 .dungeon-hero.down img { filter: grayscale(1) brightness(.5); }
 
 /* Undercroft: room map (rows climb from the entrance at the bottom to the guardian at the top) */
-.dungeon-map { position: relative; height: min(64dvh, 470px); max-height: 55dvh; min-height: 280px; border: 1px solid var(--win-edge); border-radius: var(--radius); background:
+.dungeon-map { position: relative; height: min(64dvh, 470px); max-height: 55dvh; min-height: 350px; border: 1px solid var(--win-edge); border-radius: var(--radius); background:
   radial-gradient(ellipse at 50% 100%, #2b1f17 0%, transparent 60%),
   repeating-linear-gradient(0deg, #0000 0 22px, #ffffff06 22px 23px),
   linear-gradient(180deg, #120d10, #1b1612 55%, #221a13); overflow: hidden; }
@@ -128,18 +134,18 @@ dialog#modal .depth-dossier h3 { margin: 12px 0 6px; font-size: 10px; color: var
 .room-guardian { width: 52px; height: 52px; border-color: var(--danger); }
 .room-guardian img { width: 34px; height: 34px; }
 .room-panel { padding: 10px 12px; }
-.room-panel small { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+.room-panel small { font-family: var(--text); font-weight: 600; font-size: 12px; letter-spacing: 0.3px; color: var(--gold); text-transform: uppercase; }
 .room-panel h3 { margin: 6px 0; font-size: 16px; color: var(--ink); }
 .room-panel h3 span { font-size: 13px; color: var(--ink-dim); font-weight: 500; }
 .room-panel p { margin: 6px 0; color: var(--ink-soft); }
 .room-outcome { padding: 6px 8px; border-left: 3px solid var(--gold); background: var(--inset); color: var(--ink) !important; }
-.event-choices { display: grid; gap: 6px; margin-top: 8px; }
+.event-choices { display: grid; gap: 8px; margin-top: 8px; }
 .event-choices .btn { text-align: left; }
 .event-choices .btn:disabled { opacity: 1; filter: none; border-style: dashed; color: var(--ink-dim); cursor: not-allowed; }
 /* The reason stays readable on the dimmed choice. */
-.choice-need { margin-left: 4px; padding: 1px 6px; border: 1px solid #a8483c; border-radius: var(--radius); background: #4a1f1a; font-style: normal; font-size: 11px; font-weight: 700; color: #ffd9cf; white-space: nowrap; }
+.choice-need { margin-left: 4px; padding: 1px 6px; border: 1px solid #a8483c; border-radius: var(--radius); background: #4a1f1a; font-style: normal; font-size: 12px; font-weight: 700; color: #ffd9cf; white-space: nowrap; }
 .dungeon-letter { margin: 6px 0; padding: 6px 10px; border-left: 3px solid var(--gold-border); background: var(--inset); }
-.dungeon-letter small { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+.dungeon-letter small { font-family: var(--text); font-weight: 600; font-size: 12px; letter-spacing: 0.3px; color: var(--gold); text-transform: uppercase; }
 .dungeon-letter p { margin: 4px 0 0 !important; font-style: italic; color: var(--ink) !important; }
 .dungeon-scene .departure-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 /* An active run's free exit stays on screen while the map and the room panel scroll under it. */
@@ -168,17 +174,22 @@ dialog#modal .depth-dossier h3 { margin: 12px 0 6px; font-size: 10px; color: var
 .story-party.locked .btn[aria-disabled="true"] { opacity: .7; }
 
 @media (max-width: 420px) {
-  .room { width: 40px; height: 40px; }
-  .room img { width: 24px; height: 24px; }
   .depth-card { grid-template-columns: 32px 1fr; }
   .depth-meta { grid-column: 2; }
   /* The run HUD's party stays one row of smaller portraits. */
   .dungeon-hud .dungeon-party { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-  .dungeon-hero { flex: none; width: 32px; }
+  .dungeon-hero { flex: none; width: 46px; }
   .dungeon-hero img { width: 32px; height: 32px; }
 }
 
+/* A phone (also held sideways): the intro is two lines, so the first depth is on screen on arrival (contract L8). */
+@media (max-width: 480px), (orientation: landscape) and (max-height: 500px) {
+  .dungeon-intro p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+}
+/* Held sideways the intro keeps its kicker and two lines (the route title is in the HUD, the party and its power are in each depth's dossier). */
+@media (orientation: landscape) and (max-height: 500px) { .dungeon-intro h2, .dungeon-intro .dungeon-party { display: none; } .dungeon-intro { padding-top: 6px; padding-bottom: 6px; } }
+
 /* Lore fragment on a guardian clear */
 .dungeon-lore { margin: 12px 0; padding: 8px 12px; border-left: 3px solid var(--gold-border); background: var(--inset); text-align: left; }
-.dungeon-lore small { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+.dungeon-lore small { font-family: var(--text); font-weight: 600; font-size: 12px; letter-spacing: 0.3px; color: var(--gold); text-transform: uppercase; }
 .dungeon-lore p { margin: 6px 0 0; font-style: italic; color: var(--ink-soft); }

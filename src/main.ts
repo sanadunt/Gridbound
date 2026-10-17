@@ -492,6 +492,8 @@ function modeForTownTab(tab: TownTab, fallback = commander.mode): CommanderMode 
   return 'story';
 }
 
+/** The Party view last rendered (route, tab and hero): a different one starts at the top. */
+let lastView = '';
 function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   // A mode the story has not reached yet is never shown (a restored Raid/Trials mode, a stale link): the camp explains when it opens.
   // A Commander with a run in that mode (an older file, a suspended run) keeps it reachable.
@@ -512,6 +514,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   // The Story party list keeps the open/closed state the player left it in while Party re-renders; another route forgets it.
   if (routeChanged && tab !== 'party') townState.storyPartyOpen = undefined;
   if (routeChanged && tab !== 'party-advanced') townState.pendingJob = undefined;
+  if (routeChanged && tab !== 'challenge-shop') townState.pendingBank = undefined;
   townState.tab = tab;
   townState.notice = notice;
   // A locked quarry (unseen boss, chapter not cleared) is never offered: fall back to the first open one.
@@ -538,9 +541,13 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   menuButton.dataset.badge = waiting ? String(waiting) : '';
   menuButton.setAttribute('aria-label', waiting ? t('hud.menu.waiting', { n: waiting }) : t('route.menu'));
   // Keep the scroll position when a screen re-renders in place (equipping, inspecting, learning, claiming).
-  const scrollers = '[data-training-panel], .party-scene, .secondary-content, .more-scene, .world-map-wrapper';
+  const scrollers = '[data-training-panel], .party-scene, .secondary-scene, .secondary-content, .more-scene, .world-map-wrapper';
   const oldPanel = $('town-screen').querySelector<HTMLElement>('[data-training-panel]');
-  const kept = routeChanged ? [] : Array.from($('town-screen').querySelectorAll<HTMLElement>(scrollers), el => ({ key: el.dataset.trainingPanel ?? el.className, top: el.scrollTop }));
+  // A tab or hero switch on Party/Progression starts at the top of the new tab (np-05); any other same-view re-render (equip, learn, deploy,
+  // an inspector) keeps the scroll.
+  const view = tab === 'party' || tab === 'party-advanced' ? `${tab}:${townState.trainingTab}:${townState.hero}` : tab, sameView = view === lastView;
+  lastView = view;
+  const kept = routeChanged || !sameView ? [] : Array.from($('town-screen').querySelectorAll<HTMLElement>(scrollers), el => ({ key: el.dataset.trainingPanel ?? el.className, top: el.scrollTop }));
   const keptPanel = oldPanel?.dataset.trainingPanel;
   // The Story party list stays as the player left it (open or closed) when Party re-renders: a bench/deploy never folds it under the finger.
   const partyList = routeChanged ? null : $('town-screen').querySelector<HTMLDetailsElement>('details.story-party:not(.locked)');
@@ -558,8 +565,9 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
       heading.tabIndex = -1;
       heading.focus({ preventScroll: true });
     }
-    // Back in the Undercroft with news (a fled or interrupted fight): open on the room panel that explains it.
+    // Back in the Undercroft with news (a fled or interrupted fight): open on the room panel that explains it; else on the open rooms.
     if (tab === 'dungeon' && townState.dungeonOutcome) scene?.querySelector('.room-panel')?.scrollIntoView({ block: 'end' });
+    else if (tab === 'dungeon' && profile.journey.run?.status === 'active') openRoomInView();
   }
   persist();
   if (animate && motionOn()) {
@@ -593,7 +601,7 @@ function unlockIntro(force = false) {
   const features = pendingIntros(profile);
   if (!features.length) return false;
   features.forEach(markIntro);
-  openModal(`<div class="unlock-card"><small class="unlock-kicker">${t('unlock.kicker')}</small>${features.map((f, i) => `<section class="unlock-entry" data-unlock="${f}"><h2 ${i ? '' : 'id="modal-title"'}>${t(`unlock.${f}.title` as never)}</h2><p>${t(`unlock.${f}.body` as never)}</p><button class="btn primary" data-unlock-go="${f}">${t('unlock.go')} ▶</button></section>`).join('')}<button class="btn" data-close>${t('unlock.later')}</button></div>`);
+  openModal(`<div class="unlock-card"><small class="unlock-kicker">${t('unlock.kicker')}</small>${features.map((f, i) => `<section class="unlock-entry" data-unlock="${f}"><h2 ${i ? '' : 'id="modal-title"'}>${t(`unlock.${f}.title` as never)}</h2><p>${t(`unlock.${f}.body` as never)}</p><button class="btn primary" data-unlock-go="${f}">${t('unlock.go')} ▶</button></section>`).join('')}</div><button class="btn" data-close>${t('unlock.later')}</button>`);
   modal.querySelectorAll<HTMLButtonElement>('[data-unlock-go]').forEach(button => button.addEventListener('click', () => { modal.close(); void navigateTown(button.dataset.unlockGo as TownTab); }));
   return true;
 }
@@ -627,6 +635,7 @@ $('town-screen').addEventListener('click', event => {
     return;
   }
   if (button.hasAttribute('data-dungeon-fight')) { startDungeonFight(); return; }
+  if (button.hasAttribute('data-dungeon-next')) { openRoomInView(true); return; }
   if (button.dataset.dungeonChoice && profile.journey.run) {
     const out = chooseEvent(profile.journey.run, button.dataset.dungeonChoice);
     if (out) { townState.dungeonOutcome = describeOutcome(out); townState.dungeonLetter = out.lore; sound.play(out.fight ? 'threat' : out.hurt ? 'hurt' : 'buff'); showDungeonRoom(); }
@@ -682,7 +691,7 @@ $('town-screen').addEventListener('click', event => {
     const { claimed, gold, gear } = claimAllQuests(profile, townState.hero);
     if (claimed.length) sound.play('coin');
     showTown('quests', claimed.length ? t(gear.length ? 'notice.quest.all.gear' : 'notice.quest.all', { n: claimed.length, gold, gear: questGearText(gear) }) : t('notice.quest.fail'), true);
-    $('town-screen').querySelector('.secondary-content')?.scrollTo({ top: 0 });
+    $('town-screen').querySelectorAll('.secondary-scene, .secondary-content').forEach(el => el.scrollTo({ top: 0 }));
     return;
   }
   if (button.dataset.facility) {
@@ -690,7 +699,7 @@ $('town-screen').addEventListener('click', event => {
     // The camp guide's promotion step opens on that hero's job inspector.
     if (button.dataset.pickJob) { townState.hero = Number(button.dataset.pickHero); townState.pendingJob = { hero: townState.hero, job: button.dataset.pickJob }; }
     if (button.dataset.trainingTab) townState.trainingTab = button.dataset.trainingTab as TownState['trainingTab'];
-    void navigateTown(button.dataset.facility as TownTab);
+    void navigateTown(button.dataset.facility as TownTab).then(() => { if (button.dataset.pickJob) actionRowInView('[data-job-inspector]'); });
     return;
   }
   if (button.dataset.talent) {
@@ -713,7 +722,7 @@ $('town-screen').addEventListener('click', event => {
     townState.trainingTab = 'gear';
     townState.pendingGear = { hero: townState.hero, slot, gearId: button.dataset.gearItem };
     showTown('party', '', true);
-    document.querySelector('[data-gear-preview]')?.scrollIntoView({ block: 'nearest' });
+    actionRowInView('[data-gear-preview]');
     return;
   }
   if (button.dataset.equipSkill !== undefined) {
@@ -726,8 +735,8 @@ $('town-screen').addEventListener('click', event => {
   if (button.dataset.inspectTalent) {
     townState.selectedTalent = button.dataset.inspectTalent;
     showTown('party-advanced');
-    // The inspector (with its Learn button) sits below the tree: bring it on screen, as gear selection does with its preview.
-    document.querySelector('.talent-inspector-section')?.scrollIntoView({ block: 'nearest' });
+    // The inspector (its Learn button is the card) sits below the tree: bring the card on screen, as gear selection does with its confirm.
+    document.querySelector('.talent-inspector-section [data-talent]')?.scrollIntoView({ block: 'nearest' });
     return;
   }
   if (button.dataset.branch) { townState.talentBranch = button.dataset.branch; townState.selectedTalent = undefined; showTown('party-advanced', '', true); return; }
@@ -781,11 +790,23 @@ $('town-screen').addEventListener('click', event => {
   }
   if (button.dataset.raid) { townState.raid = button.dataset.raid; townState.raidSandbox = undefined; showTown('raid', '', true); return; }
   if (button.dataset.raidVariant) { townState.raid = button.dataset.raidVariant; townState.raidSandbox = undefined; showTown('raid'); return; }
+  // A ware only opens its inspector (a second tap closes it); Buy there spends the Crystal (contract G8: spending takes two steps).
   if (button.dataset.bankBuy) {
-    const item = buyChallengeUnlock(profile, button.dataset.bankBuy);
+    townState.pendingBank = townState.pendingBank === button.dataset.bankBuy ? undefined : button.dataset.bankBuy;
+    sound.play('cursor');
+    showTown(townState.tab);
+    if (townState.pendingBank) actionRowInView('[data-bank-inspector]');
+    if (townState.pendingBank && (event as MouseEvent).detail === 0) document.querySelector<HTMLElement>('[data-cancel-bank]')?.focus({ preventScroll: true });
+    return;
+  }
+  if (button.dataset.confirmBank) {
+    const item = townState.pendingBank === button.dataset.confirmBank ? buyChallengeUnlock(profile, button.dataset.confirmBank) : undefined;
+    townState.pendingBank = undefined;
+    if (item) sound.play('coin');
     showTown(townState.tab, item ? t('notice.bank.ok', { name: item.name }) : t('notice.bank.fail'));
     return;
   }
+  if (button.hasAttribute('data-cancel-bank')) { townState.pendingBank = undefined; showTown(townState.tab); return; }
   if (button.dataset.runBuy) {
     const item = buyForRun(button.dataset.runBuy);
     if (item && inTown) showTown(townState.tab, t('notice.run.ok', { name: item.name }));
@@ -812,7 +833,7 @@ $('town-screen').addEventListener('click', event => {
     townState.pendingJob = same ? undefined : { hero: townState.hero, job };
     sound.play('cursor');
     showTown('party-advanced');
-    if (!same) document.querySelector('[data-job-inspector]')?.scrollIntoView({ block: 'nearest' });
+    if (!same) actionRowInView('[data-job-inspector]');
     // A keyboard press lost its card to the re-render: the inspector's safe exit (Close) takes the focus; Tab reaches Promote before it.
     if (!same && (event as MouseEvent).detail === 0) document.querySelector<HTMLElement>('[data-cancel-job]')?.focus({ preventScroll: true });
     return;
@@ -946,6 +967,26 @@ $('town-screen').addEventListener('change', event => {
     showTown('raid',t('notice.raid.sandbox'));return;
   }
 });
+/** An inspector just opened (gear, job, Crystal Exchange ware): its confirm row comes on screen above the sticky Depart bar (contract L8/L9),
+ *  not the top of a panel taller than the band between the sticky header and that bar. */
+function actionRowInView(inspector: string) { document.querySelector(`${inspector} .gear-preview-actions`)?.scrollIntoView({ block: 'nearest' }); noteInspectorRow(); }
+/** An open inspector whose confirm row was on screen keeps it there through a resize (the browser bars showing, a rotation: contract C5).
+ *  The resize event runs before the scroll events the resize causes, so it still sees the row as it was. */
+let inspectorRowShown = false;
+const inspectorRow = () => document.querySelector<HTMLElement>('#town-screen .gear-preview-actions');
+const noteInspectorRow = () => { const r = inspectorRow()?.getBoundingClientRect(); inspectorRowShown = Boolean(r && r.top >= 0 && r.bottom <= innerHeight); };
+let inspectorFrame = 0;
+document.addEventListener('scroll', () => { if (inTown && !inspectorFrame) inspectorFrame = requestAnimationFrame(() => { inspectorFrame = 0; noteInspectorRow(); }); }, { capture: true, passive: true });
+addEventListener('resize', () => { if (inTown && inspectorRowShown) inspectorRow()?.scrollIntoView({ block: 'nearest' }); });
+/** The run map's open rooms come into view (on a phone the entrance row is the map's bottom, often below the fold: contract L8), after the
+ *  same-route scroll restore; `focus` also puts the keyboard on the first one. */
+function openRoomInView(focus = false) {
+  requestAnimationFrame(() => {
+    const room = $('town-screen').querySelector<HTMLElement>('.dungeon-scene .room.open');
+    room?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    if (focus) room?.focus({ preventScroll: true });
+  });
+}
 /** Re-render the Undercroft with the current room's panel (outcome and actions) on screen: on a phone it sits below the map. */
 function showDungeonRoom() { showTown('dungeon'); $('town-screen').querySelector('.room-panel')?.scrollIntoView({ block: 'end' }); }
 function materialList(materials: Record<string, number>) {
@@ -1001,7 +1042,7 @@ function settleInterruptedFight() {
 function depthDossierModal(depth: number) {
   if (profile.journey.run?.status === 'active' || depth < 1 || depth > unlockedDepth(profile.cleared, profile.journey.depth)) return;
   sound.play('cursor');
-  openModal(depthDossier(profile, depth));
+  openModal(depthDossier(profile, depth, matchMedia('(max-width: 420px)').matches));
   // Opening focuses the dialog's first control (Descend, near the bottom) before Back takes the focus: start at the depth's name, on a small phone too.
   modal.scrollTop = 0;
   // On a phone Descend can open right under the finger that tapped the depth: a double tap (or a tap that lands as the dialog appears)
@@ -1015,8 +1056,10 @@ function depthDossierModal(depth: number) {
     profile.journey.run = startRun(depth, Math.floor(Math.random() * 1e9), normalizeStoryParty(profile.storyActive, profile.roster, profile.cleared));
     townState.dungeonOutcome = townState.dungeonLetter = undefined; sound.play('confirm');
     showTown('dungeon', '', true);
-    // The depth card that opened the dossier is gone: the keyboard lands on the map's first open room, not on the page.
+    // The depth card that opened the dossier is gone: the keyboard lands on the map's first open room, not on the page, and the open rooms
+    // (the map's bottom row) come into view.
     document.querySelector<HTMLElement>('.dungeon-scene .room.open')?.focus({ preventScroll: true });
+    openRoomInView();
   });
 }
 /** Fight the pending dungeon room with the run's own party, its carried HP, potions and blessings. */
@@ -2206,8 +2249,10 @@ function openModal(content: string, options: boolean | ModalOptions = true) {
   // Text exits are tagged for the navigation checks: a close/cancel closes, a parent link goes back.
   modal.querySelectorAll<HTMLElement>('[data-close]:not(.modal-close):not([data-nav-exit])').forEach(el => { el.dataset.navExit = 'close'; });
   modal.querySelectorAll<HTMLElement>('[data-nav-parent]:not(.modal-close):not([data-nav-exit])').forEach(el => { el.dataset.navExit = 'back'; });
-  // A long dialog (Save files, the Journal, Config on a phone) keeps its closing text exit on screen: the last one sticks to the bottom.
-  Array.from(modal.querySelectorAll<HTMLElement>(':scope > [data-nav-exit]:not(.modal-close)')).at(-1)?.classList.add('modal-exit');
+  // A long dialog (Save files, the Journal, Config on a phone) keeps its closing text exit on screen: the last one sticks to the bottom. A dialog
+  // that ends in an action row holding its exit (the depth dossier: Back and Descend) sticks that whole row, so the primary is never under it.
+  const actions = modal.querySelector<HTMLElement>(':scope > .modal-actions:last-of-type');
+  (actions?.querySelector('[data-nav-exit]') && !actions.nextElementSibling?.matches(':not(.modal-close)') ? actions : Array.from(modal.querySelectorAll<HTMLElement>(':scope > [data-nav-exit]:not(.modal-close)')).at(-1))?.classList.add('modal-exit');
   modal.scrollTop = 0;
   if (!alreadyOpen) {
     try { modal.showModal(); } catch { modal.show(); }
@@ -2223,8 +2268,10 @@ function openModal(content: string, options: boolean | ModalOptions = true) {
     else if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
     else modal.querySelector<HTMLElement>('button:not([disabled]), input, select, textarea, [href]')?.focus({ preventScroll: true });
   }
-  // K6: a destructive option never lands where the control that opened this content was (Leave battle…, Flee the room…, Delete…).
-  keepDangerOff(modal, lastPress && shownAt - lastPress.at < 4000 ? lastPress.rect : undefined);
+  // K6: a destructive option never lands where the control that opened this content was (Leave battle…, Flee the room…, Delete…). A control in
+  // the sticky exit row (the dossier's Descend) is never moved: a margin there would stretch the whole row over the dialog; the G7 hold and its
+  // own tap guard keep it from a double tap.
+  keepDangerOff(modal, lastPress && shownAt - lastPress.at < 4000 ? lastPress.rect : undefined, DANGER_CONTROLS.split(',').map(s => `${s.trim()}:not(.modal-exit *)`).join(', '));
   modal.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => modal.close()));
   modal.querySelectorAll('[data-nav-parent]').forEach(el => el.addEventListener('click', modalBack));
 }
@@ -2591,9 +2638,9 @@ async function presentResult() {
         <p class="boon-run-wallet">${t('boons.purse', { n: runWallet.crystal })} · ${t('battle.standing', { n: battle.living().length, total: battle.heroes.length })} · ${formatTime(battle.time)}</p>
         ${resultReward?.crystal ? `<p class="boon-run-wallet boon-bank-gain" data-result-reward>${t('boons.bank', { n: resultReward.crystal })}</p>` : ''}
       </header>
-      <section class="win rogue-promote" id="rogue-promote" aria-live="polite"></section>
       ${!offeredBoons.length ? `<button id="next-floor" class="btn primary">${t('boon.allcollected')}</button>` : ''}
       <div class="boon-draft-grid" data-cards="${offeredBoons.length}">${cardsHtml}</div>
+      <details class="win rogue-promote-wrap" hidden><summary data-rogue-points></summary><section class="rogue-promote" id="rogue-promote" aria-live="polite"></section></details>
       <footer class="boon-modal-footer"><button id="result-town" class="btn" data-nav-exit="return">${t('boon.leave')}</button></footer>
     </div>`);
     renderRoguePromote();
@@ -2795,7 +2842,7 @@ async function presentDungeonResult() {
   sound.play(won ? 'fanfare' : 'defeat');
   if (experienceRewards.some(r => r.after > r.before)) window.setTimeout(() => sound.play('levelup'), 1300);
   animateCeremony();
-  $('result-dungeon').addEventListener('click', () => { closeWithoutResume(); inTown = true; townState.dungeonOutcome = townState.dungeonLetter = undefined; routeStack = originStack(); showTown('dungeon', '', true); });
+  $('result-dungeon').addEventListener('click', () => { closeWithoutResume(); inTown = true; townState.dungeonOutcome = townState.dungeonLetter = undefined; routeStack = originStack(); showTown('dungeon', '', true); if (!townState.dungeonOutcome) openRoomInView(); });
   return true;
 }
 let dungeonLoot: { gold: number; materials: Record<string, number> } | undefined;
@@ -2929,11 +2976,13 @@ async function clearEncounter(record = true) {
   if (ok) { encounter = undefined; runBoons = []; resetRunWallet(runWallet); }
   return ok;
 }
-/** Spend the run's promotion points (one per room cleared) between floors. */
+/** Spend the run's promotion points (one per room cleared) between floors. They fold under 'Promotion points: n' below the boons, so the
+ *  boon cards come first on a phone (contract L8: the first card in full on arrival). */
 function renderRoguePromote() {
-  const host = document.getElementById('rogue-promote'), build = battle.rogueBuild;
+  const host = document.getElementById('rogue-promote'), build = battle.rogueBuild, wrap = host?.closest('details');
   if (!host) return;
-  if (!build || build.points < 1 || battle.mode !== 'endless') { host.hidden = true; return; }
+  if (!build || build.points < 1 || battle.mode !== 'endless') { host.hidden = true; if (wrap) wrap.hidden = true; return; }
+  if (wrap) { wrap.hidden = false; wrap.querySelector('[data-rogue-points]')!.textContent = t('rogue.promote.title', { n: build.points }); }
   const rows = build.recruits.map((recruit, i) => {
     const hero = battle.hero(i), options = rogueUpgrades(build, i);
     if (!hero) return '';
@@ -2941,7 +2990,7 @@ function renderRoguePromote() {
     return `<div class="rogue-promote-row"><span><b>${escapeUI(heroName(hero))}</b><small>${escapeUI(current ?? '')}</small></span><span class="rogue-promote-options">${options.length ? options.map(j => `<button class="btn" data-rogue-promote="${i}" data-job="${j.id}">${escapeUI(j.name)} ▲</button>`).join('') : `<small>${t('rogue.promote.max')}</small>`}</span></div>`;
   }).join('');
   host.hidden = false;
-  host.innerHTML = `<h3>${t('rogue.promote.title', { n: build.points })}</h3><p class="hint">${t('rogue.promote.sub')}</p>${rows}`;
+  host.innerHTML = `${wrap ? '' : `<h3>${t('rogue.promote.title', { n: build.points })}</h3>`}<p class="hint">${t('rogue.promote.sub')}</p>${rows}`;
   host.querySelectorAll<HTMLElement>('[data-rogue-promote]').forEach(el => el.addEventListener('click', () => {
     if (battle.upgradeRogue(Number(el.dataset.roguePromote), el.dataset.job!)) { sound.play('levelup'); townState.rogueSetup = structuredClone(battle.rogueBuild); }
     renderRoguePromote();
@@ -3288,14 +3337,14 @@ async function profilesMenu(notice = '') {
     });
     if (legacyHere) $('legacy-preview').onclick = () => {
       const old = loadSave(store), raw = rawV3();
-      openModal(`<h2 id="modal-title">${t('profiles.legacy.title')}</h2><p>${t('profiles.legacy.copy', { ch: old.profile.cleared.length, gold: old.profile.gold, roster: old.profile.roster.length })}</p><p>${old.warning ? escapeUI(errorText(old.warning)) : ''}</p><button id="legacy-export" class="btn" ${raw ? '' : 'disabled'}>${t('profiles.legacy.export')}</button><button id="legacy-confirm" class="btn primary" ${!raw || old.readOnly || full ? 'disabled' : ''}>${t('profiles.legacy.confirm')}</button><button data-nav-parent class="btn">${t('common.cancel')}</button>`, { parent: backToProfiles });
+      openModal(`<h2 id="modal-title">${t('profiles.legacy.title')}</h2><p>${t('profiles.legacy.copy', { ch: old.profile.cleared.length, gold: old.profile.gold, roster: old.profile.roster.length })}</p><p>${old.warning ? escapeUI(errorText(old.warning)) : ''}</p><button id="legacy-export" class="btn" ${raw ? '' : 'disabled'}>${t('profiles.legacy.export')}</button><div class="modal-actions"><button data-nav-parent class="btn">${t('common.cancel')}</button><button id="legacy-confirm" class="btn primary" ${!raw || old.readOnly || full ? 'disabled' : ''}>${t('profiles.legacy.confirm')}</button></div>`, { parent: backToProfiles });
       $('legacy-export').onclick = () => download(rawV3() ?? '', 'Gridbound-original-v3.json');
       $('legacy-confirm').onclick = () => { void leaveSafely(() => creatingCommander(async () => { const source=loadSave(store), raw=rawV3(); if (!raw || source.readOnly) return; backupLegacyNow(); const name=t('profiles.legacy.name'), candidate=copyLegacyToCommander(source.profile,name); candidate.legacySource=raw; activateCommander(await commander.create(name,candidate)); })); };
     };
     modal.querySelectorAll<HTMLElement>('[data-save-slot]').forEach(button => button.onclick = () => { void attempt(async () => { if (commander.stale) { staleModal(); return; } let ok: boolean; if (!inTown && encounter && !pendingSettlement) { const frozen=structuredClone(encounter); ok = await persist(button.dataset.saveSlot as SlotId, doc => { const state=commander.mode==='story'?doc.story:commander.mode==='raid'?doc.raid:doc.rogue; const auto=state.slots[3]; const index=state.slots.findIndex(slot=>slot.slotId===button.dataset.saveSlot); state.slots[index]=structuredClone({...auto,slotId:button.dataset.saveSlot as SlotId}); doc.encounters ??={}; doc.encounters[commander.mode]=frozen; }); } else ok = await persist(button.dataset.saveSlot as SlotId); if (!ok) { refused(); return; } sound.play('save'); await profilesMenu(t('profiles.saved', { slot: t('profiles.slot', { n: button.dataset.saveSlot!.slice(-1) }) })); }); });
     modal.querySelectorAll<HTMLElement>('[data-load-slot]').forEach(button => button.onclick = () => {
       const slot=slots.find(item=>item.slotId===button.dataset.loadSlot)!;
-      openModal(`<h2 id="modal-title">${t('profiles.preview', { slot: slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) }) })}</h2>${slotSummary(slot.state, slot.savedAt)}<p class="hint">${t('profiles.preview.hint')}</p><button id="load-confirm" class="btn primary">${t('profiles.load.confirm')}</button><button data-nav-parent class="btn">${t('common.cancel')}</button><p id="load-error" role="status"></p>`, { parent: backToProfiles });
+      openModal(`<h2 id="modal-title">${t('profiles.preview', { slot: slot.slotId === 'auto' ? t('profiles.auto') : t('profiles.slot', { n: slot.slotId.slice(-1) }) })}</h2>${slotSummary(slot.state, slot.savedAt)}<p class="hint">${t('profiles.preview.hint')}</p><p id="load-error" role="status"></p><div class="modal-actions"><button data-nav-parent class="btn">${t('common.cancel')}</button><button id="load-confirm" class="btn primary">${t('profiles.load.confirm')}</button></div>`, { parent: backToProfiles });
       $('load-confirm').onclick = async () => { if (commander.stale) { staleModal(); return; } if (!inTown || pendingSettlement) { $('load-error').textContent=t('profiles.load.blocked'); return; } try { profile=await commander.loadSlot(slot.slotId); activateCommander(commander.document!,commander.mode); closeWithoutResume(); } catch(error) { console.warn('Commander storage:', error); $('load-error').textContent=errorText(error); } };
     });
     // Continue latest is disabled (with its reason above it) when the mode has nothing to resume; a refusal is written there too, in view.

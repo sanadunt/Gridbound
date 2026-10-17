@@ -50,6 +50,8 @@ export type TownState = {
   talentBranch?: string;
   selectedTalent?: string;
   pendingGear?: PendingGear;
+  /** The Crystal Exchange ware being inspected (a tap only selects it; Buy in its inspector spends the Crystal: contract G8). */
+  pendingBank?: string;
   /** The job card being inspected on the Jobs tab (a tap only selects it; Promote in its inspector spends the gold). */
   pendingJob?: { hero: number; job: string };
   /** The Story party list on Formation, as the player left it open or closed (kept across re-renders; unset = open while slots are free). */
@@ -220,7 +222,7 @@ function moreScene(p: Profile) {
 }
 function secondaryScene(p: Profile, state: TownState) {
   const tab = state.tab as 'quests' | 'bestiary' | 'challenge-shop' | 'raid' | 'endless';
-  const body = tab === 'quests' ? questBoard(p, state.hero, state.questFilter) : tab === 'bestiary' ? bestiary(p, state.bestiaryPick) : tab === 'challenge-shop' ? challengeShop(p) : tab === 'raid' ? raids(p, state) : endless(p, state);
+  const body = tab === 'quests' ? questBoard(p, state.hero, state.questFilter) : tab === 'bestiary' ? bestiary(p, state.bestiaryPick) : tab === 'challenge-shop' ? challengeShop(p, state.pendingBank) : tab === 'raid' ? raids(p, state) : endless(p, state);
   const modeNav = tab === 'raid' || tab === 'endless' ? expeditionModes(tab, p) : '';
   // A suspended run is resumed by the departure button, which names it (the setup above is locked until it ends).
   const raidRun = state.suspended?.raid, rogueRun = state.suspended?.roguelike;
@@ -502,8 +504,12 @@ function raidSetup(p: Profile, state: TownState) {
   </details>`;
 }
 
-function challengeShop(p: Profile) {
-  return `<div class="win shop-keeper"><p>${t('shop.greeting')}</p><span class="shop-purse">${t('shop.purse', { n: p.economy.commanderCrystal })}</span></div><section class="challenge-shop-grid"><article class="win"><h3 class="subheading">${t('shop.bank')}</h3>${BANK_SHOP.map(item => { const owned = p.challengeUnlocks.includes(item.id); return `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div>${item.consumable ? `<span class="shop-cost consumable" data-bank-consumable="${item.id}">${fmtInt(item.cost)} ◆<small>${t('shop.atdeparture')}</small></span>` : `<button class="btn ${owned ? '' : 'primary'}" data-bank-buy="${item.id}" ${owned || p.economy.commanderCrystal < item.cost ? 'disabled' : ''}>${owned ? t('shop.owned') : `${fmtInt(item.cost)} ◆`}</button>`}</div>`; }).join('')}</article><article class="win"><h3 class="subheading">${t('shop.journey')}</h3><p class="hint">${t('shop.journey.hint')}</p>${CHALLENGE_SHOP.map(item => `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div><span class="shop-cost">${fmtInt(item.cost)} ◇</span></div>`).join('')}</article></section>`;
+/** The Crystal Exchange: a tap on a ware only selects it and opens its inspector under it (the cost or the shortfall; the ware above already says what it does); Buy there
+ *  spends the Crystal, Close closes it (Escape and the phone's Back walk the route, as with the gear and job inspectors). */
+function challengeShop(p: Profile, pending?: string) {
+  const crystal = p.economy.commanderCrystal;
+  const inspector = (item: typeof BANK_SHOP[number]) => `<section class="gear-preview bank-inspector" data-bank-inspector="${item.id}" aria-live="polite"><small>${t('gear.inspect')}</small><h3>${escape(item.name)}</h3><p class="gear-preview-status">${crystal >= item.cost ? t('shop.ready', { cost: item.cost }) : t('shop.short', { n: item.cost - crystal })}</p><div class="gear-preview-actions"><button class="btn primary" data-confirm-bank="${item.id}" ${crystal >= item.cost ? '' : 'disabled'}>${t('shop.confirm', { cost: item.cost })}</button><button class="btn" data-cancel-bank data-nav-exit="close">${t('common.close')}</button></div></section>`;
+  return `<div class="win shop-keeper"><p>${t('shop.greeting')}</p><span class="shop-purse">${t('shop.purse', { n: crystal })}</span></div><section class="challenge-shop-grid"><article class="win"><h3 class="subheading">${t('shop.bank')}</h3><p class="hint">${t('shop.hint')}</p>${BANK_SHOP.map(item => { const owned = p.challengeUnlocks.includes(item.id), chosen = !owned && pending === item.id; return `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div>${item.consumable ? `<span class="shop-cost consumable" data-bank-consumable="${item.id}">${fmtInt(item.cost)} ◆<small>${t('shop.atdeparture')}</small></span>` : `<button class="btn ${owned ? '' : 'primary'}" data-bank-buy="${item.id}" aria-pressed="${chosen}" ${owned ? 'disabled' : ''}>${owned ? t('shop.owned') : `${fmtInt(item.cost)} ◆`}</button>`}</div>${chosen ? inspector(item) : ''}`; }).join('')}</article><article class="win"><h3 class="subheading">${t('shop.journey')}</h3><p class="hint">${t('shop.journey.hint')}</p>${CHALLENGE_SHOP.map(item => `<div class="shop-item"><div><h4>${escape(item.name)}</h4><p>${escape(item.description)}</p></div><span class="shop-cost">${fmtInt(item.cost)} ◇</span></div>`).join('')}</article></section>`;
 }
 
 function endless(p: Profile, state: TownState) {

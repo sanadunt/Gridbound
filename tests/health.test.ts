@@ -72,14 +72,6 @@ test('P11: a context is suspended after SOUND_IDLE_MS of silence, and the next c
   assert.equal(log.resume, 1); assert.equal(log.starts.length, played + 2, 'the waking cue plays once the context runs');
 });
 
-test('pixel-font readouts in result and Undercroft screens are at least 10px', () => {
-  for (const file of ['src/styles/result.css', 'src/styles/dungeon.css']) {
-    for (const rule of readFileSync(file, 'utf8').split('\n').filter(line => line.includes('var(--pixel)'))) {
-      const size = rule.match(/font-size:\s*(\d+(?:\.\d+)?)px/);
-      if (size) assert.ok(Number(size[1]) >= 10, `${file}: ${rule.trim().slice(0, 80)}`);
-    }
-  }
-});
 
 /** Every style rule of a stylesheet with the at-rule blocks around it (comments stripped; a brace-depth scan, no CSS parser). */
 function cssRules(file: string) {
@@ -102,14 +94,37 @@ function cssRules(file: string) {
 }
 const STYLES = readdirSync('src/styles').filter(name => name.endsWith('.css')).map(name => `src/styles/${name}`);
 
-test('T1/T2 in battle: battle.css text is at least 12px (10px in the pixel font or on a badge), the chip and name tag included', () => {
-  const BADGES = ['.boon-count-badge'];
-  for (const rule of cssRules('src/styles/battle.css')) {
+/** T2: selectors allowed under the 12px text floor, each with its reason. A rule passes only when every selector of its list is allowed. */
+const SMALL_TYPE: [selector: string, floor: number, why: string][] = [
+  ['.menu-button[data-badge]', 10, 'the MENU count badge: digits in a dot (contract §3 badge floor)'],
+  ['.spot-flag', 10, 'camp sign badges (a count, ! or NEW in a pill; a dot on a narrow map)'],
+  ['.tab-new', 10, 'the NEW tag on a gate tab'],
+  ['.boon-count-badge', 10, 'the boon tray count badge in battle'],
+  ['.intent-chip small', 10, 'the counter family tag inside a threat chip'],
+  ['.menu-badge', 10, 'the MENU entries\' count badge'],
+  ['.town-sign', 11, 'camp signs: the map scales them with its width (cqw); 11px is their floor (TOWN goal 2), with a whole word per line'],
+  ['.menu-item::before', 0, 'the ▶ cursor glyph'],
+  ['details > summary::before', 0, 'the ▶ disclosure glyph'],
+  ['.dungeon-rules summary::before', 0, 'the ▸ disclosure glyph'],
+];
+test('T1/T2: every stylesheet keeps text at 12px or more, the pixel font at 10px or more (badges and glyphs on the allowlist)', () => {
+  const failures: string[] = [];
+  for (const file of STYLES) for (const rule of cssRules(file)) {
     const size = rule.body.match(/font(?:-size)?:[^;]*?(?:clamp\(|max\()?(\d+(?:\.\d+)?)px/);
     if (!size) continue;
-    const floor = rule.body.includes('var(--pixel)') || BADGES.some(b => rule.selector.includes(b)) ? 10 : 12;
-    assert.ok(Number(size[1]) >= floor, `battle.css: ${rule.selector.slice(0, 80)} is ${size[1]}px (floor ${floor}px)`);
+    const px = Number(size[1]), pixel = rule.body.includes('var(--pixel)');
+    const allowed = rule.selector.split(',').map(s => s.trim()).map(s => SMALL_TYPE.find(([sel]) => s.includes(sel)));
+    const floor = Math.min(pixel ? 10 : 12, allowed.every(Boolean) ? Math.max(...allowed.map(a => a![1])) : 12);
+    if (px < floor) failures.push(`${file}: ${rule.selector.slice(0, 70)} is ${px}px${pixel ? ' in the pixel font' : ''} (floor ${floor}px)`);
   }
+  assert.deepEqual(failures, []);
+  for (const [selector, , why] of SMALL_TYPE) assert.ok(why && STYLES.some(file => readFileSync(file, 'utf8').includes(selector.split(' ')[0].replace(/::before|\[.*$/, ''))), `allowlist entry ${selector} still names a rule`);
+});
+test('T3: names wrap at word boundaries outside battle (no mid-word breaks on talent names or gate tabs; battle.css is BATTLE\'s, whose chip test is below)', () => {
+  for (const file of STYLES.filter(f => !f.endsWith('battle.css'))) for (const rule of cssRules(file)) assert.doesNotMatch(rule.body, /overflow-wrap:\s*anywhere|word-break:\s*break-all/, `${file}: ${rule.selector.slice(0, 70)} breaks names mid-word`);
+});
+
+test('T1/T2 in battle: the chip and name tag keep whole labels', () => {
   const chip = cssRules('src/styles/battle.css').find(r => r.selector === '.unit-skill-name')!.body;
   assert.match(chip, /text-overflow:\s*clip/, 'T3: a skill chip never ends in an ellipsis (main.ts fitChip picks a label that fits)');
 });

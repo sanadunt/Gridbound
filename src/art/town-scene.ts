@@ -617,15 +617,16 @@ const pct = (v: number, of: number) => Math.round(v / of * 1000) / 10;
 const box = (id: string, target: Target, x0: number, y0: number, x1: number, y1: number, sx: number, sy: number): TownHotspot =>
   ({ id, target, x: pct(x0, TOWN_W), y: pct(y0, TOWN_H), w: pct(x1 - x0, TOWN_W), h: pct(y1 - y0, TOWN_H), signX: pct(sx, TOWN_W), signY: pct(sy, TOWN_H) });
 
-/** Tappable building rectangles (percent of the scene) and their name-plate anchors (percent, sign center). */
+/** Tappable building rectangles (percent of the scene) and their name-plate anchors (percent, sign center). Neighbours stay at least 9 scene
+ *  px apart (8 CSS px on the narrowest 195px map: contract K3), and the Bell Tower clears the HUD by 4. */
 export const TOWN_HOTSPOTS: ReadonlyArray<TownHotspot> = [
   box('gate', { facility: 'campaign' }, 76, 12, 140, 86, 108, 92),
-  box('chapel', { facility: 'dungeon' }, 150, 0, 212, 142, 186, 122),
-  box('archive', { facility: 'bestiary' }, 4, 60, 72, 134, 38, 140),
+  box('chapel', { facility: 'dungeon' }, 150, 4, 212, 137, 186, 122),
+  box('archive', { facility: 'bestiary' }, 4, 60, 66, 134, 38, 140),
   box('hall', { facility: 'party' }, 2, 148, 84, 212, 40, 218),
   box('guild', { facility: 'quests' }, 136, 146, 214, 212, 176, 218),
-  box('merchant', { facility: 'challenge-shop' }, 2, 232, 72, 292, 36, 298),
-  box('well', { facility: 'endless' }, 146, 232, 212, 292, 180, 298),
+  box('merchant', { facility: 'challenge-shop' }, 2, 232, 72, 285, 36, 298),
+  box('well', { facility: 'endless' }, 146, 232, 212, 287, 180, 298),
   box('inn', { action: 'profiles' }, 2, 294, 104, 384, 50, 352),
   box('lodge', { facility: 'raid' }, 114, 296, 214, 384, 164, 326),
 ];

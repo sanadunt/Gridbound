@@ -40,6 +40,9 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
 
   // A cleared room grants a promotion point: promote the first recruit into an advanced job.
   assert.equal(await evaluate('document.querySelector("#rogue-promote")?.hidden'), false, 'promotion panel shows with a point');
+  // The promotions fold under 'Promotion points: n' below the boons (the boons come first on a phone).
+  assert.ok(await evaluate('document.querySelector(".boon-draft-grid").compareDocumentPosition(document.querySelector("#rogue-promote")) & Node.DOCUMENT_POSITION_FOLLOWING'), 'the boons come before the promotions');
+  await click('.rogue-promote-wrap > summary');
   await click('[data-rogue-promote="0"]');
   await wait('window.gridbound.battle.rogueBuild.points === 0 && Boolean(window.gridbound.battle.rogueBuild.recruits[0].job)');
   assert.equal(await evaluate('document.querySelector("#rogue-promote").hidden'), true, 'panel hides once points are spent');

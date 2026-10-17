@@ -374,6 +374,7 @@ export const EN = {
   'dungeon.lost': 'Lost: {lost}',
   'dungeon.lost.none': 'nothing',
   'dungeon.result.hp': 'Party HP',
+  'dungeon.next.room': 'Choose the next room',
   'dungeon.howto': 'How it works',
   'dungeon.legend': 'Room key',
   'material.ember-shard': 'Ember Shard',
@@ -506,6 +507,10 @@ export const EN = {
   'shop.purse': '{n} ◆ banked',
   'shop.bank': 'Bank wares',
   'shop.owned': 'OWNED',
+  'shop.hint': 'Pick a ware to inspect it for free. Crystal is spent only when you confirm.',
+  'shop.confirm': 'Buy · {cost} ◆',
+  'shop.ready': 'Ready: {cost} ◆ is spent only when you press Buy.',
+  'shop.short': 'You need {n} more Crystal.',
   'shop.journey': 'Journey shop',
   'shop.journey.hint': 'Opens inside a Bell Trials run. Bought with journey Crystal ◇, which resets when the run ends.',
 

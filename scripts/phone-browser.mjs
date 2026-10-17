@@ -47,15 +47,15 @@ const CHECKS = {
   G2: { rule: '#app user-select none, fields text; a finger never lands on an image (coarse)', owner: 'SHELL', mode: 'gate' },
   G3: { rule: 'html overscroll-behavior-y none', owner: 'SHELL', mode: 'gate' },
   'T1-form': { rule: 'select / text input / textarea at least 16px (coarse)', owner: 'SHELL', mode: 'gate' },
-  'T1-town': { rule: 'text floors outside battle (pixel 10px, text 12px)', owner: 'TOWN', mode: 'report' },
+  'T1-town': { rule: 'text floors outside battle (pixel 10px, text 12px)', owner: 'TOWN', mode: 'gate' },
   'T1-battle': { rule: 'text floors in battle (pixel 10px, text 12px)', owner: 'BATTLE', mode: 'gate' },
-  'K1-town': { rule: 'hit boxes at least 44×44 outside battle', owner: 'TOWN', mode: 'report' },
+  'K1-town': { rule: 'hit boxes at least 44×44 outside battle', owner: 'TOWN', mode: 'gate' },
   'K1-battle': { rule: 'hit boxes at least 44×44 in battle (the grid is K2)', owner: 'BATTLE', mode: 'gate' },
-  'K3-town': { rule: 'controls at least 8px apart outside battle', owner: 'TOWN', mode: 'report' },
+  'K3-town': { rule: 'controls at least 8px apart outside battle', owner: 'TOWN', mode: 'gate' },
   'K3-battle': { rule: 'controls at least 8px apart in battle', owner: 'BATTLE', mode: 'gate' },
   K2: { rule: 'hero cards at least 70×56 (64×50 landscape); the hero zone ≥ 60% of the card and ≥ 32px tall; the chip zone inside its card, ≥ 24px tall; nothing else on a card', owner: 'BATTLE', mode: 'gate' },
-  L7: { rule: 'no nested vertical scroller under 40% of the viewport height', owner: 'TOWN', mode: 'report' },
-  'L8-town': { rule: 'the primary action is on screen on arrival (town, dialogs)', owner: 'TOWN', mode: 'report' },
+  L7: { rule: 'no nested vertical scroller under 40% of the viewport height', owner: 'TOWN', mode: 'gate' },
+  'L8-town': { rule: 'the primary action is on screen on arrival (town, dialogs)', owner: 'TOWN', mode: 'gate' },
   'L8-battle': { rule: 'the primary action is on screen on arrival (battle, results)', owner: 'BATTLE', mode: 'gate' },
   L10: { rule: 'nothing covers a hero card before FIGHT!', owner: 'BATTLE', mode: 'gate' },
   G7: { rule: 'a quick double tap never presses what the first tap opened (Ⅱ Menu → Leave battle…)', owner: 'SAFE', mode: 'gate' },
@@ -142,7 +142,8 @@ function pageLib(cfg) {
     const d = el.closest('details'); if (d && !d.open && el.tagName !== 'SUMMARY' && !el.closest('summary')) return false;
     return visible(el);
   };
-  const hits = (el, h) => Boolean(h && (h === el || el.contains(h) || (h.tagName === 'LABEL' && h.control === el) || (el.tagName === 'LABEL' && el.control && h === el.control)));
+  // A tap on a label's text toggles its control: the whole label row is the control's target (a checkbox row, contract K1).
+  const hits = (el, h) => Boolean(h && (h === el || el.contains(h) || (h.closest?.('label')?.control === el) || (el.tagName === 'LABEL' && el.control && h === el.control)));
   const inView = (x, y) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight;
   const at = (el, x, y) => inView(x, y) && hits(el, document.elementFromPoint(x, y));
   const run = (el, x, y, dx, dy, max) => { let n = 0; for (let i = 2; i <= max; i += 2) { if (!at(el, x + dx * i, y + dy * i)) break; n = i; } if (n < max && at(el, x + dx * (n + 1), y + dy * (n + 1))) n += 1; return n; };
@@ -248,9 +249,12 @@ function pageLib(cfg) {
       if (html.overscrollBehaviorY !== 'none') G3.push({ sel: 'html', text: `overscroll-behavior-y ${html.overscrollBehaviorY}` });
       // T1-form: iOS zooms on a field under 16px.
       const form = coarse ? [...root.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=button]), select, textarea')].filter(visible).map(el => ({ sel: describe(el), fs: parseFloat(cs(el).fontSize) })).filter(x => x.fs < 16) : [];
-      // T1: text floors (report).
-      const T1 = texts.filter(x => !x.vis.empty && (x.pixel ? x.eff < 10 : x.eff < 12)).map(x => ({ sel: describe(x.el), text: x.t, px: x.eff, pixel: x.pixel }));
+      // T1: text floors: the pixel font 10px, text 12px; a badge (a count or NEW in a pill) 10px, a camp sign 11px (TOWN goal 2).
+      const floor = x => x.pixel ? 10 : x.el.closest('.spot-flag, .tab-new, .menu-badge, .intent-chip small') ? 10 : x.el.closest('.town-sign') ? 11 : 12;
+      const T1 = texts.filter(x => !x.vis.empty && x.eff < floor(x)).map(x => ({ sel: describe(x.el), text: x.t, px: x.eff, pixel: x.pixel }));
       // K1 / K3: hit boxes and spacing (report); the battle grid is K2.
+      // 44px with a 1px tolerance: the hit test walks whole pixels out from a fractional centre, so an exactly 44px box can read 43.
+      const small = x => x.eff && (x.eff[0] < 43 || x.eff[1] < 43);
       const grid = el => el.closest('#unit-layer');
       const targets = [];
       for (const el of controls) {
@@ -260,11 +264,13 @@ function pageLib(cfg) {
         const onScreen = r0.top >= -1 && r0.bottom <= H + 1 && r0.left >= -1 && r0.right <= W + 1 && !vis.scrolledY && !vis.scrolledX;
         let r = r0;
         if (!onScreen) { el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }); r = el.getBoundingClientRect(); }
-        targets.push({ el, eff: effective(el, r), rect: r0, onScreen, layer: layerOf(el) });
-        if (!onScreen) restore();
+        targets.push({ el, eff: effective(el, r), rect: r0, rect2: r, onScreen, layer: layerOf(el) });
+        if (!onScreen) { const x = targets.at(-1); if (small(x)) x.covered = (() => { for (const fy of [0.04, 0.96]) for (const fx of [0.15, 0.5, 0.85]) { const h = document.elementFromPoint(r.left + r.width * fx, r.top + r.height * fy); const l = h && !hits(el, h) ? layerOf(h) : ''; if (l && l !== x.layer) return true; } return false; })(); restore(); }
       }
       restore();
-      const K1 = targets.filter(x => x.eff && (x.eff[0] < 44 || x.eff[1] < 44)).map(x => ({ sel: describe(x.el), text: textOf(x.el), eff: x.eff }));
+      // A control partly under a sticky bar or header (of another layer) counts as off-screen there, not as small: it scrolls out from under it.
+      const underSticky = x => { const r = x.rect2; for (const fy of [0.04, 0.96]) for (const fx of [0.15, 0.5, 0.85]) { const h = document.elementFromPoint(r.left + r.width * fx, r.top + r.height * fy); const l = h && !hits(x.el, h) ? layerOf(h) : ''; if (l && l !== x.layer) return true; } return false; };
+      const K1 = targets.filter(x => small(x) && !(x.onScreen ? underSticky(x) : x.covered)).map(x => ({ sel: describe(x.el), text: textOf(x.el), eff: x.eff }));
       const K3 = [], land = targets.filter(x => x.onScreen && x.eff);
       for (let i = 0; i < land.length; i++) for (let j = i + 1; j < land.length; j++) {
         const a = land[i], b = land[j];
@@ -277,10 +283,10 @@ function pageLib(cfg) {
       const L7 = [...root.querySelectorAll('*')].filter(e => /auto|scroll/.test(cs(e).overflowY) && e.scrollHeight > e.clientHeight + 4 && e.clientHeight > 0 && e.clientHeight < H * 0.4 && visible(e) && !e.closest('#unit-layer, .start-overlay')).map(e => ({ sel: describe(e), text: `${e.clientHeight}px of ${e.scrollHeight}px` }));
       // L8: the screen's primary actions, fully on screen and hit at their centre (report).
       const L8 = [];
-      for (const { sel, all, optional } of primary) {
+      for (const { sel, all, optional, last } of primary) {
         const els = [...document.querySelectorAll(sel)].filter(el => visible(el) && !el.closest('[inert]') && (kind === 'page' || kind === 'result' ? true : root.contains(el)));
         if (!els.length) { if (!optional) L8.push({ sel, text: 'missing' }); continue; }
-        for (const el of all ? els : els.slice(0, 1)) {
+        for (const el of all ? els : last ? els.slice(-1) : els.slice(0, 1)) {
           const r = el.getBoundingClientRect(), vis = visibleBox(r, el);
           const full = !vis.empty && Math.abs(vis.t - r.top) < 1 && Math.abs(vis.b - r.bottom) < 1 && r.top >= -0.5 && r.bottom <= H + 0.5 && r.left >= -0.5 && r.right <= W + 0.5;
           const hit = full && at(el, r.left + r.width / 2, r.top + r.height / 2);
@@ -479,7 +485,8 @@ async function departStory(p) {
 }
 async function skipScene(p) { if ((await p.state()).layer === 'scene') { await p.tap('.dialogue-scene .dialogue-skip'); await sleep(800); } }
 
-const DIALOG = [{ sel: 'dialog[open] .btn.primary', optional: true }, { sel: 'dialog[open] [data-nav-exit]' }];
+// A dialog's exit row is its last labelled exit (a story choice's 'Decide later' above it is one of the choices, not the way out).
+const DIALOG = [{ sel: 'dialog[open] .btn.primary', optional: true }, { sel: 'dialog[open] [data-nav-exit]', last: true }];
 const DEPART = [{ sel: '.deploy-bar .btn' }];
 const RESULT = [{ sel: '.ceremony-actions' }];
 const TOUR = [
@@ -488,7 +495,8 @@ const TOUR = [
   { id: 'camp', go: async p => toCamp(p), primary: [{ sel: '[data-continue-story], [data-resume-story], .guide-go' }] },
   { id: 'menu', go: async p => { await p.tap('#menu-button'); return (await p.state()).route === 'more'; } },
   { id: 'config', go: async p => { await p.tap('#settings'); return (await p.state()).layer === 'modal'; }, primary: DIALOG },
-  { id: 'save-files', go: async p => { await p.tap('#menu-button'); await p.tap('.more-scene [data-open-action="profiles"]'); return (await p.state()).layer === 'modal'; }, primary: DIALOG },
+  // Save files manages files (load, save to a slot, rename, back up): no one forward action, so its arrival check is its exit row.
+  { id: 'save-files', go: async p => { await p.tap('#menu-button'); await p.tap('.more-scene [data-open-action="profiles"]'); return (await p.state()).layer === 'modal'; }, primary: [{ sel: 'dialog[open] [data-nav-exit]' }] },
   { id: 'journal', go: async p => { await p.tap('#menu-button'); await p.tap('.more-scene [data-open-action="journal"]'); return (await p.state()).layer === 'modal'; }, primary: DIALOG },
   { id: 'party', go: async p => { await menuTo(p, 'party'); return true; }, after: 'none', primary: DEPART },
   ...['formation', 'skills', 'gear'].map(tab => ({ id: `party-${tab}`, go: async p => { if ((await p.state()).route !== 'party') await menuTo(p, 'party'); return await p.tap(`[data-training-tab="${tab}"]`, { optional: true, timeout: 1500 }) || 'skip'; }, after: 'none', primary: DEPART })),
@@ -561,7 +569,9 @@ const TOUR = [
   { id: 'undercroft-run', saves: ['mid'], reset: true, go: async p => { await toCamp(p); await gateTo(p, 'dungeon'); if (!await p.tap('[data-dungeon-pick]', { optional: true, timeout: 2000 })) return 'skip'; await sleep(700); await p.tap('[data-dungeon-start]'); await sleep(800); return await p.evaluate(`Boolean(document.querySelector('.dungeon-map'))`) || 'skip'; }, after: 'none', primary: [{ sel: '.room.open', all: true }] },
   { id: 'undercroft-room', saves: ['mid', 'late'], needs: ['undercroft-run'], go: async p => { if (p.combo.save === 'late') { await toCamp(p); await gateTo(p, 'dungeon'); } return await p.tap('[data-dungeon-node]:not(:disabled)', { optional: true, timeout: 2000 }) || 'skip'; }, after: 'none' },
   { id: 'undercroft-fight', saves: ['mid', 'late'], needs: ['undercroft-run', 'undercroft-room'], go: async p => { if (!await p.tap('[data-dungeon-fight]', { optional: true, timeout: 2000 })) return 'skip'; await p.waitFor(`!window.gridbound.inTown`, 10000); await fightStart(p); await sleep(1000); return true; }, after: 'none', battle: 'fight' },
-  { id: 'undercroft-result', saves: ['mid', 'late'], needs: ['undercroft-run', 'undercroft-room', 'undercroft-fight'], go: async p => { if ((await p.state()).inTown) return 'skip'; await p.evaluate(DEV_WIN); await waitResult(p); return true; }, after: 'reset', primary: RESULT },
+  { id: 'undercroft-result', saves: ['mid', 'late'], needs: ['undercroft-run', 'undercroft-room', 'undercroft-fight'], go: async p => { if ((await p.state()).inTown) return 'skip'; await p.evaluate(DEV_WIN); await waitResult(p); return true; }, after: 'none', primary: RESULT },
+  // Back from a room's result: the next row's open rooms are on screen (L8, TOWN).
+  { id: 'undercroft-map-after', saves: ['mid', 'late'], needs: ['undercroft-run', 'undercroft-room', 'undercroft-fight', 'undercroft-result'], go: async p => { if (!await p.tap('#result-dungeon', { optional: true, timeout: 3000 })) return 'skip'; await p.waitFor(`window.gridbound.inTown && Boolean(document.querySelector('.dungeon-map'))`, 8000); await sleep(400); return true; }, after: 'reset', primary: [{ sel: '.room.open', all: true }] },
   { id: 'trials-ready', saves: ['mid', 'late'], reset: true, go: async p => { await toCamp(p); await gateTo(p, 'endless'); if ((await p.state()).route !== 'endless') return 'skip'; await p.tap('[data-depart="endless"]'); await sleep(800); await p.waitFor(`!window.gridbound.inTown && window.gridbound.battle.status === 'ready'`, 15000).catch(() => {}); return !(await p.state()).inTown || 'skip'; }, after: 'none', battle: 'ready', primary: [{ sel: '#start' }] },
   { id: 'trials-draft', saves: ['mid', 'late'], needs: ['trials-ready'], go: async p => { if ((await p.state()).inTown) return 'skip'; await fightStart(p); await p.evaluate(DEV_WIN); await waitResult(p); return true; }, after: 'reset', primary: [{ sel: '[data-boon]' }] },
 ];

@@ -290,7 +290,7 @@ if (runs('reminder')) await withBrowser(async h => {
   await h.touch.tap('#menu-button'); await h.wait(`${route} === "more"`);
   await h.touch.tap('#menu-button'); await h.wait(`${route} === "camp"`);
   await h.wait('Boolean(document.querySelector("dialog[open] .unlock-card"))', 10000);
-  await h.touch.tap('dialog[open] .unlock-card > [data-close]'); await h.wait('!document.querySelector("#modal").open');
+  await h.touch.tap('dialog[open] .unlock-card ~ [data-close]'); await h.wait('!document.querySelector("#modal").open');
   await sleep(800);
   assert.equal(await h.evaluate('document.querySelector("#modal").open'), false, 'no reminder right after the unlock card');
   await h.touch.tap('#menu-button'); await h.wait(`${route} === "more"`);

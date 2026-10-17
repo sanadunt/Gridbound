@@ -33,7 +33,7 @@
 /* Defeat help: power vs the recommendation, the first to fall, the counter, one-tap fixes. */
 .defeat-help p { margin: 4px 0; font-size: 14px; }
 .defeat-first { color: var(--ink-soft); }
-.defeat-fixes { display: flex; flex-direction: column; gap: 6px; }
+.defeat-fixes { display: flex; flex-direction: column; gap: 8px; }
 .defeat-fixes .btn { width: 100%; text-align: left; }
 .result-star-goals { margin: 4px 0 8px; padding: 0; list-style: none; font-size: 13px; color: var(--ink-dim); }
 .result-star-goals li::before { content: '☆ '; color: var(--faint); }
@@ -51,7 +51,7 @@
 .boon-card:focus-visible { border-color: var(--card-accent, var(--gold)); transform: translateY(-3px); box-shadow: 0 0 0 2px var(--win-shadow), 0 0 18px var(--card-accent, var(--gold)); }
 @media (hover: hover) { .boon-card:hover { border-color: var(--card-accent, var(--gold)); transform: translateY(-3px); box-shadow: 0 0 0 2px var(--win-shadow), 0 0 18px var(--card-accent, var(--gold)); } }
 .boon-card-gem { width: 18px; height: 18px; transform: rotate(45deg); border: 1px solid var(--gold-bright); background: var(--card-accent, var(--gold)); box-shadow: 0 0 10px var(--card-accent, var(--gold)); margin-bottom: 4px; }
-.boon-patron-name { font-family: var(--pixel); font-size: 10px; color: var(--ink-dim); }
+.boon-patron-name { font-family: var(--text); font-weight: 600; font-size: 12px; letter-spacing: 0.3px; color: var(--ink-dim); text-transform: uppercase; }
 .boon-name { font-size: 18px; color: var(--card-accent, var(--gold)); }
 .boon-desc { font-size: 14px; color: var(--ink-soft); margin: 0; }
 .boon-cta { margin-top: 6px; padding: 4px 14px; border-radius: var(--radius); background: #e6c88d; color: #263329; text-shadow: none; }
@@ -65,7 +65,7 @@
 .boon-tray-card { padding: 6px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); }
 .boon-tray-card h3 { margin: 2px 0 !important; font-size: 16px; }
 .boon-tray-card p { margin: 0; font-size: 13px; color: var(--ink-soft); }
-.boon-patron-badge { font-family: var(--pixel); font-size: 10px; color: var(--ink-dim); }
+.boon-patron-badge { font-family: var(--text); font-weight: 600; font-size: 12px; letter-spacing: 0.3px; color: var(--ink-dim); text-transform: uppercase; }
 .boon-tray-footer { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .boon-tray-stats { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-soft); }
 .boon-tray-footer .btn { width: 100%; }
@@ -74,7 +74,6 @@
   .result-banner { margin: 6px 0 2px; font-size: clamp(22px, 8vw, 30px); }
   .ceremony-desc { -webkit-line-clamp: 3; font-size: 14px; }
   .xp-grid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
-  .ceremony-actions { gap: 6px; }
 }
 /* A chapter's closing outro is the story payoff: shown in full (the result screen scrolls, its actions stay at the bottom). */
 .ceremony-desc.ceremony-outro { display: block; -webkit-line-clamp: unset; overflow: visible; }
@@ -110,24 +109,43 @@
 .dialogue-end { top: 30%; animation: scene-in 0.6s ease-out; }
 .start-window p.story-beat { font-style: italic; color: #fff; }
 .start-window p.ready-tip { margin-top: -4px; font-size: 12px; color: var(--ink-dim); }
-.journal-replay { display: block; margin: 6px 0; min-height: 40px; }
+.journal-replay { display: block; margin: 8px 0; min-height: var(--touch); }
 /* Companion replays: an even grid of equal buttons (the modal's '.btn + .btn' top margin would push every button after the first down). */
-.journal-companions { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); align-items: stretch; gap: 6px; }
+.journal-companions { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); align-items: stretch; gap: 8px; }
 dialog#modal .journal-companions .btn { min-height: 44px; margin: 0; }
 .journal-epilogue p { margin: 6px 0; }
 
 /* Roguelike promotion between floors */
 .rogue-promote { margin: 0 0 12px; padding: 10px 12px; text-align: left; }
+/* On the boon draft the promotions fold below the boons ('Promotion points: n'). */
+.rogue-promote-wrap { padding: 4px 12px; text-align: left; }
+.rogue-promote-wrap > summary { font-weight: 700; }
+.rogue-promote-wrap .rogue-promote { margin: 0; padding: 0 0 6px; }
+/* A phone: the floor banner on one line and the boons right under the title (the run wallet stays). */
+@media (max-width: 480px), (max-height: 700px) {
+  .boon-draft-modal .result-banner { margin: 2px 0 0; font-size: clamp(16px, 5.4vw, 22px); letter-spacing: 1px; white-space: nowrap; }
+  .boon-draft-modal .boon-modal-subtitle { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* hidden, still read */
+  .boon-draft-modal .boon-modal-title { margin: 2px 0; }
+}
+/* A phone held sideways: compact cards (the whole card is the button; its gem and 'Take' tag are decoration) and a slimmer footer, so a
+   whole card is on screen above 'Leave for now…' on arrival. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .boon-draft-grid, .boon-draft-grid[data-cards] { grid-template-columns: repeat(2, 1fr); }
+  .boon-draft-modal .boon-card { gap: 2px; padding: 8px 10px; }
+  .boon-draft-modal .boon-card-gem, .boon-draft-modal .boon-cta { display: none; }
+  .boon-draft-modal .boon-desc { font-size: 13px; }
+  .boon-modal-footer { padding-top: 6px; padding-bottom: calc(8px + var(--safe-b)); }
+}
 .rogue-promote h3 { margin: 0 0 4px; font-family: var(--pixel); font-size: 11px; color: var(--gold); }
 .rogue-promote .hint { margin: 0 0 8px; font-size: 12px; }
 .rogue-promote-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; padding: 6px 0; border-top: 1px solid var(--line); }
 .rogue-promote-row b { display: block; }
 .rogue-promote-row small { display: block; font-size: 12px; color: var(--ink-dim); }
-.rogue-promote-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.rogue-promote-options { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* Unlock card (a mode the story just opened) */
 .unlock-card { display: flex; flex-direction: column; gap: 8px; }
-.unlock-kicker { font-family: var(--pixel); font-size: 10px; color: var(--ink-dim); letter-spacing: 1px; }
+.unlock-kicker { font-family: var(--text); font-weight: 600; font-size: 12px; letter-spacing: 0.3px; color: var(--ink-dim); text-transform: uppercase; }
 .unlock-entry { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .unlock-entry p { margin: 4px 0 8px; color: var(--ink-soft); }
 .unlock-entry .btn { width: 100%; }

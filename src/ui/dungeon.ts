@@ -51,27 +51,34 @@ function depthPicker(p: Profile): string {
       <span class="depth-meta">${locked ? '' : `<em class="power-${verdict}">${t('power.rec.short', { n: rec })}</em>`}<img src="${dungeonIcon(d.material as 'ember-shard')}" alt="${escape(materialName(d.material))}"/>${beaten ? '<i>✓</i>' : ''}</span>
     </button>`;
   }).join('');
-  // The rules come before the depths (open until the first guardian falls), so nobody descends without knowing a wipe loses the pouch.
+  // The depths come right after the intro (the first one in view on a phone); the rules follow them (open until the first guardian falls).
+  // A depth's dossier repeats what bites before Descend: wounds carry over, a wipe loses the pouch, the party is locked to the run.
   return `<article class="win dungeon-intro"><small>${t('dungeon.kicker')}</small><h2>${t('route.dungeon')}</h2><p>${t('dungeon.intro')}</p>
-    <div class="dungeon-party">${party.map(id => `<img draggable="false" src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}" title="${escape(ROSTER[id].name)}"/>`).join('')}<span>${t('power.party', { n: power })}</span></div></article>
-    <details class="win dungeon-rules" ${p.journey.depth ? '' : 'open'}><summary>${t('dungeon.howto')}</summary><p><b>${t('dungeon.rule.map.title')}</b> ${t('dungeon.rule.map')}</p><p><b>${t('dungeon.rule.hp.title')}</b> ${t('dungeon.rule.hp')}</p><p><b>${t('dungeon.rule.pouch.title')}</b> ${t('dungeon.rule.pouch')}</p>${legend()}</details>
-    ${open ? `<div class="depth-list">${cards}</div>` : `<p class="win hint">${t('dungeon.locked')}</p>`}`;
+    ${partyFaces(party, power)}</article>
+    ${open ? `<div class="depth-list">${cards}</div>` : `<p class="win hint">${t('dungeon.locked')}</p>`}
+    <details class="win dungeon-rules" ${p.journey.depth ? '' : 'open'}><summary>${t('dungeon.howto')}</summary><p><b>${t('dungeon.rule.map.title')}</b> ${t('dungeon.rule.map')}</p><p><b>${t('dungeon.rule.hp.title')}</b> ${t('dungeon.rule.hp')}</p><p><b>${t('dungeon.rule.pouch.title')}</b> ${t('dungeon.rule.pouch')}</p>${legend()}</details>`;
 }
 
 /** The depth's dossier in the modal, before a descent: nothing starts and the story party stays free until Descend. It names the foes
  *  (silhouettes until the Bestiary met them), the material, the party that would go with its power against the depth's recommendation,
- *  the rules that bite (wounds carry over, the pouch), and that the party is locked to the run. Back (focused) closes it. */
-export function depthDossier(p: Profile, depth: number): string {
+ *  the rules that bite (wounds carry over, the pouch: folded under 'How it works' on a phone, `compact`), and that the party is locked to the run.
+ *  It ends in one sticky row: Back (focused) closes it, Descend starts the run (both on screen when it opens, contract L8/L9). */
+export function depthDossier(p: Profile, depth: number, compact = false): string {
   const d = depthDef(depth), party = normalizeStoryParty(p.storyActive, p.roster, p.cleared), power = partyPower(p), rec = recommendedPower(d.unlock), verdict = powerVerdict(power, rec);
   const foe = (id: string, kind?: 'elite') => `<li class="dossier-foe ${known(p, id) ? '' : 'unseen'}"><img src="${known(p, id) ? monsterDataURL(id) : monsterShadowDataURL(id)}" alt=""/><span>${kind ? `<small>${t('dungeon.kind.elite')}</small>` : ''}<b>${foeName(p, id)}</b></span></li>`;
   return `<div class="depth-dossier" data-depth-dossier="${d.id}"><small class="dossier-kicker">${t('route.dungeon')} · ${t('dungeon.depth.label', { n: d.id })}</small><h2 id="modal-title">${t(`dungeon.depth.${d.id}` as StringKey)}</h2>
     <h3 class="subheading">${t('dungeon.guardian')}</h3><ul class="dossier-foes guardian">${foe(d.guardian)}</ul>
     <h3 class="subheading">${t('dungeon.dossier.rooms')}</h3><ul class="dossier-foes">${d.enemies.map(id => foe(id)).join('')}${d.elite.map(id => foe(id, 'elite')).join('')}</ul>
     <p class="dossier-material"><img src="${dungeonIcon(d.material as 'ember-shard')}" alt=""/>${t('dungeon.material.hint', { name: materialName(d.material) })}</p>
-    <div class="dungeon-party dossier-party">${party.map(id => `<img draggable="false" src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}" title="${escape(ROSTER[id].name)}"/>`).join('')}<span>${t('power.party', { n: power })}</span><em class="power-${verdict}">${t('power.rec.short', { n: rec })} · ${t(`power.verdict.${verdict}` as StringKey)}</em></div>
-    <p class="dossier-rules"><b>${t('dungeon.rule.hp.title')}</b> ${t('dungeon.rule.hp')} <b>${t('dungeon.rule.pouch.title')}</b> ${t('dungeon.rule.pouch')}</p>
+    ${partyFaces(party, power, 'dossier-party', `<em class="power-${verdict}">${t('power.rec.short', { n: rec })} · ${t(`power.verdict.${verdict}` as StringKey)}</em>`)}
+    <details class="dossier-howto" ${compact ? '' : 'open'}><summary>${t('dungeon.howto')}</summary><p class="dossier-rules"><b>${t('dungeon.rule.hp.title')}</b> ${t('dungeon.rule.hp')} <b>${t('dungeon.rule.pouch.title')}</b> ${t('dungeon.rule.pouch')}</p></details>
     <p class="dossier-warn">${t('dungeon.lock.warn')}</p></div>
-    <button class="btn primary" data-dungeon-start="${d.id}">${t('dungeon.descend')} ▶</button><button class="btn" data-close data-nav-exit="close" data-autofocus>◀ ${t('common.back')}</button>`;
+    <div class="modal-actions"><button class="btn" data-close data-nav-exit="close" data-autofocus>◀ ${t('common.back')}</button><button class="btn primary" data-dungeon-start="${d.id}">${t('dungeon.descend')} ▶</button></div>`;
+}
+
+/** The party that would descend: each portrait shows its hero's name under it (a touch screen has no tooltip: contract G9), then its power. */
+function partyFaces(party: number[], power: number, extra = '', tail = ''): string {
+  return `<div class="dungeon-party ${extra}">${party.map(id => `<span class="dungeon-face"><img draggable="false" src="${face(ROSTER[id].classId, id)}" alt=""/><b>${escape(ROSTER[id].name)}</b></span>`).join('')}<span class="dungeon-power">${t('power.party', { n: power })}</span>${tail}</div>`;
 }
 
 function legend(): string {
@@ -108,7 +115,9 @@ function mapView(run: DungeonRun): string {
 function roomPanel(run: DungeonRun, outcome?: string, letter?: string): string {
   const node = run.at >= 0 ? run.nodes[run.at] : undefined;
   // What the last choice did stays readable, also when it ends in an ambush (or a fled fight still waits).
-  const done = `${outcome ? `<p class="room-outcome" role="status">${escape(outcome)}</p>` : ''}${letter ? `<blockquote class="dungeon-letter"><small>${t('dungeon.letter.title')}</small><p>${escape(t(`dungeon.letter.${letter}` as StringKey))}</p></blockquote>` : ''}`;
+  // After an outcome the open rooms sit above, on the map: one tap brings them back (and the keyboard to the first).
+  const next = outcome && !run.pendingFight && reachable(run).length ? `<button class="btn" data-dungeon-next>${t('dungeon.next.room')} ▲</button>` : '';
+  const done = `${outcome ? `<p class="room-outcome" role="status">${escape(outcome)}</p>` : ''}${letter ? `<blockquote class="dungeon-letter"><small>${t('dungeon.letter.title')}</small><p>${escape(t(`dungeon.letter.${letter}` as StringKey))}</p></blockquote>` : ''}${next}`;
   if (run.pendingFight) {
     const enemy = ENEMIES[run.pendingFight.enemy];
     return `${done}<small>${t(`dungeon.kind.${run.pendingFight.kind}` as StringKey)}</small><h3>${escape(enemy?.name ?? run.pendingFight.enemy)} <span>${escape(enemy?.title ?? '')}</span></h3><p>${escape(enemy?.counter ?? '')}</p><button class="btn primary" data-dungeon-fight>${t('dungeon.fight')}</button>`;
@@ -130,7 +139,7 @@ function activeRun(run: DungeonRun, outcome?: string, letter?: string): string {
   const def = depthDef(run.depth);
   const party = run.party.filter(id => ROSTER[id]).map(id => {
     const ratio = run.hp[id] ?? 0;
-    return `<span class="dungeon-hero ${ratio <= 0 ? 'down' : ratio < .35 ? 'low' : ''}" title="${escape(ROSTER[id].name)}"><img draggable="false" src="${face(ROSTER[id].classId, id)}" alt="${escape(ROSTER[id].name)}"/><span class="gauge"><i style="width:${Math.round(ratio * 100)}%"></i></span></span>`;
+    return `<span class="dungeon-hero ${ratio <= 0 ? 'down' : ratio < .35 ? 'low' : ''}"><img draggable="false" src="${face(ROSTER[id].classId, id)}" alt=""/><b>${escape(ROSTER[id].name)}</b><span class="gauge"><i style="width:${Math.round(ratio * 100)}%"></i></span></span>`;
   }).join('');
   const blessing = run.blessing.power > 1 || run.blessing.vitality > 1 ? `<span class="dungeon-blessing">${t('dungeon.blessing', { p: Math.round((run.blessing.power - 1) * 100), v: Math.round((run.blessing.vitality - 1) * 100) })}</span>` : '';
   // The free way out comes first, above the map: the run waits, saved, and the Bell Tower picks it up again ('Abandon run' is the costly exit).

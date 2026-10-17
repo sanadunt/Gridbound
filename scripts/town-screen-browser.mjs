@@ -90,7 +90,8 @@ for (const [width, height] of [[1440, 900], [540, 900], [390, 844], [360, 640]])
   }, { width, height, mobile: width < 500 });
 }
 
-// Camp signs never cover each other or leave the map: on a narrow map (small phones) each drops to one line.
+// Camp signs never cover each other or leave the map: on a narrow map (small phones) each drops to one line. Their text is never under
+// 11px and a badge never under 10px (on a narrow map it is a 10px dot), also with the browser bars shown (360×640, 375×553, 393×659).
 // Checked on a fresh save (padlocks) and an Act II save (every NEW flag and count badge shown), in English and Indonesian.
 const signLayout = `(() => {
   const map = document.querySelector('.town-map').getBoundingClientRect();
@@ -103,9 +104,12 @@ const signLayout = `(() => {
       if (x > 2 && y > 2) problems.push(a.id + '/' + b.id + ' ' + Math.round(x) + 'x' + Math.round(y));
     }
   });
-  return { map: Math.round(map.width), gate: document.querySelector('[data-spot=gate] .town-sign b').textContent, fresh: document.querySelectorAll('.spot-new').length, locked: document.querySelectorAll('.town-spot.locked').length, problems };
+  const font = el => parseFloat(getComputedStyle(el).fontSize);
+  const small = [...document.querySelectorAll('.town-sign b, .town-sign small')].filter(el => el.getClientRects().length && font(el) < 11).map(el => el.textContent + ' ' + font(el));
+  const badges = [...document.querySelectorAll('.spot-flag')].filter(el => font(el) ? font(el) < 10 : el.getBoundingClientRect().width < 9.5).map(el => el.textContent + ' ' + font(el));
+  return { map: Math.round(map.width), small, badges, gate: document.querySelector('[data-spot=gate] .town-sign b').textContent, fresh: document.querySelectorAll('.spot-new').length, locked: document.querySelectorAll('.town-spot.locked').length, problems };
 })()`;
-for (const lang of ['en', 'id']) for (const save of [null, ACT_TWO_SAVE]) for (const [width, height] of [[360, 640], [375, 667], [390, 844]]) {
+for (const lang of ['en', 'id']) for (const save of [null, ACT_TWO_SAVE]) for (const [width, height] of [[360, 640], [375, 553], [375, 667], [393, 659], [390, 844]]) {
   await withBrowser(async ({ send, wait, evaluate, screenshot, errors }) => {
     await seedSave(send, save, lang);
     await send('Page.navigate', { url });
@@ -115,6 +119,7 @@ for (const lang of ['en', 'id']) for (const save of [null, ACT_TWO_SAVE]) for (c
     assert.ok(layout.gate.startsWith(lang === 'id' ? 'Gerbang' : 'Gate'), `${label}: the camp is in the seeded language (${layout.gate})`);
     assert.equal(save ? layout.fresh : layout.locked, 3, `${label}: ${save ? 'three NEW flags' : 'three locked modes'} are on the map`);
     assert.deepEqual(layout.problems, [], `${label}: camp signs stay apart and inside the ${layout.map}px map`);
+    assert.deepEqual([layout.small, layout.badges], [[], []], `${label}: signs at 11px or more, badges at 10px or more (a dot on a narrow map)`);
     if (width === 360) await screenshot(`artifacts/camp-signs-${lang}-${save ? 'act2' : 'fresh'}-${width}x${height}.png`);
     assert.deepEqual(errors, []);
   }, { width, height, mobile: true });

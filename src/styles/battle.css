@@ -295,6 +295,18 @@
   #battle-screen[data-battle-view="hero"] .right-sidebar, #battle-screen[data-battle-view="log"] .right-sidebar, #battle-screen[data-battle-view="log"] .left-sidebar { flex: none; min-height: auto; overflow: visible; }
 }
 
+/* A portrait phone too: Status and Log scroll as one page under the sticky top bar, so the Log is never a sliver above the stage panel
+   (contract L7: no nested scroller under 40% of the screen). */
+@media (max-width: 600px) {
+  #battle-screen:not([data-battle-view="arena"]) { overflow-y: auto; overscroll-behavior: contain; }
+  #battle-screen:not([data-battle-view="arena"]) > .battle-top { position: sticky; top: -6px; z-index: 2; margin: -6px -8px 0; padding: 6px 8px; background: var(--night); }
+  #battle-screen[data-battle-view="hero"] .right-sidebar, #battle-screen[data-battle-view="log"] .right-sidebar, #battle-screen[data-battle-view="log"] .left-sidebar { flex: none; min-height: auto; overflow: visible; }
+}
+/* A short portrait screen pads the battle screen by 4px only: the sticky bar meets the top edge there. */
+@media (max-width: 600px) and (orientation: portrait) and (max-height: 700px) {
+  #battle-screen:not([data-battle-view="arena"]) > .battle-top { top: -4px; margin-top: -4px; padding-top: 4px; }
+}
+
 /* Encounter transition */
 .battle-wipe { position: absolute; inset: 0; z-index: 70; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(14, 1fr); pointer-events: none; }
 .battle-wipe i { background: #fff; animation: wipe-block 0.42s steps(4) forwards; }

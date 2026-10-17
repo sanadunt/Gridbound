@@ -131,7 +131,7 @@ b, strong { font-weight: 600; }
 /* Hover styles only where a pointer can hover (a tapped button keeps no hover colours on a phone); a pressed toggle (MENU) keeps its own. */
 @media (hover: hover) { .btn:hover:not(:disabled):not([aria-pressed="true"]), .icon-button:hover:not(:disabled):not([aria-pressed="true"]), .tabs > button:hover:not(:disabled), .page-controls button:hover:not(:disabled) { background: var(--win-top); border-color: var(--win-hi); color: var(--gold-bright); } }
 .btn:active:not(:disabled), .icon-button:active:not(:disabled), .cmd:active:not(:disabled) { transform: translateY(1px); }
-.btn small { display: block; font-size: 11px; font-weight: 600; color: var(--ink-dim); }
+.btn small { display: block; font-size: 12px; font-weight: 600; color: var(--ink-dim); }
 .btn.primary { background: #e6c88d; border-color: #f9e5b6; color: #263329; font-weight: 700; box-shadow: 0 3px 0 #a48b5c; }
 .btn.primary small { color: #4a4a32; }
 @media (hover: hover) { .btn.primary:hover:not(:disabled) { background: #f2dca9; border-color: #fff1cf; color: #1b261d; box-shadow: 0 3px 0 #b7a477, 0 0 22px #e6c88d22; } }
@@ -144,7 +144,7 @@ b, strong { font-weight: 600; }
 .header-tools #settings, .header-tools #sound { font-family: var(--text); font-size: 22px; line-height: 1; }
 
 /* Menus with the ▶ cursor */
-.menu-list { display: flex; flex-direction: column; gap: 4px; }
+.menu-list { display: flex; flex-direction: column; gap: 8px; }
 .menu-item {
   position: relative;
   display: flex;
@@ -201,8 +201,9 @@ select, input[type="text"], input:not([type]), .name-field input {
 input[type="checkbox"] { width: 26px; height: 26px; accent-color: var(--gold); }
 input[type="range"] { width: 100%; accent-color: var(--gold); }
 label { display: block; }
-details > summary { cursor: pointer; padding: 6px 0; color: var(--gold); list-style: none; }
-details > summary::before { content: '▶ '; font-size: 11px; display: inline-block; transition: transform 0.1s; }
+/* A summary is a whole 44px row (contract K1), its ▶ marker kept. */
+details > summary { display: flex; align-items: center; gap: 6px; min-height: var(--touch); cursor: pointer; padding: 4px 0; color: var(--gold); list-style: none; }
+details > summary::before { content: '▶'; flex: none; font-size: 11px; display: inline-block; transition: transform 0.1s; }
 details[open] > summary::before { transform: rotate(90deg); }
 details > summary::-webkit-details-marker { display: none; }
 
@@ -226,10 +227,9 @@ details > summary::-webkit-details-marker { display: none; }
 /* Long destination names switch to the text font so the HUD never truncates them. */
 .hud-title[data-long="true"] { font-family: var(--text); font-size: 15px; font-weight: 700; color: var(--gold-bright); }
 .menu-button { position: relative; }
-.menu-button[data-badge]:not([data-badge=""])::after { content: attr(data-badge); position: absolute; top: -4px; right: -4px; min-width: 18px; padding: 0 4px; border: 1px solid #fff; border-radius: 9px; background: var(--danger-deep); color: #fff; font-size: 8px; line-height: 16px; text-align: center; box-shadow: 0 1px 0 #000a; }
-.header-tools { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.menu-button[data-badge]:not([data-badge=""])::after { content: attr(data-badge); position: absolute; top: -4px; right: -4px; min-width: 18px; padding: 0 4px; border: 1px solid #fff; border-radius: 9px; background: var(--danger-deep); color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; box-shadow: 0 1px 0 #000a; }
+.header-tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .header-tools .icon-button { min-width: 44px; min-height: 44px; padding: 4px; }
-.header-tools { gap: 4px; }
 .wallet + .wallet { margin-right: 2px; }
 
 .wallet { display: flex; align-items: center; font-weight: 600; }
@@ -242,7 +242,9 @@ details > summary::-webkit-details-marker { display: none; }
    room left by the framed Back, so the player still reads where they are ('Undercroft', 'Bursa Crystal' at 360px). */
 @media (max-width: 420px) {
   .header-tools #sound { display: none; }
-  .header-tools { display: grid; grid-auto-flow: column; align-items: center; justify-items: end; column-gap: 4px; row-gap: 2px; }
+  .header-tools { display: grid; grid-auto-flow: column; align-items: center; justify-items: end; column-gap: 2px; row-gap: 2px; }
+  /* The two buttons stay 8px apart (contract K3); the wallets beside them need no gap. */
+  .header-tools .icon-button + .icon-button { margin-left: 8px; }
   .header-tools .wallet { grid-row: 1; }
   .header-tools .bank-wallet { grid-row: 2; grid-column: 1; margin-right: 0; }
   .header-tools .icon-button { grid-row: 1 / span 2; }
@@ -252,7 +254,8 @@ details > summary::-webkit-details-marker { display: none; }
 @media (max-width: 380px) {
   .hud-back.btn, .menu-button { padding: 6px 7px; letter-spacing: 0; }
   .hud-nav { gap: 4px; }
-  .header-tools { column-gap: 3px; }
+  .site-header.hud-bar { padding-left: 5px; padding-right: 5px; }
+  .header-tools { column-gap: 0; }
   .hud-title, .hud-title[data-long="true"] { font-size: 12px; }
 }
 body[data-screen="battle"] .site-header { display: none; }
@@ -284,10 +287,10 @@ body.reduced-motion .town-notice.dismissed { animation: notice-gone 0s linear fo
 .page-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0; }
 .page-controls span { font-family: var(--pixel); font-size: 10px; }
 .intent-row { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
-.intent-chip { padding: 2px 6px; border: 1px solid var(--win-edge); border-radius: 2px; background: var(--inset); font-size: 11px; letter-spacing: 0.3px; }
+.intent-chip { padding: 2px 6px; border: 1px solid var(--win-edge); border-radius: 2px; background: var(--inset); font-size: 12px; letter-spacing: 0.3px; }
 .intent-chip.intent-all, .intent-chip.intent-silence { border-color: #d9b5ee; color: #ecd2ff; }
 .intent-chip.intent-mend { border-color: #9fd8c4; color: #c9f1e2; }
-.intent-chip small { margin-left: 2px; font-size: 9px; letter-spacing: 0.6px; opacity: 0.8; white-space: nowrap; }
+.intent-chip small { margin-left: 2px; font-size: 10px; font-weight: 700; letter-spacing: 0.6px; opacity: 0.8; white-space: nowrap; }
 .intent-chip.intent-weakest, .intent-chip.intent-strongest { border-color: #ffba78; color: #ffd6ad; }
 .intent-chip.intent-meteor, .intent-chip.intent-front, .intent-chip.intent-breath { border-color: #ff8a80; color: #ffc1bb; }
 .counter-note b, .counter-strategy b { color: var(--gold); font-weight: 600; }
@@ -303,25 +306,30 @@ dialog#modal {
   transform-origin: center top;
 }
 dialog#modal::backdrop { background: rgba(6, 14, 12, 0.88); backdrop-filter: blur(3px); }
-dialog#modal h2 { font-family: var(--pixel); font-size: 13px; font-weight: 400; color: var(--gold); margin: 0 30px 12px 0; line-height: 1.5; }
+dialog#modal h2 { font-family: var(--pixel); font-size: 13px; font-weight: 400; color: var(--gold); margin: 0 40px 12px 0; line-height: 1.5; }
 dialog#modal h3 { color: var(--gold-bright); margin: 12px 0 6px; font-size: 15px; }
 dialog#modal > .btn, dialog#modal .btn + .btn { margin-top: 8px; }
 dialog#modal > .btn { width: 100%; }
-dialog#modal > .modal-exit { position: sticky; bottom: -16px; z-index: 2; box-shadow: 0 10px 0 6px var(--win-bot), 0 -8px 14px 2px var(--win-bot); }
+dialog#modal > .modal-exit { position: sticky; bottom: -16px; z-index: 2; background: var(--win-bot); box-shadow: 0 10px 0 6px var(--win-bot), 0 -8px 14px 2px var(--win-bot); }
+/* A dialog whose primary action comes right before its exit keeps both in one row, and the row is what sticks (contract L9): the exit
+   first (the safe choice, focused), the forward action last and wider. */
+dialog#modal > .modal-actions { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; }
+dialog#modal > .modal-actions .btn { flex: 1 1 0; min-width: 0; min-height: var(--touch); margin-top: 0; }
+dialog#modal > .modal-actions .btn.primary { flex-grow: 1.4; }
 /* Whatever is scrolled into view (an error, Continue latest and its reason) stops above that sticky exit, never under it. */
 dialog#modal:has(> .modal-exit) { scroll-padding-bottom: 84px; }
-.modal-close { position: absolute; top: 8px; right: 8px; min-width: 36px; min-height: 36px; padding: 0; font-family: var(--text); font-size: 18px; }
+.modal-close { position: absolute; top: 6px; right: 6px; min-width: var(--touch); min-height: var(--touch); padding: 0; font-family: var(--text); font-size: 20px; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .setting-row small { display: block; color: var(--ink-dim); }
 .lang-switch { display: flex; gap: 6px; flex-shrink: 0; }
-.lang-switch .btn { min-height: 38px; padding: 6px 10px; font-size: 13px; }
+.lang-switch .btn { min-height: var(--touch); padding: 6px 12px; font-size: 13px; }
 .help-rows p { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .help-rows b { color: var(--gold); font-weight: 600; }
-.save-files { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.save-files { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
 .save-file { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); }
 .save-file.current { border-color: var(--gold-border); background: var(--gold-bg); }
 .save-file small { display: block; color: var(--ink-dim); }
-.save-file > span { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.save-file > span { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .name-field { margin: 10px 0; }
 .slot-summary { margin: 8px 0; padding: 8px 10px 8px 26px; border-radius: var(--radius); background: var(--inset); line-height: 1.5; }
 .journal-scene, .journal-chronicle { margin: 10px 0; padding-top: 8px; border-top: 1px solid var(--line); }
@@ -329,7 +337,7 @@ dialog#modal:has(> .modal-exit) { scroll-padding-bottom: 84px; }
 /* Reset confirmation: what the reset takes back and refunds. */
 .respec-list { margin: 8px 0; padding-left: 20px; }
 .respec-list li { margin: 3px 0; }
-.journal-entry-card { margin: 4px 0; }
+.journal-entry-card { margin: 8px 0; }
 #profile-error:empty, #load-error:empty, #delete-error:empty, #continue-hint:empty { display: none; }
 #profile-error, #load-error, #delete-error { color: var(--danger); }
 /* What the last Save files action did (Renamed to…, Saved to Slot n), at the top of the dialog. */
