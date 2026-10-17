@@ -220,9 +220,9 @@ async function battle(t) {
   await click('[data-depart="adventure"]');
   await waitFrame('document.querySelector("#battle-screen").hidden === false && Boolean(document.querySelector("#start"))');
   await click('#start');
-  const before = await inFrame('document.querySelector("#boss-hp").style.width');
+  const before = await inFrame('document.querySelector("#boss-hp").style.transform');
   await click('[data-tap="0"]'); await click('[data-tap="3"]');
-  await waitFrame(`document.querySelector("#boss-hp").style.width !== ${JSON.stringify(before)}`, 15000);
+  await waitFrame(`document.querySelector("#boss-hp").style.transform !== ${JSON.stringify(before)}`, 15000);
 }
 /** Swipes up and down on `selector` (its centre, on the host page) leave the host page's scrollY where it was (`from`). */
 async function swipesKeep({ point, swipeAt, evaluate }, selector, from) {

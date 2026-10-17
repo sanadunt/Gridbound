@@ -32,7 +32,7 @@ import { pausedStory, resumableEncounter, resumesPaused, type PausedStory } from
 import { backAction, type BackSource, type NavSnapshot } from './ui/back';
 import { installBackGuard, type BackGuard } from './ui/history';
 import { defeatFixes, xpSummary } from './ui/result-help';
-import { COACH_STEPS, Coach, coachEnabled, coachDone, markCoach, resetCoach, setCoachEnabled, skipCoach, type CoachStep } from './ui/coach';
+import { COACH_STEPS, Coach, coachEnabled, coachDone, markCoach, resetCoach, setCoachEnabled, skipCoach, type CoachStep, type CoachLayout } from './ui/coach';
 import { actArt, starRow } from './ui/world-map';
 import { playDialogue, paginate, CHOICE_INPUT_DELAY_MS, type DialoguePage } from './ui/dialogue';
 import { DANGER_CONTROLS, INPUT_DELAY_MS, TOWN_HELD, TOWN_SPEND, holdInput, inputHeld, keepDangerOff, pressHeld } from './ui/input-guard';
@@ -245,6 +245,16 @@ let drawIn = 0;
 /** DOM writes that skip unchanged values, so a label or text is only touched (and re-read by assistive tech) when it changes. */
 const setText = (el: Element, text: string) => { if (el.textContent !== text) el.textContent = text; };
 const setAttr = (el: Element, name: string, value: string) => { if (el.getAttribute(name) !== value) el.setAttribute(name, value); };
+/** HUD bars are full-width fills drawn with transform: scaleX (no layout); a bar is rewritten only when it moves by 0.25% or more, or
+ *  reaches empty or full. */
+const scales = new WeakMap<HTMLElement, number>();
+function setScale(el: HTMLElement, ratio: number) {
+  const r = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0, last = scales.get(el);
+  if (last !== undefined && Math.abs(last - r) < .0025 && !((r === 0 || r === 1) && last !== r)) return;
+  scales.set(el, r);
+  el.style.transform = `scaleX(${Math.round(r * 10000) / 10000})`;
+}
+const setDisabled = (el: HTMLButtonElement, disabled: boolean) => { if (el.disabled !== disabled) el.disabled = disabled; };
 /** Heroes seen down in this battle (frame() announces one that gets back up). */
 const downed = new Set<number>();
 /** One visually hidden polite live region (#battle-announcer) speaks the fight's meaningful moments: a threat's onset with its target and
@@ -330,7 +340,29 @@ let awayPaused = false;
 let wakeLock: WakeLockSentinel | null = null, wakeWanted = false, wakeAsking = false;
 /** First-battle coach state (see coachFrame). */
 let coachForced = false, coachThreat = -1, coachHero = -1, coachUntil = 0;
-const coach = new Coach(document.body, () => { skipCoach(); endCoachStep(); });
+const coach = new Coach(document.body, () => { skipCoach(); endCoachStep(); }, coachLayout);
+/** Where a coach tip may sit (ui/coach.ts): the band between the threat panel and the front row, then the focus bar's place (or, with
+ *  the focus bar hidden on a short phone, the strip under the grid); in landscape the column beside the arena. Never on a hero card or the
+ *  boss HP bar, at most 92% of the arena wide. */
+function coachLayout(): CoachLayout {
+  const rect = (el: Element | null) => el?.getBoundingClientRect() ?? new DOMRect();
+  const arena = rect($('arena')), stage = rect($('arena-stage')), intel = rect(document.querySelector('.arena-intel')), tray = rect(document.querySelector('.action-bar'));
+  const cards = Array.from(document.querySelectorAll('#unit-layer .unit-card')).map(rect).filter(r => r.width > 0);
+  const frontRow = stage.top + stage.height * ARENA.y / ARENA.height;
+  const intelOver = intel.height > 0 && intel.left < arena.right && intel.right > arena.left && intel.top < arena.bottom;
+  const bandTop = Math.max(arena.top, intelOver ? intel.bottom : arena.top) + 2;
+  const focus = document.getElementById('focus-bar'), focusShown = Boolean(focus && focus.offsetHeight > 0);
+  const lowest = cards.length ? Math.max(...cards.map(r => r.bottom)) : arena.bottom;
+  const under = focusShown ? new DOMRect(arena.left, rect(focus).top - 4, arena.width, tray.top - rect(focus).top + 2) : new DOMRect(arena.left, lowest + 2, arena.width, tray.top - lowest - 4);
+  const landscape = window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches;
+  const sideTop = intel.bottom + 6;
+  return {
+    regions: [new DOMRect(arena.left, bandTop, arena.width, frontRow - 2 - bandTop), under],
+    avoid: [...cards, rect(document.querySelector('.boss-meter'))],
+    side: landscape && tray.left > arena.right ? new DOMRect(tray.left, sideTop, tray.width, tray.top - 6 - sideTop) : undefined,
+    maxWidth: Math.max(200, arena.width * .92),
+  };
+}
 /** The first hero to fall in the current battle and stage, for the defeat screen. */
 let firstFall: { battle: Battle; stage: number; name: string; cause: string } | undefined;
 /** Selecting another chapter drops the Heroic toggle: Heroic is chosen per chapter, never carried over. */
@@ -381,6 +413,7 @@ $('app').innerHTML = `
         <div id="intent" class="intent-panel msg-window"><b></b><span></span></div>
       </div>
       <div id="arena" class="arena">
+        <div id="arena-stage" class="arena-stage">
         <div id="game-canvas" aria-hidden="true"></div>
         <div id="banner" class="battle-banner" aria-hidden="true"></div>
         <div id="skill-toast" class="skill-toast" role="status" aria-live="polite" hidden></div>
@@ -388,13 +421,13 @@ $('app').innerHTML = `
         <div id="unit-layer"></div>
         <div id="skill-picker" class="win skill-picker" role="dialog" hidden></div>
         <div class="board-bottom"><span id="standing"></span><span id="move-tip"></span></div>
+        </div>
         <section id="start-overlay" class="start-overlay" aria-labelledby="ready-title">
           <div class="win start-window">
             <small id="ready-label"></small>
             <h3 id="ready-title"></h3>
-            <p id="ready-copy"></p>
+            <div class="ready-story"><p id="ready-copy"></p><button id="ready-more" class="ready-more" type="button" aria-expanded="false" aria-controls="ready-copy" hidden>${t('ready.more')}</button></div>
             <p id="ready-tip" class="ready-tip" hidden>${t('ready.copy.story')}</p>
-            <div class="ready-actions"><button id="ready-back" class="btn" type="button" data-nav-exit="back"></button><button id="start" class="btn primary">${t('battle.begin')}</button></div>
             <p id="ready-back-hint" class="ready-back-hint" hidden></p>
           </div>
         </section>
@@ -402,6 +435,7 @@ $('app').innerHTML = `
       </div>
       <button id="focus-bar" type="button" class="win focus-bar" aria-label="${t('battle.focus.aria')}"><img class="focus-face" alt="" draggable="false"/><span class="focus-id"><b class="focus-name"></b><small class="focus-skill"></small></span><span class="focus-stats"><span class="focus-hp">HP <b></b></span><span class="focus-status"></span></span></button>
       <div class="action-bar">
+        <div class="ready-actions"><button id="ready-back" class="btn" type="button" data-nav-exit="back"></button><button id="start" class="btn primary">${t('battle.begin')}</button></div>
         <button id="guard" class="cmd guard-button"><span>${t('battle.guard')}<small><kbd class="key-hint">G</kbd><span id="guard-label"></span></small></span></button>
         <button id="potion" class="cmd potion-button"><span>${t('battle.potion')}<small><kbd class="key-hint">H</kbd></small></span><b>2</b></button>
         <button id="ultimate" class="cmd ultimate-button" disabled><i id="resolve-fill"></i><span>${t('battle.ultimate')}<small><kbd class="key-hint">R</kbd><span id="resolve-label"></span></small></span></button>
@@ -1360,7 +1394,7 @@ function updateExpedition() {
   $('loot').textContent = battle.mode === 'endless' ? `${fmtInt(runWallet.crystal)} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${fmtInt(battle.gold)}G`;
   const runShopHost = document.getElementById('run-shop-host');
   if (runShopHost) runShopHost.innerHTML = battle.mode === 'endless' && battle.status === 'ready' ? CHALLENGE_SHOP.map(item => `<button class="btn" data-run-buy="${item.id}" ${runWallet.crystal < item.cost ? 'disabled' : ''}>${item.name} · ${fmtInt(item.cost)} ◇</button>`).join('') : '';
-  $('mode-label').textContent = battle.mode === 'adventure' ? `${battle.heroic ? `${t('heroic.badge')} · ` : ''}${t('battle.chapter', { n: battle.floor })}` : battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : battle.mode === 'dungeon' ? t('dungeon.depth.label', { n: profile.journey.run?.depth ?? 1 }) : t('mode.raid');
+  $('mode-label').textContent = battle.mode === 'adventure' ? `${battle.heroic ? `${t('heroic.badge')}\u00a0·\u00a0` : ''}${t('battle.chapter', { n: battle.floor })}` : battle.mode === 'endless' ? t('battle.floor', { n: battle.floor }) : battle.mode === 'dungeon' ? t('dungeon.depth.label', { n: profile.journey.run?.depth ?? 1 }) : t('mode.raid');
   $('encounter-label').textContent = stageLabel();
   $('boss-name').textContent = battle.enemyName;
   $('boss-title').textContent = battle.enemyTitle;
@@ -1380,17 +1414,45 @@ function updateExpedition() {
     boonBadge.style.display = runBoons.length > 0 ? 'inline-block' : 'none';
   }
 }
+/** The ready sheet over the arena (it ends above the front row: L10) and FIGHT!/◀ Back in the tray (#battle-screen[data-ready], K5); the
+ *  window that offers 'Results' after a battle uses the same two parts. */
+function readySheet(visible: boolean) {
+  $('start-overlay').hidden = !visible;
+  $('battle-screen').toggleAttribute('data-ready', visible);
+}
+/** The sheet's text shows two lines; 'More' (only when there is more) opens the rest by the player's choice. */
+function setReadyCopy(text: string) {
+  const copy = $('ready-copy'), more = $('ready-more');
+  copy.textContent = text;
+  copy.classList.remove('expanded');
+  more.setAttribute('aria-expanded', 'false');
+  setText(more, t('ready.more'));
+  more.hidden = true;
+  requestAnimationFrame(updateReadyMore);
+}
+function updateReadyMore() {
+  const copy = $('ready-copy'), more = $('ready-more');
+  if ($('start-overlay').hidden) return;
+  more.hidden = !copy.classList.contains('expanded') && copy.scrollHeight <= copy.clientHeight + 1;
+}
+function toggleReadyMore() {
+  const copy = $('ready-copy'), more = $('ready-more'), open = !copy.classList.contains('expanded');
+  copy.classList.toggle('expanded', open);
+  more.setAttribute('aria-expanded', String(open));
+  setText(more, t(open ? 'ready.less' : 'ready.more'));
+}
 function showReady() {
-  $('start-overlay').hidden = false;
+  readySheet(true);
+  syncSlot();
   void keepAwake(true);
   $('ready-label').textContent = battle.stageCount > 1 ? `${t('map.wave', { n: battle.stage + 1 })}/${battle.stageCount} · ${stageLabel()}` : stageLabel();
   $('ready-title').textContent = battle.stage > 0 ? t('ready.title.next') : t('ready.title.first', { name: battle.enemyName });
   const beat = battle.mode === 'adventure' ? CAMPAIGN[battle.floor - 1]?.stages[battle.stage]?.beat : undefined;
-  $('ready-copy').textContent = beat ?? (battle.stage > 0 ? t('ready.copy.next') : battle.mode === 'adventure' ? t('ready.copy.story') : t('ready.copy.other'));
+  setReadyCopy(beat ?? (battle.stage > 0 ? t('ready.copy.next') : battle.mode === 'adventure' ? t('ready.copy.story') : t('ready.copy.other')));
   $('ready-copy').classList.toggle('story-beat', Boolean(beat));
-  // The very first wave keeps its how-to-play tip under the story beat, unless the coach is about to teach the same moves in the fight
-  // (a shorter sheet keeps the front row in view on a phone).
-  $('ready-tip').hidden = !(beat && battle.floor === 1 && battle.stage === 0 && !battle.heroic) || coachDue();
+  // The how-to-play tip shows under the story beat only on a first, uncoached run of Chapter 1's first battle (never on a replay): the
+  // coach teaches the same moves in the fight, and a shorter sheet keeps the boss in view on a phone.
+  $('ready-tip').hidden = !(beat && battle.floor === 1 && battle.stage === 0 && !battle.heroic && !profile.cleared.includes(0)) || coachDue();
   $('start').textContent = t('battle.begin');
   updateReadyBack();
   if (motionOn()) {
@@ -1412,10 +1474,10 @@ function updateReadyBack() {
  *  (a blocked or unsaved outcome), so the arena is never a dead end. */
 function showAfterOverlay(visible = true) {
   const won = battle.status === 'victory', moreWaves = won && battle.mode === 'adventure' && battle.stage + 1 < battle.stageCount;
-  $('start-overlay').hidden = !visible;
+  readySheet(visible);
   $('ready-label').textContent = '';
   $('ready-title').textContent = won ? moreWaves ? t('ready.after.wave') : t('ready.after.win') : t('ready.after.lose');
-  $('ready-copy').textContent = t('ready.after.copy');
+  setReadyCopy(t('ready.after.copy'));
   $('ready-tip').hidden = true;
   $('start').textContent = t('ready.after.button');
   updateReadyBack();
@@ -1494,7 +1556,7 @@ async function begin() {
   if (battle.mode === 'dungeon' && profile.journey.run?.pendingFight) { profile.journey.run.pendingFight.started = true; fightNote = fightNoteKey(); }
   sound.unlock();
   battle.start();
-  $('start-overlay').hidden = true;
+  readySheet(false);
   updateReadyBack();
   if (initialized) scene.encounterStart();
   addLog(t('log.begin'));
@@ -1545,12 +1607,12 @@ function updatePartyHealthView(h: PartyHero) {
   // The label counts whole seconds (the visible text keeps tenths), so it changes about once a second, not on every frame.
   const label = t('battle.hero.aria', { name: heroName(h), hp, max: h.maxHp, shield, status: h.hp > 0 && h.remaining > 0 ? fmtSec(Math.ceil(h.remaining), 0) : status });
   for (const view of views) {
-    view.hp.textContent = String(hp);
-    view.shield.textContent = String(shield);
-    view.cooldown.textContent = status;
-    view.healthFill.style.width = `${ratio * 100}%`;
-    view.shieldFill.style.width = `${Math.min(1, Math.max(0, h.shield / Math.max(1, h.maxHp))) * 100}%`;
-    view.atb.style.width = `${h.hp > 0 ? charge * 100 : 0}%`;
+    setText(view.hp, String(hp));
+    setText(view.shield, String(shield));
+    setText(view.cooldown, status);
+    setScale(view.healthFill, ratio);
+    setScale(view.shieldFill, h.shield / Math.max(1, h.maxHp));
+    setScale(view.atb, h.hp > 0 ? charge : 0);
     view.button.classList.toggle('downed', h.hp <= 0);
     view.button.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
     view.button.classList.toggle('charged', h.hp > 0 && charge > .97);
@@ -1561,19 +1623,21 @@ function updatePartyHealthView(h: PartyHero) {
 function makeUnits() {
   $('unit-layer').innerHTML = battle.heroes.map(h => {
     const p = cell(h.slot);
-    return `<div class="unit-card" data-hero="${h.id}" style="left:${p.x / 6}%;top:${p.y / 7.6}%;width:24%;height:${UNIT_H / 7.6}%;--class-color:${KITS[h.classId].color}"><button class="unit-tap" data-tap="${h.id}" aria-label="${t('battle.tap.aria', { name: heroName(h) })}"><span class="unit-name">${heroName(h)}</span><span class="tap-flash">${t('battle.tempo')}</span></button><span class="unit-hp" aria-hidden="true"><i></i><em></em></span><button type="button" class="unit-skill" data-skill-switch="${h.id}"><i class="unit-skill-fill"></i><span class="unit-skill-name"></span><span class="unit-skill-icon" aria-hidden="true"></span></button></div>`;
+    return `<div class="unit-card" data-hero="${h.id}" style="left:${p.x / 6}%;top:${p.y / 7.6}%;width:24%;height:${UNIT_H / 7.6}%;--row:${3 - Math.floor(h.slot / 3)};--class-color:${KITS[h.classId].color}"><button class="unit-tap" data-tap="${h.id}" aria-label="${t('battle.tap.aria', { name: heroName(h) })}"><span class="unit-name">${heroName(h)}</span><span class="tap-flash">${t('battle.tempo')}</span></button><span class="unit-hp" aria-hidden="true"><i></i><em></em></span><button type="button" class="unit-skill" data-skill-switch="${h.id}"><i class="unit-skill-fill"></i><span class="unit-skill-name"></span><span class="unit-skill-icon" aria-hidden="true"></span></button></div>`;
   }).join('');
-  unitViews.clear();
+  unitViews.clear(); touches.clear();
   for (const h of battle.heroes) {
     const card = document.querySelector<HTMLElement>(`#unit-layer [data-hero="${h.id}"]`)!;
     const skill = card.querySelector<HTMLButtonElement>('.unit-skill')!;
-    unitViews.set(h.id, { card, hp: card.querySelector('.unit-hp i')!, shield: card.querySelector('.unit-hp em')!, skill, fill: skill.querySelector('.unit-skill-fill')!, name: skill.querySelector('.unit-skill-name')!, icon: skill.querySelector('.unit-skill-icon')!, key: '' });
-    // A chip tap right after a tap on the same hero is a mash that slipped, not a skill change.
-    skill.addEventListener('click', event => { event.stopPropagation(); if (performance.now() - (lastHeroTap.get(h.id) ?? -Infinity) < CHIP_GUARD_MS) return; switchSkill(h.id); });
+    unitViews.set(h.id, { card, hp: card.querySelector('.unit-hp i')!, shield: card.querySelector('.unit-hp em')!, skill, fill: skill.querySelector('.unit-skill-fill')!, name: skill.querySelector('.unit-skill-name')!, icon: skill.querySelector('.unit-skill-icon')!, key: '', slot: h.slot, fit: '' });
+    bindPointer(card.querySelector<HTMLElement>('.unit-tap')!, h.id, 'card');
+    bindPointer(skill, h.id, 'chip');
+    // A pointer press is handled on its pointerup (the tracker); the click after it is dropped. A keyboard or assistive-tech click
+    // (detail 0) switches once. A chip tap right after a tap on the same hero is a mash that slipped, not a skill change.
+    skill.addEventListener('click', event => { event.stopPropagation(); if (event.detail > 0 && performance.now() - chipPointerAt < POINTER_CLICK_MS) return; chipSwitch(h.id); });
   }
   closeSkillPicker();
   $('skill-toast').hidden = true; lastHeroTap.clear();
-  $('unit-layer').querySelectorAll<HTMLElement>('[data-tap]').forEach(el => bindPointer(el, Number(el.dataset.tap)));
   renderPartyHealthTray();
   $('party-size').textContent = `${battle.heroes.length}`;
   selectedKey = '';
@@ -1582,11 +1646,16 @@ function makeUnits() {
 // A unit card spans its 112px cell plus most of the row gap, so the skill chip sits under the portrait.
 const UNIT_H = 122;
 const CHIP_GUARD_MS = 300, GUARD_MARGIN = 0.05;
+/** G5/G6: a hero drag starts past 9px; a drag let go on the hero's own tile within 24px and 300 ms is a tap (a thumb that slid); a press
+ *  activates on its own pointerup if it moved at most 12px, and the click the browser sends after it within 600 ms is dropped. */
+const DRAG_START_PX = 9, SLIDE_TAP_PX = 24, SLIDE_TAP_MS = 300, PRESS_SLOP_PX = 12, POINTER_CLICK_MS = 600;
+/** G7: a second Potion within 600 ms is a double tap, and every living hero at 95% HP or more needs no potion (a toast says so). */
+const POTION_REPEAT_MS = 600, POTION_FULL = .95;
 /** Touch players have no G key: counter texts drop their '(G)' hints there, like the action bar drops its key letters. */
 const coarsePointer = window.matchMedia('(pointer: coarse)');
 const touchText = (text: string) => coarsePointer.matches ? text.replace(/ \(G\)/g, '') : text;
 const lastHeroTap = new Map<number, number>();
-type UnitView = { card: HTMLElement; hp: HTMLElement; shield: HTMLElement; skill: HTMLButtonElement; fill: HTMLElement; name: HTMLElement; icon: HTMLElement; key: string };
+type UnitView = { card: HTMLElement; hp: HTMLElement; shield: HTMLElement; skill: HTMLButtonElement; fill: HTMLElement; name: HTMLElement; icon: HTMLElement; key: string; slot: number; fit: string };
 const unitViews = new Map<number, UnitView>();
 function updateUnitView(h: PartyHero) {
   const view = unitViews.get(h.id);
@@ -1595,24 +1664,51 @@ function updateUnitView(h: PartyHero) {
   const charge = h.total > 0 ? Math.min(1, Math.max(0, 1 - h.remaining / h.total)) : 1;
   const skills = battle.availableSkills(h.id);
   const canSwitch = h.hp > 0 && skills.length > 1 && ['ready', 'fighting'].includes(battle.status);
-  view.hp.style.width = `${ratio * 100}%`;
-  view.shield.style.width = `${Math.min(1, Math.max(0, h.shield / Math.max(1, h.maxHp))) * 100}%`;
-  view.fill.style.width = `${h.hp > 0 ? charge * 100 : 0}%`;
+  setScale(view.hp, ratio);
+  setScale(view.shield, h.shield / Math.max(1, h.maxHp));
+  setScale(view.fill, h.hp > 0 ? charge : 0);
   view.card.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
   view.card.classList.toggle('charged', h.hp > 0 && charge > .97);
   // An interrupt in hand glows while a ritual or channel can still be cut.
   view.card.classList.toggle('interrupt-ready', h.hp > 0 && KITS[h.classId].skills[h.stance].kind === 'interrupt' && battle.threats.some(v => v.type === 'all' || v.type === 'channel'));
   const key = `${h.stance}-${skills.length}-${canSwitch}-${h.hp > 0}`;
-  if (key === view.key) return;
+  if (key === view.key) { if (view.fit !== chipFitKey) fitChip(h, view); return; }
   if (view.key && view.key.split('-')[0] !== String(h.stance)) { view.card.classList.remove('switched'); void view.card.offsetWidth; view.card.classList.add('switched'); }
   view.key = key;
   const skill = KITS[h.classId].skills[h.stance];
-  setText(view.name, skill.name);
   setText(view.icon, skills.length > 2 ? '▾' : '⇄');
   view.skill.disabled = !canSwitch;
   setAttr(view.skill, 'aria-label', t('battle.skill.switch', { name: heroName(h), skill: skill.name }));
+  setAttr(view.skill, 'title', skill.name);
   setAttr(view.skill, 'aria-haspopup', String(skills.length > 2));
+  fitChip(h, view);
 }
+/** T3: the chip shows the skill's full name when it fits, else its first word, else its two-letter emblem (as the skill book draws it);
+ *  the full name stays in its aria-label/title, the focus bar, the Status view and the switch toast. Measured only when the skill or the
+ *  card width changes (chipFitKey, bumped by the arena's ResizeObserver), never on every frame. */
+let chipFitKey = '0';
+function fitChip(h: PartyHero, view: UnitView) {
+  const skill = KITS[h.classId].skills[h.stance], el = view.name;
+  view.fit = chipFitKey;
+  // Not laid out (the Status/Log view, a hidden screen): the full name for now, measured again when the arena shows (chipFitKey bumps).
+  if (!el.clientWidth) { setText(el, skill.name); return; }
+  for (const label of [skill.name, skill.name.split(' ')[0], skill.label.slice(0, 2)]) { setText(el, label); if (el.scrollWidth <= el.clientWidth) break; }
+}
+const stageResize = new ResizeObserver(entries => {
+  if (entries.some(e => e.target.id === 'arena')) chipFitKey = String(Number(chipFitKey) + 1);
+  bannerSpot = undefined;
+  if (!inTown) { placeBanner(); updateReadyMore(); }
+});
+stageResize.observe($('arena')); stageResize.observe(document.querySelector('.arena-intel')!);
+/** The arena slot's size as --slot-w/--slot-h (px), which size the arena (battle.css). A CSS size container on the slot would make every
+ *  HUD text change re-lay out the whole arena (about 25 ms per frame on a mid-range phone, P5); this runs only when the slot resizes. */
+function sizeSlot(slot: HTMLElement, width: number, height: number) { slot.style.setProperty('--slot-w', `${width}px`); slot.style.setProperty('--slot-h', `${height}px`); }
+const slotResize = new ResizeObserver(([entry]) => sizeSlot(entry.target as HTMLElement, entry.contentRect.width, entry.contentRect.height));
+slotResize.observe(document.querySelector('.arena-slot')!);
+/** When the arena appears (a battle's ready window, back from Status/Log) its size is set at once, not a frame later by the observer. */
+function syncSlot() { const slot = document.querySelector<HTMLElement>('.arena-slot')!, cs = getComputedStyle(slot); sizeSlot(slot, slot.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), slot.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)); }
+// A web font that arrives late changes every label's width: the chips are measured again.
+document.fonts?.addEventListener?.('loadingdone', () => { chipFitKey = String(Number(chipFitKey) + 1); });
 function switchSkill(id: number) {
   const h = battle.hero(id);
   if (!h || h.hp <= 0 || inTown) return;
@@ -1636,11 +1732,14 @@ function openSkillPicker(id: number) {
   pickerReturn = active instanceof HTMLElement && active !== document.body && !picker.contains(active) ? active : document.querySelector<HTMLElement>(`[data-skill-switch="${id}"]`);
   picker.setAttribute('aria-label', t('battle.skill.choose', { name: heroName(h) }));
   picker.innerHTML = `<h4>${t('battle.skill.choose', { name: heroName(h) })}</h4>${battle.availableSkills(id).map(i => { const s = kit.skills[i]; return `<button type="button" data-pick-skill="${i}" aria-pressed="${h.stance === i}"><span><b>${s.name}</b><small>${s.label}</small></span><em>${fmtSec(s.cooldown)}</em></button>`; }).join('')}`;
-  const p = cell(h.slot);
-  const width = Math.max(180, $('arena').clientWidth * .52) / $('arena').clientWidth * 100;
+  const p = cell(h.slot), stageWidth = $('arena-stage').clientWidth;
+  const width = Math.max(180, stageWidth * .52) / stageWidth * 100, bottom = Math.min(70, (760 - p.y - 70) / 7.6);
   picker.style.left = `${Math.min(98 - width, Math.max(2, (p.x + 72) / 6 - width / 2))}%`;
-  picker.style.bottom = `${Math.min(70, (760 - p.y - 70) / 7.6)}%`;
+  picker.style.bottom = `${bottom}%`;
   picker.hidden = false;
+  // A short screen crops the stage's top: the picker then slides down to stay inside the visible arena.
+  const above = $('arena').getBoundingClientRect().top + 4 - picker.getBoundingClientRect().top;
+  if (above > 0) picker.style.bottom = `calc(${bottom}% - ${Math.ceil(above)}px)`;
   picker.querySelectorAll<HTMLButtonElement>('[data-pick-skill]').forEach(button => button.addEventListener('click', event => {
     event.stopPropagation();
     withDetailsPausedAction(() => battle.stance(id, Number(button.dataset.pickSkill)));
@@ -1677,17 +1776,18 @@ function updateFocusBar() {
   const img = bar.querySelector<HTMLImageElement>('.focus-face')!;
   const src = face(h);
   if (img.getAttribute('src') !== src) img.setAttribute('src', src);
-  bar.querySelector('.focus-name')!.textContent = `${heroName(h)} · LV ${h.level}`;
-  bar.querySelector('.focus-skill')!.textContent = skill.name;
-  bar.querySelector('.focus-hp b')!.textContent = `${Math.ceil(Math.max(0, h.hp))}/${h.maxHp}${h.shield > 0 ? ` +${Math.round(h.shield)}` : ''}`;
-  bar.querySelector('.focus-status')!.textContent = status;
+  setText(bar.querySelector('.focus-name')!, `${heroName(h)} · LV ${h.level}`);
+  setText(bar.querySelector('.focus-skill')!, skill.name);
+  setText(bar.querySelector('.focus-hp b')!, `${Math.ceil(Math.max(0, h.hp))}/${h.maxHp}${h.shield > 0 ? ` +${Math.round(h.shield)}` : ''}`);
+  setText(bar.querySelector('.focus-status')!, status);
   bar.classList.toggle('low-health', h.hp > 0 && ratio <= .35);
   bar.classList.toggle('downed', h.hp <= 0);
 }
-type Touch = { id: number; x: number; y: number; started: number; drag: boolean; el: HTMLElement };
+type Touch = { id: number; x: number; y: number; started: number; drag: boolean; el: HTMLElement; origin: 'card' | 'chip' };
 const touches = new Map<number, Touch>();
+/** A client point in stage units (600×760): the stage is the arena's full 600:760 canvas, whose top a short screen crops. */
 function point(x: number, y: number) {
-  const r = $('arena').getBoundingClientRect();
+  const r = $('arena-stage').getBoundingClientRect();
   return { x: (x - r.left) / r.width * 600, y: (y - r.top) / r.height * 760 };
 }
 function slotAt(p: { x: number; y: number }) {
@@ -1707,45 +1807,88 @@ function tapHero(id: number, sync = false) {
   }
   renderInspector();
 }
-function bindPointer(el: HTMLElement, id: number) {
+/** The last pointer press a chip handled on its pointerup: the click the browser sends after it is dropped (POINTER_CLICK_MS). */
+let chipPointerAt = -Infinity;
+/** A chip switch (two skills) or picker (three or more), unless the same hero was just tapped (CHIP_GUARD_MS). */
+function chipSwitch(id: number) { if (performance.now() - (lastHeroTap.get(id) ?? -Infinity) < CHIP_GUARD_MS) return; switchSkill(id); }
+/**
+ * One tracker for a hero card's two parts (G5/G6): the card (`.unit-tap`: sprite, name tag, HP bar) and its skill chip. A press anywhere
+ * on the card starts a hero drag once it moves 9px; released on another tile it moves the hero, on its own tile within 24px and 300 ms it
+ * is a tap (a thumb that slid). Without a drag, the card charges the hero (on pointerup) and the chip switches its skill. Two fingers on
+ * two heroes are two taps; a third finger is ignored. Each pointer is its own press, so a hero drag never blocks the tray.
+ */
+function bindPointer(el: HTMLElement, id: number, origin: 'card' | 'chip') {
   el.addEventListener('pointerdown', e => {
     if (e.button !== 0 || touches.size >= 2 || inTown) return;
     const h = battle.hero(id);
     if (!h || h.hp <= 0) return;
     sound.unlock();
-    if (moveMode) { battle.move(battle.selected, h.slot); moveMode = false; renderInspector(); return; }
-    lastHeroTap.set(id, performance.now());
-    battle.selected = id;
-    renderInspector();
-    el.setPointerCapture(e.pointerId);
-    touches.set(e.pointerId, { id, x: e.clientX, y: e.clientY, started: performance.now(), drag: false, el });
+    if (origin === 'card' && moveMode) { battle.move(battle.selected, h.slot); moveMode = false; renderInspector(); return; }
+    // The card selects its hero at once; a chip waits (a chip tap must not count as a hero tap for CHIP_GUARD_MS).
+    if (origin === 'card') { lastHeroTap.set(id, performance.now()); battle.selected = id; renderInspector(); }
+    try { el.setPointerCapture(e.pointerId); } catch { /* the pointer is already gone */ }
+    touches.set(e.pointerId, { id, x: e.clientX, y: e.clientY, started: performance.now(), drag: false, el, origin });
   });
   el.addEventListener('pointermove', e => {
     const t = touches.get(e.pointerId);
     if (!t || scene.dragId !== -1 && scene.dragId !== id) return;
-    if (Math.hypot(e.clientX - t.x, e.clientY - t.y) > 9) {
-      t.drag = true;
-      scene.dragId = id;
-      scene.dragPoint = point(e.clientX, e.clientY);
-      scene.hoverSlot = slotAt(scene.dragPoint);
-      el.closest('.unit-card')?.classList.add('dragging');
-    }
+    if (!t.drag && Math.hypot(e.clientX - t.x, e.clientY - t.y) <= DRAG_START_PX) return;
+    if (!t.drag && t.origin === 'chip') { battle.selected = id; closeSkillPicker(); renderInspector(); }
+    t.drag = true;
+    scene.dragId = id;
+    scene.dragPoint = point(e.clientX, e.clientY);
+    scene.hoverSlot = slotAt(scene.dragPoint);
+    el.closest('.unit-card')?.classList.add('dragging');
   });
   const finish = (e: PointerEvent, cancelled = false) => {
     const t = touches.get(e.pointerId);
     if (!t) return;
-    if (!cancelled) {
-      if (t.drag) { const slot = slotAt(point(e.clientX, e.clientY)); if (slot >= 0) battle.move(id, slot); }
-      else tapHero(id, [...touches.entries()].some(([key, other]) => key !== e.pointerId && other.id === id && Math.abs(other.started - t.started) < 120));
-    }
     touches.delete(e.pointerId);
+    if (t.origin === 'chip') chipPointerAt = performance.now();
+    if (!cancelled) {
+      const slot = t.drag ? slotAt(point(e.clientX, e.clientY)) : -1, hero = battle.hero(id);
+      const slid = t.drag && hero !== undefined && slot === hero.slot && Math.hypot(e.clientX - t.x, e.clientY - t.y) <= SLIDE_TAP_PX && performance.now() - t.started <= SLIDE_TAP_MS;
+      if (t.drag && !slid) { if (slot >= 0) battle.move(id, slot); }
+      else if (t.origin === 'chip' && !t.drag) chipSwitch(id);
+      else tapHero(id, [...touches.values()].some(other => other.id === id && Math.abs(other.started - t.started) < 120));
+    }
     if (t.drag) { scene.dragId = -1; scene.dragPoint = undefined; scene.hoverSlot = -1; }
     el.closest('.unit-card')?.classList.remove('dragging');
   };
   el.addEventListener('pointerup', e => finish(e));
   el.addEventListener('pointercancel', e => finish(e, true));
   el.addEventListener('lostpointercapture', e => finish(e as PointerEvent, true));
-  el.addEventListener('click', e => { if (e.detail === 0) tapHero(id); });
+  if (origin === 'card') el.addEventListener('click', e => { if (e.detail === 0) tapHero(id); });
+}
+/**
+ * G6: a battle button (Guard, Potion, Ninefold Dawn, Ⅱ Menu) acts on the pointerup of its own pointer when that pointer moved 12px or
+ * less and was not cancelled, so it works while another finger drags a hero (browsers send no click for a second finger). The click that
+ * follows is dropped; a keyboard or assistive-tech click (detail 0) acts once.
+ */
+function pressable(el: HTMLButtonElement, fn: () => void) {
+  let down: { id: number; x: number; y: number } | undefined, pointerAt = -Infinity;
+  el.addEventListener('pointerdown', e => {
+    // A dialog over the tray (e.g. the away menu a capture listener opened for this very touch): the press is not the button's.
+    if (e.button !== 0 || modal.open) { pointerAt = performance.now(); return; }
+    down = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    try { el.setPointerCapture(e.pointerId); } catch { /* the pointer is already gone */ }
+  });
+  el.addEventListener('pointerup', e => {
+    if (!down || down.id !== e.pointerId) return;
+    const near = Math.hypot(e.clientX - down.x, e.clientY - down.y) <= PRESS_SLOP_PX;
+    down = undefined; pointerAt = performance.now();
+    if (near && !el.disabled && !modal.open) fn();
+  });
+  el.addEventListener('pointercancel', e => { if (down?.id === e.pointerId) { down = undefined; pointerAt = performance.now(); } });
+  el.addEventListener('click', e => { if (e.detail > 0 && performance.now() - pointerAt < POINTER_CLICK_MS) return; fn(); });
+}
+/** Potion from the tray or H (G7): a second one within POTION_REPEAT_MS is a double tap, and a party at full health keeps its potions. */
+let potionAt = -Infinity;
+function usePotion() {
+  if (inTown || battle.status !== 'fighting' || battle.potions <= 0 || performance.now() - potionAt < POTION_REPEAT_MS) return;
+  const living = battle.living();
+  if (living.length && living.every(h => h.hp >= h.maxHp * POTION_FULL)) { arenaToast(t('battle.potion.full')); return; }
+  if (battle.potion()) potionAt = performance.now();
 }
 function setBattleView(view: 'arena' | 'hero' | 'log') {
   if (view !== 'arena' && battle.status === 'fighting') {
@@ -1758,6 +1901,7 @@ function setBattleView(view: 'arena' | 'hero' | 'log') {
   $('battle-screen').dataset.battleView = view;
   document.querySelectorAll<HTMLButtonElement>('.battle-view-tabs [data-battle-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.battleView === view)));
   $('battle-detail-pause-note').hidden = !pauseForDetails || view === 'arena';
+  if (view === 'arena') { syncSlot(); chipFitKey = String(Number(chipFitKey) + 1); }
   if (view === 'hero') renderInspector();
   frame(1);
 }
@@ -1771,15 +1915,17 @@ function cycleSkill(id: number, direction = 1) {
   renderInspector();
   frame(1);
 }
-/** A short 'Skill: X (tap again to undo)' note after a one-tap switch, so a stray tap is noticed and undone. */
+/** A short note just above the front row: 'Skill: X (tap again to undo)' after a one-tap switch, so a stray tap is noticed and undone,
+ *  or why a Potion was kept. */
 let skillToastTimer = 0;
-function skillToast(h: PartyHero) {
+function arenaToast(text: string) {
   const toast = $('skill-toast');
-  toast.textContent = `${heroName(h)} · ${t('battle.skill.toast', { skill: KITS[h.classId].skills[h.stance].name })}`;
+  toast.textContent = text;
   toast.hidden = false;
   window.clearTimeout(skillToastTimer);
   skillToastTimer = window.setTimeout(() => { toast.hidden = true; }, 1800);
 }
+const skillToast = (h: PartyHero) => arenaToast(`${heroName(h)} · ${t('battle.skill.toast', { skill: KITS[h.classId].skills[h.stance].name })}`);
 function withDetailsPausedAction<T>(action: () => T): T {
   const restorePause = pauseForDetails && battle.status === 'paused';
   if (restorePause) battle.pause();
@@ -1827,14 +1973,14 @@ function frame(dt: number) {
   }
   for (const h of battle.heroes) { if (h.hp <= 0) downed.add(h.id); else if (downed.delete(h.id)) announce(t('a11y.revived', { name: heroName(h) })); }
   if (battle.mode === 'dungeon' && battle.status === 'fighting') noteDungeonFight();
-  $('boss-health').textContent = `${fmtInt(Math.ceil(battle.bossHp))} / ${fmtInt(battle.bossMax)}`;
-  const hpPercent = `${battle.bossHp / battle.bossMax * 100}%`;
-  $('boss-hp').style.width = hpPercent;
-  const ghost = document.getElementById('boss-hp-ghost');
-  if (ghost) ghost.style.width = hpPercent;
-  $('phase').textContent = t('battle.phase', { n: battle.phase });
-  $('stagger').style.width = `${Math.min(100, battle.breakLeft > 0 ? battle.breakLeft / BREAK_SECONDS * 100 : battle.stagger / battle.staggerThreshold() * 100)}%`;
-  $('stagger-label').textContent = battle.breakLeft > 0 ? t('battle.break') : t('battle.armor');
+  // Every HUD write below skips unchanged values (setText/setScale/setDisabled): a frame of the fight never re-lays out the page (P5).
+  setText($('boss-health'), `${fmtInt(Math.ceil(battle.bossHp))} / ${fmtInt(battle.bossMax)}`);
+  const hpRatio = battle.bossHp / battle.bossMax;
+  setScale($('boss-hp'), hpRatio);
+  setScale($('boss-hp-ghost'), hpRatio);
+  setText($('phase'), t('battle.phase', { n: battle.phase }));
+  setScale($('stagger'), battle.breakLeft > 0 ? battle.breakLeft / BREAK_SECONDS : battle.stagger / battle.staggerThreshold());
+  setText($('stagger-label'), battle.breakLeft > 0 ? t('battle.break') : t('battle.armor'));
   $('battle-screen').classList.toggle('boss-broken', battle.breakLeft > 0);
   // The boss clock counts this battle (its enrage reads the same time); the result's Time is the whole chapter.
   setText($('clock'), formatTime(battle.stageTime));
@@ -1851,35 +1997,38 @@ function frame(dt: number) {
   setText(intent.querySelector('b')!, threat ? `${t('battle.intent.time', { name: eventText(threat.name, lang()), s: fmtDec(Math.max(0, threat.left)) })}${threat.targetId !== undefined ? ` → ${heroLabel(threat.targetId)}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: fmtDec(battle.guardLeft) }) : t('battle.watch'));
   setText(intent.querySelector('span')!, threat ? `${threat.counter ? touchText(eventText(threat.counter, lang())) : t('battle.counter.default')}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.hint'));
   placeBanner();
-  $('damage').textContent = fmtInt(battle.damage);
-  $('blocked').textContent = fmtInt(battle.blocked);
-  $('loot').textContent = battle.mode === 'endless' ? `${fmtInt(runWallet.crystal)} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${fmtInt(battle.gold)}G`;
-  $('standing').textContent = t('battle.standing', { n: battle.living().length, total: battle.heroes.length });
-  $('move-tip').textContent = moveMode ? t('battle.move.pick') : t('battle.drag');
-  $('resolve-fill').style.width = `${battle.resolve}%`;
-  $('resolve-label').textContent = battle.resolve >= 100 ? t('battle.ult.ready') : t('battle.ult.charge', { n: Math.floor(battle.resolve) });
+  setText($('damage'), fmtInt(battle.damage));
+  setText($('blocked'), fmtInt(battle.blocked));
+  setText($('loot'), battle.mode === 'endless' ? `${fmtInt(runWallet.crystal)} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${fmtInt(battle.gold)}G`);
+  setText($('standing'), t('battle.standing', { n: battle.living().length, total: battle.heroes.length }));
+  setText($('move-tip'), moveMode ? t('battle.move.pick') : t('battle.drag'));
+  setScale($('resolve-fill'), battle.resolve / 100);
+  setText($('resolve-label'), battle.resolve >= 100 ? t('battle.ult.ready') : t('battle.ult.charge', { n: Math.floor(battle.resolve) }));
   const ultReady = battle.resolve >= 100 && battle.status === 'fighting';
-  $<HTMLButtonElement>('ultimate').disabled = !ultReady;
+  setDisabled($<HTMLButtonElement>('ultimate'), !ultReady);
   $('ultimate').classList.toggle('ready', ultReady);
-  $<HTMLButtonElement>('potion').disabled = battle.potions <= 0 || battle.status !== 'fighting';
-  $('potion').querySelector('b')!.textContent = String(battle.potions);
-  $<HTMLButtonElement>('guard').disabled = battle.guardCooldown > 0 || battle.status !== 'fighting';
+  setDisabled($<HTMLButtonElement>('potion'), battle.potions <= 0 || battle.status !== 'fighting');
+  setText($('potion').querySelector('b')!, String(battle.potions));
+  setDisabled($<HTMLButtonElement>('guard'), battle.guardCooldown > 0 || battle.status !== 'fighting');
   // Guard only helps if it is still up at impact: cue the window once an all-grid hit is within GUARD_DURATION
   // (minus a few frames, since guardLeft ticks down before the impact resolves).
   const guardWindow = battle.status === 'fighting' && battle.guardCooldown <= 0 && battle.guardLeft <= 0 && battle.threats.some(v => v.type === 'all' && v.left <= GUARD_DURATION - GUARD_MARGIN);
   $('guard').classList.toggle('ready-window', guardWindow);
-  $('guard-label').textContent = guardWindow ? t('battle.guard.now') : battle.guardLeft > 0 ? t('battle.guard.active', { s: fmtDec(battle.guardLeft) }) : battle.guardCooldown > 0 ? t('battle.guard.cd', { s: fmtDec(battle.guardCooldown) }) : t('battle.guard.ready');
+  setText($('guard-label'), guardWindow ? t('battle.guard.now') : battle.guardLeft > 0 ? t('battle.guard.active', { s: fmtDec(battle.guardLeft) }) : battle.guardCooldown > 0 ? t('battle.guard.cd', { s: fmtDec(battle.guardCooldown) }) : t('battle.guard.ready'));
   $('guard').classList.toggle('guarding', battle.guardLeft > 0);
   coachFrame(guardWindow);
-  $('lane-targets-hint')?.remove();
   document.querySelector('.lane-targets')?.classList.toggle('has-minions', battle.minions.length > 0);
   for (const h of battle.heroes) {
-    const el = document.querySelector<HTMLElement>(`[data-hero="${h.id}"]`);
-    if (!el) continue;
-    const p = cell(h.slot);
-    el.style.left = `${p.x / 6}%`;
-    el.style.top = `${p.y / 7.6}%`;
-    el.style.setProperty('--row', String(3 - Math.floor(h.slot / 3))); // upper rows on top: a chip's tap area reaches into the card below
+    const view = unitViews.get(h.id), el = view?.card;
+    if (!view || !el) continue;
+    // A card is placed only when its hero changes tile (upper rows paint above lower ones: the sprite's head may reach up).
+    if (view.slot !== h.slot) {
+      view.slot = h.slot;
+      const p = cell(h.slot);
+      el.style.left = `${p.x / 6}%`;
+      el.style.top = `${p.y / 7.6}%`;
+      el.style.setProperty('--row', String(3 - Math.floor(h.slot / 3)));
+    }
     el.classList.toggle('selected', h.id === battle.selected);
     el.classList.toggle('downed', h.hp <= 0);
     el.classList.toggle('buffed', h.buff > 0);
@@ -1889,11 +2038,12 @@ function frame(dt: number) {
   updateFocusBar();
   if (pickerHero !== -1 && (battle.status !== 'fighting' && battle.status !== 'ready' || (battle.hero(pickerHero)?.hp ?? 0) <= 0)) closeSkillPicker();
   const h = battle.hero(battle.selected);
-  if (h && $('selected-hp')) {
-    $('selected-hp').textContent = `${Math.ceil(h.hp)} / ${h.maxHp}`;
-    $('selected-shield').textContent = String(Math.round(h.shield));
-    $('fatigue-label').textContent = h.fatigue > 70 ? t('battle.fatigue.tired') : h.fatigue > 40 ? t('battle.fatigue.warm') : t('battle.fatigue.fresh');
-    $('fatigue-fill').style.width = `${h.fatigue}%`;
+  const hpLabel = document.getElementById('selected-hp');
+  if (h && hpLabel) {
+    setText(hpLabel, `${Math.ceil(h.hp)} / ${h.maxHp}`);
+    setText($('selected-shield'), String(Math.round(h.shield)));
+    setText($('fatigue-label'), h.fatigue > 70 ? t('battle.fatigue.tired') : h.fatigue > 40 ? t('battle.fatigue.warm') : t('battle.fatigue.fresh'));
+    setScale($('fatigue-fill'), h.fatigue / 100);
   }
 }
 /**
@@ -1955,17 +2105,25 @@ function renderBossStatus() {
   chips.forEach(([, label, ratio], i) => {
     const chip = host.children[i] as HTMLElement, text = chip.querySelector('b')!;
     if (text.textContent !== label) text.textContent = label;
-    chip.querySelector<HTMLElement>('i')!.style.width = `${Math.max(0, Math.min(1, ratio)) * 100}%`;
+    setScale(chip.querySelector<HTMLElement>('i')!, ratio);
   });
 }
 /** Banners belong in the boss area, but on short phones the intel band (statuses + intent) overlays the arena top and its
- *  counter text matters most while a warning banner shows: keep the banner just below the band and above the front row. */
+ *  counter text matters most while a warning banner shows: keep the banner just below the band (when it lies over the arena, not beside
+ *  it in landscape), inside the visible part of the stage and above the front row. The spot (px from the stage's top) is measured when a
+ *  banner shows and when the stage or the band resizes (stageResize), never after a frame's HUD writes (they would force a layout). */
+let bannerSpot: number | undefined;
 function placeBanner() {
   const banner = $('banner');
   if (!banner.classList.contains('visible')) return;
-  const arena = $('arena').getBoundingClientRect(), intel = document.querySelector('.arena-intel')!.getBoundingClientRect();
-  const frontRow = arena.height * ARENA.y / ARENA.height, top = Math.max(arena.height * .27, intel.bottom - arena.top + 4);
-  banner.style.top = `${Math.round(Math.min(top, frontRow - banner.offsetHeight - 2))}px`;
+  if (bannerSpot === undefined) {
+    const stage = $('arena-stage').getBoundingClientRect(), arena = $('arena').getBoundingClientRect(), intel = document.querySelector('.arena-intel')!.getBoundingClientRect();
+    const crop = arena.top - stage.top, frontRow = stage.height * ARENA.y / ARENA.height;
+    const over = intel.height > 0 && intel.left < arena.right && intel.right > arena.left && intel.top < arena.bottom;
+    const top = Math.max(crop + 4, stage.height * .27, over ? intel.bottom - stage.top + 4 : 0);
+    bannerSpot = Math.round(Math.min(top, frontRow - banner.offsetHeight - 2));
+  }
+  setAttr(banner, 'style', `top:${bannerSpot}px`);
 }
 function addLog(text: string) {
   const p = document.createElement('p');
@@ -1990,6 +2148,7 @@ window.addEventListener('battle-banner', event => {
   // The stage name already headlines the ready window: log it, but keep the arena clear for the FIGHT! cue.
   if (e.kind !== 'stage') {
     $('banner').textContent = text;
+    bannerSpot = undefined;
     $('banner').className = `battle-banner visible ${['warning', 'down', 'enrage'].includes(e.type) ? 'danger' : e.type === 'ultimate' ? 'ultimate' : e.type === 'break' ? 'break' : e.type === 'interrupt' ? 'interrupt' : ''}`;
     clearTimeout(bannerTimer);
     bannerTimer = window.setTimeout(() => {
@@ -2103,8 +2262,11 @@ modal.addEventListener('close', () => {
 });
 function closeWithoutResume() { resumeOnClose = false; clearResultState(); if (modal.open) modal.close(); }
 /** Controls; opened from the pause menu (`fromPause`) it is a sub-view whose Back returns to the pause menu, the fight still paused. */
+/** G9: on a touch screen the Controls help names the gestures (tap a hero, the skill chip, Ⅱ Menu, the phone's Back) instead of keys. */
+const TOUCH_HELP: Record<string, string> = { 'help.tap.title': 'help.tap.title.touch', 'help.skill.title': 'help.skill.title.touch', 'help.skill': 'help.skill.touch', 'help.guard.title': 'help.guard.title.touch', 'help.items.title': 'help.items.title.touch', 'help.pause.title': 'help.pause.title.touch', 'help.back.title': 'help.back.title.touch' };
 function help(fromPause = false) {
-  const rows: [string, string][] = [['help.tap.title', 'help.tap'], ['help.skill.title', 'help.skill'], ['help.drag.title', 'help.drag'], ['help.guard.title', 'help.guard'], ['help.items.title', 'help.items'], ['help.lanes.title', 'help.lanes'], ['help.enrage.title', 'help.enrage'], ['help.pause.title', 'help.pause'], ['help.back.title', 'help.back']];
+  const touchKeys = coarsePointer.matches, key = (k: string) => touchKeys ? TOUCH_HELP[k] ?? k : k;
+  const rows: [string, string][] = ([['help.tap.title', 'help.tap'], ['help.skill.title', 'help.skill'], ['help.drag.title', 'help.drag'], ['help.guard.title', 'help.guard'], ['help.items.title', 'help.items'], ['help.lanes.title', 'help.lanes'], ['help.enrage.title', 'help.enrage'], ['help.pause.title', 'help.pause'], ['help.back.title', 'help.back']] as [string, string][]).map(([title, body]) => [key(title), key(body)]);
   const vars = { t: formatTime(ENRAGE_AT), pct: Math.round((ENRAGE_DMG - 1) * 100), s: ENRAGE_AT - ENRAGE_WARN, move: fmtSec(MOVE_PENALTY) };
   openModal(`<h2 id="modal-title">${t('help.title')}</h2><div class="help-rows">${rows.map(([title, body]) => `<p><b>${t(title as never, vars)}</b><br>${t(body as never, vars)}</p>`).join('')}</div>${fromPause ? `<button class="btn primary" data-nav-parent>${t('common.back')}</button>` : `<button class="btn primary" data-close>${t('help.close')}</button>`}`, { parent: fromPause ? renderPause : undefined });
 }
@@ -2709,7 +2871,7 @@ function resumeEncounter(savedEncounter: NonNullable<typeof encounter>) {
   townState.rogueSetup = battle.rogueBuild ? structuredClone(battle.rogueBuild) : townState.rogueSetup;
   if (initialized) scene.replace(battle);
   makeUnits(); updateExpedition(); showReady();
-  $('ready-copy').textContent = t('ready.resume'); $('ready-tip').hidden = true;
+  setReadyCopy(t('ready.resume')); $('ready-tip').hidden = true;
   if (frozen.settled) result();
   // A won wave left with Save & suspend resumes where its resume card says ('Resume CH n · battle k'): the next battle's ready window.
   else if (battle.mode === 'adventure' && battle.status === 'victory' && battle.stage + 1 < battle.stageCount) advanceWave();
@@ -3266,14 +3428,15 @@ $('battle-detail-resume').addEventListener('click', () => setBattleView('arena')
 $('focus-bar').addEventListener('click', () => setBattleView('hero'));
 // Expedition and preparation routes are handled by the Town screen's delegated actions.
 $('start').addEventListener('click', begin);
-$('pause').addEventListener('click', pauseMenu);
+$('ready-more').addEventListener('click', toggleReadyMore);
+pressable($<HTMLButtonElement>('pause'), pauseMenu);
 $('combat-boons').addEventListener('click', showBoonTray);
 $('howto').addEventListener('click', () => help());
 $('settings').addEventListener('click', () => settings());
 $('sound').addEventListener('click', () => { profile.sound = !profile.sound; updateSound(); });
-$('guard').addEventListener('click', () => battle.guard());
-$('potion').addEventListener('click', () => battle.potion());
-$('ultimate').addEventListener('click', () => battle.ultimate());
+pressable($<HTMLButtonElement>('guard'), () => battle.guard());
+pressable($<HTMLButtonElement>('potion'), usePotion);
+pressable($<HTMLButtonElement>('ultimate'), () => battle.ultimate());
 document.querySelectorAll<HTMLElement>('[data-lane]').forEach(el => el.addEventListener('click', () => {
   const lane = Number(el.dataset.lane);
   battle.targetLane = battle.targetLane === lane ? -1 : lane;
@@ -3322,7 +3485,7 @@ window.addEventListener('keydown', e => {
   if ((e.code === 'Space' && (!controlFocused || heroFocused)) || e.code === 'KeyP') { e.preventDefault(); pauseMenu(); return; }
   if (e.code === 'Enter' && !controlFocused && battle.status === 'ready') begin();
   if (e.code === 'KeyB') { e.preventDefault(); showBoonTray(); }
-  if (e.code === 'KeyH') battle.potion();
+  if (e.code === 'KeyH') usePotion();
   if (e.code === 'KeyG') battle.guard();
   if (e.code === 'KeyR') battle.ultimate();
   if (/^Digit[1-9]$/.test(e.code)) { const h = battle.heroes.find(h => h.slot === Number(e.code.slice(-1)) - 1); if (h) { sound.unlock(); tapHero(h.id); } }

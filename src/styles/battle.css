@@ -1,23 +1,28 @@
 /* Battle screen: enemy window, big arena, party status window, command row. */
 #battle-screen { position: relative; z-index: 1; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 6px 8px 8px; background: radial-gradient(ellipse at 50% 20%, #1a332b, var(--night) 70%); }
-.battle-top { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.battle-top { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .battle-place { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
-.battle-place b { font-family: var(--pixel); font-size: 10px; font-weight: 400; color: var(--gold); }
+/* 'HEROIC · CH 7' never splits (T4, no-break spaces in the strings too): only the stage name under it wraps. */
+.battle-place b { font-family: var(--pixel); font-size: 10px; font-weight: 400; color: var(--gold); white-space: nowrap; }
 .battle-place span { font-size: 13px; color: var(--ink-soft); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; line-height: 1.15; overflow-wrap: anywhere; }
-.battle-view-tabs { display: flex; gap: 4px; }
-.battle-view-tabs button { min-width: 44px; min-height: 44px; padding: 4px 8px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink-soft); font-size: 13px; }
-.battle-view-tabs button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
-.arena-heading-controls { display: flex; gap: 4px; }
+/* Battle / Status / Log are one segmented control (they touch); separate controls keep 8px apart (K3). */
+.battle-view-tabs { display: flex; gap: 0; }
+.battle-view-tabs button { position: relative; min-width: 46px; min-height: 44px; padding: 4px 8px; border: 1px solid var(--win-edge); border-radius: 0; background: var(--inset); color: var(--ink-soft); font-size: 13px; }
+.battle-view-tabs button + button { margin-left: -1px; }
+.battle-view-tabs button:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.battle-view-tabs button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.battle-view-tabs button[aria-pressed="true"] { z-index: 1; border-color: var(--gold); color: var(--gold); }
+.arena-heading-controls { display: flex; gap: 8px; }
 .arena-heading-controls .icon-button { min-width: 44px; min-height: 44px; padding: 2px; }
 /* 'Ⅱ Menu': a framed, labelled button (never just the lane glyph II) that opens the pause menu. */
 .battle-menu.btn { min-width: 44px; min-height: 44px; padding: 4px 10px; font: 700 14px/1 var(--text); white-space: nowrap; border-color: var(--gold-border); }
 /* Small phones: tighter tabs and Menu leave the place label room for whole words ('LANTAI 1 / Kedalaman 1' next to ✦ in Bell Trials and raids). */
-@media (max-width: 380px) { .battle-top, .battle-view-tabs, .arena-heading-controls { gap: 3px; } .battle-view-tabs button { padding: 4px; font-size: 12px; } .battle-menu.btn { padding: 4px 6px; } }
+@media (max-width: 380px) { .battle-view-tabs button { padding: 4px 6px; font-size: 12px; } .battle-menu.btn { padding: 4px 6px; } }
 .combat-boons-btn { position: relative; }
-.boon-count-badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; border-radius: 9px; background: var(--gold); color: #263329; font-size: 9px; line-height: 18px; text-shadow: none; }
+.boon-count-badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; border-radius: 9px; background: var(--gold); color: #263329; font-size: 10px; font-weight: 700; line-height: 18px; text-shadow: none; }
 
 .left-sidebar, .right-sidebar { display: none; }
-.arena-column { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.arena-column { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 #battle-screen[data-battle-view="hero"] .arena-column, #battle-screen[data-battle-view="log"] .arena-column { display: none; }
 #battle-screen[data-battle-view="hero"] .right-sidebar, #battle-screen[data-battle-view="log"] .right-sidebar { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; overflow-y: auto; }
 #battle-screen[data-battle-view="hero"] #battle-log-panel, #battle-screen[data-battle-view="log"] #battle-hero-panel, #battle-screen[data-battle-view="log"] .battle-detail-health { display: none; }
@@ -35,7 +40,7 @@
 
 /* Enemy window */
 .threat-band { flex: 0 0 auto; }
-.boss-hud { padding: 6px 10px 8px; }
+.boss-hud { padding: 6px 10px 8px; contain: layout style; }
 .boss-title { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
 .boss-title h2 { font-size: 18px; color: #fff; white-space: nowrap; }
 /* The subtitle grows from its own width: when name + subtitle + phase do not fit one line (a phone, a long Frostbound/Gilded/Ashbound
@@ -43,9 +48,10 @@
 #boss-title { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--ink-dim); line-height: 1.2; overflow-wrap: anywhere; }
 .boss-phase-badge { margin-left: auto; font-family: var(--pixel); font-size: 10px; color: var(--gold); white-space: nowrap; }
 .boss-meter { position: relative; height: 14px; margin: 4px 0; border: 2px solid #fff; border-radius: 3px; background: #1a0610; box-shadow: 0 0 0 2px #000; overflow: hidden; }
-.boss-hp-ghost, #boss-hp { position: absolute; left: 0; top: 0; bottom: 0; }
-.boss-hp-ghost { background: #fff3a8; transition: width 0.6s 0.25s ease-out; }
-#boss-hp { background: linear-gradient(180deg, #ff9d9d, var(--danger) 40%, var(--danger-deep)); transition: width 0.08s linear; }
+/* HUD bars are full-width fills scaled with transform: scaleX (main.ts setScale), so a frame's bar updates never re-lay out the page. */
+.boss-hp-ghost, #boss-hp { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left; }
+.boss-hp-ghost { background: #fff3a8; transition: transform 0.6s 0.25s ease-out; }
+#boss-hp { background: linear-gradient(180deg, #ff9d9d, var(--danger) 40%, var(--danger-deep)); transition: transform 0.08s linear; }
 .boss-phase-notch { position: absolute; top: 0; bottom: 0; width: 2px; background: #000a; }
 .boss-phase-notch.p1 { left: 66.6%; } .boss-phase-notch.p2 { left: 33.3%; }
 #boss-health { order: 3; font-family: var(--pixel); font-size: 10px; color: #fff; white-space: nowrap; }
@@ -53,15 +59,22 @@
 /* Battle readouts keep a 10px floor (Press Start 2P is unreadable below that on phones). */
 .stagger-row { display: flex; align-items: center; gap: 8px; font-family: var(--pixel); font-size: 10px; color: var(--ink-dim); }
 .stagger-track { flex: 1; height: 6px; border: 1px solid var(--win-edge); background: var(--inset); }
-.stagger-track i { display: block; height: 100%; background: linear-gradient(180deg, #e9f6ff, #8fb4d8); }
+.stagger-track i { display: block; height: 100%; transform-origin: left; background: linear-gradient(180deg, #e9f6ff, #8fb4d8); }
 #battle-screen.boss-broken .stagger-track i { background: linear-gradient(180deg, #fff6b0, var(--gold)); animation: blink 0.3s steps(2) infinite; }
 #battle-screen.boss-broken #stagger-label { color: var(--gold); }
 
 /* Arena */
-.arena-slot { position: relative; flex: 1 1 auto; min-height: 0; container-type: size; display: flex; justify-content: center; }
+/* The arena keeps the hero grid at the phone's full width on short screens (the browser bars showing): the stage (600×760 canvas
+   units, the grid in its lower half) stays whole at the bottom, and up to 120 canvas px of sky above the boss are cropped instead of
+   leaving side gutters (only as far as a 360px wide arena needs: a desktop keeps the whole sky). --arena-w is the arena's width, its
+   height is the stage's or the slot's, whichever is less. The slot's size comes
+   from main.ts (a ResizeObserver writes --slot-w/--slot-h): as a CSS size container, every HUD text change re-laid out the whole arena. */
+.arena-slot { position: relative; flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; --slot-w: 0px; --slot-h: 0px; --arena-w: min(var(--slot-w), max(var(--slot-h) * 600 / 760, min(var(--slot-h) * 600 / 640, 360px))); }
 /* The arena sits at the bottom of its slot, so the spare height on tall phones becomes an intel band (boss statuses + intent)
    above it instead of two empty bands; where the arena fills the slot, the band overlays the top of the arena as before. */
-.arena { position: relative; width: min(100cqw, 100cqh * 600 / 760); aspect-ratio: 600 / 760; align-self: flex-end; border: 1px solid var(--win-edge); border-radius: var(--radius); box-shadow: 0 0 0 3px var(--win-shadow), 0 8px 24px #0008; overflow: hidden; background: #0e1e19; }
+.arena { position: relative; width: var(--arena-w); height: min(var(--slot-h), var(--arena-w) * 760 / 600); align-self: flex-end; container-type: size; border: 1px solid var(--win-edge); border-radius: var(--radius); box-shadow: 0 0 0 3px var(--win-shadow), 0 8px 24px #0008; overflow: hidden; background: #0e1e19; }
+/* The stage: the canvas and every layer placed in canvas units (cards, lanes, banner, toast, picker), anchored to the arena's bottom. */
+.arena-stage { position: absolute; left: 0; right: 0; bottom: 0; aspect-ratio: 600 / 760; }
 #game-canvas, #game-canvas canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; image-rendering: pixelated; }
 #unit-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 /* Touch: no pan or zoom gesture starts on the arena or a hero card (the drag is the game's); the battle tray answers taps at once. */
@@ -71,15 +84,15 @@
 .unit-card { position: absolute; }
 .unit-tap { position: absolute; inset: 0; width: 100%; padding: 0; border: 0; background: transparent; touch-action: none; }
 .unit-tap:focus-visible { outline: 2px solid var(--gold); }
-.unit-name { position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%); padding: 0 4px; border-radius: 2px; background: #000a; font-size: 11px; color: #fff; white-space: nowrap; pointer-events: none; }
+.unit-name { position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%); padding: 0 4px; border-radius: 2px; background: #000a; font-size: 12px; color: #fff; white-space: nowrap; pointer-events: none; }
 .unit-card.selected .unit-name { color: var(--gold); }
 .unit-card.downed .unit-name { color: #999; text-decoration: line-through; }
 .unit-card.dragging { z-index: 5; }
-.tap-flash { position: absolute; left: 50%; top: 4px; transform: translateX(-50%); font-family: var(--pixel); font-size: 8px; color: var(--gold); text-shadow: 1px 1px 0 #000; opacity: 0; pointer-events: none; }
+.tap-flash { position: absolute; left: 50%; top: 4px; transform: translateX(-50%); font-family: var(--pixel); font-size: 10px; color: var(--gold); text-shadow: 1px 1px 0 #000; opacity: 0; pointer-events: none; }
 .unit-tap.tapped .tap-flash { animation: tap-pop 0.45s ease-out; }
 @keyframes tap-pop { 0% { opacity: 1; transform: translate(-50%, 6px) scale(1.4); } 100% { opacity: 0; transform: translate(-50%, -10px) scale(1); } }
 
-.arena-intel { position: absolute; z-index: 4; top: 6px; left: calc((100cqw - min(100cqw, 100cqh * 600 / 760)) / 2 + 6px); right: calc((100cqw - min(100cqw, 100cqh * 600 / 760)) / 2 + 6px); display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+.arena-intel { position: absolute; z-index: 4; top: 6px; left: calc((var(--slot-w) - var(--arena-w)) / 2 + 6px); right: calc((var(--slot-w) - var(--arena-w)) / 2 + 6px); display: flex; flex-direction: column; gap: 4px; pointer-events: none; contain: layout style; }
 .intent-panel { position: relative; padding: 5px 10px 6px; font-size: 13px; opacity: .85; transition: opacity 0.15s; pointer-events: none; }
 .intent-panel b { display: block; font-family: var(--pixel); font-size: 10px; font-weight: 400; line-height: 1.6; }
 .intent-panel span { display: block; color: var(--ink-soft); line-height: 1.25; }
@@ -101,7 +114,7 @@
 .boss-status { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
 .boss-status:empty { display: none; }
 .status-chip { position: relative; display: inline-flex; align-items: center; min-height: 18px; padding: 1px 6px; border: 1px solid currentColor; border-radius: 3px; background: #07120fd9; overflow: hidden; font-family: var(--pixel); font-size: 10px; line-height: 1.4; }
-.status-chip i { position: absolute; left: 0; top: 0; bottom: 0; background: currentColor; opacity: .28; }
+.status-chip i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left; background: currentColor; opacity: .28; }
 .status-chip b { position: relative; font-weight: 400; }
 .status-chip.mark { color: #ffc46b; } .status-chip.weaken { color: #c4b0ff; } .status-chip.curse { color: #d39cff; } .status-chip.delay { color: #b9cef5; }
 /* Soft enrage: the countdown pulses (without ever hiding), then ENRAGED stays lit for the rest of the stage. */
@@ -112,31 +125,42 @@
 /* Sits just above the front row (the minion band), so it never covers a hero or a skill chip. */
 .skill-toast { position: absolute; z-index: 6; left: 50%; bottom: 53%; transform: translateX(-50%); width: max-content; max-width: 92%; padding: 4px 10px; border: 1px solid var(--gold-border); border-radius: 3px; background: #07120fee; color: var(--ink); font-size: 13px; text-align: center; pointer-events: none; }
 
-.lane-targets { position: absolute; z-index: 2; left: 0; right: 0; top: 37%; height: 10%; pointer-events: none; }
-.lane-targets button { position: absolute; top: 0; width: 22%; height: max(100%, 44px); transform: translateX(-50%); padding: 0; border: 2px dashed transparent; border-radius: var(--radius); background: transparent; pointer-events: auto; color: transparent; }
+/* Lane targets sit in the minion band and grow upwards into it, never down into the front row; they take taps only while minions are
+   on the field (an invisible button never sits over a hero: K4). */
+.lane-targets { position: absolute; z-index: 2; left: 0; right: 0; bottom: 53%; height: 10%; pointer-events: none; }
+.lane-targets button { position: absolute; bottom: 0; width: 22%; height: max(100%, 44px); transform: translateX(-50%); padding: 0; border: 2px dashed transparent; border-radius: var(--radius); background: transparent; pointer-events: none; color: transparent; touch-action: manipulation; }
 .lane-targets button:nth-child(1) { left: 24%; } .lane-targets button:nth-child(2) { left: 50%; } .lane-targets button:nth-child(3) { left: 76%; }
-.lane-targets button span { position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%); font-family: var(--pixel); font-size: 8px; }
-.lane-targets.has-minions button { border-color: #ffffff44; color: #ffffffaa; }
+.lane-targets button span { position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%); font-family: var(--pixel); font-size: 10px; }
+.lane-targets.has-minions button { border-color: #ffffff44; color: #ffffffaa; pointer-events: auto; }
 .lane-targets button.active { border-style: solid; border-color: var(--gold); color: var(--gold); background: #e5c68718; }
 
-.board-bottom { position: absolute; z-index: 2; left: 6px; right: 6px; bottom: 1px; display: flex; justify-content: space-between; font-size: 10px; line-height: 1.2; color: #ffffffaa; text-shadow: 1px 1px 0 #000; pointer-events: none; }
+.board-bottom { position: absolute; z-index: 2; left: 6px; right: 6px; bottom: 1px; display: flex; justify-content: space-between; font-size: 12px; line-height: 1.2; color: #ffffffaa; text-shadow: 1px 1px 0 #000; pointer-events: none; }
 
-/* Ready phase: a compact sheet over the boss area. The grid stays visible and only the window takes input,
-   so heroes can still be dragged into formation (Battle.move allows 'ready'). */
-.start-overlay { position: absolute; z-index: 6; left: 0; right: 0; top: 0; max-height: 47%; display: flex; justify-content: center; align-items: flex-start; padding: 8px; background: linear-gradient(180deg, #06100dcc 60%, #06100d00); pointer-events: none; }
-.start-window { width: min(100%, 360px); max-height: 100%; overflow: auto; padding: 8px 12px 10px; text-align: center; pointer-events: auto; }
+/* Ready phase: a compact sheet over the boss area that always ends above the front row (L10: the grid's top is 393/600 of the arena's
+   width above its bottom), so every hero stays visible and draggable into formation (Battle.move allows 'ready'). FIGHT! and its Back
+   sit in the battle tray under the thumb (K5). The story beat shows two lines; 'More' opens the rest. */
+.start-overlay { position: absolute; z-index: 6; left: 0; right: 0; top: 0; bottom: calc(100cqw * 393 / 600 + 2px); display: flex; justify-content: center; align-items: flex-start; padding: 6px; background: linear-gradient(180deg, #06100dcc 60%, #06100d00); pointer-events: none; }
+.start-window { width: min(100%, 360px); max-height: 100%; overflow: auto; overscroll-behavior: contain; padding: 6px 12px 8px; text-align: center; pointer-events: auto; }
 .start-window small { color: var(--ink-dim); }
-.start-window h3 { font-family: var(--pixel); font-size: 12px; color: var(--gold); margin: 4px 0; line-height: 1.5; }
-.start-window p { margin: 4px 0 8px; font-size: 13px; line-height: 1.3; color: var(--ink-soft); }
-.start-window .btn { width: 100%; font-family: var(--pixel); font-size: 13px; }
-/* FIGHT! with its Back before it: the Back in the text font, FIGHT! takes the rest of the row. */
-.ready-actions { display: flex; gap: 8px; }
-.ready-actions #ready-back { flex: 0 0 auto; width: auto; min-width: 88px; font: 700 14px/1 var(--text); }
-.ready-actions #start { flex: 1 1 auto; }
-.start-window .ready-back-hint { margin: 6px 0 0; font-size: 12px; color: var(--ink-dim); }
+.start-window #ready-label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.start-window h3 { font-family: var(--pixel); font-size: 12px; color: var(--gold); margin: 2px 0; line-height: 1.5; }
+.start-window p { margin: 2px 0 4px; font-size: 13px; line-height: 1.3; color: var(--ink-soft); }
+.ready-story { display: flex; align-items: center; gap: 8px; text-align: left; }
+.ready-story #ready-copy { flex: 1 1 auto; min-width: 0; }
+.start-window #ready-copy:not(.expanded) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.ready-more { flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 2px 8px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--gold); font-size: 13px; font-weight: 600; touch-action: manipulation; }
+.start-window .ready-back-hint { margin: 4px 0 0; font-size: 12px; color: var(--ink-dim); }
+/* FIGHT! with its Back before it, in the tray: the Back in the text font, FIGHT! takes the rest of the row. While the ready window is
+   up the tray shows only them; from FIGHT! on only Guard, Potion and Ninefold Dawn (one layout on every screen). */
+.action-bar .ready-actions { display: none; grid-column: 1 / -1; gap: 8px; }
+#battle-screen[data-ready] .action-bar > .cmd { display: none; }
+#battle-screen[data-ready] .action-bar .ready-actions { display: flex; }
+.ready-actions .btn { min-height: 48px; }
+.ready-actions #ready-back { flex: 0 0 auto; width: auto; min-width: 96px; font: 700 15px/1 var(--text); }
+.ready-actions #start { flex: 1 1 auto; font-family: var(--pixel); font-size: 14px; }
 
 /* Party status window with ATB-style skill gauges */
-.party-health-tray { flex: 0 0 auto; display: grid; grid-template-columns: 1fr; gap: 2px; padding: 4px 6px; }
+.party-health-tray { flex: 0 0 auto; display: grid; grid-template-columns: 1fr; gap: 8px; padding: 4px 6px; }
 .party-health-card { display: grid; grid-template-columns: 26px minmax(48px, 1fr) auto 1.1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; min-height: 44px; padding: 2px 4px; border: 0; border-radius: var(--radius); background: transparent; color: var(--ink); text-align: left; }
 .party-health-card[aria-pressed="true"] { background: #ffffff18; }
 .party-health-card[aria-pressed="true"] .party-hero-name { color: var(--gold); }
@@ -144,14 +168,14 @@
 .party-hero-name { grid-row: 1 / 3; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .party-health-values { grid-column: 3; grid-row: 1; display: flex; gap: 8px; align-items: baseline; font-size: 12px; justify-self: end; }
 .party-hp b { font-family: var(--pixel); font-size: 11px; font-weight: 400; }
-.party-hp small, .party-sh { font-size: 11px; color: var(--ink-dim); }
+.party-hp small, .party-sh { font-size: 12px; color: var(--ink-dim); }
 .party-sh b { color: var(--mana); font-weight: 600; }
 .party-health-meter { grid-column: 3; grid-row: 2; position: relative; height: 5px; width: 76px; justify-self: end; border: 1px solid var(--win-edge); background: var(--inset); }
-.party-health-meter i, .party-health-meter em { position: absolute; left: 0; top: 0; bottom: 0; }
-.party-health-meter i { background: var(--hp); transition: width 0.15s linear; }
+.party-health-meter i, .party-health-meter em { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left; }
+.party-health-meter i { background: var(--hp); transition: transform 0.15s linear; }
 .party-health-meter em { background: #6fd3ffcc; height: 2px; }
 .party-atb { grid-column: 4; grid-row: 1 / 3; position: relative; height: 10px; border: 1px solid var(--win-edge); border-radius: 2px; background: var(--inset); box-shadow: 0 0 0 1px #000; overflow: hidden; }
-.party-atb i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(180deg, #fff3b0, var(--gold) 50%, var(--gold-deep)); }
+.party-atb i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left; background: linear-gradient(180deg, #fff3b0, var(--gold) 50%, var(--gold-deep)); }
 .party-cooldown { grid-column: 4; grid-row: 1 / 3; justify-self: center; font-family: var(--pixel); font-size: 10px; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; pointer-events: none; z-index: 1; }
 .party-health-card.charged .party-atb { border-color: var(--gold); animation: atb-full 0.4s steps(2) infinite; }
 @keyframes atb-full { 50% { box-shadow: 0 0 0 1px #000, 0 0 8px var(--gold); } }
@@ -161,10 +185,10 @@
 .party-health-card.downed .party-hp b { color: var(--danger); }
 
 /* Command row */
-.action-bar { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 6px; }
+.action-bar { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 8px; contain: layout style; }
 .cmd { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 4px 6px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--win-mid);  color: #fff; overflow: hidden; font-size: 15px; line-height: 1.1; }
 .cmd > span { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; }
-.cmd small { font-size: 11px; color: var(--ink-soft); }
+.cmd small { font-size: 12px; color: var(--ink-soft); }
 .cmd b { position: relative; z-index: 1; font-family: var(--pixel); font-size: 12px; color: var(--hp); font-weight: 400; }
 .cmd:disabled { filter: grayscale(0.6) brightness(0.7); cursor: default; }
 .guard-button.guarding { border-color: var(--mana); background: #1d3c4a; }
@@ -179,23 +203,24 @@
 /* Nothing follows the Potion key (its count is the big number): no dangling separator ('H ·'). */
 .key-hint:last-child::after { content: none; }
 @media (pointer: coarse) { .key-hint { display: none; } }
-#resolve-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(180deg, #ffe48a66, #e0a93a55); transition: width 0.2s; }
+#resolve-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left; background: linear-gradient(180deg, #ffe48a66, #e0a93a55); transition: transform 0.2s; }
 .ultimate-button.ready { border-color: var(--gold); background: #e6c88d; color: #263329; text-shadow: none; animation: ult-ready 0.5s steps(2) infinite; filter: none; }
 .ultimate-button.ready small { color: #4a4a32; }
 @keyframes ult-ready { 50% { box-shadow: 0 0 0 2px var(--win-shadow), 0 0 16px 4px #e5c687aa; } }
 
 /* Status / log views */
 .battle-detail-pause-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; font-size: 14px; }
+.battle-detail-pause-note .btn { min-height: 44px; }
 .hero-identity { display: flex; gap: 12px; align-items: center; }
 .portrait-frame { position: relative; flex-shrink: 0; }
 .portrait-frame img { width: 60px; height: 66px; }
-.portrait-frame span { position: absolute; left: 0; right: 0; bottom: -4px; text-align: center; font-family: var(--pixel); font-size: 8px; color: var(--gold); }
+.portrait-frame span { position: absolute; left: 0; right: 0; bottom: -4px; text-align: center; font-family: var(--pixel); font-size: 10px; color: var(--gold); }
 .hero-class { color: var(--ink-dim); }
 .hero-identity h2 { font-family: var(--pixel); font-size: 13px; color: var(--gold); margin: 4px 0; }
 .hero-identity p { margin: 0; font-size: 13px; color: var(--ink-soft); }
 .hero-stats { display: flex; gap: 16px; margin: 10px 0; }
 .hero-stats b { font-family: var(--pixel); font-size: 10px; font-weight: 400; color: var(--gold); }
-.stance-options { display: flex; flex-direction: column; gap: 6px; }
+.stance-options { display: flex; flex-direction: column; gap: 8px; }
 .stance-option { display: flex; justify-content: space-between; align-items: center; min-height: var(--touch); padding: 6px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink); text-align: left; }
 .stance-option b { font-weight: 600; display: block; }
 .stance-option small { color: var(--ink-dim); }
@@ -203,13 +228,14 @@
 .stance-option.chosen i { color: var(--gold); }
 .skill-description { margin: 8px 0; font-size: 14px; color: var(--ink-soft); }
 .focus-meter > div { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-dim); margin-bottom: 4px; }
-.focus-meter .gauge i { background: linear-gradient(180deg, #ffd0a0, #e07a3a); }
+.focus-meter .gauge i { width: 100%; transform-origin: left; transition: none; background: linear-gradient(180deg, #ffd0a0, #e07a3a); }
 .move-button { width: 100%; margin-top: 10px; }
-.move-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
-.move-grid button { min-height: 40px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink); }
+.move-button small { font-size: 12px; }
+.move-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
+.move-grid button { min-height: 44px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink); }
 #combat-log { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
 .log-entry { margin: 0; padding: 3px 0; border-bottom: 1px solid var(--line); }
-.log-entry span { font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); margin-right: 8px; }
+.log-entry span { font-size: 12px; font-weight: 600; color: var(--ink-dim); margin-right: 8px; font-variant-numeric: tabular-nums; }
 .session-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; text-align: center; }
 .session-stats small { display: block; color: var(--ink-dim); }
 .session-stats b { font-family: var(--pixel); font-size: 10px; font-weight: 400; color: var(--gold); }
@@ -219,7 +245,22 @@
   .boss-hud { padding: 4px 8px 6px; }
   .stagger-row { margin-top: -2px; }
   .party-health-card { min-height: 44px; }
-  .cmd { min-height: 44px; font-size: 14px; }
+  .cmd, .ready-actions .btn { min-height: 44px; font-size: 14px; }
+}
+/* Short portrait phones (the browser bars showing, an iPhone SE): the place label keeps one line and the focus bar steps aside (the
+   selected card is highlighted, the Status view has the details), so the grid keeps the full width. */
+@media (orientation: portrait) and (max-height: 700px) {
+  #battle-screen { gap: 4px; padding-top: 4px; }
+  .arena-column { gap: 6px; }
+  .battle-place span { -webkit-line-clamp: 1; line-clamp: 1; }
+  .boss-title h2 { font-size: 16px; }
+  #battle-screen .focus-bar { display: none; }
+}
+/* The threat panel stays short on phones: the threat line in full, its counter on one line (the whole text is in the log and the
+   announcer); while a coach tip shows, only the threat line. */
+@media (max-height: 760px) {
+  .intent-panel span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.coaching .intent-panel span { display: none; }
 }
 
 /* Landscape / short-wide screens: arena on the left, HUD on the right. */
@@ -231,6 +272,28 @@
   .focus-bar { grid-column: 2; grid-row: 2; align-self: start; }
   .action-bar { grid-column: 2; grid-row: 3; }
 }
+/* A landscape phone (L6): the arena takes the whole height in column 1 (cropping up to 120 canvas px of sky only to reach a 300px
+   wide grid), and column 2 holds the top bar, the boss window, the threat panel (beside the arena, never over the boss), the focus
+   bar and the tray. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body[data-screen="battle"] #app { --app-max: 1180px; max-width: min(100vw, 1180px); }
+  #battle-screen[data-battle-view="arena"] { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto auto auto minmax(0, 1fr) auto; gap: 6px 12px; }
+  #battle-screen[data-battle-view="arena"] > .battle-top { grid-column: 2; grid-row: 1; }
+  #battle-screen[data-battle-view="arena"] .arena-column, #battle-screen[data-battle-view="arena"] .arena-slot { display: contents; }
+  #battle-screen[data-battle-view="arena"] .threat-band { grid-column: 2; grid-row: 2; }
+  #battle-screen[data-battle-view="arena"] .arena-intel { position: relative; grid-column: 2; grid-row: 3; top: auto; left: auto; right: auto; }
+  #battle-screen[data-battle-view="arena"] .focus-bar { grid-column: 2; grid-row: 4; align-self: start; }
+  #battle-screen[data-battle-view="arena"] .action-bar { grid-column: 2; grid-row: 6; }
+  #battle-screen[data-battle-view="arena"] .arena { --lh: calc(100dvh - var(--safe-t) - var(--safe-b) - 14px); grid-column: 1; grid-row: 1 / -1; align-self: end; height: var(--lh); width: clamp(var(--lh) * 600 / 760, 300px, var(--lh) * 600 / 640); }
+  .battle-place span { -webkit-line-clamp: 1; line-clamp: 1; }
+  .boss-hud { padding: 4px 8px 6px; }
+  .boss-title h2 { font-size: 16px; }
+  .cmd, .ready-actions .btn { min-height: 44px; }
+  /* Status and Log scroll as one page under a sticky top bar (two side-by-side scrollers left the log a 70px sliver). */
+  #battle-screen:not([data-battle-view="arena"]) { overflow-y: auto; overscroll-behavior: contain; }
+  #battle-screen:not([data-battle-view="arena"]) > .battle-top { position: sticky; top: -6px; z-index: 2; margin: -6px -8px 0; padding: 6px 8px; background: var(--night); }
+  #battle-screen[data-battle-view="hero"] .right-sidebar, #battle-screen[data-battle-view="log"] .right-sidebar, #battle-screen[data-battle-view="log"] .left-sidebar { flex: none; min-height: auto; overflow: visible; }
+}
 
 /* Encounter transition */
 .battle-wipe { position: absolute; inset: 0; z-index: 70; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(14, 1fr); pointer-events: none; }
@@ -238,12 +301,13 @@
 @keyframes wipe-block { 0% { background: #fff; } 30% { background: #0e1e19; transform: scale(1); } 100% { background: #0e1e19; transform: scale(0); } }
 
 /* Grid units: each hero cell carries its own HP bar and a skill chip (charge fill + switch). */
-.unit-card { position: absolute; z-index: var(--row, 1); container-type: inline-size; }
-/* A small name tag tells same-class heroes apart. */
-.unit-name { display: block; left: 3px; top: 2px; bottom: auto; transform: none; max-width: calc(100% - 6px); overflow: hidden; text-overflow: ellipsis; padding: 0 3px; font-size: 10px; line-height: 1.35; color: #fffc; background: #000a; }
+.unit-card { position: absolute; z-index: var(--row, 1); container-type: inline-size; contain: layout style; }
+/* A small name tag tells same-class heroes apart: 12px, never an ellipsis (T3); it gives up its padding before its letters. */
+.unit-name { display: block; left: 2px; top: 2px; bottom: auto; transform: none; max-width: calc(100% - 4px); overflow: hidden; text-overflow: clip; padding: 0 3px; font-size: 12px; line-height: 1.25; color: #fffc; background: #000a; }
+@container (max-width: 80px) { .unit-name { padding: 0 1px; } }
 .unit-hp { position: absolute; z-index: 1; left: 7%; right: 7%; top: 61%; height: 5%; min-height: 3px; border: 1px solid #07120fcc; background: #07120fcc; pointer-events: none; overflow: hidden; }
-.unit-hp i, .unit-hp em { position: absolute; left: 0; top: 0; bottom: 0; }
-.unit-hp i { background: linear-gradient(180deg, #b8f0c8, var(--hp) 45%, var(--hp-deep)); transition: width 0.15s linear; }
+.unit-hp i, .unit-hp em { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left; }
+.unit-hp i { background: linear-gradient(180deg, #b8f0c8, var(--hp) 45%, var(--hp-deep)); transition: transform 0.15s linear; }
 .unit-hp em { height: 40%; background: var(--mana); }
 .unit-card.low-health .unit-hp i { background: var(--hp-low); }
 .unit-card.low-health .unit-hp { animation: low-hp 0.8s steps(2) infinite; }
@@ -251,16 +315,19 @@
 .unit-card.ko-flash::after { content: ''; position: absolute; inset: 0; border-radius: 3px; background: #ff2a2a; opacity: 0; pointer-events: none; animation: ko-flash 0.6s ease-out; }
 @keyframes ko-flash { 0%, 30% { opacity: .5; } 100% { opacity: 0; } }
 .unit-card.downed .unit-hp { opacity: 0.4; }
-.unit-skill { position: absolute; z-index: 1; left: 4%; right: 4%; top: 68%; height: 31%; display: flex; align-items: center; gap: 2px; padding: 0 4px 0 6px; border: 1px solid var(--win-edge); border-radius: 3px; background: #0e1e19e6; color: var(--ink); font-size: clamp(10px, 9cqw, 13px); font-weight: 600; line-height: 1; touch-action: manipulation; }
-/* The tap target grows to 36-40px on phones without the chip looking any bigger: upwards over the HP bar but never past
-   the middle of the card (60% of the chip's height), which stays the hero's tap area, and downwards across the row gap
-   into the top strip of the card below (its name tag, above the sprite; upper rows paint above lower rows, see --row).
-   Chip taps right after a hero tap on the same card are ignored (CHIP_GUARD_MS). */
-.unit-skill::before { content: ''; position: absolute; left: -1px; right: -1px; top: max(-60%, min(-1px, calc(100% - 31px))); bottom: max(-9px, min(-3px, calc(100% - 30px))); }
+/* The chip: a 12px label (the full skill name when it fits, else its first word, else its emblem: main.ts fitChip) and ⇄/▾. A drag that
+   starts on it moves the hero like one on the card (touch-action none, main.ts bindPointer), a tap without movement switches. */
+.unit-skill { position: absolute; z-index: 1; left: 4%; right: 4%; top: 68%; height: 31%; min-height: 18px; display: flex; align-items: center; gap: 2px; padding: 0 3px 0 5px; border: 1px solid var(--win-edge); border-radius: 3px; background: #0e1e19e6; color: var(--ink); font-size: max(12px, min(9cqw, 13px)); font-weight: 600; line-height: 1; touch-action: none; }
+/* Its tap target stays inside its own card (K2/K4): up to the HP bar, 4px to the sides and 2px below, never into the card below. The
+   hero's own zone (sprite, name tag, HP bar) keeps the upper 60% of the card. Chip taps right after a hero tap on the same card are
+   ignored (CHIP_GUARD_MS). */
+.unit-skill::before { content: ''; position: absolute; left: -4px; right: -4px; top: -22%; bottom: -2px; }
+.unit-skill:disabled { pointer-events: none; }
 .unit-skill:disabled::before { display: none; }
-.unit-skill-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: color-mix(in srgb, var(--class-color) 38%, transparent); transition: width 0.1s linear; }
-.unit-skill-name { position: relative; flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.unit-skill-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left; border-radius: 2px; background: color-mix(in srgb, var(--class-color) 38%, transparent); }
+.unit-skill-name { position: relative; flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: clip; }
 .unit-skill-icon { position: relative; flex-shrink: 0; color: var(--gold); font-size: 0.9em; }
+@container (max-width: 90px) { .unit-skill-icon { display: none; } }
 .unit-skill:focus-visible { border-color: var(--gold-border); }
 @media (hover: hover) { .unit-skill:hover:not(:disabled) { border-color: var(--gold-border); } }
 .unit-skill:disabled { cursor: default; }
@@ -275,17 +342,17 @@
 @keyframes skill-swap { 0% { transform: scale(1.12); background: var(--gold-bg); } }
 
 /* Skill picker (heroes with three or more skills) */
-.skill-picker { position: absolute; z-index: 7; width: 52%; min-width: 180px; max-width: 280px; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.skill-picker { position: absolute; z-index: 7; width: 52%; min-width: 180px; max-width: 280px; padding: 6px; display: flex; flex-direction: column; gap: 8px; }
 .skill-picker h4 { margin: 0 0 2px; font-size: 12px; color: var(--ink-dim); font-weight: 500; }
 .skill-picker button { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 44px; padding: 4px 10px; border: 1px solid var(--win-edge); border-radius: 3px; background: var(--inset); color: var(--ink); text-align: left; }
 .skill-picker button b { display: block; font-size: 14px; }
-.skill-picker button small { color: var(--ink-dim); font-size: 11px; }
+.skill-picker button small { color: var(--ink-dim); font-size: 12px; }
 .skill-picker button[aria-pressed="true"] { border-color: var(--gold-border); background: var(--gold-bg); }
 .skill-picker button[aria-pressed="true"] b { color: var(--gold); }
-.skill-picker button em { font-style: normal; font-family: var(--pixel); font-size: 8px; color: var(--ink-dim); }
+.skill-picker button em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--ink-dim); }
 
 /* Focus bar: one compact line for the selected hero, whatever the party size. */
-.focus-bar { flex: 0 0 auto; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 48px; padding: 4px 10px; text-align: left; cursor: pointer; }
+.focus-bar { flex: 0 0 auto; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 48px; padding: 4px 10px; text-align: left; cursor: pointer; contain: layout style; }
 .focus-face { width: 30px; height: 33px; }
 .focus-id { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
 .focus-id b { font-size: 14px; color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -298,14 +365,25 @@
 
 /* First-battle coach: a tip bubble with an arrow at the control it is about; it never blocks taps or drags (only Skip is clickable). */
 /* The bubble lives on body, outside #app: it takes #app's touch rules itself (no selection or callout on a long press of Skip). */
-.coach-bubble { position: fixed; z-index: 35; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 10px; border: 2px solid var(--gold); border-radius: var(--radius); background: #12231ef2; box-shadow: 0 0 0 3px #000a, 0 8px 22px #000c; color: var(--ink); pointer-events: none; animation: coach-in .2s ease-out; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* Two columns: the label and a tip of at most two lines, then Skip (the bubble's only control, 44×44). ui/coach.ts places it in the band
+   above the front row (or over the focus bar, or beside the arena in landscape), off every hero card and the boss HP bar, with its arrow
+   (a stem when it has to reach further) at the control it is about. */
+.coach-bubble { position: fixed; z-index: 35; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 8px; padding: 4px 6px 4px 10px; border: 2px solid var(--gold); border-radius: var(--radius); background: #12231ef2; box-shadow: 0 0 0 3px #000a, 0 8px 22px #000c; color: var(--ink); pointer-events: none; animation: coach-in .2s ease-out; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .coach-bubble[hidden] { display: none; }
-.coach-bubble small { font-family: var(--pixel); font-size: 8px; color: var(--gold); }
-.coach-text { order: 2; flex: 1 1 100%; font-size: 15px; font-weight: 700; line-height: 1.25; color: var(--gold-bright); }
-.coach-skip { order: 1; pointer-events: auto; margin-left: auto; min-height: 30px; padding: 2px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink-soft); font-size: 12px; }
-.coach-arrow { position: absolute; left: calc(var(--arrow-x, 50%) - 9px); top: 100%; width: 0; height: 0; border: 9px solid transparent; border-top-color: var(--gold); }
-.coach-bubble.below .coach-arrow { top: auto; bottom: 100%; border-top-color: transparent !important; border-bottom-color: var(--gold); }
-.coach-bubble[data-step="drag"], .coach-bubble[data-step="guard"] { border-color: #ff8a80; }
-.coach-bubble[data-step="drag"] .coach-arrow { border-top-color: #ff8a80; }
-.coach-bubble[data-step="guard"] .coach-arrow { border-top-color: #ff8a80; }
+/* The 'Tip' label sits on the top border like a tab, so the bubble is only as tall as its two lines and Skip. */
+.coach-bubble small { position: absolute; left: 10px; top: -8px; padding: 0 4px; background: #12231e; font-family: var(--pixel); font-size: 10px; line-height: 14px; color: var(--gold); }
+.coach-text { grid-column: 1; font-size: 14px; font-weight: 700; line-height: 1.25; color: var(--gold-bright); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.coach-skip { grid-column: 2; grid-row: 1; pointer-events: auto; min-width: 44px; min-height: 44px; padding: 2px 10px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--inset); color: var(--ink-soft); font-size: 13px; touch-action: manipulation; }
+/* The arrow: a triangle at the end of a stem of --arrow-len px (0 when the bubble sits next to its target). */
+.coach-bubble { --coach-color: var(--gold); }
+.coach-bubble[data-step="drag"], .coach-bubble[data-step="guard"] { --coach-color: #ff8a80; border-color: #ff8a80; }
+.coach-arrow { position: absolute; left: calc(var(--arrow-x, 50%) - 9px); top: 100%; width: 18px; height: calc(var(--arrow-len, 0px) + 9px); pointer-events: none; }
+.coach-arrow::before { content: ''; position: absolute; left: 8px; top: 0; width: 2px; height: var(--arrow-len, 0px); background: var(--coach-color); opacity: .8; }
+.coach-arrow::after { content: ''; position: absolute; left: 0; bottom: 0; border: 9px solid transparent; border-bottom: 0; border-top-color: var(--coach-color); }
+.coach-bubble.below .coach-arrow { top: auto; bottom: 100%; }
+.coach-bubble.below .coach-arrow::before { top: auto; bottom: 0; }
+.coach-bubble.below .coach-arrow::after { bottom: auto; top: 0; border-top: 0; border-bottom: 9px solid var(--coach-color); border-left-color: transparent; border-right-color: transparent; }
+.coach-bubble.side .coach-arrow { top: calc(var(--arrow-y, 50%) - 9px); left: auto; right: 100%; width: calc(var(--arrow-len, 0px) + 9px); height: 18px; }
+.coach-bubble.side .coach-arrow::before { left: auto; right: 0; top: 8px; width: var(--arrow-len, 0px); height: 2px; }
+.coach-bubble.side .coach-arrow::after { left: 0; top: 0; bottom: auto; border: 9px solid transparent; border-left: 0; border-right-color: var(--coach-color); }
 @keyframes coach-in { from { opacity: 0; transform: translateY(6px); } }

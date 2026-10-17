@@ -81,12 +81,15 @@ Resolve penuh. Pertarungan bisa dijeda kapan saja.
 Mouse atau sentuh:
 
 - **Ketuk hero**: mempercepat gauge skill hero itu.
-- **Seret hero**: pindah ke petak lain (Status → Pindahkan hero melakukan hal yang sama tanpa menyeret).
-- **Chip skill di kartu hero**: ganti ke skill terpasang yang lain.
+- **Seret hero** dari mana saja di kartunya (termasuk chip skill): pindah ke petak lain (Status → Pindahkan hero melakukan
+  hal yang sama tanpa menyeret).
+- **Ketuk chip skill di kartu hero**: ganti ke skill terpasang yang lain.
 - **Lane I · II · III** (di atas grid, saat ada minion): arahkan skill jarak jauh ke lane minion; ketuk lane yang sama lagi
   untuk kembali mengincar boss.
-- Tombol **Guard**, **Ramuan**, dan **Fajar Sembilan** di bawah grid, **Ⅱ Menu** di kanan atas (lanjutkan, kontrol, pengaturan,
-  atau tinggalkan). Sebelum **SERANG!**, **◀ Kembali** membawamu ke tempat berangkat; belum ada yang terpakai sebelum bertarung.
+- Tombol **Guard**, **Ramuan**, dan **Fajar Sembilan** di bawah grid (tetap bekerja saat jari lain menyeret hero; Ramuan tidak
+  terpakai bila party masih sehat), **Ⅱ Menu** di kanan atas (lanjutkan, kontrol, pengaturan, atau tinggalkan). Sebelum
+  pertarungan, **SERANG!** dan **◀ Kembali** berada di baris yang sama di bawah grid: **◀ Kembali** membawamu ke tempat
+  berangkat; belum ada yang terpakai sebelum bertarung.
 - Di kota, **◀ Kembali** (kiri atas) mundur satu layar; tombol Kembali di browser atau ponsel melakukan hal yang sama (di
   pertarungan tombol itu membuka menu).
 

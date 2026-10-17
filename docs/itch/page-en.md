@@ -74,12 +74,15 @@ Resolve is full. You can pause at any time.
 Mouse or touch:
 
 - **Tap a hero**: speed up that hero's skill gauge.
-- **Drag a hero**: move it to another tile (Status view → Move hero does the same without dragging).
-- **Skill chip on a hero card**: switch to the hero's other equipped skill.
+- **Drag a hero** from anywhere on its card (the skill chip included): move it to another tile (Status view → Move hero does
+  the same without dragging).
+- **Tap the skill chip on a hero card**: switch to the hero's other equipped skill.
 - **Lanes I · II · III** (above the grid, when minions appear): aim ranged skills at a minion lane; tap the same lane again
   to target the boss.
-- **Guard, Potion** and **Ninefold Dawn** buttons under the grid, **Ⅱ Menu** at the top right (resume, controls, settings or
-  leave). Before **FIGHT!**, **◀ Back** returns to where you set out; nothing is spent until you fight.
+- **Guard, Potion** and **Ninefold Dawn** buttons under the grid (they work while another finger drags a hero; a Potion is
+  kept when the party is healthy), **Ⅱ Menu** at the top right (resume, controls, settings or leave). Before the fight,
+  **FIGHT!** and **◀ Back** sit in the same row under the grid: **◀ Back** returns to where you set out; nothing is spent
+  until you fight.
 - In town, **◀ Back** (top left) goes back one screen; the browser's or phone's Back button does the same (in battle it opens
   the menu).
 

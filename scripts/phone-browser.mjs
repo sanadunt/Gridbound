@@ -48,16 +48,16 @@ const CHECKS = {
   G3: { rule: 'html overscroll-behavior-y none', owner: 'SHELL', mode: 'gate' },
   'T1-form': { rule: 'select / text input / textarea at least 16px (coarse)', owner: 'SHELL', mode: 'gate' },
   'T1-town': { rule: 'text floors outside battle (pixel 10px, text 12px)', owner: 'TOWN', mode: 'report' },
-  'T1-battle': { rule: 'text floors in battle (pixel 10px, text 12px)', owner: 'BATTLE', mode: 'report' },
+  'T1-battle': { rule: 'text floors in battle (pixel 10px, text 12px)', owner: 'BATTLE', mode: 'gate' },
   'K1-town': { rule: 'hit boxes at least 44×44 outside battle', owner: 'TOWN', mode: 'report' },
-  'K1-battle': { rule: 'hit boxes at least 44×44 in battle (the grid is K2)', owner: 'BATTLE', mode: 'report' },
+  'K1-battle': { rule: 'hit boxes at least 44×44 in battle (the grid is K2)', owner: 'BATTLE', mode: 'gate' },
   'K3-town': { rule: 'controls at least 8px apart outside battle', owner: 'TOWN', mode: 'report' },
-  'K3-battle': { rule: 'controls at least 8px apart in battle', owner: 'BATTLE', mode: 'report' },
-  K2: { rule: 'hero cards at least 70×56 (64×50 landscape)', owner: 'BATTLE', mode: 'report' },
+  'K3-battle': { rule: 'controls at least 8px apart in battle', owner: 'BATTLE', mode: 'gate' },
+  K2: { rule: 'hero cards at least 70×56 (64×50 landscape); the hero zone ≥ 60% of the card and ≥ 32px tall; the chip zone inside its card, ≥ 24px tall; nothing else on a card', owner: 'BATTLE', mode: 'gate' },
   L7: { rule: 'no nested vertical scroller under 40% of the viewport height', owner: 'TOWN', mode: 'report' },
   'L8-town': { rule: 'the primary action is on screen on arrival (town, dialogs)', owner: 'TOWN', mode: 'report' },
-  'L8-battle': { rule: 'the primary action is on screen on arrival (battle, results)', owner: 'BATTLE', mode: 'report' },
-  L10: { rule: 'nothing covers a hero card before FIGHT!', owner: 'BATTLE', mode: 'report' },
+  'L8-battle': { rule: 'the primary action is on screen on arrival (battle, results)', owner: 'BATTLE', mode: 'gate' },
+  L10: { rule: 'nothing covers a hero card before FIGHT!', owner: 'BATTLE', mode: 'gate' },
   G7: { rule: 'a quick double tap never presses what the first tap opened (Ⅱ Menu → Leave battle…)', owner: 'SAFE', mode: 'gate' },
   K6: { rule: 'the leave dialog puts the danger last, never where its opener was, and keeps the focus on the safe option', owner: 'SAFE', mode: 'gate' },
   C2: { rule: 'a blur that leaves the page (notification shade, Control Center) pauses a live fight behind its menu', owner: 'SAFE', mode: 'gate' },
@@ -205,7 +205,9 @@ function pageLib(cfg) {
         if (!rs.length) continue;
         const rect = { left: Math.min(...rs.map(x => x.left)), top: Math.min(...rs.map(x => x.top)), right: Math.max(...rs.map(x => x.right)), bottom: Math.max(...rs.map(x => x.bottom)) };
         const s = cs(el);
-        let scale = 1; for (let e = el; e; e = e.parentElement) { if (e.offsetWidth > 0) { scale = e.getBoundingClientRect().width / e.offsetWidth || 1; break; } }
+        // A transform's scale (offsetWidth is rounded to whole pixels: a ratio within 2% of 1 is that rounding, not a scale).
+        // Measured on the first box at least 40px wide, where that rounding stays under 2.5%.
+        let scale = 1; for (let e = el; e; e = e.parentElement) { if (e.offsetWidth >= 40) { scale = e.getBoundingClientRect().width / e.offsetWidth || 1; if (Math.abs(scale - 1) < .02) scale = 1; break; } }
         const vis = visibleBox(rect, el);
         texts.push({ t: txt.slice(0, 40), el, eff: Math.round(parseFloat(s.fontSize) * scale * 10) / 10, pixel: /press start/i.test(s.fontFamily), rect, vis });
       }
@@ -291,6 +293,27 @@ function pageLib(cfg) {
         if (!visible(card)) continue;
         const r = card.getBoundingClientRect(), [mw, mh] = landscape ? [64, 50] : [70, 56];
         if (r.width < mw || r.height < mh) K2.push({ sel: describe(card), text: textOf(card.querySelector('.unit-name') ?? card), size: [Math.round(r.width), Math.round(r.height)] });
+        // The card's zones in a fight (no picker open): a 7×28 grid of points hit-tested; the hero zone is its own .unit-tap, the chip zone
+        // its own enabled chip; anything else on the card (another card's chip, a lane button) fails. The chip's own reach: up to the HP
+        // bar, at most 2px below the card.
+        if (battle === 'fight' && !card.classList.contains('downed') && document.getElementById('skill-picker')?.hidden !== false) {
+          const tap = card.querySelector('.unit-tap'), chip = card.querySelector('.unit-skill:not(:disabled)'), hp = card.querySelector('.unit-hp')?.getBoundingClientRect();
+          let hero = 0, own = 0, total = 0; const foreign = new Set(), heroRows = new Set(), chipRows = new Set();
+          for (let i = 0; i < 7; i++) for (let j = 0; j < 28; j++) {
+            const x = r.left + (i + .5) * r.width / 7, y = r.top + (j + .5) * r.height / 28; if (x < 0 || y < 0 || x >= W || y >= H) continue;
+            const e = document.elementFromPoint(x, y); total++;
+            if (tap?.contains(e)) { hero++; if (i === 3) heroRows.add(j); } else if (chip?.contains(e)) { own++; if (i === 3) chipRows.add(j); }
+            else if (e?.closest('button, [role=button]')) foreign.add(describe(e.closest('button, [role=button]')));
+          }
+          const heroH = heroRows.size * r.height / 28, chipH = chipRows.size * r.height / 28;
+          if (total && hero / total < .6) K2.push({ sel: describe(card), text: `hero zone ${Math.round(hero / total * 100)}% of the card` });
+          if (heroH < 32) K2.push({ sel: describe(card), text: `hero zone ${Math.round(heroH)}px tall` });
+          if (chip && chipH < 24 - r.height / 28) K2.push({ sel: describe(card), text: `chip zone ${Math.round(chipH)}px tall` });
+          if (foreign.size) K2.push({ sel: describe(card), text: `other controls on the card: ${[...foreign].join(', ')}` });
+          if (chip) { const c = chip.getBoundingClientRect(), before = getComputedStyle(chip, '::before'), top = c.top + parseFloat(before.top), bottom = c.bottom - parseFloat(before.bottom);
+            if (hp && top < hp.top - 1) K2.push({ sel: describe(chip), text: `chip zone starts ${Math.round(hp.top - top)}px above the HP bar` });
+            if (bottom > r.bottom + 2.5) K2.push({ sel: describe(chip), text: `chip zone ends ${Math.round(bottom - r.bottom)}px below its card` }); }
+        }
         if (battle === 'ready' && !at(card, r.left + r.width / 2, r.top + r.height / 2)) L10.push({ sel: describe(card), text: `covered by ${describe(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2))}` });
       }
       return { layer: kind, viewport: [W, H], results: { L3, L5, G1, G2, G3, 'T1-form': form, T1, K1, K3, K2, L7, L8, L10 } };
@@ -566,8 +589,14 @@ async function measureHere(p, screen, rec, combo) {
   if (p.variant !== combo.variants[0]) { await p.emulate(combo.variants[0]); await sleep(350); await p.settle({ min: 100, quiet: 300, max: 1500 }); }
 }
 
-/** The check id a raw result belongs to on this screen (T1/K1/K3/L8 are split between TOWN and BATTLE). */
-const checkId = (raw, screenId) => ['T1', 'K1', 'K3', 'L8'].includes(raw) ? `${raw}-${BATTLE_SCREENS.test(screenId) ? 'battle' : 'town'}` : raw;
+/** The check id a raw result belongs to on this screen (T1/K1/K3/L8 are split between TOWN and BATTLE). BATTLE owns the battle screen
+ *  itself (its text in dialogs too) and the arrival of results; result screens, the Bell Trials boon draft (its arrival too), and dialog controls
+ *  (the ×, menu rows: base.css), belong to TOWN. */
+const checkId = (raw, screenId, layer) => {
+  if (!['T1', 'K1', 'K3', 'L8'].includes(raw)) return raw;
+  const battle = BATTLE_SCREENS.test(screenId) && screenId !== 'trials-draft' && (raw === 'L8' || (layer !== 'result' && !(layer === 'modal' && raw !== 'T1')));
+  return `${raw}-${battle ? 'battle' : 'town'}`;
+};
 
 async function runCombo(combo) {
   const tag = `${combo.profile}-${combo.variants.join('+')}-${combo.save}-${combo.lang}`;
@@ -644,7 +673,7 @@ function verdicts(rec) {
   for (const [id, items] of Object.entries(rec.checks ?? {})) add(id, items);
   for (const v of rec.variants ?? []) {
     if (v.error) add('tour', [{ text: `measure: ${v.error}` }]);
-    for (const [raw, items] of Object.entries(v.results ?? {})) add(checkId(raw, rec.id), items.map(item => ({ variant: v.variant, ...item })));
+    for (const [raw, items] of Object.entries(v.results ?? {})) add(checkId(raw, rec.id, v.layer), items.map(item => ({ variant: v.variant, ...item })));
   }
   return rows;
 }

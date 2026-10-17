@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { withBrowser, seedSave, ACT_TWO_SAVE } from './browser-harness.mjs';
+import { MID, LATE } from './phone-saves.mjs';
 
 const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5180/';
 
@@ -36,11 +37,12 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
     const battle = window.gridbound.battle;
     return {
       expected: battle.bossHp / battle.bossMax * 100,
-      health: document.querySelector("#boss-hp").style.width,
-      ghost: document.querySelector("#boss-hp-ghost").style.width
+      // The bars are full-width fills drawn with transform: scaleX (no layout per frame).
+      health: parseFloat(document.querySelector("#boss-hp").style.transform.replace("scaleX(", "")) * 100,
+      ghost: parseFloat(document.querySelector("#boss-hp-ghost").style.transform.replace("scaleX(", "")) * 100
     };
   })()`);
-  assert.ok(Math.abs(Number.parseFloat(bossHealth.health) - bossHealth.expected) < 0.001, 'Boss HP bar must track the current health ratio');
+  assert.ok(Math.abs(bossHealth.health - bossHealth.expected) < 0.05, `Boss HP bar must track the current health ratio: ${JSON.stringify(bossHealth)}`);
   assert.equal(bossHealth.ghost, bossHealth.health, 'Ghost bar must follow the current health ratio');
 
   // 3. Test Threat / Intent Danger Mode
@@ -159,14 +161,15 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
 
   // Each grid cell carries its own HP bar and skill chip; the chip switches skills in place.
   assert.equal(await evaluate('document.querySelectorAll("#unit-layer .unit-card .unit-hp").length'), await evaluate('window.gridbound.battle.heroes.length'));
-  // The chip looks the same but takes taps across >=36px (never past the card's middle, which stays the hero); each card carries its hero's name.
+  // K2/K4 (phone contract): the chip's tap zone is at least 24px tall and stays inside its own card (from the HP bar to 2px under the card),
+  // so the card's middle stays the hero and a chip never takes a tap meant for the card below; each card carries its hero's name.
   const chipHit = await evaluate(`(() => {
-    const chip = document.querySelector('[data-skill-switch="0"]'), card = chip.closest('.unit-card'), r = chip.getBoundingClientRect(), c = card.getBoundingClientRect();
+    const chip = document.querySelector('[data-skill-switch="0"]'), card = chip.closest('.unit-card'), r = chip.getBoundingClientRect(), c = card.getBoundingClientRect(), hp = card.querySelector('.unit-hp').getBoundingClientRect();
     let top = Infinity, bottom = -Infinity;
     for (let y = r.bottom + 12; y > c.top; y -= .5) if (document.elementFromPoint(r.left + r.width / 2, y)?.closest('.unit-skill') === chip) { top = Math.min(top, y); bottom = Math.max(bottom, y); }
-    return { height: r.height, hit: bottom - top, center: Boolean(document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2)?.closest('[data-tap="0"]')), name: card.querySelector('.unit-name').getBoundingClientRect().width > 0 };
+    return { height: r.height, hit: bottom - top, belowCard: bottom - c.bottom, aboveHp: hp.top - top, center: Boolean(document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2)?.closest('[data-tap="0"]')), name: card.querySelector('.unit-name').getBoundingClientRect().width > 0 };
   })()`);
-  assert.ok(chipHit.hit >= 36 && chipHit.height < 30 && chipHit.center && chipHit.name, `Skill chip hit area is ~36px without growing or covering the hero: ${JSON.stringify(chipHit)}`);
+  assert.ok(chipHit.hit >= 24 && chipHit.belowCard <= 2.5 && chipHit.aboveHp <= 1 && chipHit.height < 30 && chipHit.center && chipHit.name, `Skill chip hit area is >= 24px inside its card without covering the hero: ${JSON.stringify(chipHit)}`);
   assert.equal(await evaluate('getComputedStyle(document.querySelector("#guard .key-hint")).display'), 'none', 'Touch screens hide the keyboard letters');
   // A chip tap right after a hero tap is a slipped mash: ignored.
   const stanceGuarded = await evaluate('window.gridbound.battle.hero(0).stance');
@@ -233,7 +236,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await click('[data-depart="adventure"]');
   await wait('window.gridbound.battle.status === "ready" && document.querySelector("#start")');
   const drag = await evaluate(`(() => {
-    const b = window.gridbound.battle, h = b.heroes[0], arena = document.querySelector('#arena').getBoundingClientRect();
+    const b = window.gridbound.battle, h = b.heroes[0], arena = document.querySelector('#arena-stage').getBoundingClientRect();
     const free = [0, 1, 2, 3, 4, 5, 6, 7, 8].find(slot => !b.heroes.some(x => x.slot === slot) && slot !== h.slot);
     const at = slot => ({ x: arena.left + (72 + (slot % 3) * 156 + 72) / 600 * arena.width, y: arena.top + (367 + Math.floor(slot / 3) * 124 + 40) / 760 * arena.height });
     const from = at(h.slot), hit = document.elementFromPoint(from.x, from.y);
@@ -317,17 +320,17 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   assert.ok(shortPhone.track >= 40 && shortPhone.rowScroll <= shortPhone.rowClient, `The enrage countdown leaves the ARMOR meter alone: ${JSON.stringify(shortPhone)}`);
   assert.ok(!/\(G\)/.test(shortPhone.counter), `Touch players do not see keyboard letters in counter texts: ${shortPhone.counter}`);
   await screenshot('artifacts/combat-hud-360x640-threat.png');
-  // Skill chips keep a >=36px tap target on a 360px phone; the card's middle and the hero's body (~30% down) stay the hero's tap area.
-  // Stack a hero directly under another, so one chip's tap area meets the card below it.
+  // Skill chips keep a >= 24px tap target inside their own card on a 360px phone; the card's middle and the hero's body (~30% down) stay the
+  // hero's tap area, and so does the top strip (name tag) of a card right under another. Stack a hero directly under another.
   await evaluate(`(() => { const b = window.gridbound.battle, top = b.heroes.find(h => h.slot < 3), below = b.heroes.find(h => h.slot >= 6); b.threats = []; if (top && below) b.move(below.id, top.slot + 3); window.gridbound.step(0); })()`);
   await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
   const chips360 = await evaluate(`[...document.querySelectorAll('[data-skill-switch]')].filter(chip => !chip.disabled).map(chip => {
     const card = chip.closest('.unit-card'), r = chip.getBoundingClientRect(), c = card.getBoundingClientRect(); let top = Infinity, bottom = -Infinity;
     for (let y = r.bottom + 12; y > c.top; y -= .5) if (document.elementFromPoint(r.left + r.width / 2, y)?.closest('.unit-skill') === chip) { top = Math.min(top, y); bottom = Math.max(bottom, y); }
     const hero = (frac) => document.elementFromPoint(c.left + c.width / 2, c.top + c.height * frac)?.closest('[data-tap]')?.dataset.tap === card.dataset.hero;
-    return { height: r.height, hit: bottom - top, topFrac: (top - c.top) / c.height, center: hero(.5), body: hero(.3) };
+    return { height: r.height, hit: bottom - top, topFrac: (top - c.top) / c.height, below: bottom - c.bottom, center: hero(.5), body: hero(.3), nameTag: hero(.04) };
   })`);
-  assert.ok(chips360.length > 0 && chips360.every(chip => chip.hit >= 36 && chip.height < 30 && chip.topFrac > .5 && chip.center && chip.body), `Skill chips keep a 36px target on a 360px phone: ${JSON.stringify(chips360)}`);
+  assert.ok(chips360.length > 0 && chips360.every(chip => chip.hit >= 24 && chip.below <= 2.5 && chip.height < 30 && chip.topFrac > .5 && chip.center && chip.body && chip.nameTag), `Skill chips keep a 24px target inside their card on a 360px phone: ${JSON.stringify(chips360)}`);
   assert.deepEqual(errors, []);
   console.log('✓ 360x640 combat fit and target-size test passed');
 }, { width: 360, height: 640, mobile: true });
@@ -359,3 +362,154 @@ for (const [width, height, lang] of [[360, 640, 'id'], [390, 844, 'id'], [390, 8
     console.log(`✓ boss header ${lang} ${width}×${height}: chapters 1-16 without overlap`);
   }, { width, height, mobile: width < 500 });
 }
+
+// ── The fight on a phone (phone contract K2, K5, L10, T1/T3, G5–G7; emulated phones, the browser bars shown where noted) ──
+const PHONES = {
+  'a360-bars': { width: 360, height: 640, dpr: 3, ua: 'android' },
+  'se-bars': { width: 375, height: 553, dpr: 2, ua: 'iphone' },
+  'i15-bars': { width: 393, height: 659, dpr: 3, ua: 'iphone' },
+  'land-bars': { width: 852, height: 343, dpr: 3, ua: 'iphone', insets: { left: 59, right: 59, bottom: 21 }, landscape: true },
+  'land': { width: 852, height: 393, dpr: 3, ua: 'iphone', insets: { left: 59, right: 59, bottom: 21 }, landscape: true },
+  'i15': { width: 393, height: 852, dpr: 3, ua: 'iphone', insets: { top: 59, bottom: 34 } },
+  'p7': { width: 412, height: 915, dpr: 2.625, ua: 'android', insets: { bottom: 24 } },
+};
+const frames = 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))';
+async function phoneChapter({ wait, evaluate }, chapter) {
+  await evaluate(`window.gridbound.boot('adventure', ${chapter})`);
+  await wait('!window.gridbound.inTown && window.gridbound.battle.status === "ready" && !document.querySelector("#start-overlay").hidden');
+  await evaluate(frames); await new Promise(resolve => setTimeout(resolve, 300));
+}
+async function phoneOpen({ send, wait, evaluate }, save, lang) {
+  await seedSave(send, save, lang);
+  await send('Page.navigate', { url });
+  await wait('window.gridbound?.scene?.textures?.exists("dragon-0")', 30000);
+  await evaluate('document.fonts.ready');
+}
+const GRID = `(() => { const cards = [...document.querySelectorAll('#unit-layer .unit-card')].map(c => c.getBoundingClientRect());
+  const names = [...document.querySelectorAll('#unit-layer .unit-skill-name, #unit-layer .unit-name')].filter(n => n.getBoundingClientRect().width > 0);
+  return { heroes: cards.length, cell: [Math.min(...cards.map(r => r.width)), Math.min(...cards.map(r => r.height))].map(Math.round),
+    cut: names.filter(n => n.scrollWidth > n.clientWidth + .5).map(n => n.textContent), fonts: Math.min(...names.map(n => parseFloat(getComputedStyle(n).fontSize))), scroll: document.documentElement.scrollWidth - innerWidth }; })()`;
+// L10/K5: during the ready window every hero card is hit at its centre (the sheet ends above the front row), and FIGHT! with its ◀ Back sit in
+// the tray, in the bottom 40% of a portrait screen and hit-testable. 8 heroes (the late save) in chapters 1, 5 and 11; the grid, chips and name
+// tags (K2: cells >= 75px wide in portrait, >= 64 in landscape; T1/T3: 12px, never cut) in the fight that follows; 6 heroes (the mid save) too.
+for (const [name, lang] of [['se-bars', 'en'], ['se-bars', 'id'], ['a360-bars', 'en'], ['a360-bars', 'id'], ['i15-bars', 'en'], ['land-bars', 'en'], ['land', 'en']]) {
+  const phone = PHONES[name], minCell = phone.landscape ? 64 : 75;
+  for (const save of [LATE, MID]) await withBrowser(async h => {
+    const { wait, evaluate, screenshot, errors } = h, heroes = save === LATE ? 8 : 6;
+    await phoneOpen(h, save, lang);
+    for (const chapter of save === LATE ? [1, 5, 11] : [5]) {
+      await phoneChapter(h, chapter);
+      const ready = await evaluate(`(() => { const H = innerHeight, cover = [];
+        for (const c of document.querySelectorAll('#unit-layer .unit-card')) { const r = c.getBoundingClientRect(), e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!c.contains(e)) cover.push(c.dataset.hero + '→' + (e?.id || e?.className)); }
+        const at = sel => { const e = document.querySelector(sel), r = e.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { top: r.top / H, hit: e.contains(hit), shown: r.height > 0 }; };
+        return { cover, start: at('#start'), back: at('#ready-back'), cmds: [...document.querySelectorAll('.action-bar > .cmd')].filter(c => c.getBoundingClientRect().height > 0).length }; })()`);
+      const where = `${name} ${lang} CH${chapter} ${heroes} heroes: ${JSON.stringify(ready)}`;
+      assert.deepEqual(ready.cover, [], `L10: nothing covers a hero card before FIGHT! (${where})`);
+      assert.ok(ready.start.shown && ready.start.hit && ready.back.shown && ready.back.hit, `FIGHT! and ◀ Back are on screen and hit-testable (${where})`);
+      if (!phone.landscape) assert.ok(ready.start.top >= .6 && ready.back.top >= .6, `K5: FIGHT! and ◀ Back sit in the bottom 40% (${where})`);
+      assert.equal(ready.cmds, 0, `the tray shows only FIGHT! and its Back before the fight (${where})`);
+    }
+    await screenshot(`artifacts/combat-hud-phone-${name}-${lang}-${heroes}-ready.png`);
+    await evaluate('document.querySelector("#start").click()');
+    await wait('window.gridbound.battle.status === "fighting"');
+    await evaluate(frames); await new Promise(resolve => setTimeout(resolve, 300));
+    const grid = await evaluate(GRID), where = `${name} ${lang} ${heroes} heroes: ${JSON.stringify(grid)}`;
+    assert.equal(grid.heroes, heroes, where);
+    assert.ok(grid.cell[0] >= minCell && grid.cell[1] >= (phone.landscape ? 50 : 56), `K2: hero cards at least ${minCell}px wide (${where})`);
+    assert.deepEqual(grid.cut, [], `T3: no skill chip or name tag is cut (${where})`);
+    assert.ok(grid.fonts >= 12 && grid.scroll <= 1, `T1: chips and name tags are 12px or more, no sideways scroll (${where})`);
+    assert.equal(await evaluate('[...document.querySelectorAll(".action-bar > .cmd")].filter(c => c.getBoundingClientRect().height > 0).length'), 3, 'Guard, Potion and Ninefold Dawn are back in the tray after FIGHT!');
+    await screenshot(`artifacts/combat-hud-phone-${name}-${lang}-${heroes}-fight.png`);
+    assert.deepEqual(errors, []);
+    console.log(`✓ phone ${name} ${lang}, ${heroes} heroes: ready window clear of the grid, FIGHT! in the tray, cells ${grid.cell.join('×')}, labels whole`);
+  }, { phone });
+}
+
+// G5/G6/G7 with real touches on the iPhone 15 and Pixel 7 profiles: the card's zones, drags from the chip, a slid tap, two thumbs, Potion.
+for (const name of ['i15', 'p7']) await withBrowser(async h => {
+  const { send, wait, evaluate, touch, key, errors } = h, sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  await phoneOpen(h, LATE, 'en');
+  await phoneChapter(h, 13);
+  await evaluate('document.querySelector("#start").click()');
+  await wait('window.gridbound.battle.status === "fighting"');
+  // The battle clock stands still (the HUD keeps drawing), so taps, moves and Guard are read without the boss interfering.
+  await evaluate('window.gridbound.scene.timeScale = 0; window.gridbound.battle.threats = []');
+  const finger = (x, y, id = 1) => ({ x, y, id, radiusX: 4, radiusY: 4, force: 1 });
+  const T = (type, touchPoints) => send('Input.dispatchTouchEvent', { type, touchPoints });
+  const rect = id => evaluate(`(() => { const r = document.querySelector('#unit-layer [data-hero="${id}"]').getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; })()`);
+  const hero = id => evaluate(`(() => { const h = window.gridbound.battle.hero(${id}); return { slot: h.slot, stance: h.stance }; })()`);
+  const taps = () => evaluate('window.gridbound.battle.taps');
+  // Taps and moves wait on the battle clock (tap repeat, move lock): the stopped clock is reset between steps.
+  const rest = async () => { await evaluate('window.gridbound.battle.heroes.forEach(h => { h.fatigue = 0; h.lastTap = -99; h.moveLock = 0; })'); await sleep(350); };
+  const [A, B] = await evaluate(`(() => { const b = window.gridbound.battle, hs = b.heroes; const a = hs.find(h => h.slot >= 3 && h.slot < 6 && hs.some(x => x.slot === h.slot + 3) && b.availableSkills(h.id).length === 2); return [a.id, hs.find(x => x.slot === a.slot + 3).id]; })()`);
+  // K2: a touch at 55% and 60% of a card charges its hero (the chip starts lower).
+  for (const frac of [.55, .6]) {
+    await rest(); const c = await rect(A), t0 = await taps(), s0 = (await hero(A)).stance;
+    await touch.tap({ x: c.x + c.w / 2, y: c.y + c.h * frac }); await sleep(150);
+    assert.deepEqual([await taps() - t0, (await hero(A)).stance], [1, s0], `${name}: a touch at ${frac * 100}% of the card charges the hero`);
+  }
+  // K4: a touch at 6% into the card under another (its name tag) is that card's own, never the chip above.
+  { await rest(); const c = await rect(B), t0 = await taps(), s0 = (await hero(A)).stance;
+    const hit = await evaluate(`document.elementFromPoint(${c.x + c.w / 2}, ${c.y + c.h * .06})?.closest('.unit-tap')?.dataset.tap`);
+    await touch.tap({ x: c.x + c.w / 2, y: c.y + c.h * .06 }); await sleep(150);
+    assert.deepEqual([hit, await taps() - t0, (await hero(A)).stance, await evaluate('window.gridbound.battle.selected')], [String(B), 1, s0, B], `${name}: the top strip of a lower card belongs to its own hero`); }
+  // G5: a drag that starts on the chip moves the hero (to the tile above); a chip tap without movement still switches the skill.
+  { await rest(); const c = await rect(A), h0 = await hero(A), from = { x: c.x + c.w / 2, y: c.y + c.h * .85 };
+    await touch.drag(from, { x: from.x, y: from.y - c.h * 1.1 }, 10); await sleep(200);
+    const h1 = await hero(A);
+    assert.deepEqual([h1.slot, h1.stance], [h0.slot - 3, h0.stance], `${name}: a drag from the skill chip moves the hero and keeps its skill`); }
+  { await rest(); const c = await rect(A), s0 = (await hero(A)).stance;
+    await touch.tap({ x: c.x + c.w / 2, y: c.y + c.h * .85 }); await sleep(200);
+    assert.notEqual((await hero(A)).stance, s0, `${name}: a tap on the chip switches the skill`);
+    assert.match(await evaluate('document.querySelector("#skill-toast").textContent'), /Skill: .+\(tap again to undo\)/); }
+  // G5: a thumb that slides 14px and lifts on its own tile within 300 ms taps (the four touch events queued like a quick finger).
+  { await rest(); const c = await rect(A), t0 = await taps(), slot = (await hero(A)).slot, p = { x: c.x + c.w / 2, y: c.y + c.h * .3 };
+    const queued = [T('touchStart', [finger(p.x, p.y)])]; for (const dx of [5, 10, 14]) { await sleep(16); queued.push(T('touchMove', [finger(p.x + dx, p.y)])); }
+    await sleep(16); queued.push(T('touchEnd', [])); await Promise.all(queued); await sleep(150);
+    assert.deepEqual([await taps() - t0, (await hero(A)).slot], [1, slot], `${name}: a slid tap on the hero's own tile is a tap`); }
+  // G6: finger 1 rests on a hero card while finger 2 taps Guard, Potion, Ninefold Dawn, Ⅱ Menu.
+  const thumbs = async sel => {
+    const c = await rect(B), a = { x: c.x + c.w / 2, y: c.y + c.h * .3 }, b = await touch.point(sel);
+    await T('touchStart', [finger(a.x, a.y, 1)]); await sleep(60); await T('touchStart', [finger(a.x, a.y, 1), finger(b.x, b.y, 2)]); await sleep(60);
+    await T('touchEnd', [finger(a.x, a.y, 1)]); await sleep(60); await T('touchEnd', []); await sleep(250);
+  };
+  await rest(); await thumbs('#guard');
+  assert.ok(await evaluate('window.gridbound.battle.guardLeft > 0'), `${name}: Guard works while another finger is on a hero`);
+  await evaluate('window.gridbound.battle.heroes.forEach(h => { h.hp = h.maxHp * .5; }); window.gridbound.battle.potions = 2'); await sleep(200);
+  await thumbs('#potion');
+  assert.equal(await evaluate('window.gridbound.battle.potions'), 1, `${name}: Potion works while another finger is on a hero`);
+  await evaluate('window.gridbound.battle.resolve = 100'); await sleep(250);
+  await thumbs('#ultimate');
+  assert.ok(await evaluate('window.gridbound.battle.resolve < 100'), `${name}: Ninefold Dawn works while another finger is on a hero`);
+  await thumbs('#pause');
+  assert.ok(await evaluate('window.gridbound.battle.status === "paused" && Boolean(document.querySelector("dialog[open] #pause-retreat"))'), `${name}: Ⅱ Menu works while another finger is on a hero`);
+  await evaluate('document.querySelector("dialog[open]").close(); if (window.gridbound.battle.status === "paused") window.gridbound.battle.pause();'); await sleep(300);
+  // G6: a keyboard Enter on Guard guards exactly once (its click has detail 0).
+  await evaluate(`(() => { const b = window.gridbound.battle, guard = b.guard.bind(b); window.__guards = 0; b.guardCooldown = 0; b.guardLeft = 0; b.guard = () => { window.__guards++; return guard(); }; document.querySelector('#guard').disabled = false; document.querySelector('#guard').focus(); })()`);
+  await key('Enter'); await sleep(200);
+  assert.equal(await evaluate('window.__guards'), 1, `${name}: Enter on Guard guards once`);
+  // G7: a quick double tap on Potion at full HP spends nothing and says why; hurt, it spends exactly one.
+  await evaluate('window.gridbound.battle.potions = 2; window.gridbound.battle.heroes.forEach(h => { h.hp = h.maxHp; })'); await sleep(700);
+  await touch.rapidDoubleTap('#potion', 150); await sleep(250);
+  assert.equal(await evaluate('window.gridbound.battle.potions'), 2, `${name}: Potion at full HP spends nothing`);
+  assert.equal(await evaluate('document.querySelector("#skill-toast").hidden ? "" : document.querySelector("#skill-toast").textContent'), 'Party is healthy');
+  await evaluate('window.gridbound.battle.heroes.forEach(h => { h.hp = h.maxHp * .3; })'); await sleep(700);
+  await touch.rapidDoubleTap('#potion', 150); await sleep(250);
+  assert.equal(await evaluate('window.gridbound.battle.potions'), 1, `${name}: a double tap on Potion spends one`);
+  assert.deepEqual(errors, []);
+  console.log(`✓ phone ${name}: card zones, chip drag and tap, slid tap, two thumbs, Enter on Guard, Potion double tap`);
+}, { phone: PHONES[name] });
+
+// G9: on a touch screen the Controls help names the gestures, not the keys.
+await withBrowser(async h => {
+  const { wait, evaluate } = h;
+  await phoneOpen(h, MID, 'id');
+  await phoneChapter(h, 2);
+  await evaluate('document.querySelector("#start").click()'); await wait('window.gridbound.battle.status === "fighting"');
+  await evaluate('document.querySelector("#pause").click()'); await wait('Boolean(document.querySelector("dialog[open] #pause-help"))');
+  await evaluate('document.querySelector("dialog[open] #pause-help").click()'); await wait('Boolean(document.querySelector("dialog[open] .help-rows"))');
+  const titles = await evaluate('[...document.querySelectorAll("dialog[open] .help-rows b")].map(b => b.textContent)');
+  assert.ok(titles.includes('Ketuk hero') && titles.some(t => /chip skill/.test(t)) && titles.includes('Jeda · Ⅱ Menu') && titles.some(t => t.startsWith('Kembali · tombol Kembali ponsel')), `touch help titles: ${JSON.stringify(titles)}`);
+  assert.ok(!titles.some(t => /Esc|Spasi|1–9|Q \/ E| · [GHR]\b/.test(t)), `no key names on a touch screen: ${JSON.stringify(titles)}`);
+  console.log('✓ phone Controls help names touch gestures (ID)');
+}, { phone: PHONES['a360-bars'] });

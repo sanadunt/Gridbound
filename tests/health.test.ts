@@ -102,6 +102,18 @@ function cssRules(file: string) {
 }
 const STYLES = readdirSync('src/styles').filter(name => name.endsWith('.css')).map(name => `src/styles/${name}`);
 
+test('T1/T2 in battle: battle.css text is at least 12px (10px in the pixel font or on a badge), the chip and name tag included', () => {
+  const BADGES = ['.boon-count-badge'];
+  for (const rule of cssRules('src/styles/battle.css')) {
+    const size = rule.body.match(/font(?:-size)?:[^;]*?(?:clamp\(|max\()?(\d+(?:\.\d+)?)px/);
+    if (!size) continue;
+    const floor = rule.body.includes('var(--pixel)') || BADGES.some(b => rule.selector.includes(b)) ? 10 : 12;
+    assert.ok(Number(size[1]) >= floor, `battle.css: ${rule.selector.slice(0, 80)} is ${size[1]}px (floor ${floor}px)`);
+  }
+  const chip = cssRules('src/styles/battle.css').find(r => r.selector === '.unit-skill-name')!.body;
+  assert.match(chip, /text-overflow:\s*clip/, 'T3: a skill chip never ends in an ellipsis (main.ts fitChip picks a label that fits)');
+});
+
 test('phone shell: the root (not body) stops overscroll, sizes never use vh, hover lives inside (hover: hover)', () => {
   assert.ok(STYLES.length >= 7 && STYLES.includes('src/styles/base.css'), 'every stylesheet is checked');
   const base = cssRules('src/styles/base.css');

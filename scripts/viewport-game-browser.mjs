@@ -78,7 +78,8 @@ for (const [width, height] of viewports) {
         ['boss health', document.querySelector('#battle-screen #boss-health')],
         ...[...document.querySelectorAll('#battle-screen .lane-targets button')].map((element, index) => [\`target lane \${index + 1}\`, element]),
         ...[...document.querySelectorAll('#battle-screen #unit-layer .unit-skill')].map((element, index) => [\`unit skill \${index + 1}\`, element]),
-        ['focus bar', document.querySelector('#battle-screen #focus-bar')],
+        // A short portrait phone hides the focus bar (the selected card is highlighted; the Status view has the details).
+        ...(innerHeight > 700 || innerWidth > innerHeight ? [['focus bar', document.querySelector('#battle-screen #focus-bar')]] : []),
         ...[...document.querySelectorAll('#battle-screen .action-bar > button')].map(element => [element.id, element])
       ];
       const bounds = selector => {
@@ -91,7 +92,7 @@ for (const [width, height] of viewports) {
         actions: bounds('#battle-screen .action-bar'),
         controls: controlElements.map(([name, element]) => measure(name, element)),
         standing: document.querySelector('#standing').textContent.trim(),
-        health: [...document.querySelectorAll('#battle-screen #unit-layer .unit-hp i')].map(bar => bar.style.width).filter(Boolean),
+        health: [...document.querySelectorAll('#battle-screen #unit-layer .unit-hp i')].map(bar => bar.style.transform).filter(Boolean),
         focusHp: document.querySelector('#battle-screen #focus-bar .focus-hp b')?.textContent.trim(),
         bossHealthLines: (() => {
           const range = document.createRange();
@@ -106,18 +107,23 @@ for (const [width, height] of viewports) {
       assert.ok(rect.width >= 1 && rect.height >= 1 && rect.left >= 0 && rect.right <= width && rect.top >= 0 && rect.bottom <= height,
         `${name} remains visible at ${width}×${height}: ${JSON.stringify(rect)}`);
     }
+    const shortPortrait = height <= 700 && height > width;
     assert.deepEqual(active.controls.map(control => control.name), [
       'boss HUD', 'boss name', 'boss health', 'target lane 1', 'target lane 2', 'target lane 3',
-      'unit skill 1', 'unit skill 2', 'unit skill 3', 'focus bar', 'guard', 'potion', 'ultimate'
+      'unit skill 1', 'unit skill 2', 'unit skill 3', ...(shortPortrait ? [] : ['focus bar']), 'guard', 'potion', 'ultimate'
     ], `Every boss, lane, party, and action control is present at ${width}×${height}`);
+    if (shortPortrait) assert.equal(await evaluate('getComputedStyle(document.querySelector("#focus-bar")).display'), 'none', `The focus bar steps aside on a short portrait phone (${width}×${height})`);
     const clipped = active.controls.filter(control => !control.visible || !control.withinViewport || control.clippedBy.length);
     assert.deepEqual(clipped, [], `Every combat control remains visible without scrolling at ${width}×${height}: ${JSON.stringify(clipped)}`);
     assert.match(active.standing, /^\d+\/\d+ standing$/);
-    assert.ok(active.health.length === 3 && active.health.every(value => /^\d+(\.\d+)?%$/.test(value)),
+    assert.ok(active.health.length === 3 && active.health.every(value => /^scaleX\(\d+(\.\d+)?\)$/.test(value)),
       `Every hero cell shows an HP bar at ${width}×${height}: ${JSON.stringify(active.health)}`);
-    assert.match(active.focusHp ?? '', /^\d+\/\d+/, `Selected hero HP stays readable at ${width}×${height}`);
+    if (!shortPortrait) assert.match(active.focusHp ?? '', /^\d+\/\d+/, `Selected hero HP stays readable at ${width}×${height}`);
     assert.equal(active.bossHealthLines, 1, `Boss health remains on one readable line at ${width}×${height}`);
     assert.ok(active.threat.length > 0, 'Active battle retains a readable threat/counter cue');
+    // Lane targets take taps only while minions are up (K4: no invisible button over the front row otherwise).
+    assert.equal(await evaluate('getComputedStyle(document.querySelector("#battle-screen [data-lane=\'0\']")).pointerEvents'), 'none', `Without minions the lane buttons take no taps at ${width}×${height}`);
+    await evaluate('window.gridbound.battle.summon(); window.gridbound.step(0)');
     const lanePoint = await evaluate(`(() => {
       const lane = document.querySelector('#battle-screen [data-lane="0"]');
 

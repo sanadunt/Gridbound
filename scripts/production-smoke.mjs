@@ -31,9 +31,9 @@ try{
   await wait('document.querySelector("#storage-status")?.textContent.startsWith("Saved")');
   await click.nav('campaign');await wait('Boolean(document.querySelector(".world-map-wrapper .expedition-mode-nav"))');await click('[data-zone="0"]');await wait('Boolean(document.querySelector("[data-depart=adventure]"))');
   await wait('document.querySelector("#storage-status")?.textContent.startsWith("Saved")');await click('[data-depart="adventure"]');await wait('document.querySelector("#battle-screen").hidden===false');await click('#start');
-  const before=await evaluate('document.querySelector("#boss-hp").style.width');
+  const before=await evaluate('document.querySelector("#boss-hp").style.transform');
   await click('[data-tap="0"]');await click('[data-tap="3"]');
-  await wait(`document.querySelector('#boss-hp').style.width!==${JSON.stringify(before)}`);
+  await wait(`document.querySelector('#boss-hp').style.transform!==${JSON.stringify(before)}`);
   const resources=await evaluate('performance.getEntriesByType("resource").map(r=>r.name)');
   assert.ok(resources.length>5);assert.ok(resources.every(url=>url.startsWith(publicRoot)||url.startsWith('data:')),JSON.stringify(resources));
   assert.deepEqual(errors,[]);await screenshot('artifacts/production-subpath.png');
