@@ -310,7 +310,9 @@ dialog#modal h2 { font-family: var(--pixel); font-size: 13px; font-weight: 400; 
 dialog#modal h3 { color: var(--gold-bright); margin: 12px 0 6px; font-size: 15px; }
 dialog#modal > .btn, dialog#modal .btn + .btn { margin-top: 8px; }
 dialog#modal > .btn { width: 100%; }
-dialog#modal > .modal-exit { position: sticky; bottom: -16px; z-index: 2; background: var(--win-bot); box-shadow: 0 10px 0 6px var(--win-bot), 0 -8px 14px 2px var(--win-bot); }
+dialog#modal > .modal-exit { position: sticky; bottom: -16px; z-index: 2; box-shadow: 0 10px 0 6px var(--win-bot), 0 -8px 14px 2px var(--win-bot); }
+/* A primary exit (Config's Back) keeps its gold face: the window colour behind it made its dark label unreadable. */
+dialog#modal > .modal-exit:not(.btn.primary) { background: var(--win-bot); }
 /* A dialog whose primary action comes right before its exit keeps both in one row, and the row is what sticks (contract L9): the exit
    first (the safe choice, focused), the forward action last and wider. */
 dialog#modal > .modal-actions { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; }

@@ -222,7 +222,7 @@ Phones change the type scale by moving small labels from the pixel font to the b
 - **I1 Fullscreen.**
   - Config offers Fullscreen wherever `document.fullscreenEnabled` is true: the web build on Android, and itch with `allow="fullscreen"`. It never appears on iPhone, which has no element fullscreen.
   - On a coarse pointer, entering fullscreen asks for a portrait lock (best effort, errors ignored).
-  - The choice is remembered per viewer (`gridbound.ui.fullscreen`) and requested again on the next real tap after a reload.
+  - The choice is remembered per viewer (`gridbound.ui.fullscreen`) and requested again on the next real tap after a reload or after the page is shown again. Fullscreen dropped while the page is hidden (an app switch, the shade) is not the player's 'off'.
   - Leaving fullscreen with the phone's Back or Escape takes no game Back step and does not pop the history guard.
 - **I2 Installable (web build only).**
   - The manifest has `name`, `short_name` 'Gridbound', `start_url`/`scope` resolving to the game's folder, `display: standalone`, `display_override: ["fullscreen", "standalone"]`, `orientation: portrait`, `background_color`/`theme_color` from the palette, and PNG icons 192, 512 and maskable 512.
@@ -241,7 +241,7 @@ Phones change the type scale by moving small labels from the pixel font to the b
   |---|---|---|
   | W/WS, persistence granted | Config and Save files status line | "Saves are protected on this device." |
   | W Android, not granted | same | "The browser may clear saves when the phone runs low on space. Keep a backup." |
-  | W iPhone Safari (not standalone) | same | "Safari deletes the saves of sites you haven't opened for 7 days. Add Gridbound to your Home Screen, or keep a backup." Once INSTALL lands, add: "The Home Screen app starts with its own empty save: copy your backup first, then paste it there (Save files → Paste backup)." |
+  | W iPhone Safari (not standalone) | same | "Safari deletes the saves of sites you haven't opened for 7 days. Add Gridbound to your Home Screen, or keep a backup." Then (INSTALL): "The Home Screen app starts with its own empty save: copy your backup first, then paste it there (Save files → Paste backup)." |
   | WS iPhone | same | "Saves are kept by the Home Screen app." |
   | I (itch) | same | "Saves live in this browser's storage for itch.io. Keep a backup." |
   | W Android | Config | Fullscreen row, sub-line: "Fill the whole screen. Your phone's Back gesture leaves it." |

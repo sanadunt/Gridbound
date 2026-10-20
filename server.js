@@ -26,6 +26,7 @@ const types = {
   '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
   '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
+  '.webmanifest': 'application/manifest+json', // the web build's install manifest (assets/manifest.webmanifest)
 };
 // Text is served compressed (contract P8): Brotli, else gzip, else as is, by the request's Accept-Encoding. Each file is compressed once per
 // process (hashed assets at the strongest level, they never change; index.html and the icon are re-checked by mtime) and kept in memory;

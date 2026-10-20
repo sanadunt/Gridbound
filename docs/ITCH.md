@@ -16,7 +16,7 @@ berubah dari waktu ke waktu; kalau sebuah nama tidak persis sama, cari field den
 
 | File | Isi |
 | --- | --- |
-| `npm run package:itch` → `artifacts/Gridbound-itch-<versi>.zip` (+ `.sha256`) | ZIP untuk di-upload. Dibuat dari `dist/` oleh `scripts/package-itch.py`, yang memastikan `index.html` ada di root ZIP, semua URL relatif, tidak ada host luar, kurang dari 1000 file, dan nama file cocok huruf besar/kecilnya. |
+| `npm run package:itch` → `artifacts/Gridbound-itch-<versi>.zip` (+ `.sha256`) | ZIP untuk di-upload. Dibuat dari build khusus itch (`vite build --mode itch` → `dist-itch/`, tanpa manifest aplikasi, ikon aplikasi, dan tag Layar Utama milik build web) oleh `scripts/package-itch.py --dist dist-itch`, yang memastikan `index.html` ada di root ZIP, semua URL relatif, tidak ada host luar, kurang dari 1000 file, dan nama file cocok huruf besar/kecilnya. |
 | `docs/itch/cover.png` | Cover image 630×500. |
 | `docs/itch/banner.png` | Banner halaman 960×240 (opsional, lewat Edit theme). |
 | `docs/itch/screenshots/01-title.png` … `05-undercroft.png` | 5 screenshot bahasa Inggris, potret ponsel (1080×1920). |

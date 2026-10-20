@@ -15,6 +15,9 @@ test('Hostinger bundle supplies an Apache-compatible index and conservative cach
   assert.match(text, /immutable/);
   assert.match(text, /nosniff/);
   assert.doesNotMatch(text, /RewriteRule/);
+  // Phone contract I2: the web build's install manifest is served as a manifest, compressed.
+  assert.match(text, /AddType application\/manifest\+json \.webmanifest/);
+  assert.match(text, /AddOutputFilterByType DEFLATE [^\n]*application\/manifest\+json/);
 });
 
 test('Hostinger packager produces identical static-only ZIPs and rejects secrets/source maps', () => {
@@ -28,10 +31,12 @@ test('Hostinger packager produces identical static-only ZIPs and rejects secrets
     writeFileSync(join(root, 'dist/favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
     copyFileSync(config, join(root, 'dist/.htaccess'));
     writeFileSync(join(root, 'dist/assets/index-testhash.js'), 'export {};');
+    writeFileSync(join(root, 'dist/assets/manifest.webmanifest'), '{"short_name":"Gridbound"}');
+    writeFileSync(join(root, 'dist/assets/app-icon-192.png'), 'PNG fixture');
     const run = () => JSON.parse(execFileSync('python3', [join(root, 'scripts/package-hostinger.py')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
     const first = run();
     const bytes = readFileSync(first.zip);
-    assert.equal(first.files, 4);
+    assert.equal(first.files, 6, 'index, .htaccess, favicon, js, and the web build\'s manifest and icon');
     assert.equal(first.root_entry, 'index.html');
     assert.equal(run().sha256, first.sha256);
     assert.deepEqual(readFileSync(first.zip), bytes);

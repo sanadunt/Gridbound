@@ -1,6 +1,7 @@
 /**
  * Embedded play (itch.io serves HTML games in an <iframe> on another origin): the game keeps the keyboard after a click on it,
- * keeps the host page still, and offers fullscreen when the page allows it. Outside an iframe only `fullscreen*` matters.
+ * keeps the host page still, and offers fullscreen when the page allows it. Outside an iframe only the fullscreen part matters (Config → Fullscreen
+ * on Android's web build too, phone contract I1).
  */
 type Axis = 'x' | 'y';
 /** Keys whose default action scrolls, with the direction they scroll in (Shift+Space scrolls up). */
@@ -69,9 +70,63 @@ export function installEmbedGuards() {
 /** Fullscreen is offered only where the page may use it (an iframe needs allow="fullscreen"; iPhone Safari has no element fullscreen). */
 export const fullscreenAvailable = () => typeof document !== 'undefined' && document.fullscreenEnabled === true && typeof document.documentElement.requestFullscreen === 'function';
 export const fullscreenOn = () => Boolean(document.fullscreenElement);
-/** Toggle fullscreen on the whole page (needs a user gesture); resolves to the resulting state, never throws. */
+/** Installed to the Home Screen (iOS `navigator.standalone`) or opened from an installed app's icon: no browser bars to hide. */
+export const standaloneApp = () => (typeof matchMedia === 'function' && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement)) || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+/** I1: the player's choice, per viewer (gridbound. prefix: itch's origin is shared). */
+export const FULLSCREEN_KEY = 'gridbound.ui.fullscreen';
+function rememberFullscreen(on: boolean) { try { localStorage.setItem(FULLSCREEN_KEY, on ? '1' : '0'); } catch { /* storage blocked: not remembered */ } }
+export function fullscreenWanted() { try { return localStorage.getItem(FULLSCREEN_KEY) === '1'; } catch { return false; } }
+const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+type LockableOrientation = ScreenOrientation & { lock?: (orientation: string) => Promise<void>; unlock?: () => void };
+/** Enter fullscreen and, on a phone, ask for portrait (best effort: a desktop or a refusing browser rejects, which is ignored). */
+async function enterFullscreen() {
+  await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+  if (coarse()) try { await (screen.orientation as LockableOrientation | undefined)?.lock?.('portrait')?.catch?.(() => {}); } catch { /* no orientation lock */ }
+}
+/** Toggle fullscreen on the whole page (needs a user gesture); resolves to the resulting state and remembers it, never throws. */
 export async function toggleFullscreen() {
-  try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); }
+  try { if (document.fullscreenElement) await document.exitFullscreen(); else await enterFullscreen(); }
   catch (error) { console.warn('Fullscreen:', error); }
+  rememberFullscreen(fullscreenOn());
   return fullscreenOn();
+}
+let fullscreenLeftAt = -Infinity, unloading = false, visibilityAt = -Infinity, armed = false;
+/** Fullscreen bookkeeping on every host: leaving it by the system (the phone's Back, Esc, the browser's own control) remembers 'off', so the
+ *  game never fights the player, and drops the portrait lock. A page being unloaded (a reload in fullscreen) keeps the choice, and so does
+ *  one that leaves it while hidden or within a second of hiding or showing again (a phone may drop fullscreen when the player switches apps
+ *  or pulls down the shade). A choice remembered as 'on' is asked for again on the next real tap or key (a request needs a user activation),
+ *  after a reload and after the page is shown again, except under automation, in an installed app (already without bars) or where
+ *  fullscreen is unavailable. */
+export function installFullscreen() {
+  if (typeof document === 'undefined' || !fullscreenAvailable()) return;
+  armed = false; visibilityAt = -Infinity;
+  window.addEventListener('pagehide', () => { unloading = true; });
+  window.addEventListener('pageshow', () => { unloading = false; armFullscreen(); });
+  document.addEventListener('visibilitychange', () => { visibilityAt = performance.now(); if (document.visibilityState !== 'hidden') armFullscreen(); });
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) return;
+    fullscreenLeftAt = performance.now();
+    try { (screen.orientation as LockableOrientation | undefined)?.unlock?.(); } catch { /* not locked */ }
+    if (!unloading && document.visibilityState !== 'hidden' && fullscreenLeftAt - visibilityAt > 1000) rememberFullscreen(false);
+  });
+  armFullscreen();
+}
+function armFullscreen() {
+  if (armed || document.fullscreenElement || !fullscreenWanted() || navigator.webdriver || standaloneApp()) return;
+  armed = true;
+  const again = (event: Event) => {
+    if (event.type === 'keydown' && (event as KeyboardEvent).code === 'Escape') return; // Escape grants no activation
+    armed = false;
+    window.removeEventListener('pointerup', again, true); window.removeEventListener('keydown', again, true);
+    if (!document.fullscreenElement) enterFullscreen().catch(error => console.warn('Fullscreen:', error));
+  };
+  window.addEventListener('pointerup', again, true); window.addEventListener('keydown', again, true);
+}
+/** An Escape that leaves fullscreen is the browser's, not a game Back step (I1). Chrome on a desktop consumes it; a browser that still
+ *  passes the keydown on either sends it after leaving (within a moment) or before: then `later` decides once the browser has acted. */
+export function fullscreenEscape(later: () => void) {
+  if (performance.now() - fullscreenLeftAt < 250) return true;
+  if (!document.fullscreenElement) return false;
+  window.setTimeout(() => { if (document.fullscreenElement && performance.now() - fullscreenLeftAt >= 250) later(); }, 150);
+  return true;
 }

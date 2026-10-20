@@ -1,9 +1,14 @@
-"""Build a deterministic, validated ZIP of dist/ for an itch.io HTML5 upload. Python 3.9+.
+"""Build a deterministic, validated ZIP of the itch-mode build for an itch.io HTML5 upload. Python 3.9+.
+
+    python3 scripts/package-itch.py --dist dist-itch   # npm run package:itch builds dist-itch/ with `vite build --mode itch`
 
 itch.io extracts the ZIP and loads index.html from its root inside an <iframe> on another origin, under a per-upload path,
 so the bundle must be relative-only, self-contained (no fetches to other hosts) and inside itch's limits (fewer than 1000
 files, well under 500 MB, case-sensitive names). The Apache .htaccess that Hostinger needs is left out, like every dotfile.
+The web build's install surface (manifest, app icons, Apple / mobile-web-app tags: scripts/web-app.ts) is refused: itch's CDN
+origin is shared by many games, so the itch build (`--mode itch`) leaves it out (phone contract I3).
 """
+import argparse
 import hashlib
 import json
 import re
@@ -11,11 +16,16 @@ from pathlib import Path, PurePosixPath
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 ROOT = Path(__file__).resolve().parents[1]
-DIST = ROOT / 'dist'
+args = argparse.ArgumentParser(description='Package the itch.io HTML upload.')
+args.add_argument('--dist', default='dist', help='the built folder (npm run package:itch builds dist-itch)')
+DIST = (ROOT / args.parse_args().dist).resolve()
 MAX_FILES = 999  # itch.io refuses an HTML upload with 1000 files or more
 MAX_BYTES = 64 * 1024 * 1024  # extracted size; itch allows 500 MB, our bundle is a few MB, so anything near this is a mistake
 ASSET_TYPES = {'.js', '.css', '.woff', '.woff2', '.ttf', '.otf', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.ogg', '.mp3', '.wav'}
 SKIPPED = {'.htaccess'}  # Apache config for the Hostinger ZIP; itch serves its own headers
+# The web build's install surface (scripts/web-app.ts); never in the itch upload.
+WEB_APP_FILE = re.compile(r'(^|/)(manifest\.webmanifest|app-icon-[^/]*)$')
+WEB_APP_TAG = re.compile(r'rel=["\']?(?:manifest|apple-touch-icon)|apple-mobile-web-app|mobile-web-app-capable', re.I)
 # Host names that appear in the bundle as inert strings, never fetched: XML namespaces and Phaser's banner/gameURL metadata.
 INERT_HOSTS = {'www.w3.org', 'phaser.io'}
 HOST = re.compile(r'(?:(?:https?|wss?):)?//((?:[a-z0-9-]+\.)+[a-z]{2,})(?![a-z0-9-])', re.I)
@@ -33,13 +43,15 @@ def fail(message):
 
 for required in ['index.html', 'favicon.svg']:
     if not (DIST / required).is_file():
-        fail(f'missing dist/{required}; run npm run build first')
+        fail(f'missing {DIST.name}/{required}; run npm run package:itch')
 found = sorted(p for p in DIST.rglob('*') if p.is_file() or p.is_symlink())
 files = []
 for path in found:
     rel = path.relative_to(DIST)
     if str(rel) in SKIPPED:
         continue
+    if WEB_APP_FILE.search(rel.as_posix()):
+        fail(f'{rel} is the web build\'s install surface; build the itch upload with `vite build --mode itch` (npm run package:itch)')
     is_entry = str(rel) in ['index.html', 'favicon.svg']
     is_asset = len(rel.parts) == 2 and rel.parts[0] == 'assets' and path.suffix in ASSET_TYPES and not rel.name.startswith('.')
     if path.is_symlink() or not (is_entry or is_asset):
@@ -88,6 +100,8 @@ def hosts(text):
 
 external = set()
 index = (DIST / 'index.html').read_text(encoding='utf-8')
+if WEB_APP_TAG.search(index):
+    fail('index.html has the web build\'s manifest / Home Screen tags; build the itch upload with `vite build --mode itch` (npm run package:itch)')
 refs = HTML_REF.findall(index)
 for ref in refs:
     local_ref(ref, '', 'index.html')

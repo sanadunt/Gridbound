@@ -37,7 +37,7 @@ import { COACH_STEPS, Coach, coachEnabled, coachDone, markCoach, resetCoach, set
 import { actArt, starRow } from './ui/world-map';
 import { playDialogue, paginate, CHOICE_INPUT_DELAY_MS, type DialoguePage } from './ui/dialogue';
 import { DANGER_CONTROLS, INPUT_DELAY_MS, TOWN_HELD, TOWN_SPEND, holdInput, inputHeld, keepDangerOff, pressHeld } from './ui/input-guard';
-import { fullscreenAvailable, fullscreenOn, installEmbedGuards, toggleFullscreen } from './ui/embed';
+import { fullscreenAvailable, fullscreenEscape, fullscreenOn, installEmbedGuards, installFullscreen, standaloneApp, toggleFullscreen } from './ui/embed';
 import { ARENA, cell } from './render/arena';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
@@ -467,13 +467,18 @@ $('app').innerHTML = `
   <div id="battle-announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <dialog id="modal" aria-labelledby="modal-title"></dialog>`;
 const modal = $<HTMLDialogElement>('modal');
-/** Embedded in another page (itch.io's cross-origin iframe): keyboard/scroll guards, Config → Fullscreen, the backup as text and
- *  Save → Paste backup. A top-level page (the normal web build) gets none of them. */
+/** Embedded in another page (itch.io's cross-origin iframe): keyboard/scroll guards and the backup as text after a download.
+ *  A top-level page (the normal web build) gets none of them. */
 const embedded = installEmbedGuards();
+// I1: Config → Fullscreen wherever the page may use it (Android's web build, itch with allow="fullscreen"): the choice is remembered and
+// asked for again on the next tap after a reload; leaving it through the system remembers 'off'.
+installFullscreen();
+/** An installed app opened full screen (the manifest's display_override): the row would have nothing to add. */
+const appFullscreen = () => matchMedia('(display-mode: fullscreen)').matches && !fullscreenOn();
 // Entering fullscreen puts the page above an open modal (both live in the top layer, the newest on top): the modal would stay open,
 // invisible, over an inert page. It is shown again on top with its focus; the close this queues is swallowed (no resume, no refocus).
 let raisingModal = false;
-if (embedded) {
+if (fullscreenAvailable()) {
   document.addEventListener('close', event => { if (event.target === modal && raisingModal) { raisingModal = false; if (modal.open) event.stopImmediatePropagation(); } }, true);
   document.addEventListener('fullscreenchange', () => {
     const box = document.getElementById('setting-fullscreen') as HTMLInputElement | null;
@@ -2346,10 +2351,12 @@ function settings(fromPause = false) {
     <label class="setting-row"><span><b>${t('settings.sound')}</b><small>${t('settings.sound.sub')}${/iP(hone|ad|od)/.test(navigator.userAgent) ? ` ${t('settings.sound.ios')}` : ''}</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.motion')}</b><small>${reduceMotionQuery.matches ? t('settings.motion.device') : t('settings.motion.sub')}</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.coach')}</b><small>${t('settings.coach.sub')}</small></span><input id="setting-coach" type="checkbox" ${coachEnabled() ? 'checked' : ''}></label>
-    ${embedded && fullscreenAvailable() ? `<label class="setting-row"><span><b>${t('settings.fullscreen')}</b><small>${t('settings.fullscreen.sub')}</small></span><input id="setting-fullscreen" type="checkbox" ${fullscreenOn() ? 'checked' : ''}></label>` : ''}
-    ${storageNoteMarkup()}<p class="hint">${t('settings.save.note')}</p><div class="departure-actions backup-actions"><button id="export-save" class="btn">${t('settings.export')}</button><button id="export-text" class="btn">${t('profiles.export.text')}</button></div><button class="btn primary" ${fromPause ? 'data-nav-parent' : 'data-close'}>${t('common.back')}</button>`, { parent: fromPause ? renderPause : undefined });
+    ${fullscreenAvailable() && !appFullscreen() ? `<label class="setting-row"><span><b>${t('settings.fullscreen')}</b><small>${t(coarsePointer.matches ? 'settings.fullscreen.sub.touch' : 'settings.fullscreen.sub')}</small></span><input id="setting-fullscreen" type="checkbox" ${fullscreenOn() ? 'checked' : ''}></label>` : ''}
+    ${installOffered() ? `<div id="install-row" class="setting-row"><span><b>${t('settings.install')}</b><small>${t(coarsePointer.matches ? 'settings.install.sub' : 'settings.install.sub.desktop')}</small></span><button id="install-app" type="button" class="btn">${t('settings.install.button')}</button></div>` : ''}
+    ${storageNoteMarkup(true)}<p class="hint">${t('settings.save.note')}</p><div class="departure-actions backup-actions"><button id="export-save" class="btn">${t('settings.export')}</button><button id="export-text" class="btn">${t('profiles.export.text')}</button></div><button class="btn primary" ${fromPause ? 'data-nav-parent' : 'data-close'}>${t('common.back')}</button>`, { parent: fromPause ? renderPause : undefined });
   $('export-save').addEventListener('click',exportCommander);
   $('export-text').addEventListener('click',copyBackup);
+  document.getElementById('install-app')?.addEventListener('click', () => { void installApp(); });
   $('setting-sound').addEventListener('change', e => { profile.sound = (e.target as HTMLInputElement).checked; updateSound(); });
   $('setting-coach').addEventListener('change', e => { setCoachEnabled((e.target as HTMLInputElement).checked); if (coach.step) endCoachStep(); });
   $('setting-motion').addEventListener('change', e => { profile.motion = (e.target as HTMLInputElement).checked; applyMotion(); persist(); });
@@ -3173,10 +3180,34 @@ async function keepSavesPersistent(force = false) {
   if (note) { note.textContent = storageNote(); note.dataset.persistent = String(persistence); }
   return persistence;
 }
-const iosSafariTab = () => (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) && !(matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true);
-/** I6: where the saves live and how safe they are, at the top of Config's save part and of Save files. */
-function storageNote() { return embedded ? t('storage.embedded') : persistence ? t('storage.persistent') : iosSafariTab() ? t('storage.ios') : t('storage.besteffort'); }
-function storageNoteMarkup() { void keepSavesPersistent(); return `<p id="storage-note" class="hint storage-note" data-persistent="${persistence === true}">${storageNote()}</p>`; }
+const iosDevice = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const iosSafariTab = () => iosDevice() && !standaloneApp();
+/** I6: where the saves live and how safe they are, at the top of Config's save part and of Save files. A Home Screen app on iOS keeps its
+ *  own storage (apart from Safari's tab, and out of its 7-day eviction). */
+function storageNote() { return embedded ? t('storage.embedded') : iosDevice() && standaloneApp() ? t('storage.standalone') : persistence ? t('storage.persistent') : iosSafariTab() ? t('storage.ios') : t('storage.besteffort'); }
+/** `install`: Config and Save files also say, in an iPhone/iPad browser tab, how to add the game to the Home Screen and move the save there
+ *  (the Home Screen app starts with its own empty storage: Copy backup as text here, Paste backup there). */
+function storageNoteMarkup(install = false) { void keepSavesPersistent(); return `<p id="storage-note" class="hint storage-note" data-persistent="${persistence === true}">${storageNote()}</p>${install && !embedded && iosSafariTab() ? `<p class="hint storage-install">${t('storage.ios.install')}</p>` : ''}`; }
+/** I2 on Android/Chrome: the browser's install offer is kept for Config's Install row (its own mini-infobar stays away), and dropped once
+ *  used or once the game is installed. Never in a frame (itch has no manifest). */
+type InstallPrompt = Event & { prompt: () => Promise<unknown> };
+let installPrompt: InstallPrompt | null = null;
+if (!embedded) {
+  window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event as InstallPrompt; });
+  window.addEventListener('appinstalled', () => { installPrompt = null; dropInstallRow(); });
+}
+const installOffered = () => Boolean(installPrompt) && !standaloneApp();
+/** The row goes with the offer: the keyboard moves on to the next control first, never to the page behind the open Config. */
+function dropInstallRow() {
+  const row = document.getElementById('install-row');
+  if (row?.contains(document.activeElement)) (document.getElementById('export-save') ?? document.getElementById('modal-title'))?.focus({ preventScroll: true });
+  row?.remove();
+}
+async function installApp() {
+  const offer = installPrompt;
+  installPrompt = null; dropInstallRow();
+  try { await offer?.prompt(); } catch (error) { console.warn('Install:', error); }
+}
 /** Keep `target` (a field's buttons) above the on-screen keyboard: scrolled into the dialog's view and, where the visual viewport is known,
  *  above its bottom (iOS shrinks only the visual viewport). It follows the keyboard until the field's view is gone. */
 function keepAboveKeyboard(target: HTMLElement) {
@@ -3307,7 +3338,7 @@ async function profilesMenu(notice = '') {
     // 'Retry save' only when a save failed or a result waits to be saved; 'Old save' only when there is an old save to look at.
     const retryable = commander.failed || pendingSettlement, legacyHere = Boolean(rawV3());
     const noCheckpoint = !current?.encounters?.[commander.mode];
-    openModal(`<h2 id="modal-title">${t('profiles.title')}</h2>${notice ? `<p class="profiles-notice" aria-hidden="true">${escapeUI(notice)}</p>` : ''}<p id="profiles-notice" class="sr-only" role="status"></p>${storageNoteMarkup()}<p class="hint">${t('profiles.intro')}</p>
+    openModal(`<h2 id="modal-title">${t('profiles.title')}</h2>${notice ? `<p class="profiles-notice" aria-hidden="true">${escapeUI(notice)}</p>` : ''}<p id="profiles-notice" class="sr-only" role="status"></p>${storageNoteMarkup(true)}<p class="hint">${t('profiles.intro')}</p>
       <div class="save-files">${documents.map((doc,index) => `<div class="save-file ${current?.commanderId === doc.commanderId ? 'current' : ''}"><div><b>${escapeUI(doc.name)}</b><small>${t('profiles.file', { ch: doc.story.slots[3].state?.cleared.length ?? 0, total: CAMPAIGN.length, crystal: doc.shared.bankCrystal })}</small></div><button data-commander="${index}" class="btn">${current?.commanderId === doc.commanderId ? t('profiles.current') : t('profiles.switch')}</button></div>`).join('') || (unheld ? '' : `<p>${t('profiles.empty')}</p>`)}</div>
       <form id="rename-form" class="name-form"><label class="name-field">${t('profiles.name')} <input id="commander-name" maxlength="32" enterkeyhint="done" autocomplete="off" value="${escapeUI(current?.name ?? t('profiles.default.name'))}"></label></form>
       ${unheld ? `<p class="hint" id="continue-summary">${t('profiles.continue.summary', progressSummary(profile))}</p>` : ''}
@@ -3547,7 +3578,7 @@ window.addEventListener('keydown', e => {
     return;
   }
   // Escape is one Back step on every layer (a story scene handles its own keys first and skips).
-  if (e.code === 'Escape') { e.preventDefault(); escapeHandled = true; window.setTimeout(() => { escapeHandled = false; }, 0); goBack('escape'); return; }
+  if (e.code === 'Escape') { e.preventDefault(); escapeHandled = true; window.setTimeout(() => { escapeHandled = false; }, 0); if (!fullscreenEscape(() => goBack('escape'))) goBack('escape'); return; }
   if (modal.open) {
     if (e.code === 'KeyB' && modal.querySelector('.boon-tray-modal')) { e.preventDefault(); modal.close(); }
     // P toggles the pause menu (Space presses its focused Resume).

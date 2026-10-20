@@ -86,6 +86,12 @@ DocumentRoot "{www}"
                 assert 'application/javascript' in response.headers.get('Content-Type', '')
                 assert response.headers.get('Content-Encoding') == 'gzip'
                 assert gzip.decompress(response.read()) == (www / js).read_bytes()
+            # The web build's install manifest (phone contract I2): its own MIME type, compressed.
+            request = urllib.request.Request(origin + prefix + 'assets/manifest.webmanifest', headers={'Accept-Encoding': 'gzip'})
+            with urllib.request.urlopen(request) as response:
+                assert 'application/manifest+json' in response.headers.get('Content-Type', '')
+                assert response.headers.get('Content-Encoding') == 'gzip'
+                assert json.loads(gzip.decompress(response.read()))['short_name'] == 'Gridbound'
             for path, status in [('.htaccess', 403), ('assets/does-not-exist.js', 404), ('assets/', 403)]:
                 try:
                     urllib.request.urlopen(origin + prefix + path)

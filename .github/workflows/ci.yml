@@ -18,7 +18,9 @@ jobs:
       - run: npm run build
       - run: npm run balance
       - run: python3 scripts/package-hostinger.py
-      - run: python3 scripts/package-itch.py
+      # The itch upload is its own build: no manifest, app icons or Home Screen tags (itch's CDN origin is shared).
+      - run: npx vite build --mode itch --outDir dist-itch
+      - run: python3 scripts/package-itch.py --dist dist-itch
       - uses: actions/upload-artifact@v4
         with:
           name: gridbound-static

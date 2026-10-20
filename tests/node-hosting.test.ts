@@ -49,6 +49,7 @@ test('Node hosting entry serves built assets without exposing the repository', a
     await writeFile(join(root, 'dist/assets/big-abcdefgh.js'), BIG_JS);
     await writeFile(join(root, 'dist/assets/font-abcdefgh.woff2'), 'wOF2 fixture bytes wOF2 fixture bytes wOF2 fixture bytes');
     await writeFile(join(root, 'dist/.htaccess'), '# fixture');
+    await writeFile(join(root, 'dist/assets/manifest.webmanifest'), JSON.stringify({ name: 'Gridbound: Ashes of the Bell', short_name: 'Gridbound', icons: Array.from({length: 40}, (_, i) => ({ src: `app-icon-${i}.png`, sizes: '192x192', type: 'image/png' })) }));
     await symlink(join(root, 'package.json'), join(root, 'dist/assets/escape-abcdefgh.js'));
     child = spawn(process.execPath, [join(root, 'server.js')], {
       cwd: tmpdir(), env: {...process.env, HOST: '127.0.0.1', PORT: '0'}, stdio: ['ignore', 'pipe', 'pipe'],
@@ -81,6 +82,17 @@ test('Node hosting entry serves built assets without exposing the repository', a
       assert.match(asset.headers['content-type']!, /application\/javascript/);
       assert.match(asset.headers['cache-control']!, /immutable/);
       assert.equal(asset.headers['x-content-type-options'], 'nosniff');
+    });
+    await t.test('the web build\'s install manifest is served as application/manifest+json, revalidated and compressed (I2)', async () => {
+      const plain = await get(port, '/assets/manifest.webmanifest');
+      assert.equal(plain.status, 200);
+      assert.equal(plain.headers['content-type'], 'application/manifest+json');
+      assert.match(plain.headers['cache-control']!, /no-cache/);
+      assert.equal(JSON.parse(plain.body).short_name, 'Gridbound');
+      const br = await raw(port, '/assets/manifest.webmanifest', {'Accept-Encoding': 'br'});
+      assert.equal(br.headers['content-encoding'], 'br');
+      assert.equal(JSON.parse(brotliDecompressSync(br.body).toString()).short_name, 'Gridbound');
+      assert.equal((await get(port, '/manifest.webmanifest')).status, 404, 'only under assets/');
     });
     await t.test('missing assets, source, dotfiles, traversal and symlinks never disclose files', async () => {
       for (const path of ['/assets/no-file.js', '/assets/', '/package.json', '/server.js', '/src/main.ts', '/.htaccess', '/.env', '/assets/%2e%2e/%2e%2e/package.json', '/assets/escape-abcdefgh.js']) {

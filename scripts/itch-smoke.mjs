@@ -36,10 +36,13 @@ mkdirSync(shots, { recursive: true });
 const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
 const zip = resolve(process.env.ITCH_ZIP || `artifacts/Gridbound-itch-${version}.zip`);
 if (!process.argv.includes('--skip-build')) execFileSync('npm', ['run', 'package:itch'], { stdio: 'inherit' });
-else if (!process.env.ITCH_ZIP && !existsSync(zip)) execFileSync('python3', ['scripts/package-itch.py'], { stdio: 'inherit' });
+else if (!process.env.ITCH_ZIP && !existsSync(zip)) execFileSync('python3', ['scripts/package-itch.py', '--dist', 'dist-itch'], { stdio: 'inherit' });
 const root = mkdtempSync(join(tmpdir(), 'gridbound-itch-'));
 execFileSync('python3', ['-I', '-c', 'import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])', zip, root]);
 assert.ok(existsSync(join(root, 'index.html')), 'index.html is at the ZIP root');
+// I3: the itch upload never carries the web build's install surface (manifest, app icons, Home Screen tags); itch's origin is shared.
+assert.deepEqual(readdirSync(join(root, 'assets')).filter(name => /\.webmanifest$|^app-icon-/.test(name)), [], 'no manifest or app icons in the itch ZIP');
+assert.doesNotMatch(readFileSync(join(root, 'index.html'), 'utf8'), /rel="manifest"|apple-touch-icon|apple-mobile-web-app|mobile-web-app-capable/, 'no Home Screen tags in the itch ZIP');
 assert.ok(!readdirSync(root).some(name => name.startsWith('.')), 'no dotfiles in the ZIP');
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff': 'font/woff', '.woff2': 'font/woff2', '.png': 'image/png' };

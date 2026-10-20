@@ -71,7 +71,7 @@ function fixture() {
   writeFileSync(join(root, 'dist/assets/index-abc12345.js'), 'const ns="http://www.w3.org/2000/svg";console.log("Phaser / https://phaser.io");export{};');
   writeFileSync(join(root, 'dist/assets/index-abc12345.css'), '@font-face{src:url(./font-abc12345.woff2)}.x{background:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\'/%3E")}');
   writeFileSync(join(root, 'dist/assets/font-abc12345.woff2'), 'woff2');
-  const run = () => JSON.parse(execFileSync('python3', [join(root, 'scripts/package-itch.py')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+  const run = (...args: string[]) => JSON.parse(execFileSync('python3', [join(root, 'scripts/package-itch.py'), ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
   return { root, run, file: (path: string, text: string) => writeFileSync(join(root, 'dist', path), text), read: (path: string) => readFileSync(join(root, 'dist', path), 'utf8') };
 }
 
@@ -110,23 +110,38 @@ test('itch packager refuses what breaks on itch.io: absolute or external URLs, m
       const path = join(root, 'dist', extra);
       refused(() => { mkdirSync(join(path, '..'), { recursive: true }); writeFileSync(path, 'x'); }, message, () => rmSync(path));
     }
+    // I3: the web build's install surface (scripts/web-app.ts) never reaches itch's shared origin.
+    for (const extra of ['assets/manifest.webmanifest', 'assets/app-icon-192.png', 'assets/app-icon-maskable-512.png']) {
+      const path = join(root, 'dist', extra);
+      refused(() => writeFileSync(path, 'x'), /install surface; build the itch upload with `vite build --mode itch`/, () => rmSync(path));
+    }
+    for (const tag of ['<link rel="manifest" href="./favicon.svg">', '<meta name="apple-mobile-web-app-capable" content="yes">', '<meta name="mobile-web-app-capable" content="yes">', '<link rel="apple-touch-icon" href="./favicon.svg">']) refused(() => file('index.html', index.replace('</head>', `${tag}</head>`)), /manifest \/ Home Screen tags/, restore);
     refused(() => { for (let i = 0; i < 996; i++) file(`assets/chunk-${String(i).padStart(4, '0')}.js`, 'export{};'); }, /fewer than 1000/, () => { for (let i = 0; i < 996; i++) rmSync(join(root, 'dist/assets', `chunk-${String(i).padStart(4, '0')}.js`)); });
+    // --dist names the built folder (npm run package:itch builds dist-itch/).
+    cpSync(join(root, 'dist'), join(root, 'dist-itch'), { recursive: true });
+    assert.equal(run('--dist', 'dist-itch').files, 5);
+    rmSync(join(root, 'dist'), { recursive: true });
+    assert.throws(() => run(), (error: Error & { stderr?: string }) => /missing dist\/index\.html; run npm run package:itch/.test(String(error.stderr)));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('the built bundle passes the itch rules (when dist/ exists)', { skip: !existsSync('dist/index.html') && 'no dist/ (npm run build)' }, () => {
+/** The itch-mode build: dist-itch/ (npm run package:itch), else a dist/ without the web build's manifest. */
+const itchDist = existsSync('dist-itch/index.html') ? 'dist-itch' : existsSync('dist/index.html') && !readFileSync('dist/index.html', 'utf8').includes('rel="manifest"') ? 'dist' : '';
+test('the built itch bundle passes the itch rules: no manifest, app icons or Home Screen tags (when dist-itch/ exists)', { skip: !itchDist && 'no itch build (npm run package:itch)' }, () => {
   const root = mkdtempSync(join(tmpdir(), 'gridbound-itch-dist-'));
   try {
     mkdirSync(join(root, 'scripts'));
     copyFileSync('scripts/package-itch.py', join(root, 'scripts/package-itch.py'));
     copyFileSync('package.json', join(root, 'package.json'));
-    cpSync('dist', join(root, 'dist'), { recursive: true });
+    cpSync(itchDist, join(root, 'dist'), { recursive: true });
     const summary = JSON.parse(execFileSync('python3', [join(root, 'scripts/package-itch.py')], { encoding: 'utf8' }));
     assert.ok(summary.files < 1000 && summary.extracted_bytes < 64 * 1024 * 1024);
     const names = zipNames(summary.zip);
     assert.ok(names.includes('index.html') && names.includes('favicon.svg') && names.some(name => /^assets\/.+\.js$/.test(name)));
     assert.ok(names.every(name => !name.split('/').some(part => part.startsWith('.'))), 'no dotfiles');
-    const index = readFileSync('dist/index.html', 'utf8');
+    assert.deepEqual(names.filter(name => /\.webmanifest$|(^|\/)app-icon-/.test(name)), [], 'no manifest or app icons');
+    const index = readFileSync(`${itchDist}/index.html`, 'utf8');
+    assert.doesNotMatch(index, /rel="manifest"|apple-touch-icon|apple-mobile-web-app|mobile-web-app-capable/, 'no Home Screen tags');
     for (const [, ref] of index.matchAll(/(?:src|href)="([^"]+)"/g)) assert.match(ref, /^\.\/(assets\/|favicon\.svg$)/, `index.html loads ${ref} relatively`);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -209,25 +224,28 @@ test('embed guards: installed only in a frame; a wheel or scroll key nothing in 
   } finally { Object.assign(g, saved); }
 });
 
-test('main.ts turns the iframe features on only when framed: the normal web build keeps its menus', () => {
+test('main.ts turns the iframe features on only when framed; fullscreen follows the page permission, install the web build', () => {
   const main = readFileSync('src/main.ts', 'utf8');
   assert.match(main, /const embedded = installEmbedGuards\(\);/);
-  assert.match(main, /\$\{embedded && fullscreenAvailable\(\) \? `<label class="setting-row">/, 'Config → Fullscreen');
+  // Config → Fullscreen wherever the page may use it (I1): Android's web build too, itch only with allow="fullscreen", never on iPhone.
+  assert.match(main, /\$\{fullscreenAvailable\(\) && !appFullscreen\(\) \? `<label class="setting-row">/, 'Config → Fullscreen');
+  assert.doesNotMatch(main, /embedded && fullscreenAvailable/, 'not frame-only');
   // Paste backup and Copy backup as text are on every build (phone contract I5); only the text after a download is the frame's.
   assert.match(main, /<button id="import-text-button" class="btn"/, 'Save → Paste backup, every build');
   assert.doesNotMatch(main, /\$\{embedded \? `<button id="import-text-button"/, 'Paste backup is not frame-only');
   assert.match(main, /<button id="export-text-commander" class="btn">/, 'Save → Copy backup as text, every build');
   assert.match(main, /if \(embedded\) backupText\(text, filename\);/, 'the backup as text after a download');
   assert.match(main, /async function keepSavesPersistent\(force = false\) \{\s*if \(embedded\) return false;/, 'persistent storage is asked for only outside a frame');
-  assert.match(main, /if \(embedded\) \{\s*document\.addEventListener\('close'/, 'the fullscreen modal fix');
+  assert.match(main, /if \(fullscreenAvailable\(\)\) \{\s*document\.addEventListener\('close'/, 'the fullscreen modal fix, on every host');
+  assert.match(main, /if \(!embedded\) \{\s*window\.addEventListener\('beforeinstallprompt'/, 'the Install row never in a frame');
   assert.doesNotMatch(main, /\bframed\(\)/, 'decided once, by installEmbedGuards()');
 });
 
 test('itch packaging runs in CI and has npm scripts; the smoke embeds at the size CLAUDE.md recommends', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-  assert.equal(pkg.scripts['package:itch'], 'npm run build && python3 scripts/package-itch.py');
+  assert.equal(pkg.scripts['package:itch'], 'tsc --noEmit && vite build --mode itch --outDir dist-itch && python3 scripts/package-itch.py --dist dist-itch');
   assert.match(pkg.scripts['test:itch'], /scripts\/itch-smoke\.mjs/);
-  assert.match(readFileSync('.github/workflows/ci.yml', 'utf8'), /run: python3 scripts\/package-itch\.py/);
+  assert.match(readFileSync('.github/workflows/ci.yml', 'utf8'), /run: npx vite build --mode itch --outDir dist-itch\n\s+- run: python3 scripts\/package-itch\.py --dist dist-itch/);
   const [, w, h] = readFileSync('scripts/itch-smoke.mjs', 'utf8').match(/const EMBED = \{ width: (\d+), height: (\d+) \}/) ?? [];
   assert.ok(w && h, 'the smoke states its embed size');
   assert.ok(readFileSync('CLAUDE.md', 'utf8').includes(`${w}×${h}`), `CLAUDE.md recommends the ${w}×${h} embed the smoke checks`);

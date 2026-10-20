@@ -16,7 +16,7 @@ if not any(p.suffix == '.js' and p.parent.name == 'assets' for p in files):
 for path in files:
     rel = path.relative_to(DIST)
     is_entry = str(rel) in ['index.html', '.htaccess', 'favicon.svg']
-    is_asset = rel.parts[0] == 'assets' and path.suffix in {'.js', '.css', '.woff', '.woff2', '.ttf', '.otf', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.ogg', '.mp3', '.wav'} and not any(part.startswith('.') for part in rel.parts)
+    is_asset = rel.parts[0] == 'assets' and path.suffix in {'.js', '.css', '.woff', '.woff2', '.ttf', '.otf', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.ogg', '.mp3', '.wav', '.webmanifest'} and not any(part.startswith('.') for part in rel.parts)
     if path.is_symlink() or not (is_entry or is_asset):
         raise SystemExit(f'Unexpected payload: {rel}')
 output = ROOT / 'artifacts' / f'Gridbound-Hostinger-{version}.zip'
