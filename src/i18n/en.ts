@@ -745,6 +745,8 @@ export const EN = {
   'battle.fx.move': 'MOVE',
   'settings.sound': 'Sound effects',
   'settings.sound.sub': 'Synthesized battle and menu sounds.',
+  'settings.music': 'Music',
+  'settings.music.sub': 'A soft synthesized score for town and battle.',
   'settings.motion': 'Full motion',
   'settings.motion.sub': 'Turn off to reduce shaking and particles.',
   'settings.save.note': 'Saves stay in this browser. Download a backup before clearing site data, and restore it with Import save in the Save menu.',

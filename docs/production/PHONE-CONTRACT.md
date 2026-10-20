@@ -270,7 +270,7 @@ Phones change the type scale by moving small labels from the pixel font to the b
   | P8 | Every host serves text compressed: server.js (br/gzip, `Vary: Accept-Encoding`), Hostinger (mod_deflate), itch (CDN) | server.js uncompressed: 2.19 MB, title at 12.46s |
   | P9 | Render: at most 60 fps; no `preserveDrawingBuffer`; preFX and postFX pipelines disabled (11 shader programs, not 31) | 120Hz uncapped; 31 programs |
   | P10 | Heap after 10 battles ≤ 15 MB; DOM nodes and listeners flat after the first battle | 9.12 MB (passes) |
-  | P11 | No AudioContext while Sound is off; the context suspends when the page is hidden and after silence | Running from the first tap |
+  | P11 | No AudioContext while Sound effects **and** Music are off (amended by P3 of the HADES direction: Music is its own Config toggle and shares the one context); the context suspends and the music scheduler stops when the page is hidden, and the context suspends after silence (playing music counts as sound) | Running from the first tap |
 
 ---
 

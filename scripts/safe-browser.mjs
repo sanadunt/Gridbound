@@ -15,7 +15,9 @@
 // - keys: Save files' name field renames with the keyboard's Enter, and 'delete' in any case enables Delete forever (touch-10);
 // - turn: the iPhone 15 held sideways (L6, portrait only): the Turn card pauses a live fight without a menu, hiding/showing/focus/a tap
 //   resume nothing under it, upright again the fight waits behind its menu; a pause menu open as the phone turns stays open under the card;
-// - sound: no AudioContext while Sound is off, and a swipe that starts on a button plays no cue (G10, P11).
+// - sound: no AudioContext while Sound effects and Music are off (a muted start never makes one), and a swipe that starts on a button
+//   plays no cue (G10, P11); the music: none before the first tap, the hub on the camp and the map's march in place, silent and suspended
+//   while hidden and back on return, the ready window muffled, FIGHT!, boss phase 2, a pause ducking, the victory sting, the hub again.
 //   SAFE_ONLY=leave|lifecycle|turn|wake|persist|reminder|detour|keys|sound runs some parts. Screenshots: artifacts/phone-wp-safe/.
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -39,9 +41,11 @@ const PHONES = {
 const SIDEWAYS = { width: 852, height: 393, landscape: true, insets: { left: 59, right: 59, bottom: 21 } }, UPRIGHT = { width: 393, height: 852, landscape: false, insets: { top: 59, bottom: 34 } };
 const route = 'document.querySelector(".town-game-shell")?.dataset.townRoute';
 const SPOOF = "Object.defineProperty(navigator, 'webdriver', { get: () => false, configurable: true })";
-const boot = async (h, save, lang = 'en', scripts = []) => {
+const boot = async (h, save, lang = 'en', scripts = [], after = []) => {
   for (const source of scripts) await h.send('Page.addScriptToEvaluateOnNewDocument', { source });
   await seedSave(h.send, save, lang);
+  // Scripts that write per-viewer flags run after the seed (which clears localStorage on the first load).
+  for (const source of after) await h.send('Page.addScriptToEvaluateOnNewDocument', { source });
   await h.send('Page.navigate', { url });
   await h.wait('Boolean(window.gridbound?.navState)', 30000);
 };
@@ -462,12 +466,14 @@ if (runs('keys')) await withBrowser(async h => {
 }, { phone: PHONES.se });
 
 /** AudioContext spy: contexts made and oscillators started (every cue makes at least one). */
+const MUSIC_OFF = "localStorage.setItem('gridbound.ui.music', 'off')";
+const music = 'window.gridbound.music()';
 const AUDIO_SPY = "(() => { const A = window.AudioContext; if (!A) return; const spy = window.__audio = { made: 0, osc: 0 }; window.AudioContext = class extends A { constructor(...args) { super(...args); spy.made++; } createOscillator() { spy.osc++; return super.createOscillator(); } }; })()";
 if (runs('sound')) await withBrowser(async h => {
-  await boot(h, MID, 'en', [AUDIO_SPY]);
+  await boot(h, MID, 'en', [AUDIO_SPY], [MUSIC_OFF]);
   await h.touch.tap('#menu-button'); await h.wait(`${route} === "more"`);
   await h.touch.tap('.more-scene [data-facility="quests"]'); await h.wait(`${route} === "quests"`);
-  assert.equal(await h.evaluate('window.__audio.made'), 0, 'no AudioContext while Sound is off (P11)');
+  assert.equal(await h.evaluate('window.__audio.made'), 0, 'no AudioContext while Sound effects and Music are off (P11)');
   // Sound on (Config: the ♫ button is hidden on a narrow phone): the first activation creates the context.
   await h.touch.tap('#settings'); await h.wait('Boolean(document.querySelector("dialog[open] #setting-sound"))');
   await h.touch.tap('#setting-sound');
@@ -483,5 +489,59 @@ if (runs('sound')) await withBrowser(async h => {
   await h.touch.tap('#menu-button');
   await h.wait(`window.__audio.osc > ${quiet}`);
   assert.deepEqual(h.errors, [], 'no console errors');
-  console.log('PASS sound: no AudioContext while Sound is off; a swipe from a button is silent, a tap is heard');
+  console.log('PASS sound: no AudioContext while Sound effects and Music are off; a swipe from a button is silent, a tap is heard');
+}, { phone: PHONES.a360 });
+if (runs('sound')) await withBrowser(async h => {
+  // Music on (the default), Sound effects off in this save: the score alone makes the context, on the first tap.
+  await boot(h, MID, 'en', [AUDIO_SPY]);
+  await sleep(800);
+  assert.equal(await h.evaluate('window.__audio.made'), 0, 'no context before the first tap (autoplay rule)');
+  assert.equal((await h.evaluate(music)).playing, null);
+  await h.touch.tap('#menu-button'); await h.wait(`${route} === "more"`);
+  await h.wait(`window.__audio.made === 1 && ${music}.playing === "hub" && ${music}.scheduling`, 8000);
+  await h.click.nav('campaign');
+  await h.wait(`${music}.playing === "map"`);
+  assert.equal(await h.evaluate('window.__audio.made'), 1, 'one shared context');
+  const setHidden = hidden => h.evaluate(`Object.defineProperty(document, 'hidden', { get: () => ${hidden}, configurable: true }); Object.defineProperty(document, 'visibilityState', { get: () => ${hidden ? "'hidden'" : "'visible'"}, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); true`);
+  await setHidden(true);
+  await h.wait(`!${music}.scheduling && ${music}.context === "suspended"`, 5000);
+  const silent = await h.evaluate('window.__audio.osc');
+  await sleep(800);
+  assert.equal(await h.evaluate('window.__audio.osc'), silent, 'a hidden page schedules no notes');
+  await setHidden(false);
+  await h.wait(`${music}.scheduling && ${music}.context === "running" && window.__audio.osc > ${silent}`, 8000);
+  assert.equal((await h.evaluate(music)).playing, 'map', 'the map goes on where it was');
+  await h.click.nav('camp');
+  await departStory(h);
+  await h.wait(`/^battle-act[1-4]$/.test(${music}.requested ?? "") && ${music}.muffle && !${music}.fight`, 8000);
+  await fight(h);
+  await h.wait(`${music}.fight && !${music}.muffle && ${music}.phase === 1`);
+  await h.evaluate('(() => { const g = window.gridbound, b = g.battle; b.bossHp = Math.round(b.bossMax * .5); g.step(.05); return b.phase; })()');
+  await h.wait(`${music}.phase === 2`, 5000);
+  await h.touch.tap('#pause'); await h.wait('window.gridbound.battle.status === "paused"');
+  await h.wait(`${music}.duck`);
+  await h.evaluate('document.querySelector("dialog[open] [data-close]")?.click()'); await h.wait('window.gridbound.battle.status === "fighting"');
+  await h.wait(`!${music}.duck`);
+  // Every won wave keeps its battle track under the card, ducked; the last one plays the victory sting.
+  for (let wave = 0; wave < 8; wave++) {
+    await h.evaluate(DEV_WIN);
+    await h.wait(resultUp, 20000);
+    if (!await h.evaluate('Boolean(document.querySelector("#next-wave"))')) break;
+    await h.wait(`/^battle-act/.test(${music}.requested ?? "") && ${music}.duck`, 5000);
+    await h.click('#next-wave');
+    await fight(h);
+  }
+  await h.wait(`${music}.requested === "sting-win"`, 5000);
+  await h.click('#result-town');
+  await h.wait(`window.gridbound.inTown && ${music}.playing === "hub"`, 15000);
+  // Config → Music off: the score fades out and stops (Sound effects are off too: the context is suspended).
+  await h.touch.tap('#settings'); await h.wait('Boolean(document.querySelector("dialog[open] #setting-music"))');
+  assert.equal(await h.evaluate('document.querySelector("#setting-music").checked'), true);
+  await h.touch.tap('#setting-music');
+  await h.wait(`!${music}.scheduling && ${music}.playing === null && ${music}.context === "suspended"`, 5000);
+  assert.equal(await h.evaluate('localStorage.getItem("gridbound.ui.music")'), 'off', 'a per-viewer flag');
+  assert.equal(await h.evaluate('document.querySelector("#sound").getAttribute("aria-pressed")'), 'false', 'the ♫ button shows everything muted');
+  assert.equal(await h.evaluate('window.__audio.made'), 1);
+  assert.deepEqual(h.errors, [], 'no console errors');
+  console.log('PASS sound: music starts on the first tap, hub → map in place, silent and suspended while hidden, ready → fight → phase 2 → pause duck → victory sting → hub, Music off stops it');
 }, { phone: PHONES.a360 });

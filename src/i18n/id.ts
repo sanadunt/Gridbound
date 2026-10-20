@@ -747,6 +747,8 @@ export const ID: Record<keyof typeof EN, string> = {
   'battle.fx.move': 'PINDAH',
   'settings.sound': 'Efek suara',
   'settings.sound.sub': 'Suara pertarungan dan menu hasil sintesis.',
+  'settings.music': 'Musik',
+  'settings.music.sub': 'Iringan musik sintetis untuk kota dan pertarungan.',
   'settings.motion': 'Animasi penuh',
   'settings.motion.sub': 'Matikan untuk mengurangi guncangan dan partikel.',
   'settings.save.note': 'Save tersimpan di browser ini. Unduh cadangan sebelum menghapus data situs, lalu pulihkan dengan Impor save di menu Save.',

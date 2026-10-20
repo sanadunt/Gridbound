@@ -7,6 +7,7 @@
 //                   hook (window.gridbound) on a production build with the hook compiled in (built to artifacts/perf-hook/), also via server.js.
 //   PERF_RUNS=3     runs per figure (medians reported)          PERF_DEVICES=pixel7,lowend      PERF_NETS=slow4g,fast4g
 //   PERF_ONLY=load,tap,gl,battle,idle,routes,leak               PERF_BATTLE_SECONDS=60          CHROME_PATH as for the other browser scripts
+//   PERF_MUSIC=on   the score plays (the default, as for a player); off seeds Config → Music off; both runs the idle part (P6) twice
 // Report: artifacts/perf-phone.json (and stdout); filmstrips of the first load in artifacts/perf-phone/.
 import { spawn } from 'node:child_process';
 import { copyFile, mkdir, writeFile } from 'node:fs/promises';
@@ -28,6 +29,8 @@ const part = name => !ONLY || ONLY.has(name);
 const BATTLE_SECONDS = Number(process.env.PERF_BATTLE_SECONDS || 60);
 const IDLE_SECONDS = 10;
 const DIST = process.env.PERF_DIST === '1';
+const MUSIC = process.env.PERF_MUSIC || 'on';
+const MUSIC_OFF = "localStorage.setItem('gridbound.ui.music', 'off')";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const median = a => { const s = a.filter(x => typeof x === 'number' && Number.isFinite(x)).sort((x, y) => x - y); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2 * 100) / 100; };
 const r2 = x => Math.round(x * 100) / 100;
@@ -82,7 +85,7 @@ if(!(P.marks.title&&P.marks.town)&&performance.now()<60000)raf(poll);};raf(poll)
 const SPOOF = "Object.defineProperty(navigator,'webdriver',{get:()=>false})";
 
 /** A phone session: metrics, touch, user agent, CPU throttling, the network, the probe; `spoof` hides automation (the real title flow). */
-async function phone(device, run, { net, spoof = false, save = LATE } = {}) {
+async function phone(device, run, { net, spoof = false, save = LATE, music = MUSIC !== 'off' } = {}) {
   const d = DEVICE[device];
   return withBrowser(async tools => {
     const { send, evaluate } = tools;
@@ -92,6 +95,7 @@ async function phone(device, run, { net, spoof = false, save = LATE } = {}) {
     if (spoof) await send('Page.addScriptToEvaluateOnNewDocument', { source: SPOOF });
     await send('Page.addScriptToEvaluateOnNewDocument', { source: PROBE });
     await seedSave(send, save, 'en');
+    if (!music) await send('Page.addScriptToEvaluateOnNewDocument', { source: MUSIC_OFF });
     await send('Emulation.setCPUThrottlingRate', { rate: d.cpu });
     tools.on(m => { if (m.method === 'Page.javascriptDialogOpening') send('Page.handleJavaScriptDialog', { accept: true }).catch(() => {}); });
     tools.metrics = async () => Object.fromEntries((await send('Performance.getMetrics')).metrics.map(m => [m.name, m.value]));
@@ -238,12 +242,16 @@ try {
 
   // P6: idle windows in the real player flow (automation hidden): town screens, a ready window (awake: its grid can be dragged), a paused fight,
   // the Status view and a result card (asleep).
-  if (part('idle')) {
-    report.idle = {};
+  if (part('idle')) for (const musicOn of MUSIC === 'both' ? [true, false] : [MUSIC !== 'off']) {
+    const key = MUSIC === 'both' && !musicOn ? 'idleMusicOff' : 'idle';
+    report[key] = {};
     for (const device of DEVICES) await phone(device, async t => {
-      const out = report.idle[device] = {};
+      const out = report[key][device] = { music: musicOn };
       const measure = async (label, town = true) => {
+        const busy0 = musicOn ? (await t.evaluate('window.gridbound.music().busyMs')) : 0;
         const cost = await windowCost(t, IDLE_SECONDS);
+        // The score's own share of the window (its scheduler's main-thread time, ms/s).
+        if (musicOn) cost.musicMsPerSec = r2(((await t.evaluate('window.gridbound.music().busyMs')) - busy0) / IDLE_SECONDS);
         const loop = await loopState(t);
         out[label] = { ...cost, loopRunning: loop?.running ?? null };
         if (town && cost.recalcsPerSec > BUDGET.P6.townRecalcsPerSec) fail('P6', `${device} ${label}: ${cost.recalcsPerSec} style recalcs/s`);
@@ -262,6 +270,9 @@ try {
       for (let i = 0; i < 20 && await t.evaluate('Boolean(document.querySelector(".dialogue-scene, dialog[open]"))'); i++) { await t.evaluate('document.querySelector(".dialogue-skip")?.click(); document.querySelector("dialog[open] [data-close], dialog[open] [data-autofocus]")?.click()'); await sleep(600); }
       await sleep(1500);
       out.engineStartedAfterTitle = await t.evaluate('Boolean(window.gridbound.scene)');
+      // P6 is measured with the score playing (as a player hears it) unless Music is off.
+      out.campMusic = await t.evaluate('window.gridbound.music()');
+      if (musicOn && !out.campMusic.scheduling) fail('P6', `${device}: the music is not playing in the camp`);
       await measure('camp');
       await t.click.nav('campaign'); await sleep(2500); await measure('map');
       await t.click.nav('more'); await sleep(2500); await measure('menu');
@@ -285,7 +296,11 @@ try {
       await measure('resultCard', false);
       out.resultCard.state = await t.evaluate('({status:window.gridbound.battle.status,result:document.getElementById("result-screen").dataset.result??null,inTown:window.gridbound.inTown})');
       out.audioContexts = await t.evaluate('window.__pp.ac');
-    }, { spoof: true });
+      // P11: one shared context at most (Sound effects and Music share it).
+      if (out.audioContexts > 1) fail('P11', `${device}: ${out.audioContexts} AudioContexts`);
+      // The perf saves have Sound effects off: with Music off too there is no context at all.
+      if (!musicOn && out.audioContexts > 0) fail('P11', `${device}: an AudioContext with Sound effects and Music off`);
+    }, { spoof: true, music: musicOn });
   }
 
   // P7: tap → next painted frame for each town route (first and repeat visits), and Depart → the ready window.

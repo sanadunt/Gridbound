@@ -1,6 +1,6 @@
 /**
- * Procedural audio for Gridbound's forest-ruin combat.
- * Short procedural combat and interface cues; background music is disabled.
+ * Procedural audio for Gridbound: short synthesized combat and interface cues, and the one AudioContext the score (`music.ts`) shares.
+ * No context exists while Sound effects and Music are both off (P11).
  */
 
 /** A running context with no cue for this long is suspended (a phone keeps a running AudioContext's audio hardware awake). */
@@ -8,9 +8,18 @@ export const SOUND_IDLE_MS = 20_000;
 
 export class Sound {
   private on = true;
-  /** Sound on or off (Config, the ♫ button). Off never creates a context, and a running one is suspended at once. */
+  private musicOn = false;
+  /** Sound effects on or off (Config, the ♫ button). With Music off too, no context is ever created and a running one is suspended at once. */
   get enabled() { return this.on; }
-  set enabled(value: boolean) { this.on = value; if (!value && this.ctx?.state === 'running') { this.idleSuspended = true; void this.ctx.suspend().catch(() => {}); } }
+  set enabled(value: boolean) { this.on = value; this.quietIfUnused(); }
+  /** Music on or off (Config → Music, the ♫ button): the score shares this class's context (`context()`). */
+  get music() { return this.musicOn; }
+  set music(value: boolean) { this.musicOn = value; this.quietIfUnused(); }
+  /** Something needs the context: Sound effects or Music. */
+  private get wanted() { return this.on || this.musicOn; }
+  private quietIfUnused() { if (!this.wanted && this.ctx?.state === 'running') { this.idleSuspended = true; void this.ctx.suspend().catch(() => {}); } }
+  /** Called for the big cues (the ultimate, a kill, a cut-in): the score ducks under them for a moment. */
+  onBig?: () => void;
   private ctx?: AudioContext;
   private last = -Infinity;
   private lastSupport = -Infinity;
@@ -36,21 +45,29 @@ export class Sound {
     const c = this.ctx;
     if (!c) return;
     if (hidden) { if (c.state === 'running') { this.hiddenSuspend = true; void c.suspend().catch(() => {}); } return; }
-    if (this.hiddenSuspend || (c.state as string) === 'interrupted') { this.hiddenSuspend = false; if (this.on) void c.resume().catch(() => {}); }
+    if (this.hiddenSuspend || (c.state as string) === 'interrupted') { this.hiddenSuspend = false; if (this.wanted) void c.resume().catch(() => {}); }
   }
 
   /** True when a cue may play now (the idle timer starts again). A context the idle timer suspended is resumed first: the cue that woke it
    *  plays once it runs (`replay`), cues that arrive meanwhile are dropped. */
   private live(replay?: () => void) {
+    if (!this.on) return false;
+    return this.wake(replay);
+  }
+  private wake(replay?: () => void) {
     const c = this.ctx;
-    if (!this.on || !c) return false;
+    if (!this.wanted || !c) return false;
     if (c.state === 'running') { this.armIdle(); return true; }
     if (this.idleSuspended && !this.waking && !this.hiddenSuspend && (c.state as string) !== 'closed') {
       this.waking = true;
-      void c.resume().then(() => { this.waking = false; this.idleSuspended = false; if (c.state === 'running') replay?.(); }, () => { this.waking = false; });
+      void c.resume().then(() => { this.waking = false; this.idleSuspended = false; if (c.state === 'running') { this.armIdle(); replay?.(); } }, () => { this.waking = false; });
     }
     return false;
   }
+  /** The shared context for the score, once a user activation created it (unlock); undefined while Sound effects and Music are both off. */
+  context() { return this.wanted ? this.ctx : undefined; }
+  /** Music playing counts as activity: the idle suspend waits, and a context it suspended is resumed. True while the context runs. */
+  keepAlive() { return this.wake(); }
   /** One pending timer at most (a busy fight plays dozens of cues a second): each cue only moves `lastCue`, and the timer, when it fires
    *  early, waits out the rest. */
   private lastCue = 0;
@@ -158,7 +175,7 @@ export class Sound {
   /** From a user activation (a click, a key, a finger lifted): create the context (only while Sound is on) and resume it from any stopped
    *  state, iOS's 'interrupted' included. */
   unlock() {
-    if (!this.on) return;
+    if (!this.wanted) return;
     try {
       this.ctx ??= new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const state = this.ctx.state as string;
@@ -246,15 +263,11 @@ export class Sound {
     if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
     const c = this.ctx;
     if (duration <= 0) return;
-    if (!this.noise || this.noise.sampleRate !== c.sampleRate) {
-      this.noise = c.createBuffer(1, c.sampleRate, c.sampleRate);
-      const data = this.noise.getChannelData(0);
-      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-    }
-    const length = Math.min(duration, this.noise.duration);
+    const buffer = this.noiseBuffer(c);
+    const length = Math.min(duration, buffer.duration);
 
     const noise = c.createBufferSource();
-    noise.buffer = this.noise;
+    noise.buffer = buffer;
 
     const filter = c.createBiquadFilter();
     filter.type = filterType;
@@ -268,7 +281,16 @@ export class Sound {
     filter.connect(gain);
     gain.connect(c.destination);
 
-    noise.start(c.currentTime, Math.random() * (this.noise.duration - length), length);
+    noise.start(c.currentTime, Math.random() * (buffer.duration - length), length);
+  }
+  /** One second of white noise per context, shared by the cues and the score's brushes, crackle and kicks. */
+  noiseBuffer(c: AudioContext) {
+    if (!this.noise || this.noise.sampleRate !== c.sampleRate) {
+      this.noise = c.createBuffer(1, c.sampleRate, c.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
+    return this.noise;
   }
 
   /** Tactile metallic coin clink for UI clicks and tabs */
@@ -327,6 +349,7 @@ export class Sound {
   /** Play a cue. `value` (0..1) tunes the cues that take one: tap-tick's pitch climbs with the hero's charge ring, combo-up chimes once per tier. */
   play(kind: string, value = 0) {
     if (!this.live(() => this.play(kind, value))) return;
+    if (kind === 'ultimate' || kind === 'kill' || kind === 'cut-in') this.onBig?.();
     const now = performance.now();
     const combatHit = kind === 'hit' || kind === 'hit-heavy' || kind === 'hit-magic' || kind === 'hit-slash';
     if (combatHit) {
@@ -388,6 +411,23 @@ export class Sound {
 
       case 'card-deal':
         this.cardDeal();
+        break;
+
+      // The Bell over Emberhollow: entering the town from the title.
+      case 'bell-toll':
+        this.bell(147, 2.4, 0.03);
+        this.synthNote(73, 1.6, { type: 'sine', volume: 0.02, attack: 0.01 });
+        break;
+      // A wooden door: a low thunk and the latch (entering an Undercroft room).
+      case 'door':
+        this.synthNote(96, 0.16, { type: 'triangle', volume: 0.04, slide: -30 });
+        this.noiseBurst(0.09, 0.03, 420, 'lowpass');
+        setTimeout(() => { this.synthNote(1250, 0.03, { type: 'square', volume: 0.01 }); this.noiseBurst(0.03, 0.012, 3200, 'highpass'); }, 120);
+        break;
+      // A reward: a falling-then-rising cascade of bells (quests claimed, a star chest opened).
+      case 'reward-chime':
+        [1047, 1319, 1568, 2093].forEach((n, i) => setTimeout(() => this.synthNote(n, 0.3, { type: 'sine', volume: 0.014, attack: 0.004 }), i * 60));
+        setTimeout(() => this.bell(1047, 0.8, 0.012), 260);
         break;
 
       case 'pact-toggle':

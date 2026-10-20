@@ -44,6 +44,8 @@ import { ICONS, threatFamily } from './ui/battle-icons';
 import { dangerSide } from './render/juice';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
+import { Music } from './audio/music';
+import { musicFor, type MusicState } from './audio/tracks';
 import { loadSave, saveProfile, backupLegacy, legacyBackup, commanderFromBackup, isCompleteV3, SAVE_KEY } from './game/save';
 import { createProfile, FALLEN_XP, type Profile } from './game/profile';
 import { heroProgress } from './game/levels';
@@ -123,6 +125,7 @@ function showTitleScreen(animated = true) {
   document.body.classList.add('title-up');
   paintTownArt();
   updateTitleStatus();
+  syncMusic();
   // The entrance never blocks a tap: PRESS START and the menu take taps while it plays.
   if (animated && motionOn()) {
     enter(q('.title-logo', titleScreen), { opacity: 0, transform: 'translateY(-30px) scale(1.4)' }, { duration: 600, easing: EASE_BACK });
@@ -144,10 +147,12 @@ function enterEmberhollow() {
   const titleScreen = $('title-screen');
   if (!titleScreen || titleScreen.hidden || titleScreen.classList.contains('dismissing')) return;
   sound.unlock();
-  sound.play('confirm');
+  // The Bell rings the player in; the hub theme comes in under the fading title.
+  sound.play('bell-toll');
   // The title fades out with its CSS transition (.dismissing, 0.25 s); with motion the Enter entry nudges first.
   if (motionOn()) $('title-enter')?.animate?.([{}, { transform: 'translateX(8px)' }, {}], { duration: 160, easing: EASE_OUT });
   titleScreen.classList.add('dismissing');
+  syncMusic();
   setTimeout(() => {
     titleScreen.hidden = true;
     titleScreen.classList.remove('dismissing');
@@ -219,6 +224,16 @@ function persist(slotId: SlotId = 'auto', edit?: (document: CommanderDocument) =
 }
 const sound = new Sound();
 sound.enabled = profile.sound;
+/** Config → Music: a per-viewer flag like Vibration (on by default; no save field). With Sound effects off too there is no AudioContext (P11). */
+const MUSIC_KEY = 'gridbound.ui.music';
+function musicOn() { try { return localStorage.getItem(MUSIC_KEY) !== 'off'; } catch { return true; } }
+function storeMusic(on: boolean) { try { if (on) localStorage.removeItem(MUSIC_KEY); else localStorage.setItem(MUSIC_KEY, 'off'); } catch { /* storage blocked: the default stays */ } }
+sound.music = musicOn();
+const music = new Music(sound);
+music.enabled = sound.music;
+sound.onBig = () => music.punch();
+/** The story scene on screen, for the score: a chapter intro plays the title theme, other scenes the hub ducked. */
+let sceneMusic: 'intro' | 'story' | undefined;
 let battle = new Battle('adventure', 1, profileModifiers(profile), storyBattleOptions(profile));
 /** The arena scene: constructed by startEngine() once the engine chunk has loaded; `initialized` once its first frame created it. */
 let scene: BattleScene | undefined;
@@ -240,10 +255,25 @@ function arenaLive() {
 /** Wake or sleep the loop to match arenaLive(); the HUD's endless pulses (body.battle-idle, battle.css) stop whenever nothing is fighting. */
 function syncEngine() {
   document.body.classList.toggle('battle-idle', battle.status !== 'fighting');
+  syncMusic();
   const loop = engine?.loop;
   if (!loop?.started) return;
   if (arenaLive()) loop.wake(); else loop.sleep();
 }
+/** What the score hears: a story scene over everything, the title (not while it fades out: the hub comes in under it), a result, the battle
+ *  (dimmed under a dialog or the Status/Log view), else the town route. */
+function musicState(): MusicState {
+  if (sceneMusic) return { scene: sceneMusic };
+  const title = $('title-screen');
+  if (title && !title.hidden && !title.classList.contains('dismissing')) return { title: true };
+  if (inTown) return { route: townState.tab };
+  const won = battle.status === 'victory', moreWaves = won && battle.mode === 'adventure' && battle.stage + 1 < battle.stageCount;
+  const result = resultScreen.hidden ? undefined : won ? (moreWaves ? 'wave' : 'victory') : battle.status === 'defeat' ? 'defeat' : undefined;
+  return { result, battle: { mode: battle.mode, chapter: battle.floor, floor: battle.floor, status: battle.status, phase: battle.phase, dimmed: modal.open || ($('battle-screen').dataset.battleView ?? 'arena') !== 'arena' } };
+}
+/** Called with syncEngine (title, showTown, boot/showReady, begin, results, dialogs, pause, views), on boss phases, story scenes and user
+ *  activations (the first tap starts the music: autoplay rule). Cheap when nothing changed. */
+function syncMusic() { music.set(musicFor(musicState())); }
 let recorded = false;
 let chapterResult: { stars: number; improved: boolean; heroic?: { gold: number; materials: Record<string, number> } } | undefined;
 /** What the last settled result credited (gold for Story, bank Crystal otherwise) and the party cap it unlocked (0 = unchanged). */
@@ -397,7 +427,7 @@ $('app').innerHTML = `
 <section id="title-screen" class="title-screen" hidden>${titleMarkup()}</section>
 <header class="site-header hud-bar">
   <div class="hud-nav"><button id="home" class="btn hud-back" type="button" data-nav-exit="back" hidden><span aria-hidden="true">◀</span> <span>${t('hud.back')}</span></button><span id="hud-title" class="hud-title">${t('town.name')}</span></div>
-  <div class="header-tools"><b id="wallet" class="wallet">${currencyAmount('gold', walletAmounts().gold)}</b><b id="bank-wallet" class="wallet bank-wallet">${currencyAmount('crystal', walletAmounts().crystal)}</b><button id="sound" class="icon-button" aria-label="${t('hud.sound')}" aria-pressed="${profile.sound}">♫</button><button id="settings" class="icon-button" aria-label="${t('hud.settings')}">⚙</button><button id="menu-button" class="icon-button menu-button" aria-pressed="false" aria-label="${t('route.menu')}">${t('hud.menu')}</button></div>
+  <div class="header-tools"><b id="wallet" class="wallet">${currencyAmount('gold', walletAmounts().gold)}</b><b id="bank-wallet" class="wallet bank-wallet">${currencyAmount('crystal', walletAmounts().crystal)}</b><button id="sound" class="icon-button" aria-label="${t('hud.sound')}" aria-pressed="${profile.sound || musicOn()}">♫</button><button id="settings" class="icon-button" aria-label="${t('hud.settings')}">⚙</button><button id="menu-button" class="icon-button menu-button" aria-pressed="false" aria-label="${t('route.menu')}">${t('hud.menu')}</button></div>
 </header>
   <main id="town-screen" class="town-screen"></main>
   <main id="battle-screen" class="game-layout" data-battle-view="arena" hidden>
@@ -667,7 +697,7 @@ $('town-screen').addEventListener('click', event => {
   }
   if (button.dataset.dungeonPick) { depthDossierModal(Number(button.dataset.dungeonPick)); return; }
   if (button.dataset.dungeonNode && profile.journey.run) {
-    if (enterNode(profile.journey.run, Number(button.dataset.dungeonNode))) { townState.dungeonOutcome = townState.dungeonLetter = undefined; sound.play('cursor'); showDungeonRoom(); }
+    if (enterNode(profile.journey.run, Number(button.dataset.dungeonNode))) { townState.dungeonOutcome = townState.dungeonLetter = undefined; sound.play('door'); showDungeonRoom(); }
     return;
   }
   if (button.hasAttribute('data-dungeon-fight')) { startDungeonFight(); return; }
@@ -702,7 +732,7 @@ $('town-screen').addEventListener('click', event => {
   if (button.hasAttribute('data-dungeon-close')) { delete profile.journey.run; townState.dungeonOutcome = townState.dungeonLetter = undefined; showTown('dungeon'); return; }
   if (button.hasAttribute('data-star-chest')) {
     const reward = claimStarChest(profile);
-    if (reward) { sound.play('fanfare'); showTown(townState.tab, t('stars.chest.got', { gold: reward.gold, mat: materialList(reward.materials) })); }
+    if (reward) { sound.play('reward-chime'); showTown(townState.tab, t('stars.chest.got', { gold: reward.gold, mat: materialList(reward.materials) })); }
     return;
   }
   if (button.dataset.heroic !== undefined) { townState.heroic = button.dataset.heroic === '1'; showTown(townState.tab); return; }
@@ -725,7 +755,7 @@ $('town-screen').addEventListener('click', event => {
   }
   if (button.hasAttribute('data-claim-all')) {
     const { claimed, gold, gear } = claimAllQuests(profile, townState.hero);
-    if (claimed.length) sound.play('coin');
+    if (claimed.length) sound.play('reward-chime');
     showTown('quests', claimed.length ? t(gear.length ? 'notice.quest.all.gear' : 'notice.quest.all', { n: claimed.length, gold, gear: questGearText(gear) }) : t('notice.quest.fail'), true);
     $('town-screen').querySelectorAll('.secondary-scene, .secondary-content').forEach(el => el.scrollTo({ top: 0 }));
     return;
@@ -891,6 +921,7 @@ $('town-screen').addEventListener('click', event => {
   if(button.dataset.claimQuest){
     const questId = button.dataset.claimQuest;
     const ok=claimQuest(profile,questId,townState.hero);
+    if (ok) sound.play('reward-chime');
     const gearName = ok && ok.gear ? GEAR.find(g => g.id === ok.gear)?.name ?? ok.gear : '';
     showTown('quests',ok?t(!ok.gear ? 'notice.quest.ok' : ok.refund ? 'notice.quest.gear.refund' : ok.equipped ? 'notice.quest.gear.equipped' : 'notice.quest.ok.gear', { name: ROSTER[ok.hero].name, gear: gearName, gold: ok.refund }):t('notice.quest.fail'), true);
     if (ok && motionOn()) {
@@ -1203,9 +1234,9 @@ function chapterIntro(zoneIndex: number) {
   const zone = CAMPAIGN[zoneIndex];
   const [name, place] = zone.speaker.split(' · ').map(part => part.trim());
   const pages = paginate(zone.intro).map(text => storyPage(text, name, place));
-  playingScene = true;
+  playingScene = true; sceneMusic = 'intro'; syncMusic();
   return playDialogue($('app'), { kicker: t('battle.chapter', { n: zoneIndex + 1 }), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(Math.floor(zoneIndex / 4)), pages, motion: motionOn(), onBlip: () => sound.play('text') })
-    .finally(() => { playingScene = false; markIntroSeen(zoneIndex); });
+    .finally(() => { playingScene = false; sceneMusic = undefined; syncMusic(); markIntroSeen(zoneIndex); });
 }
 /** Recruits of the chapter just cleared, for the result screen's notice (their join scenes are queued in the journey). */
 let recruitedIds: number[] = [];
@@ -1214,16 +1245,16 @@ function recruitScene(id: number, force = false) {
   const hero = CHARACTERS[id];
   // Skipped under automation like the title screen and chapter intros; QA plays it through window.gridbound.recruitScene.
   if (!hero || (!force && navigator.webdriver)) return Promise.resolve();
-  playingScene = true;
+  playingScene = true; sceneMusic = 'story'; syncMusic();
   return playDialogue($('app'), { kicker: t('recruit.kicker'), title: t('recruit.title', { name: hero.name }), subtitle: KITS[hero.classId].name, backdrop: actArt(Math.min(3, Math.floor(hero.recruitChapter / 4))), pages: [{ speaker: hero.name, portrait: portrait(hero.classId, 0, id), text: hero.joinLine }], motion: motionOn(), onBlip: () => sound.play('text') })
-    .finally(() => { playingScene = false; });
+    .finally(() => { playingScene = false; sceneMusic = undefined; syncMusic(); });
 }
 /** A story choice as a scene: its question, its options and 'Decide later' (which leaves it open in the Journal). */
 async function choiceScene(scene: (typeof STORY_CHOICES)[number]) {
-  playingScene = true;
+  playingScene = true; sceneMusic = 'story'; syncMusic();
   const choices = [...scene.options.map(o => ({ value: o.id, label: o.label, reply: o.outcome })), { value: '', label: t('journal.later') }];
   const value = await playDialogue($('app'), { kicker: t('choice.kicker'), title: scene.title, backdrop: actArt(Math.min(3, Math.floor((scene.chapter - 1) / 4))), pages: [{ speaker: t('story.chronicle'), place: scene.title, text: scene.text, choices, safeChoice: choices.length - 1 }], motion: motionOn(), onBlip: () => sound.play('text') })
-    .finally(() => { playingScene = false; });
+    .finally(() => { playingScene = false; sceneMusic = undefined; syncMusic(); });
   if (!value || commander.stale) return;
   profile.narrative ??= {};
   if (narrativeChoice(profile.narrative, scene.id, value, profile.cleared)) await persist();
@@ -1239,9 +1270,9 @@ function endingScene() {
     ...STORY_CHOICES.filter(s => Object.hasOwn(state, s.id)).map(s => chronicle(s.title, s.options.find(o => o.id === state[s.id])!.outcome)),
     { text: '', card: { kicker: t('ending.card.kicker'), title: t('town.name'), subtitle: t('ending.card.subtitle') } },
   ];
-  playingScene = true;
+  playingScene = true; sceneMusic = 'story'; syncMusic();
   return playDialogue($('app'), { kicker: t('ending.kicker'), title: zone.name, subtitle: zone.subtitle, backdrop: actArt(3), pages, motion: motionOn(), onBlip: () => sound.play('text') })
-    .finally(() => { playingScene = false; });
+    .finally(() => { playingScene = false; sceneMusic = undefined; syncMusic(); });
 }
 let campScenesRunning = false;
 /**
@@ -2265,7 +2296,7 @@ window.addEventListener('battle-banner', event => {
     bannerSpot = undefined;
     $('banner').className = `battle-banner visible ${['warning', 'down', 'enrage'].includes(e.type) ? 'danger' : e.type === 'ultimate' ? 'ultimate' : e.type === 'break' ? 'break' : e.type === 'interrupt' ? 'interrupt' : e.type === 'phase' ? 'phase' : ''}`;
     // J5: a new phase slams in like the boss's title card.
-    if (e.type === 'phase') { sound.play('title-slam'); if (motionOn()) enter($('banner'), { opacity: 0, transform: 'scale(1.8)' }, { duration: 260, easing: EASE_BACK }); }
+    if (e.type === 'phase') { syncMusic(); sound.play('title-slam'); if (motionOn()) enter($('banner'), { opacity: 0, transform: 'scale(1.8)' }, { duration: 260, easing: EASE_BACK }); }
     clearTimeout(bannerTimer);
     bannerTimer = window.setTimeout(() => {
       const banner = $('banner');
@@ -2443,6 +2474,7 @@ function settings(fromPause = false) {
   openModal(`<h2 id="modal-title">${t('settings.title')}</h2>
     <div class="setting-row" role="group" aria-label="${t('settings.language')}"><span><b>${t('settings.language')}</b><small>${inTown ? t('settings.language.sub') : t('settings.language.town')}</small></span><span class="lang-switch">${(['en', 'id'] as Lang[]).map(code => `<button type="button" class="btn" data-lang="${code}" aria-pressed="${lang() === code}" ${inTown ? '' : 'disabled'}>${code === 'en' ? 'English' : 'Indonesia'}</button>`).join('')}</span></div>
     <label class="setting-row"><span><b>${t('settings.sound')}</b><small>${t('settings.sound.sub')}${/iP(hone|ad|od)/.test(navigator.userAgent) ? ` ${t('settings.sound.ios')}` : ''}</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label>
+    <label class="setting-row"><span><b>${t('settings.music')}</b><small>${t('settings.music.sub')}</small></span><input id="setting-music" type="checkbox" ${music.enabled ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.motion')}</b><small>${reduceMotionQuery.matches ? t('settings.motion.device') : t('settings.motion.sub')}</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.coach')}</b><small>${t('settings.coach.sub')}</small></span><input id="setting-coach" type="checkbox" ${coachEnabled() ? 'checked' : ''}></label>
     ${vibrationAvailable() ? `<label class="setting-row"><span><b>${t('settings.vibration')}</b><small>${t('settings.vibration.sub')}</small></span><input id="setting-vibration" type="checkbox" ${vibrationOn() ? 'checked' : ''}></label>` : ''}
@@ -2453,13 +2485,18 @@ function settings(fromPause = false) {
   $('export-text').addEventListener('click',copyBackup);
   document.getElementById('install-app')?.addEventListener('click', () => { void installApp(); });
   $('setting-sound').addEventListener('change', e => { profile.sound = (e.target as HTMLInputElement).checked; updateSound(); });
+  $('setting-music').addEventListener('change', e => setMusic((e.target as HTMLInputElement).checked));
   $('setting-coach').addEventListener('change', e => { setCoachEnabled((e.target as HTMLInputElement).checked); if (coach.step) endCoachStep(); });
   document.getElementById('setting-vibration')?.addEventListener('change', e => setVibration((e.target as HTMLInputElement).checked));
   $('setting-motion').addEventListener('change', e => { profile.motion = (e.target as HTMLInputElement).checked; applyMotion(); persist(); });
   // The checkbox shows the real state: a refused request (no user gesture, a page that disallows it) puts it back.
   document.getElementById('setting-fullscreen')?.addEventListener('change', e => { void toggleFullscreen().then(on => { (e.target as HTMLInputElement).checked = on; }); });
 }
-function updateSound() { sound.enabled = profile.sound; if (profile.sound) sound.unlock(); $('sound').setAttribute('aria-pressed', String(profile.sound)); persist(); }
+function updateSound() { sound.enabled = profile.sound; if (profile.sound) sound.unlock(); audioButton(); persist(); }
+/** Config → Music (per viewer): off fades the score out (and, with Sound effects off too, the context is suspended); on starts it at once. */
+function setMusic(on: boolean) { storeMusic(on); sound.music = on; music.enabled = on; if (on) { sound.unlock(); syncMusic(); } audioButton(); }
+/** The ♫ button is pressed while anything sounds (Sound effects or Music). */
+function audioButton() { $('sound').setAttribute('aria-pressed', String(profile.sound || music.enabled)); }
 function pauseMenu() {
   if (inTown) return;
   // An ended battle shows its result; in a read-only tab (no result can be saved) the menu stays reachable for its Leave entry.
@@ -3152,7 +3189,7 @@ function activateCommander(document: CommanderDocument, mode = document.activeMo
   if (!same || !profile.roster.includes(townState.hero)) townState.hero = profile.roster[0];
   if (!same || !canEnterZone(profile, townState.zone)) selectZone(Math.min(profile.cleared.length, CAMPAIGN.length - 1));
   sound.enabled = profile.sound; applyMotion();
-  $('sound').setAttribute('aria-pressed', String(profile.sound));
+  audioButton();
   if (resumed && mode === document.activeMode) { syncProfileEconomy(profile); savedSignature = `${document.commanderId}:${commander.document!.revision}:${JSON.stringify(context())}`; } else savedSignature = '';
   updateTitleStatus();
   if (inTown && renderTownAfterActivation) showTown(mode === 'story' ? 'camp' : mode === 'raid' ? 'raid' : 'endless');
@@ -3613,8 +3650,9 @@ const cueTarget = (event: Event) => { const target = (event.target as HTMLElemen
 let pressPointer = 'mouse';
 document.addEventListener('pointerdown', event => { pressPointer = event.pointerType; if (event.pointerType === 'mouse' && cueTarget(event)) sound.play('cursor'); }, true);
 document.addEventListener('click', event => { if (event.detail > 0 && pressPointer !== 'mouse' && cueTarget(event) && !inputHeld(event)) sound.play('cursor'); }, true);
-// Audio starts (and comes back from iOS's 'interrupted') on user-activation events: a lifted finger, a click, a key. Never while Sound is off.
-for (const type of ['pointerup', 'click', 'keydown']) document.addEventListener(type, () => { if (profile.sound) sound.unlock(); }, { capture: true, passive: true });
+// Audio starts (and comes back from iOS's 'interrupted') on user-activation events: a lifted finger, a click, a key. Never while Sound effects and Music are both off.
+// The music starts on the same activations (it never autoplays before one).
+for (const type of ['pointerup', 'click', 'keydown']) document.addEventListener(type, () => { if (profile.sound || music.enabled) { sound.unlock(); syncMusic(); } }, { capture: true, passive: true });
 const titleScreenEl = $('title-screen');
 const leavePressPhase = () => { if (!titleScreenEl.classList.contains('press-phase')) return false; titleScreenEl.classList.remove('press-phase'); sound.unlock(); sound.play('confirm'); requestAnimationFrame(() => $('title-enter').focus({ preventScroll: true })); return true; };
 // PRESS START ends on the click itself, not on pointerdown: a touch's compatibility click lands where the finger was, and leaving on
@@ -3636,7 +3674,8 @@ pressable($<HTMLButtonElement>('pause'), pauseMenu);
 $('combat-boons').addEventListener('click', showBoonTray);
 $('howto').addEventListener('click', () => help());
 $('settings').addEventListener('click', () => settings());
-$('sound').addEventListener('click', () => { profile.sound = !profile.sound; updateSound(); });
+// The ♫ button mutes (or brings back) both Sound effects and Music.
+$('sound').addEventListener('click', () => { const on = !(profile.sound || music.enabled); setMusic(on); profile.sound = on; updateSound(); });
 pressable($<HTMLButtonElement>('guard'), () => battle.guard());
 pressable($<HTMLButtonElement>('potion'), usePotion);
 pressable($<HTMLButtonElement>('ultimate'), () => battle.ultimate());
@@ -3831,7 +3870,7 @@ const exposeQaHook = () => { if (import.meta.env.DEV) Object.assign(window, { gr
   get runBoons() { return runBoons; },
   setRunBoons: (b: string[]) => { runBoons = [...b]; battle.boons = [...b]; updateExpedition(); },
   step: (seconds: number) => { for (let t = 0; t < Math.min(600, Math.max(0, seconds)); t += 1 / 60) battle.tick(1 / 60); frame(1); },
-  boot, get scene() { return scene; }, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro, recruitScene: (id: number) => recruitScene(id, true), campScenes: () => playCampScenes(true), endingScene,
+  boot, get scene() { return scene; }, music: () => music.state(), showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro, recruitScene: (id: number) => recruitScene(id, true), campScenes: () => playCampScenes(true), endingScene,
   /** Force the first-battle coach on (tips replay from the start) or off, regardless of automation and Config. */
   coach: (force = true) => { coachForced = force; if (force) resetCoach(); else if (coach.step) endCoachStep(); return { step: coach.step ?? null, done: COACH_STEPS.filter(coachDone) }; },
   /** Ask before a Story departure with free party slots even under automation (`on = false`: back to skipping it there). */
