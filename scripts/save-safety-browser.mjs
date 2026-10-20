@@ -5,6 +5,8 @@
 // warning, a Journal choice re-renders the Journal, and another tab's commit makes this tab read-only. On a phone (390×844, touch) Save
 // files offers Copy backup as text and Paste backup on the web build too, notes the backup time, and the backup reminder closes with 'Not now'.
 import assert from 'node:assert/strict';
+// Every Page.reload marks the old document first and waits for a new one: under load the old page stays live until the reload commits.
+// Only backup (JSON) blobs are counted: the town art's PNG blob (townSceneURL) may land after the stub on a freshly loaded page.
 import { withBrowser } from './browser-harness.mjs';
 
 const url = process.env.GRIDBOUND_URL || 'http://127.0.0.1:5180/';
@@ -31,8 +33,8 @@ await withBrowser(async ({ send, wait, evaluate, click, screenshot, errors }) =>
   await evaluate(`indexedDB.deleteDatabase('gridbound.commanders.r1'); localStorage.clear(); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(seed)}))`);
   const raw = await evaluate("localStorage.getItem('gridbound.v3')");
   const reload = async () => {
-    await send('Page.reload');
-    await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
+    await evaluate('window.__beforeReload = true'); await send('Page.reload');
+    await wait('!window.__beforeReload && window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
     await wait(`${status()}.startsWith("Saved")`, 15000);
   };
 
@@ -64,7 +66,7 @@ await withBrowser(async ({ send, wait, evaluate, click, screenshot, errors }) =>
   assert.equal((await evaluate(docs)).length, 1, 'no Commander was created');
 
   // (iii) The backup download is real JSON that Import save restores as a new Commander.
-  await evaluate('window.__blobs = []; const create = URL.createObjectURL; URL.createObjectURL = blob => { window.__blobs.push(blob); return create(blob); }');
+  await evaluate('window.__blobs = []; const create = URL.createObjectURL; URL.createObjectURL = blob => { if (blob.type === "application/json") window.__blobs.push(blob); return create(blob); }');
   await evaluate('document.querySelector("dialog[open]").close()');
   await click('#settings');
   await wait('Boolean(document.querySelector("dialog[open] #export-save"))');
@@ -156,14 +158,14 @@ await withBrowser(async ({ send, wait, evaluate, click, screenshot }) => {
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")', 20000);
   await evaluate(`indexedDB.deleteDatabase('gridbound.commanders.r1'); localStorage.clear(); localStorage.setItem('qa.failPut', '1'); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(seed)}))`);
-  await send('Page.reload');
-  await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
+  await evaluate('window.__beforeReload = true'); await send('Page.reload');
+  await wait('!window.__beforeReload && window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
   assert.equal((await evaluate(docs)).length, 0, 'the migration could not be written');
   assert.match(await evaluate(status()), /quota/i, 'the failure is shown');
   const baseline = await evaluate(progress());
   assert.deepEqual({ cleared: baseline.cleared, gold: baseline.gold }, { cleared: 5, gold: 4321 }, 'the live progress is the legacy save');
 
-  await evaluate('window.__blobs = []; const create = URL.createObjectURL; URL.createObjectURL = blob => { window.__blobs.push(blob); return create(blob); }');
+  await evaluate('window.__blobs = []; const create = URL.createObjectURL; URL.createObjectURL = blob => { if (blob.type === "application/json") window.__blobs.push(blob); return create(blob); }');
   await click('#settings');
   await wait('Boolean(document.querySelector("dialog[open] #export-save"))');
   await click('#export-save');
@@ -236,8 +238,8 @@ await withBrowser(async ({ send, wait, evaluate, click }) => {
   await send('Page.navigate', { url });
   await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")', 20000);
   await evaluate(`indexedDB.deleteDatabase('gridbound.commanders.r1'); localStorage.clear(); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(seed)}))`);
-  await send('Page.reload');
-  await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
+  await evaluate('window.__beforeReload = true'); await send('Page.reload');
+  await wait('!window.__beforeReload && window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
   await wait(`${status()}.startsWith("Saved")`);
   const toChapter = async () => {
     await click.nav('campaign');
@@ -320,8 +322,8 @@ await withBrowser(async ({ send, wait, evaluate, click }) => {
   await evaluate(`localStorage.clear(); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(seed)}))`);
   const legacy = () => evaluate("(() => { const p = JSON.parse(localStorage.getItem('gridbound.v3')); return { cleared: p.cleared.length, gold: p.gold, crystal: p.economy.commanderCrystal }; })()");
   for (let visit = 0; visit < 2; visit++) {
-    await send('Page.reload');
-    await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
+    await evaluate('window.__beforeReload = true'); await send('Page.reload');
+    await wait('!window.__beforeReload && window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
     await wait(`${status()}.startsWith("Browser storage limited")`);
     const live = await evaluate(progress());
     assert.deepEqual({ cleared: live.cleared, gold: live.gold }, { cleared: 5, gold: 4321 }, `visit ${visit + 1} migrates the mirrored save`);
@@ -332,7 +334,7 @@ await withBrowser(async ({ send, wait, evaluate, click }) => {
     await click.nav('camp');
   }
   // Switching language would reload a session-only Commander away; its Export button downloads the real document.
-  await evaluate('window.__blobs = []; const create = URL.createObjectURL; URL.createObjectURL = blob => { window.__blobs.push(blob); return create(blob); }');
+  await evaluate('window.__blobs = []; const create = URL.createObjectURL; URL.createObjectURL = blob => { if (blob.type === "application/json") window.__blobs.push(blob); return create(blob); }');
   await click('#settings');
   await wait('Boolean(document.querySelector(\'dialog[open] [data-lang="id"]\'))');
   await click('dialog[open] [data-lang="id"]');
@@ -352,8 +354,8 @@ await withBrowser(async ({ send, wait, evaluate, click }) => {
   await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")', 20000);
   await evaluate(`localStorage.clear(); localStorage.setItem('qa.hang', '1'); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(seed)}))`);
   const raw = await evaluate("localStorage.getItem('gridbound.v3')");
-  await send('Page.reload');
-  await wait('Boolean(document.querySelector("#town-screen:not([hidden]) .town-spot") && document.querySelector("canvas"))', 20000);
+  await evaluate('window.__beforeReload = true'); await send('Page.reload');
+  await wait('!window.__beforeReload && Boolean(document.querySelector("#town-screen:not([hidden]) .town-spot") && document.querySelector("canvas"))', 20000);
   await wait('Object.keys(localStorage).some(k => k.startsWith("gridbound.v3.backup-"))', 10000);
   assert.equal(await evaluate('localStorage.getItem(Object.keys(localStorage).find(k => k.startsWith("gridbound.v3.backup-")))'), raw, 'the raw save is backed up before it is rewritten');
   // (The HUD sound button is hidden on phone widths, so toggle it in Settings.)
@@ -372,8 +374,8 @@ await withBrowser(async ({ send, wait, evaluate, click }) => {
   await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")', 20000);
   await evaluate(`new Promise(resolve => { const request = indexedDB.deleteDatabase('gridbound.commanders.r1'); request.onsuccess = request.onerror = request.onblocked = () => resolve(); })`);
   await evaluate("localStorage.clear(); localStorage.setItem('gridbound.v3', '{invalid')");
-  await send('Page.reload');
-  await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
+  await evaluate('window.__beforeReload = true'); await send('Page.reload');
+  await wait('!window.__beforeReload && window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
   assert.equal((await evaluate(docs)).length, 0, 'a corrupt save is not migrated at boot');
   await click('.town-spot[data-open-action="profiles"]');
   await wait('Boolean(document.querySelector("dialog[open] #continue-mine"))');
@@ -406,8 +408,8 @@ await withBrowser(async ({ send, wait, evaluate, click, touch }) => {
   await wait('window.gridbound && document.querySelector("#town-screen:not([hidden])")', 20000);
   await evaluate(`new Promise(resolve => { const request = indexedDB.deleteDatabase('gridbound.commanders.r1'); request.onsuccess = request.onerror = request.onblocked = () => resolve(); })`);
   await evaluate(`localStorage.clear(); localStorage.setItem('gridbound.v3', JSON.stringify(${JSON.stringify(seed)}))`);
-  await send('Page.reload');
-  await wait('window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
+  await evaluate('window.__beforeReload = true'); await send('Page.reload');
+  await wait('!window.__beforeReload && window.gridbound && document.querySelector("#town-screen:not([hidden]) .town-spot")', 20000);
   await wait(`${status()}.startsWith("Saved")`, 15000);
   const saveFiles = async () => { await click('#menu-button'); await wait('Boolean(document.querySelector(".more-scene"))'); await touch.tap('.more-scene [data-open-action="profiles"]'); await wait('Boolean(document.querySelector("dialog[open] #import-text-button"))'); };
   await saveFiles();

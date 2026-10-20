@@ -277,7 +277,8 @@ function pageLib(cfg) {
         if (a.el.contains(b.el) || b.el.contains(a.el) || a.layer !== b.layer || a.el.closest('[role=group], .tabs, .lang-switch, .title-lang, .battle-view-tabs') && a.el.parentElement === b.el.parentElement) continue;
         const gx = Math.max(0, b.rect.left - a.rect.right, a.rect.left - b.rect.right), gy = Math.max(0, b.rect.top - a.rect.bottom, a.rect.top - b.rect.bottom);
         const gap = gx > 0 && gy > 0 ? Math.hypot(gx, gy) : Math.max(gx, gy);
-        if (gap < 8) K3.push({ sel: textOf(a.el) || describe(a.el), text: textOf(b.el) || describe(b.el), gap: Math.round(gap * 10) / 10 });
+        // 8px less sub-pixel noise: at a fractional device scale (Pixel 7: 2.625) an 8px flex gap between fractional-width cards reads 7.99.
+        if (gap < 7.9) K3.push({ sel: textOf(a.el) || describe(a.el), text: textOf(b.el) || describe(b.el), gap: Math.round(gap * 10) / 10 });
       }
       // L7: nested vertical scrollers shorter than 40% of the viewport while their content is taller (report).
       const L7 = [...root.querySelectorAll('*')].filter(e => /auto|scroll/.test(cs(e).overflowY) && e.scrollHeight > e.clientHeight + 4 && e.clientHeight > 0 && e.clientHeight < H * 0.4 && visible(e) && !e.closest('#unit-layer, .start-overlay')).map(e => ({ sel: describe(e), text: `${e.clientHeight}px of ${e.scrollHeight}px` }));
@@ -415,10 +416,11 @@ class Phone {
   async settle({ min = 250, quiet = 350, max = 3000 } = {}) {
     const start = Date.now(); await sleep(min);
     while (Date.now() - start < max) {
-      let s; try { s = await this.evaluate(`(() => { const q = window.__phoneQA; if (!q) return { away: true }; const g = window.gridbound, b = g && g.battle; return { idle: performance.now() - q.last, styleIdle: performance.now() - q.lastStyle, fighting: Boolean(g && !g.inTown && b && b.status === 'fighting' && !document.querySelector('dialog[open]')) }; })()`); } catch { await sleep(150); continue; }
+      let s; try { s = await this.evaluate(`(() => { const q = window.__phoneQA; if (!q) return { away: true }; const g = window.gridbound, b = g && g.battle; return { idle: performance.now() - q.last, styleIdle: performance.now() - q.lastStyle, fighting: Boolean(g && !g.inTown && b && b.status === 'fighting' && !document.querySelector('dialog[open]')), entering: document.getAnimations().some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)) }; })()`); } catch { await sleep(150); continue; }
       if (s.away) return;
       if (s.fighting) { if (Date.now() - start > 700) return; await sleep(100); continue; }
-      if (s.idle >= quiet && (s.styleIdle >= quiet || Date.now() - start > 1500)) return;
+      // One-shot entrances (Web Animations, e.g. the talent cards' scale(.94)) end first: a rect read mid-entrance is not the layout.
+      if (s.idle >= quiet && (s.styleIdle >= quiet || Date.now() - start > 1500) && !s.entering) return;
       await sleep(90);
     }
   }

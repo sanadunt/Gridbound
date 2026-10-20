@@ -59,6 +59,8 @@ export class BattleScene extends Phaser.Scene {
   this.dragon=this.add.image(300,200,'dragon-0').setScale(2.28).setDepth(5);
   this.threats=this.add.graphics().setDepth(7);this.fx=this.add.graphics().setDepth(20);this.flashRect=this.add.rectangle(300,380,600,760,0xffffff,0).setDepth(45);this.resetEnemyDeathAnimation();this.syncHeroes();
  }
+ /** create() has run (the engine's first step): from then on a new battle goes through replace(), which builds its hero sprites. */
+ get created(){return Boolean(this.floor);}
  replace(battle:Battle){this.tweens.killAll();for(const child of [...this.children.list])if('depth' in child && Number(child.depth)>=17)child.destroy();this.fx=this.add.graphics().setDepth(20);this.flashRect=this.add.rectangle(300,380,600,760,0xffffff,0).setDepth(45);this.hitStop=0;this.bossKick=0;this.introLeft=0;this.victoryAge=0;this.pulse=0;this.shake=0;this.bossCue=undefined;this.dragId=-1;this.dragPoint=undefined;this.hoverSlot=-1;this.battle=battle;this.heroes.forEach(s=>s.destroy());this.heroes.clear();this.enemies.forEach(s=>s.destroy());this.enemies.clear();this.particles=[];this.flashes.clear();this.attacks.clear();this.accumulator=0;this.timeScale=1;this.resetHitStats();this.resetEnemyDeathAnimation();this.syncHeroes();}
  private resetHitStats(){this.hits.reset();this.shakeUsed=0;this.lastStop=-9;}
  /** Add screen shake within a per-second budget so dense fights do not shake constantly; `force` (ultimate, KO, break) ignores the budget. */
@@ -138,6 +140,8 @@ export class BattleScene extends Phaser.Scene {
    for(const dx of [0,137])for(const dy of [0,105])this.floor.fillStyle(selected?0xdfc486:0x70836a).fillRect(p.x+dx,p.y+dy,7,2).fillRect(p.x+dx,p.y+dy,2,7);
    if(this.hoverSlot===i){this.floor.fillStyle(0xe1ce93,.22).fillRect(p.x,p.y,144,112);this.floor.lineStyle(2,0xefdeb0).strokeRect(p.x,p.y,144,112);}
    if(h){
+    // A hero without a sprite (a battle handed over without replace()) gets one here instead of breaking the frame.
+    if(!this.heroes.has(h.id))this.syncHeroes();
     const pos=center(i),image=this.heroes.get(h.id)!;let x=pos.x,y=pos.y-HERO_LIFT;
     const attack=this.attacks.get(h.id)??0;if(attack>0){this.attacks.set(h.id,attack-dt);if(!this.reducedMotion)y-=Math.sin(Math.min(1,attack/.34)*Math.PI)*26;}
     if(this.victoryAge>0&&h.hp>0&&!this.reducedMotion)y-=Math.abs(Math.sin((this.victoryAge*2.6+h.id*.37)*Math.PI))*18;

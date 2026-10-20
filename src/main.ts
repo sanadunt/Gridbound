@@ -3661,8 +3661,9 @@ async function keepAwake(on: boolean) {
 function applyMotion() { if (scene) scene.reducedMotion = !motionOn(); document.body.classList.toggle('reduced-motion', !motionOn()); }
 applyMotion();
 reduceMotionQuery.addEventListener('change', applyMotion);
-/** Point the arena at the current battle: a created scene replaces its sprites; one still loading draws it in its create(). */
-function arenaBattle() { if (initialized) scene!.replace(battle); else if (scene) scene.battle = battle; }
+/** Point the arena at the current battle: through replace() (which builds the hero sprites) once its create() ran (also when the loop fell asleep before the first frame was
+ *  rendered, so `initialized` is still false), else by reference for create() to draw. */
+function arenaBattle() { if (scene?.created) scene.replace(battle); else if (scene) scene.battle = battle; }
 let engineReady: Promise<void> | undefined;
 /** Phaser renders a frame once the smoothed frame time reaches 1000/limit ms: a cap of exactly 60 skipped every other frame of a 60 Hz screen
  *  (16.66 ms falls just short of 16.67 by rounding), so the cap sits at 61, which still holds a 120 Hz screen to 60 frames and a 90 Hz one to 45. */

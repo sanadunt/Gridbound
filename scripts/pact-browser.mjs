@@ -148,6 +148,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   await wait('Boolean(document.querySelector(".endless-rules"))');
   await fits('Mobile Sunken Bell');
 
+  // The button enters at scale(.96) (a one-shot Web Animation): measure it once that has finished.
+  await evaluate('Promise.all(document.querySelector(\'[data-depart="endless"]\').getAnimations().map(a => a.finished)).then(() => true)');
   const endlessDepartHeight = await evaluate('document.querySelector(\'[data-depart="endless"]\').getBoundingClientRect().height');
   assert.ok(endlessDepartHeight >= 44, `Endless depart button height must be >= 44px, got ${endlessDepartHeight}`);
 
