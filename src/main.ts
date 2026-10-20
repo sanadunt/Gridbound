@@ -37,7 +37,8 @@ import { COACH_STEPS, Coach, coachEnabled, coachDone, markCoach, resetCoach, set
 import { actArt, starRow } from './ui/world-map';
 import { playDialogue, paginate, CHOICE_INPUT_DELAY_MS, type DialoguePage } from './ui/dialogue';
 import { DANGER_CONTROLS, INPUT_DELAY_MS, TOWN_HELD, TOWN_SPEND, holdInput, inputHeld, keepDangerOff, pressHeld } from './ui/input-guard';
-import { fullscreenAvailable, fullscreenEscape, fullscreenOn, installEmbedGuards, installFullscreen, standaloneApp, toggleFullscreen } from './ui/embed';
+import { fullscreenAvailable, fullscreenEscape, fullscreenOn, installEmbedGuards, installFullscreen, playUpright, standaloneApp, toggleFullscreen, uprightAvailable } from './ui/embed';
+import { installTurnCard } from './ui/turn-card';
 import { ARENA, cell } from './render/arena';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
@@ -346,14 +347,16 @@ let backGuard: BackGuard | undefined;
 const DISCARD_GRACE_MS = 60_000;
 /** The fight was paused while the player looked away, without its menu yet: the menu opened later resumes it on close. */
 let awayPaused = false;
+/** The Turn card (ui/turn-card.ts), installed with the phone life-cycle below: while it shows, nothing resumes a fight. */
+let turnCard: { shown(): boolean } | undefined;
 /** The screen wake lock held while a battle is on screen (keepAwake). */
 let wakeLock: WakeLockSentinel | null = null, wakeWanted = false, wakeAsking = false;
 /** First-battle coach state (see coachFrame). */
 let coachForced = false, coachThreat = -1, coachHero = -1, coachUntil = 0;
 const coach = new Coach(document.body, () => { skipCoach(); endCoachStep(); }, coachLayout);
 /** Where a coach tip may sit (ui/coach.ts): the band between the threat panel and the front row, then the focus bar's place (or, with
- *  the focus bar hidden on a short phone, the strip under the grid); in landscape the column beside the arena. Never on a hero card or the
- *  boss HP bar, at most 92% of the arena wide. */
+ *  the focus bar hidden on a short phone, the strip under the grid). Never on a hero card or the boss HP bar, at most 92% of the arena
+ *  wide. */
 function coachLayout(): CoachLayout {
   const rect = (el: Element | null) => el?.getBoundingClientRect() ?? new DOMRect();
   const arena = rect($('arena')), stage = rect($('arena-stage')), intel = rect(document.querySelector('.arena-intel')), tray = rect(document.querySelector('.action-bar'));
@@ -364,12 +367,9 @@ function coachLayout(): CoachLayout {
   const focus = document.getElementById('focus-bar'), focusShown = Boolean(focus && focus.offsetHeight > 0);
   const lowest = cards.length ? Math.max(...cards.map(r => r.bottom)) : arena.bottom;
   const under = focusShown ? new DOMRect(arena.left, rect(focus).top - 4, arena.width, tray.top - rect(focus).top + 2) : new DOMRect(arena.left, lowest + 2, arena.width, tray.top - lowest - 4);
-  const landscape = window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches;
-  const sideTop = intel.bottom + 6;
   return {
     regions: [new DOMRect(arena.left, bandTop, arena.width, frontRow - 2 - bandTop), under],
     avoid: [...cards, rect(document.querySelector('.boss-meter'))],
-    side: landscape && tray.left > arena.right ? new DOMRect(tray.left, sideTop, tray.width, tray.top - 6 - sideTop) : undefined,
     maxWidth: Math.max(200, arena.width * .92),
   };
 }
@@ -462,7 +462,6 @@ $('app').innerHTML = `
     </aside>
   </main>
   <main id="result-screen" class="result-screen" aria-labelledby="result-title" hidden></main>
-  <p class="rotate-hint" aria-hidden="true">${t('rotate.hint')}</p>
   <footer id="storage-status" class="storage-status" role="status"></footer>
   <div id="battle-announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <dialog id="modal" aria-labelledby="modal-title"></dialog>`;
@@ -2177,8 +2176,7 @@ function renderBossStatus() {
   });
 }
 /** Banners belong in the boss area, but on short phones the intel band (statuses + intent) overlays the arena top and its
- *  counter text matters most while a warning banner shows: keep the banner just below the band (when it lies over the arena, not beside
- *  it in landscape), inside the visible part of the stage and above the front row. The spot (px from the stage's top) is measured when a
+ *  counter text matters most while a warning banner shows: keep the banner just below the band (when it lies over the arena), inside the visible part of the stage and above the front row. The spot (px from the stage's top) is measured when a
  *  banner shows and when the stage or the band resizes (stageResize), never after a frame's HUD writes (they would force a layout). */
 let bannerSpot: number | undefined;
 function placeBanner() {
@@ -2327,7 +2325,9 @@ modal.addEventListener('close', () => {
   // parent, pause and focus return this late event must not reset.
   if (modal.open) return;
   modalParent = undefined; modal.dataset.blocking = '';
-  if (resumeOnClose && !inTown && battle.status === 'paused') battle.pause(); resumeOnClose = false;
+  // Under the Turn card the fight stays paused (a Back that closed its menu there): the menu comes back when the phone is upright.
+  if (resumeOnClose && !inTown && battle.status === 'paused') { if (turnCard?.shown()) awayPaused = true; else battle.pause(); }
+  resumeOnClose = false;
   syncEngine();
   const back = modalReturn; modalReturn = null;
   if (back?.isConnected && !back.closest('[hidden],[inert]') && (document.activeElement === document.body || modal.contains(document.activeElement))) back.focus({ preventScroll: true });
@@ -3609,7 +3609,7 @@ function pauseAway(menu = true) {
   renderPause();
 }
 /** Back from a blur (the window has the focus again, or the page is shown): the pause menu that waited for the player. */
-function showAwayMenu() { if (awayPaused && !inTown && battle.status === 'paused' && !modal.open) renderPause(); }
+function showAwayMenu() { if (awayPaused && !inTown && battle.status === 'paused' && !modal.open && !turnCard?.shown()) renderPause(); }
 // A browser that gives the window no focus event on return: the player's first touch shows the waiting menu (its tap hold drops that tap).
 document.addEventListener('pointerdown', () => { if (awayPaused) showAwayMenu(); }, true);
 /** The page went to the background (visibilitychange → hidden, pagehide, freeze): pause, settle a won or lost battle whose result waited
@@ -3643,6 +3643,16 @@ document.addEventListener('resume', pageShown);
 // A blur that leaves no element of this document focused (focus moves inside the page refocus it at once) is the player looking away.
 window.addEventListener('blur', () => { window.setTimeout(() => { if (!document.hasFocus()) pauseAway(false); }, 0); });
 window.addEventListener('focus', showAwayMenu);
+// L6, portrait only: a phone held sideways shows the Turn card over everything. A live fight pauses behind it without its menu (the menu
+// would sit hidden under the card); turned upright again, the menu the fight waits behind opens (as after a blur, C2), nothing resumes.
+turnCard = installTurnCard({
+  pause: () => pauseAway(false),
+  restored: showAwayMenu,
+  fight: () => !inTown && (battle.status === 'fighting' || battle.status === 'paused'),
+  canUpright: uprightAvailable,
+  upright: playUpright,
+  back: () => { if (!escapeHandled) goBack('escape'); },
+});
 /** C6: while a battle is on screen (ready, fighting or paused) the screen stays on where the browser allows it; refused in the itch frame
  *  (no screen-wake-lock in its allow list: not even asked), on battery saver or a hidden page, silently. The browser drops it on hide. */
 async function keepAwake(on: boolean) {

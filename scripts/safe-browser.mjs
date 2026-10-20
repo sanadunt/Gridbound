@@ -13,8 +13,10 @@
 // - reminder: the backup reminder shows in the camp after an act clear (webdriver spoofed: the real player flow), once (I6);
 // - detour: a lost Story battle 4 left through a defeat fix stays resumable as 'Resume CH 1 · battle 4', with the talent bought on the way (C8);
 // - keys: Save files' name field renames with the keyboard's Enter, and 'delete' in any case enables Delete forever (touch-10);
+// - turn: the iPhone 15 held sideways (L6, portrait only): the Turn card pauses a live fight without a menu, hiding/showing/focus/a tap
+//   resume nothing under it, upright again the fight waits behind its menu; a pause menu open as the phone turns stays open under the card;
 // - sound: no AudioContext while Sound is off, and a swipe that starts on a button plays no cue (G10, P11).
-//   SAFE_ONLY=leave|lifecycle|wake|persist|reminder|detour|keys|sound runs some parts. Screenshots: artifacts/phone-wp-safe/.
+//   SAFE_ONLY=leave|lifecycle|turn|wake|persist|reminder|detour|keys|sound runs some parts. Screenshots: artifacts/phone-wp-safe/.
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { withBrowser, seedSave } from './browser-harness.mjs';
@@ -32,8 +34,9 @@ const PHONES = {
   se: { width: 375, height: 667, dpr: 2, ua: 'iphone' },
   p7: { width: 412, height: 915, dpr: 2.625, ua: 'android' },
   i15: { width: 393, height: 852, dpr: 3, ua: 'iphone', insets: { top: 59, bottom: 34 } },
-  land: { width: 852, height: 393, dpr: 3, ua: 'iphone', landscape: true, insets: { left: 59, right: 59, bottom: 21 } },
 };
+/** The iPhone 15 turned sideways (portrait only, L6: the Turn card covers the game). */
+const SIDEWAYS = { width: 852, height: 393, landscape: true, insets: { left: 59, right: 59, bottom: 21 } }, UPRIGHT = { width: 393, height: 852, landscape: false, insets: { top: 59, bottom: 34 } };
 const route = 'document.querySelector(".town-game-shell")?.dataset.townRoute';
 const SPOOF = "Object.defineProperty(navigator, 'webdriver', { get: () => false, configurable: true })";
 const boot = async (h, save, lang = 'en', scripts = []) => {
@@ -87,7 +90,7 @@ const doubleTapLeave = async (h, label, danger) => {
 };
 
 if (runs('leave')) {
-  for (const [phone, lang] of [['a360', 'id'], ['a360', 'en'], ['se', 'en'], ['p7', 'en'], ['p7', 'id'], ['i15', 'en'], ['land', 'en']]) await withBrowser(async h => {
+  for (const [phone, lang] of [['a360', 'id'], ['a360', 'en'], ['se', 'en'], ['p7', 'en'], ['p7', 'id'], ['i15', 'en']]) await withBrowser(async h => {
     await boot(h, MID, lang);
     await departStory(h); await fight(h); await sleep(600);
     const state = await doubleTapLeave(h, `${phone} ${lang} Story`, 'abandon-run');
@@ -124,7 +127,7 @@ if (runs('leave')) {
     assert.deepEqual(h.errors, [], 'no console errors');
   }, { phone: PHONES[phone] });
   // The Undercroft's 'Flee the room…' (half the pouch) and a Bell Trials 'Leave battle…' (the run) take the same care.
-  for (const [phone, lang] of [['a360', 'id'], ['land', 'en']]) await withBrowser(async h => {
+  for (const [phone, lang] of [['a360', 'id'], ['i15', 'en']]) await withBrowser(async h => {
     await boot(h, MID, lang);
     await h.click.nav('dungeon');
     await h.click('[data-dungeon-pick="1"]'); await h.wait('Boolean(document.querySelector("#modal [data-dungeon-start]"))');
@@ -140,7 +143,7 @@ if (runs('leave')) {
     await h.screenshot(`${out}/flee-double-${phone}-${lang}.png`);
     assert.deepEqual(h.errors, [], 'no console errors');
   }, { phone: PHONES[phone] });
-  for (const [phone, lang] of [['a360', 'en'], ['a360', 'id'], ['i15', 'en'], ['land', 'en']]) await withBrowser(async h => {
+  for (const [phone, lang] of [['a360', 'en'], ['a360', 'id'], ['i15', 'en']]) await withBrowser(async h => {
     await boot(h, MID, lang);
     await h.click.nav('endless');
     await h.click('[data-depart="endless"]');
@@ -197,6 +200,45 @@ if (runs('lifecycle')) await withBrowser(async h => {
   assert.deepEqual(h.errors, [], 'no console errors');
   console.log('PASS lifecycle: blur away, hidden, pagehide and freeze pause; a blur inside does not; nothing resumes on return; a hidden page settles a won battle');
 }, { phone: PHONES.a360 });
+
+// L6 + C1–C3 with the phone held sideways: the Turn card pauses a live fight without a menu (it would sit hidden under the card), hiding the
+// page and coming back while sideways resumes nothing and opens nothing, and turned upright the fight waits behind its pause menu. A pause
+// menu open when the phone turns stays open under the card (and comes back as it was); Escape there closes it but the fight stays paused.
+if (runs('turn')) await withBrowser(async h => {
+  await boot(h, MID, 'en');
+  await departStory(h); await fight(h); await sleep(400);
+  const state = () => h.evaluate(`({ status: window.gridbound.battle.status, menu: Boolean(document.querySelector('dialog[open] #pause-retreat')), open: document.querySelector('#modal').open, card: getComputedStyle(document.getElementById('turn-card')).display !== 'none', fight: document.querySelector('#turn-card .turn-fight').getBoundingClientRect().width > 0, inert: document.getElementById('app').inert })`);
+  await h.setPhone(SIDEWAYS);
+  await h.wait('window.gridbound.battle.status === "paused"');
+  await sleep(300);
+  assert.deepEqual(await state(), { status: 'paused', menu: false, open: false, card: true, fight: true, inert: true }, 'sideways: paused under the card, no menu, the card says the battle waits');
+  await h.screenshot(`${out}/turn-fight-sideways.png`);
+  const t0 = await h.evaluate('window.gridbound.battle.time');
+  // Hidden and shown again while sideways, the window's focus back: nothing resumes and no menu opens under the card.
+  const setHidden = hidden => h.evaluate(`Object.defineProperty(document, 'hidden', { get: () => ${hidden}, configurable: true }); Object.defineProperty(document, 'visibilityState', { get: () => ${hidden ? "'hidden'" : "'visible'"}, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); true`);
+  await setHidden(true); await sleep(300); await setHidden(false);
+  await h.evaluate("window.dispatchEvent(new Event('focus')); true");
+  await h.touch.tap({ x: 426, y: 300 }); await sleep(800);
+  assert.deepEqual(await state(), { status: 'paused', menu: false, open: false, card: true, fight: true, inert: true }, 'hidden, shown and tapped sideways: still paused, no menu');
+  assert.equal(await h.evaluate('window.gridbound.battle.time'), t0, 'the battle clock stands still under the card');
+  // Upright: the menu the fight waits behind (C2), nothing resumed.
+  await h.setPhone(UPRIGHT);
+  await h.wait('Boolean(document.querySelector("dialog[open] #pause-retreat"))', 5000);
+  await sleep(300);
+  assert.deepEqual(await state(), { status: 'paused', menu: true, open: true, card: false, fight: false, inert: false }, 'upright: the pause menu, still paused');
+  // A pause menu open as the phone turns stays open under the card; Escape sideways (Back passes through) closes it, the fight stays paused,
+  // and upright again the menu waits once more.
+  await h.setPhone(SIDEWAYS); await h.wait(`getComputedStyle(document.getElementById('turn-card')).display !== 'none'`); await sleep(300);
+  assert.deepEqual(await state(), { status: 'paused', menu: true, open: true, card: true, fight: true, inert: true }, 'sideways over the pause menu: it stays open under the card');
+  await h.key('Escape'); await sleep(400);
+  assert.deepEqual(await state(), { status: 'paused', menu: false, open: false, card: true, fight: true, inert: true }, 'Escape under the card closes the menu, the fight stays paused');
+  await h.setPhone(UPRIGHT);
+  await h.wait('Boolean(document.querySelector("dialog[open] #pause-retreat"))', 5000);
+  await h.touch.tap('dialog[open] .menu-list [data-close]');
+  await h.wait('window.gridbound.battle.status === "fighting"');
+  assert.deepEqual(h.errors, [], 'no console errors');
+  console.log('PASS turn: sideways the Turn card pauses a fight without a menu; hide/show/focus resume nothing; upright the fight waits behind its menu');
+}, { phone: PHONES.i15 });
 
 /** navigator.wakeLock stand-in: counts requests and the sentinels held; `reject` refuses every request like the itch frame or battery saver. */
 const wakeStub = reject => `(() => { const log = window.__wake = { requests: 0, held: 0, last: null }; Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request: async type => { log.requests++; if (${reject}) throw new DOMException('Wake Lock permission request denied', 'NotAllowedError'); const listeners = []; const s = { type, released: false, addEventListener: (name, f) => { if (name === 'release') listeners.push(f); }, release: async () => { if (s.released) return; s.released = true; log.held--; listeners.forEach(f => f()); } }; log.held++; log.last = s; return s; } } }); })()`;

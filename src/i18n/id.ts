@@ -830,7 +830,11 @@ export const ID: Record<keyof typeof EN, string> = {
   // navigation
   'hud.back': 'Kembali',
   'hud.back.to': 'Kembali ke {name}',
-  'rotate.hint': 'Putar ponselmu tegak untuk tampilan terbaik.',
+  'turn.title': 'Putar ponselmu ke posisi tegak',
+  'turn.body': 'Gridbound dimainkan tegak.',
+  'turn.body.fight': 'Pertarunganmu menunggu, dijeda.',
+  'turn.upright': 'Main tegak',
+  'turn.locked': 'Halaman ini menahan layar menyamping. Keluar dari layar penuh, lalu putar ponselmu.',
   'battle.menu': 'Menu',
   'ready.back': 'Kembali',
   'ready.back.hint': 'Belum ada yang terpakai sebelum {begin}',

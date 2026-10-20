@@ -78,10 +78,33 @@ function rememberFullscreen(on: boolean) { try { localStorage.setItem(FULLSCREEN
 export function fullscreenWanted() { try { return localStorage.getItem(FULLSCREEN_KEY) === '1'; } catch { return false; } }
 const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 type LockableOrientation = ScreenOrientation & { lock?: (orientation: string) => Promise<void>; unlock?: () => void };
-/** Enter fullscreen and, on a phone, ask for portrait (best effort: a desktop or a refusing browser rejects, which is ignored). */
+/** Lock the screen upright: resolves to whether the browser agreed (a desktop, iPhone, a frame without the right or a browser that holds
+ *  the screen sideways itself refuses), never throws. */
+async function lockPortrait(orientation = 'portrait') {
+  const lock = (screen.orientation as LockableOrientation | undefined)?.lock;
+  if (typeof lock !== 'function') return false;
+  try { await lock.call(screen.orientation, orientation); return true; } catch { return false; }
+}
+/** Enter fullscreen and, on a phone, ask for portrait. Resolves to `{ locked }`: whether the portrait lock held (false on a desktop, which
+ *  is never asked, and wherever the browser refuses). */
 async function enterFullscreen() {
   await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-  if (coarse()) try { await (screen.orientation as LockableOrientation | undefined)?.lock?.('portrait')?.catch?.(() => {}); } catch { /* no orientation lock */ }
+  return { locked: coarse() ? await lockPortrait() : false };
+}
+/** A lock is possible here: fullscreen is available, the browser has an orientation lock and the page is not an installed app (which the
+ *  manifest already holds upright). The Turn card offers Play upright only then. */
+export const uprightAvailable = () => fullscreenAvailable() && typeof (screen.orientation as LockableOrientation | undefined)?.lock === 'function' && !standaloneApp();
+/** Play upright (the Turn card, needs a user gesture): fullscreen on this document — also nested inside a host's fullscreen (itch's
+ *  frame has allow="fullscreen") — then the portrait lock. When the lock is refused, a fullscreen this call entered is left again (it
+ *  would only hide the browser's controls on a sideways screen). Resolves to `{ locked }`, never throws. */
+export async function playUpright() {
+  const entered = !document.fullscreenElement;
+  try { if (entered) await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); }
+  catch (error) { console.warn('Fullscreen:', error); return { locked: false }; }
+  const locked = await lockPortrait('portrait-primary');
+  if (!locked && entered && document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+  else if (locked) rememberFullscreen(true);
+  return { locked };
 }
 /** Toggle fullscreen on the whole page (needs a user gesture); resolves to the resulting state and remembers it, never throws. */
 export async function toggleFullscreen() {

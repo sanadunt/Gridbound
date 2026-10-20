@@ -141,6 +141,22 @@ test('phone shell: the root (not body) stops overscroll, sizes never use vh, hov
   }
 });
 
+test('L6 portrait only: no landscape layout anywhere, one 600px column; the Turn card is the only landscape rule and matches ui/turn-card.ts', () => {
+  const failures: string[] = [];
+  for (const file of STYLES) {
+    for (const rule of cssRules(file).filter(r => r.within.some(at => /orientation:\s*landscape/.test(at))))
+      if (!rule.selector.split(',').every(s => s.includes('#turn-card') || s.includes('body.turn-up'))) failures.push(`${file}: ${rule.selector.slice(0, 70)}`);
+    const css = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.doesNotMatch(css, /--app-max|max-width:\s*min\(100vw,\s*1180px\)/, `${file}: the column never widens (one portrait column on every window)`);
+    assert.doesNotMatch(css, /rotate-hint/, `${file}: the rotate hint is gone (the Turn card replaced it)`);
+  }
+  assert.deepEqual(failures, [], 'only the Turn card lives under (orientation: landscape)');
+  const turn = cssRules('src/styles/base.css').filter(r => r.selector.includes('#turn-card') && r.within.length);
+  const query = readFileSync('src/ui/turn-card.ts', 'utf8').match(/TURN_QUERY = '([^']+)'/)![1];
+  assert.ok(turn.length && turn.every(r => r.within.some(at => at.includes(query))), 'the CSS shows the card under the same query that pauses the fight');
+  assert.match(cssRules('src/styles/base.css').find(r => r.selector === ':root')!.body, /--col:\s*600px/, 'the column is 600px');
+});
+
 test('phone shell: safe-area insets pad the game, form controls are 16px on a coarse pointer, the viewport stays zoomable', () => {
   const base = cssRules('src/styles/base.css');
   const root = base.find(r => r.selector === ':root')!.body;

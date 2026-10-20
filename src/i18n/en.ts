@@ -828,8 +828,12 @@ export const EN = {
   // navigation
   'hud.back': 'Back',
   'hud.back.to': 'Back to {name}',
-  // a landscape phone (town and title only, fades by itself)
-  'rotate.hint': 'Turn your phone upright for the best view.',
+  // the Turn card: a phone held sideways (the game plays upright only)
+  'turn.title': 'Turn your phone upright',
+  'turn.body': 'Gridbound plays upright.',
+  'turn.body.fight': 'Your battle waits, paused.',
+  'turn.upright': 'Play upright',
+  'turn.locked': 'This page holds the screen sideways. Leave full screen, then turn your phone.',
   'battle.menu': 'Menu',
   'ready.back': 'Back',
   'ready.back.hint': 'Nothing is spent until you press {begin}',

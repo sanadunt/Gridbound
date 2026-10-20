@@ -29,13 +29,14 @@ export const PROFILES = {
   se: { width: 375, height: 667, bars: 553, dpr: 2, ua: 'iphone', insets: { full: {}, bars: {} } },
   i15: { width: 393, height: 852, bars: 659, dpr: 3, ua: 'iphone', insets: { full: { top: 59, bottom: 34 }, bars: {} } },
   p7: { width: 412, height: 915, bars: 835, dpr: 2.625, ua: 'android', insets: { full: { bottom: 24 }, bars: { bottom: 24 } } },
-  land: { width: 852, height: 393, bars: 343, dpr: 3, ua: 'iphone', landscape: true, insets: { full: { left: 59, right: 59, bottom: 21 }, bars: { left: 59, right: 59, bottom: 21 } } },
+  // Portrait only (L6): `land` plays upright (an iPhone 15) and turns the phone sideways on the TURN screens, where only the Turn card shows.
+  land: { width: 393, height: 852, bars: 659, dpr: 3, ua: 'iphone', insets: { full: { top: 59, bottom: 34 }, bars: {} }, turn: { width: 852, height: 393, insets: { left: 59, right: 59, bottom: 21 } } },
 };
 const SAVES = { fresh: null, mid: MID, late: LATE };
 /** The default matrix (contract §10), else every profile × variant × save × language. */
 const MATRIX = process.env.PHONE_FULL === '1'
   ? Object.keys(PROFILES).flatMap(profile => ['fresh', 'mid', 'late'].flatMap(save => ['en', 'id'].map(lang => ({ profile, variants: ['full', 'bars'], save, lang }))))
-  : [{ profile: 'a360', variants: ['bars'], save: 'mid', lang: 'en' }, { profile: 'a360', variants: ['bars'], save: 'mid', lang: 'id' }, { profile: 'se', variants: ['bars'], save: 'mid', lang: 'en' }, { profile: 'i15', variants: ['full'], save: 'fresh', lang: 'en' }, { profile: 'land', variants: ['full'], save: 'mid', lang: 'en' }];
+  : [{ profile: 'a360', variants: ['bars'], save: 'mid', lang: 'en' }, { profile: 'a360', variants: ['bars'], save: 'mid', lang: 'id' }, { profile: 'se', variants: ['bars'], save: 'mid', lang: 'en' }, { profile: 'i15', variants: ['full'], save: 'fresh', lang: 'en' }, { profile: 'land', variants: ['full'], save: 'mid', lang: 'en' }, { profile: 'land', variants: ['full'], save: 'mid', lang: 'id' }];
 
 /** Every check: the contract rule, its owner package and its mode. */
 const CHECKS = {
@@ -53,7 +54,7 @@ const CHECKS = {
   'K1-battle': { rule: 'hit boxes at least 44×44 in battle (the grid is K2)', owner: 'BATTLE', mode: 'gate' },
   'K3-town': { rule: 'controls at least 8px apart outside battle', owner: 'TOWN', mode: 'gate' },
   'K3-battle': { rule: 'controls at least 8px apart in battle', owner: 'BATTLE', mode: 'gate' },
-  K2: { rule: 'hero cards at least 70×56 (64×50 landscape); the hero zone ≥ 60% of the card and ≥ 32px tall; the chip zone inside its card, ≥ 24px tall; nothing else on a card', owner: 'BATTLE', mode: 'gate' },
+  K2: { rule: 'hero cards at least 70×56; the hero zone ≥ 60% of the card and ≥ 32px tall; the chip zone inside its card, ≥ 24px tall; nothing else on a card', owner: 'BATTLE', mode: 'gate' },
   L7: { rule: 'no nested vertical scroller under 40% of the viewport height', owner: 'TOWN', mode: 'gate' },
   'L8-town': { rule: 'the primary action is on screen on arrival (town, dialogs)', owner: 'TOWN', mode: 'gate' },
   'L8-battle': { rule: 'the primary action is on screen on arrival (battle, results)', owner: 'BATTLE', mode: 'gate' },
@@ -61,7 +62,13 @@ const CHECKS = {
   G7: { rule: 'a quick double tap never presses what the first tap opened (Ⅱ Menu → Leave battle…)', owner: 'SAFE', mode: 'gate' },
   K6: { rule: 'the leave dialog puts the danger last, never where its opener was, and keeps the focus on the safe option', owner: 'SAFE', mode: 'gate' },
   C2: { rule: 'a blur that leaves the page (notification shade, Control Center) pauses a live fight behind its menu', owner: 'SAFE', mode: 'gate' },
+  TURN1: { rule: 'held sideways, the Turn card covers the whole screen (a 3×3 grid of points hits #turn-card)', owner: 'TURN', mode: 'gate' },
+  TURN2: { rule: 'a live fight is paused under the Turn card, and its card says so', owner: 'TURN', mode: 'gate' },
+  TURN3: { rule: 'turned upright again: the card is gone, the same screen is back intact, nothing resumed (a fight waits behind its menu), L3/L5/K1 pass', owner: 'TURN', mode: 'gate' },
+  TURN4: { rule: 'Play upright shows iff fullscreen and an orientation lock exist; a refused lock shows turn.locked', owner: 'TURN', mode: 'gate' },
 };
+/** The screens the `land` combo turns sideways (reached upright through the tour's own steps). */
+const TURN_SCREENS = ['title-menu', 'camp', 'config', 'party', 'gate-map', 'story-intro', 'battle-ready', 'battle-fight'];
 const BATTLE_SCREENS = /^(battle|result|raid-(ready|fight|result)|undercroft-(fight|result)|trials)/;
 
 // ───────────────────────────── in-page library ─────────────────────────────
@@ -178,6 +185,14 @@ function pageLib(cfg) {
     },
     // ready also means past its tap hold (G7): a control that just appeared or moved under the finger ignores taps for a moment.
     ready(sel) { const el = document.querySelector(sel), held = el?.closest('[data-input-until]'); return Boolean(el && visible(el) && !el.disabled && !el.closest('[inert]') && !(held && performance.now() < Number(held.dataset.inputUntil))); },
+    /** The Turn card as the player sees it: shown, the points of a 3×3 grid it does not cover, Play upright, the locked line. */
+    turn() {
+      const card = document.getElementById('turn-card'), W = innerWidth, H = innerHeight, cover = [];
+      const shown = Boolean(card && cs(card).display !== 'none');
+      for (const fx of [0.05, 0.5, 0.95]) for (const fy of [0.05, 0.5, 0.95]) { const e = document.elementFromPoint(fx * W, fy * H); if (!card?.contains(e)) cover.push([Math.round(fx * W), Math.round(fy * H), describe(e)]); }
+      const upright = document.getElementById('turn-upright'), fight = card?.querySelector('.turn-fight');
+      return { shown, cover, upright: Boolean(upright && visible(upright)), fight: Boolean(fight && visible(fight)), locked: norm(document.getElementById('turn-locked')?.textContent), inert: Boolean(document.getElementById('app')?.inert), focus: document.activeElement?.id || document.activeElement?.tagName };
+    },
     /** Red translucent bands over the safe-area insets, for the screenshots only. */
     tint(bands) {
       document.querySelectorAll('.qa-band').forEach(e => e.remove());
@@ -187,7 +202,7 @@ function pageLib(cfg) {
     },
     untint() { document.querySelectorAll('.qa-band').forEach(e => e.remove()); },
     /** Every rule of the contract this test checks, on the screen as it is. */
-    measure({ bands = {}, coarse, landscape, primary = [], battle }) {
+    measure({ bands = {}, coarse, primary = [], battle }) {
       const W = innerWidth, H = innerHeight, { kind, root } = topLayer();
       const scrollers0 = [...document.querySelectorAll('*')].filter(e => e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1).map(e => [e, e.scrollTop, e.scrollLeft]);
       const restore = () => scrollers0.forEach(([e, t, l]) => { if (e.scrollTop !== t) e.scrollTop = t; if (e.scrollLeft !== l) e.scrollLeft = l; });
@@ -298,7 +313,7 @@ function pageLib(cfg) {
       const K2 = [], L10 = [];
       if (battle) for (const card of document.querySelectorAll('#unit-layer .unit-card')) {
         if (!visible(card)) continue;
-        const r = card.getBoundingClientRect(), [mw, mh] = landscape ? [64, 50] : [70, 56];
+        const r = card.getBoundingClientRect(), [mw, mh] = [70, 56];
         if (r.width < mw || r.height < mh) K2.push({ sel: describe(card), text: textOf(card.querySelector('.unit-name') ?? card), size: [Math.round(r.width), Math.round(r.height)] });
         // The card's zones in a fight (no picker open): a 7×28 grid of points hit-tested; the hero zone is its own .unit-tap, the chip zone
         // its own enabled chip; anything else on the card (another card's chip, a lane button) fails. The chip's own reach: up to the HP
@@ -371,7 +386,7 @@ class Phone {
   }
   async emulate(variant) {
     this.variant = variant;
-    await this.setPhone({ height: variant === 'bars' ? this.prof.bars : this.prof.height, insets: this.prof.insets[variant] ?? {} });
+    await this.setPhone({ width: this.prof.width, height: variant === 'bars' ? this.prof.bars : this.prof.height, landscape: false, insets: this.prof.insets[variant] ?? {} });
   }
   async navigate(url) { await this.send('Page.navigate', { url }); await this.waitFor(`document.readyState === 'complete' && location.href.startsWith(${J(url.slice(0, 30))})`, 20000).catch(() => {}); }
   /** A fresh page on the combo's save (cleared storage, the init script for this generation), waiting for the boot. */
@@ -586,7 +601,7 @@ async function measureHere(p, screen, rec, combo) {
   for (const variant of combo.variants) {
     if (variant !== p.variant) { await p.emulate(variant); await sleep(450); await p.settle({ min: 100, quiet: 300, max: 1500 }); }
     const bands = p.prof.insets[variant] ?? {};
-    const opts = { bands, coarse: true, landscape: Boolean(p.prof.landscape), primary: screen.primary ?? [], battle: screen.battle };
+    const opts = { bands, coarse: true, primary: screen.primary ?? [], battle: screen.battle };
     let m;
     try { m = await p.evaluate(`window.__phone.measure(${J(opts)})`); } catch (error) { m = { error: String(error.message).slice(0, 300), results: {} }; }
     const shot = join(dir, `${rec.id}-${variant}.png`);
@@ -599,6 +614,60 @@ async function measureHere(p, screen, rec, combo) {
     rec.variants.push({ variant, shot, layer: m.layer, error: m.error, results: m.results });
   }
   if (p.variant !== combo.variants[0]) { await p.emulate(combo.variants[0]); await sleep(350); await p.settle({ min: 100, quiet: 300, max: 1500 }); }
+}
+
+/** L6 (portrait only): the screen as reached upright, then the phone turned sideways — only the Turn card shows (TURN1), a live fight pauses
+ *  (TURN2), Play upright where a lock may exist (TURN4, once, on the camp) — then upright again: the same screen, intact, nothing resumed, and
+ *  L3/L5/K1 on it (TURN3). Screenshots: <screen>-turn.png (sideways) and <screen>-full.png (back upright). */
+const TURN_LOCKED = { en: 'This page holds the screen sideways. Leave full screen, then turn your phone.', id: 'Halaman ini menahan layar menyamping. Keluar dari layar penuh, lalu putar ponselmu.' };
+async function turnHere(p, screen, rec) {
+  const dir = join(SHOTS, p.tag), turn = p.prof.turn;
+  await mkdir(dir, { recursive: true });
+  const shot = async (name, width, height) => { try { const { data } = await p.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width, height, scale: 2 / p.prof.dpr } }); await writeFile(join(dir, name), Buffer.from(data, 'base64')); } catch {} };
+  const status = () => p.evaluate(`window.gridbound.inTown ? null : window.gridbound.battle.status`);
+  const before = await p.state(), live = await status() === 'fighting', key = s => J({ layer: s.layer, route: s.route, title: s.title, inTown: s.inTown, scene: s.scene, result: s.result, modal: s.modal });
+  await p.setPhone({ width: turn.width, height: turn.height, landscape: true, insets: turn.insets });
+  await sleep(600);
+  const sideways = await p.evaluate('window.__phone.turn()');
+  if (!sideways.shown) p.fail('TURN1', 'held sideways, no Turn card');
+  else if (sideways.cover.length) p.fail('TURN1', `the Turn card does not cover: ${J(sideways.cover)}`);
+  if (sideways.shown && !sideways.inert) p.fail('TURN1', 'the game behind the Turn card is not inert');
+  await shot(`${rec.id}-turn.png`, turn.width, turn.height);
+  if (live) {
+    await sleep(1000);
+    const now = await status();
+    if (now !== 'paused') p.fail('TURN2', `a live fight under the Turn card is ${now}`);
+    if (!sideways.fight) p.fail('TURN2', 'the Turn card does not say the battle waits');
+  }
+  if (screen.id === 'camp') {
+    const can = await p.evaluate(`document.fullscreenEnabled === true && typeof screen.orientation?.lock === 'function'`);
+    if (sideways.upright !== can) p.fail('TURN4', `Play upright ${sideways.upright ? 'shown' : 'hidden'} where a lock ${can ? 'may' : 'cannot'} exist`);
+    if (sideways.upright) {
+      await p.touch.tap('#turn-upright');
+      await p.waitFor(`document.getElementById('turn-locked')?.textContent.length > 0`, 4000).catch(() => {});
+      const after = await p.evaluate('window.__phone.turn()');
+      // Headless Chrome refuses the portrait lock: the card says what holds the screen, the button steps aside, and the fullscreen it entered is left.
+      if (after.locked !== TURN_LOCKED[p.combo.lang] || after.upright) p.fail('TURN4', `a refused lock: ${J(after)}`);
+      if (await p.evaluate('Boolean(document.fullscreenElement)')) p.fail('TURN4', 'a refused lock stayed in fullscreen');
+      await shot(`${rec.id}-turn-locked.png`, turn.width, turn.height);
+    }
+  }
+  await p.emulate(p.variant);
+  await sleep(700); await p.settle({ min: 100, quiet: 300, max: 2500 });
+  const upright = await p.evaluate('window.__phone.turn()'), back = await p.state();
+  if (upright.shown) p.fail('TURN3', 'turned upright, the Turn card is still there');
+  const expected = live ? { ...before, modal: true, layer: 'modal' } : before;
+  if (key(back) !== key(expected)) p.fail('TURN3', `the screen changed: ${key(before)} → ${key(back)}`);
+  if (live && (await status() !== 'paused' || !await p.evaluate(`Boolean(document.querySelector('dialog[open] #pause-retreat'))`))) p.fail('TURN3', `the fight did not wait behind its menu: ${await status()}`);
+  if (!live && J(before.battle) !== J(back.battle)) p.fail('TURN3', `the battle changed: ${J(before.battle)} → ${J(back.battle)}`);
+  const bands = p.prof.insets[p.variant] ?? {};
+  let m;
+  try { m = await p.evaluate(`window.__phone.measure(${J({ bands, coarse: true, primary: [] })})`); } catch (error) { m = { error: String(error.message).slice(0, 300), results: {} }; }
+  const results = m.results ?? {};
+  for (const [raw, id] of [['L3', 'TURN3'], ['L5', 'TURN3'], ['K1', 'TURN3']]) for (const item of results[raw] ?? []) p.fail(id, `${raw}: ${J(item).slice(0, 180)}`);
+  await shot(`${rec.id}-${p.variant}.png`, p.prof.width, p.variant === 'bars' ? p.prof.bars : p.prof.height);
+  rec.turn = { sideways, upright: { shown: upright.shown }, before: key(before), after: key(back) };
+  rec.variants = [{ variant: p.variant, layer: m.layer, error: m.error, results: {} }];
 }
 
 /** The check id a raw result belongs to on this screen (T1/K1/K3/L8 are split between TOWN and BATTLE). BATTLE owns the battle screen
@@ -638,10 +707,11 @@ async function runCombo(combo) {
       }
       let needReset = false;
       const tour = TOUR.filter(s => !s.saves || s.saves.includes(combo.save));
-      const wanted = new Set(tour.filter(s => selected(s.id)).flatMap(s => [s.id, ...(s.needs ?? [])]));
+      const measured = s => selected(s.id) && (!prof.turn || TURN_SCREENS.includes(s.id));
+      const wanted = new Set(tour.filter(measured).flatMap(s => [s.id, ...(s.needs ?? [])]));
       for (const screen of tour) {
         if (!wanted.has(screen.id)) { if (screen.reset || screen.after === 'reset') needReset = true; continue; }
-        const measure = selected(screen.id);
+        const measure = measured(screen);
         const rec = { id: screen.id };
         const errorsBefore = h.errors.length;
         p.notes.length = 0; p.checks = {};
@@ -653,7 +723,7 @@ async function runCombo(combo) {
           await p.settle({ min: 200 });
           if (screen.name) rec.id = await screen.name(p);
           rec.state = await p.state();
-          await measureHere(p, screen, rec, combo);
+          if (prof.turn) await turnHere(p, screen, rec); else await measureHere(p, screen, rec, combo);
         } catch (error) {
           rec.error = String(error.message || error).slice(0, 300);
           needReset = true;
@@ -671,7 +741,7 @@ async function runCombo(combo) {
         } catch { needReset = true; }
       }
     } catch (error) { out.fatal = String(error.stack || error).slice(0, 500); log(tag, 'FATAL', error.message); }
-  }, { phone: { width: prof.width, height: combo.variants[0] === 'bars' ? prof.bars : prof.height, dpr: prof.dpr, ua: prof.ua, landscape: Boolean(prof.landscape), insets: prof.insets[combo.variants[0]] ?? {} } });
+  }, { phone: { width: prof.width, height: combo.variants[0] === 'bars' ? prof.bars : prof.height, dpr: prof.dpr, ua: prof.ua, insets: prof.insets[combo.variants[0]] ?? {} } });
   return out;
 }
 

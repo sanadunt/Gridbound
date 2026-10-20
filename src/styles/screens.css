@@ -227,11 +227,11 @@
 .party-scene > .deploy-bar, .secondary-scene > .deploy-bar { position: static; padding: 0; background: none; }
 .party-scene > *, .secondary-scene > * { flex-shrink: 0; }
 .party-scene > .training-panel, .secondary-scene > .secondary-content { flex-shrink: 1; }
-/* Phones, and a phone held sideways (contract L6/L7): the whole Party route scrolls (no nested panel); the hero collapses to a one-line sticky
+/* Phones (contract L7): the whole Party route scrolls (no nested panel); the hero collapses to a one-line sticky
    header with the tabs, and Depart stays at the bottom. The Raid and Bell Trials setups and the Quest Board scroll as one page too, their
    departure bar stuck to the bottom. */
 .sheet-line { display: none; }
-@media (max-width: 480px), (orientation: landscape) and (max-height: 500px) {
+@media (max-width: 480px) {
   .town-scene > .party-scene { overflow-y: auto; scroll-padding-top: 120px; scroll-padding-bottom: 96px; gap: 8px; }
   .party-scene > .training-panel { flex: none; min-height: 0; overflow: visible; }
   .town-scene > .secondary-scene { overflow-y: auto; scroll-padding-bottom: 96px; }
@@ -249,8 +249,6 @@
   .party-scene > .deploy-bar { position: sticky; bottom: -10px; z-index: 5; margin: 0 -10px -10px; padding: 8px 10px 10px; background: linear-gradient(180deg, transparent, var(--night) 30%); }
   .party-roster button img { width: 28px; height: 30px; }
 }
-/* A phone held sideways: the hero header scrolls away with the page, so the panel keeps the height between the HUD and Depart. */
-@media (orientation: landscape) and (max-height: 500px) { .party-sticky { position: static; } }
 @media (max-height: 700px) {
   .training-identity img { width: 44px; height: 48px; }
   .training-identity p { display: none; }

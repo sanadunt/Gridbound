@@ -424,10 +424,10 @@ for (const viewport of [{ width: 1280, height: 900, mobile: false, tag: 'desktop
 
 // The depth dossier on short phones (the browser bars shown): Back and Descend share one sticky row, both on screen and hit at their centre
 // when it opens (no scrolling), on depths 1 and 5; a touch on Descend after its hold starts the run. The row stays one button tall even when
-// the tapped depth card sat where the row lands (K6 never puts a margin on Descend there: it stretched the row to 130px held sideways).
-const PHONES = [[375, 667], [393, 782], [360, 640], [393, 852, { top: 59, bottom: 34 }], [852, 343, { left: 59, right: 59, bottom: 21 }, true]];
+// the tapped depth card sat where the row lands (K6 never puts a margin on Descend there: it would stretch the row). Portrait only (L6).
+const PHONES = [[375, 667], [393, 782], [360, 640], [393, 852, { top: 59, bottom: 34 }]];
 const late = { ...qaProfile, roster: [0, 4, 3, 2], cleared: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], journey: { ...qaProfile.journey, depth: 4 } };
-for (const [width, height, insets = {}, landscape = false] of PHONES) for (const depth of [1, 5]) {
+for (const [width, height, insets = {}] of PHONES) for (const depth of [1, 5]) {
   await withBrowser(async ({ send, wait, evaluate, click, touch, screenshot, errors }) => {
     await seedSave(send, late, 'en');
     await send('Page.navigate', { url });
@@ -449,7 +449,7 @@ for (const [width, height, insets = {}, landscape = false] of PHONES) for (const
     await wait('window.gridbound.profile().journey.run?.status === "active"');
     await wait(openRoomsInView, 2000).catch(() => assert.fail(`${width}×${height}: after Descend the open rooms are on screen`));
     assert.deepEqual(errors, []);
-  }, { phone: { width, height, dpr: 2, ua: width === 360 ? 'android' : 'iphone', insets, landscape } });
+  }, { phone: { width, height, dpr: 2, ua: width === 360 ? 'android' : 'iphone', insets } });
 }
 console.log('PASS Undercroft dossier and run map on short phones (L8/L9)');
 console.log('PASS dungeon browser');

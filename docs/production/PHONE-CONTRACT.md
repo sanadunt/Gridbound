@@ -1,6 +1,6 @@
 # Gridbound phone contract (v1)
 
-> **Status: plan and acceptance target, not a description of shipped behaviour** (see "Documentation boundaries" in `CLAUDE.md`; `src/` is the authority). The phone shell package (SHELL: L1–L5, the touch rules G1–G3 and G9, the 16px form fields and the rotate hint of L6) is implemented and its checks are gates in `scripts/phone-browser.mjs`. The SAFE package (§6 C1–C8, G7 for dialogs and town, G10, K6, I4–I6 without the Home Screen advice, P11) is implemented too: `scripts/phone-browser.mjs` gates G7, K6 and C2 on its tour and `scripts/safe-browser.mjs` checks the rest on emulated phones (the iPhone audio session and a real OS tab discard are manual device checks). The other packages' rules (TOWN, BATTLE, INSTALL, PERF) are targets that `phone-browser` lists in `report` mode until their package lands.
+> **Status: plan and acceptance target, not a description of shipped behaviour** (see "Documentation boundaries" in `CLAUDE.md`; `src/` is the authority). The phone shell package (SHELL: L1–L5, the touch rules G1–G3 and G9, the 16px form fields) is implemented and its checks are gates in `scripts/phone-browser.mjs`; L6 is now *Portrait only* (P1 of the HADES direction: the landscape layouts and the rotate hint are gone, a phone held sideways gets the Turn card, gated as TURN1–TURN4). The SAFE package (§6 C1–C8, G7 for dialogs and town, G10, K6, I4–I6 without the Home Screen advice, P11) is implemented too: `scripts/phone-browser.mjs` gates G7, K6 and C2 on its tour and `scripts/safe-browser.mjs` checks the rest on emulated phones (the iPhone audio session and a real OS tab discard are manual device checks). The other packages' rules (TOWN, BATTLE, INSTALL, PERF) are targets that `phone-browser` lists in `report` mode until their package lands.
 
 Why this exists: the owner wrote "Aku main di HP sihh, karena fokus gamenya kan di HP. Bisa sesuaikan?" ("I play on my phone, since the game's focus is the phone. Can you adapt it?"). The phone is the primary platform and desktop is secondary. We don't know which phone or which host the owner uses, so the contract covers **Android Chrome and iPhone Safari**, on **the web build and the itch.io frame**.
 
@@ -48,14 +48,14 @@ These are the profiles that `scripts/phone-browser.mjs` uses (ids as written):
 | `se` | iPhone SE | 375×667 | 375×553 | 2 | iPhone Safari | none | none | The shortest portrait we support. |
 | `i15` | iPhone 15 | 393×852 | 393×659 | 3 | iPhone Safari | top 59, bottom 34 | none | Full = installed or standalone; bars = Safari. |
 | `p7` | Pixel 7 (large Android) | 412×915 | 412×835 | 2.625 | Android Chrome | bottom 24 | bottom 24 | |
-| `land` | iPhone 15 landscape | 852×393 | 852×343 | 3 | iPhone Safari | left/right 59, bottom 21 | same | The phone held sideways. |
+| `land` | iPhone 15 turned sideways | 393×852 upright, 852×393 turned | — | 3 | iPhone Safari | top 59, bottom 34 upright; left/right 59, bottom 21 turned | — | The phone held sideways: the Turn card covers it (L6, TURN1–TURN4). |
 | `itch` | itch mobile full-screen frame | 390×844 | — | 1 (cross-origin frame input quirk) | Android | 0 (inside the frame) | — | Covered by `scripts/itch-smoke.mjs`. |
 | `embed` | itch desktop embed | 540×900 | — | 1 | desktop | — | — | Existing. |
 | `desk` | Desktop | 1280×900 | — | 1 | desktop | — | — | Regression: desktop must keep working. |
 
-- **Support floor.** Portrait 360×553 CSS px and larger. Anything narrower (320px, and `gui-layout-smoke` at 180×370) is best effort: no horizontal overflow and nothing unreachable. Landscape phones must work from 640×340 up.
+- **Support floor.** Portrait 360×553 CSS px and larger. Anything narrower (320px, and `gui-layout-smoke` at 180×370) is best effort: no horizontal overflow and nothing unreachable. Landscape phones get the Turn card (L6): no screen is laid out sideways.
 - **Engines.** Android Chrome 111+ and iOS Safari 16.4+. The CSS already needs container queries, `:has`, `dvh` and `color-mix`; Screen Wake Lock needs 16.4. Older engines are not supported, and no finding is filed for them.
-- **Test matrix.** Every rule is checked on `a360`, `se`, `i15`, `p7` and `land`, in the *full* and *bars* variants, in EN. ID is checked at `a360` and `i15`. Every text-fit rule (L5, L8, T1–T5, K1) runs in both languages at `a360` and `se`.
+- **Test matrix.** Every rule is checked on `a360`, `se`, `i15` and `p7`, in the *full* and *bars* variants, in EN; `land` checks the Turn card (TURN1–TURN4) in EN and ID. ID is checked at `a360` and `i15`. Every text-fit rule (L5, L8, T1–T5, K1) runs in both languages at `a360` and `se`.
 - **Real devices.** Real iOS Safari, Android gesture navigation, pull-to-refresh, long-press menus and iOS input zoom cannot be produced in headless Chrome. They are on the manual checklist (§10), and their rules are also backed by static CSS tests.
 
 ---
@@ -69,14 +69,15 @@ These are the profiles that `scripts/phone-browser.mjs` uses (ids as written):
   - The overlays positioned `inset: 0` inside `#app` (`.title-screen`, `.result-screen`, `.dialogue-scene`) fill the padding box. They keep their art full-bleed but pad their own content and controls by the insets (for example, Skip gets `top: calc(10px + var(--safe-t))` and `right: calc(10px + var(--safe-r))`).
   - `dialog#modal`: `max-height: calc(100dvh - 32px - var(--safe-t) - var(--safe-b))`, `width: min(calc(100vw - 24px - var(--safe-l) - var(--safe-r)), 540px)`.
   - Floating layers (`.storage-status`, the coach bubble, `.town-notice`, `#skill-picker`, `#skill-toast`) stay inside the inset rectangle.
-- **L3 Test.** With `Emulation.setSafeAreaInsetsOverride` set for the profile, no enabled interactive control (`button`, `a[href]`, `summary`, `select`, `input`, `textarea`, `label` that wraps a control, `[role=button]`, `.unit-card`), and no text of the HUD bar, battle top bar, action bar or a sticky footer, intersects an inset band (0.5px tolerance). This covers `#home`, `#menu-button`, `#settings`, `#pause`, `.cmd`, `#start`, `#ready-back`, `.deploy-bar .btn`, `.ceremony-actions .btn`, `[data-nav-exit]` and `[data-continue-story]`. Bands: `i15` full top 59 and bottom 34; `a360`/`p7` bottom 24; `land` left/right 59 and bottom 21.
+- **L3 Test.** With `Emulation.setSafeAreaInsetsOverride` set for the profile, no enabled interactive control (`button`, `a[href]`, `summary`, `select`, `input`, `textarea`, `label` that wraps a control, `[role=button]`, `.unit-card`), and no text of the HUD bar, battle top bar, action bar or a sticky footer, intersects an inset band (0.5px tolerance). This covers `#home`, `#menu-button`, `#settings`, `#pause`, `.cmd`, `#start`, `#ready-back`, `.deploy-bar .btn`, `.ceremony-actions .btn`, `[data-nav-exit]` and `[data-continue-story]`. Bands: `i15` full top 59 and bottom 34; `a360`/`p7` bottom 24 (a phone held sideways shows only the Turn card, which pads itself by the insets).
 - **L4 Viewport units.** Sizes use `dvh`, `svh`, `%` or container units. `vh` never appears in `src/styles` (static test). `vw` is allowed, because width does not change with the bars.
 - **L5 No horizontal page scroll.** On every screen and profile, `document.documentElement.scrollWidth <= innerWidth + 1`. No element's box crosses the viewport's left or right edge unless it sits inside a horizontal scroller.
-- **L6 One portrait column, and landscape.** `--col` 600px on every size. On a landscape phone (`(pointer: coarse) and (orientation: landscape) and (max-height: 500px)`):
-  - every town route scrolls as one page, and its sticky footer stays reachable;
-  - the battle uses its side-by-side layout with the arena sized by height and the intent panel beside it, not over the boss;
-  - town routes and the title show a one-line, non-blocking hint, "Turn your phone upright for the best view". It is never shown over a fight, fades by itself (shown again only on the next turn to landscape, never after a fight), and ignores taps (`pointer-events: none`).
-  - Orientation is locked to portrait only when the game is in fullscreen (I1) or installed (I2).
+- **L6 Portrait only.** The game is one portrait column (`--col` 600px) on every window shape: a phone, a tablet held sideways, a laptop (1280×720, 1366×768), itch's desktop full screen, a 960×600 embed. Never two columns, never a side-by-side layout. On a window wider than the column it is centred at full height with a static vignette in the gutters (no blur, no animation), and the battle arena sizes itself by the height that remains.
+  - A phone held sideways (`(pointer: coarse) and (orientation: landscape) and (max-height: 500px)`) shows only the **Turn card** (`#turn-card`, `src/ui/turn-card.ts`), from the first paint: a pixel phone turning upright, "Turn your phone upright", and "Your battle waits, paused." when a battle is on screen. It covers the whole screen (also over an open dialog: it is the topmost modal dialog) and makes the game behind it inert.
+  - A live fight pauses under it without its menu; nothing resumes when the phone turns back: the pause menu waits, as after a blur (C2). The screen beneath is the same, intact.
+  - Back passes through: Escape, Backspace and the phone's Back take their normal Back step on the screen beneath (the card is no navigation layer).
+  - **Play upright** shows only where fullscreen and `screen.orientation.lock` exist and the game is not an installed app: fullscreen on the game's document (nested in a host's fullscreen too), then a `portrait-primary` lock. A refused lock says "This page holds the screen sideways. Leave full screen, then turn your phone." and leaves the fullscreen it entered.
+  - Orientation is locked to portrait in the game's own fullscreen (I1) and in the installed app (I2). On itch.io, Orientation: Portrait is mandatory (itch locks the phone to that setting when it launches the game; `docs/ITCH.md`).
 - **L7 One scroller per route.** A route scrolls as a whole, or as one main list. No nested vertical scroller is shorter than 40% of the viewport height while its content is taller. This bans the 118px training panel. A dialog scrolls as one.
 - **L8 The primary action is visible on arrival.** On every profile, including *bars*, the screen's primary action is fully on screen when the screen opens, without any scrolling, and `elementFromPoint` at its centre returns it (or a descendant):
 
@@ -136,7 +137,7 @@ Phones change the type scale by moving small labels from the pixel font to the b
 
 - **K1 Size.** Every visible, enabled control has an effective hit box of at least **44×44 CSS px**. That includes the dialog ×, `<details>` summaries, Bestiary T1–T4 chips, language buttons, Quest buttons, Undercroft room nodes, the coach's Skip, checkbox rows (the whole label row is the target), and the skill book's I/II. The only exception is the battle grid (K2).
 - **K2 Battle grid** (dense by design):
-  - At every portrait profile, including *bars*, each hero card is at least **70×56 CSS px** (at least 64×50 in landscape).
+  - At every profile, including *bars*, each hero card is at least **70×56 CSS px**.
   - The card's hero zone (points that hit `.unit-tap`) covers at least 60% of the card and is at least 32px tall.
   - The skill chip's hit zone stays inside its own card: its top no higher than the HP bar, its bottom no more than 2px past the card. It is at least 24px tall.
   - A drag can start anywhere on the card.
@@ -210,7 +211,7 @@ Phones change the type scale by moving small labels from the pixel font to the b
 | **C2** Window blur with the document unfocused (notification shade, Control Center, a tap on the itch host page) | A live fight pauses. |
 | **C3** Return to the page | Nothing resumes by itself: the pause menu waits for Resume. Sound comes back, including iOS's `interrupted` state. The wake lock is requested again while a battle is on screen. |
 | **C4** OS discard or reload of a backgrounded tab | It never costs more than the checkpoint. A backgrounded Undercroft fight restarts the room at the noted HP and potions with the pouch intact, and a notice says so. A reload while the tab was visible keeps the anti-reload flee penalty. |
-| **C5** Rotation | No state is lost. The layout recovers, the fight keeps its state, and neither orientation scrolls horizontally. |
+| **C5** Rotation | No state is lost. Turned sideways the Turn card covers the screen and pauses a live fight (L6); turned back the same screen is intact and nothing scrolls horizontally. |
 | **C6** Screen auto-lock | While a battle is on screen (ready, fighting or paused), the game holds a screen wake lock where allowed (refused in the itch frame and on battery saver: ignored silently). The lock is released in town and on results. |
 | **C7** Back/forward cache | The production build stays bfcache-eligible in Chrome. Never add an `unload` handler. |
 | **C8** A detour after a defeat | A lost Story battle k (k > 1) left through a defeat fix or Return stays resumable as 'Resume CH n · battle k'. If that cannot be kept, leaving asks first, with 'Retry this battle' focused. |
@@ -221,7 +222,7 @@ Phones change the type scale by moving small labels from the pixel font to the b
 
 - **I1 Fullscreen.**
   - Config offers Fullscreen wherever `document.fullscreenEnabled` is true: the web build on Android, and itch with `allow="fullscreen"`. It never appears on iPhone, which has no element fullscreen.
-  - On a coarse pointer, entering fullscreen asks for a portrait lock (best effort, errors ignored).
+  - On a coarse pointer, entering fullscreen asks for a portrait lock; whether it held is returned (`enterFullscreen()` → `{ locked }`). A phone held sideways where a lock is possible is offered **Play upright** on the Turn card (L6).
   - The choice is remembered per viewer (`gridbound.ui.fullscreen`) and requested again on the next real tap after a reload or after the page is shown again. Fullscreen dropped while the page is hidden (an app switch, the shade) is not the player's 'off'.
   - Leaving fullscreen with the phone's Back or Escape takes no game Back step and does not pop the history guard.
 - **I2 Installable (web build only).**
@@ -287,7 +288,7 @@ Phones change the type scale by moving small labels from the pixel font to the b
   - It asserts the rules in the table below.
   - Each check carries its owner package and a mode: `gate` fails the run, `report` only lists. A package flips its own checks to `gate` when it lands; at the end all are `gate`.
   - `PHONE_ONLY=<profile|screen regex>` narrows a run, `PHONE_FULL=1` runs the whole matrix, and screenshots go to `artifacts/phone/<profile>-<save>-<lang>/<screen>-<variant>.png`.
-  - The default matrix (in `test:browser`) is: `a360` bars EN and ID (mid save), `se` bars EN (mid), `i15` full with insets EN (fresh), and `land` EN (mid).
+  - The default matrix (in `test:browser`) is: `a360` bars EN and ID (mid save), `se` bars EN (mid), `i15` full with insets EN (fresh), and `land` EN and ID (mid): its short tour (title, camp, Config, Party, map, story intro, ready window, fight) is reached upright and turned sideways on each screen for TURN1 (the Turn card covers a 3×3 grid of `elementFromPoint`), TURN2 (a live fight is paused and the card says so), TURN3 (upright again: the card is gone, the same screen, nothing resumed, L3/L5/K1 pass) and TURN4 (`#turn-upright` iff `fullscreenEnabled` and `screen.orientation.lock`; headless refuses the lock, so its press shows the locked line).
 
   | Rule | Check | Owner |
   |---|---|---|
@@ -308,10 +309,11 @@ Phones change the type scale by moving small labels from the pixel font to the b
   | G7 | Double tap: Potion | BATTLE |
   | C1–C6 | Life-cycle | SAFE |
   | I1–I6 | Install and storage | INSTALL |
+  | TURN1–TURN4 | The Turn card (L6) | TURN |
   | P1–P11 | Performance | PERF (in perf-browser.mjs) |
 
 - **Static checks (CI, `npm test`):**
-  - `tests/health.test.ts`: pixel font at least 10px; px fonts at least 12px apart from the allowlist; no `vh`; `overscroll-behavior` on `html`; the coarse-pointer 16px form rule; `:hover` only inside `(hover: hover)`.
+  - `tests/health.test.ts`: pixel font at least 10px; px fonts at least 12px apart from the allowlist; no `vh`; `overscroll-behavior` on `html`; the coarse-pointer 16px form rule; `:hover` only inside `(hover: hover)`; no `orientation: landscape` query outside the `#turn-card` block and the column never widens (L6).
   - `tests/itch.test.ts`: no manifest or app tags in the itch build.
   - `tests/node-hosting.test.ts`: compression and the manifest MIME type.
   - `tests/dungeon.test.ts`: the background interrupt path.
@@ -322,6 +324,7 @@ Phones change the type scale by moving small labels from the pixel font to the b
     - a downward swipe on the camp HUD and on a Quests list at its top never reloads;
     - Guard, Potion and Depart clear the gesture bar;
     - Fullscreen on and off with Back;
+    - itch.io Run game stays upright; turned sideways the Turn card shows and a fight pauses; Play upright locks portrait inside itch's full screen (or says the page holds it sideways);
     - install from the browser menu;
     - long press on the camp shows no image menu;
     - a 120Hz phone stays cool in town.

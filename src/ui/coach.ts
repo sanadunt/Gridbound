@@ -23,9 +23,9 @@ export function skipCoach() { flags().done = [...COACH_STEPS]; save(); }
 /** QA: forget which tips were shown. */
 export function resetCoach() { flags().done = []; save(); }
 
-/** Where the bubble may go: candidate regions (in order), rectangles it must never cover (hero cards, the boss HP bar), and in landscape
- *  the column beside the arena (`side`). Viewport coordinates. */
-export type CoachLayout = { regions: DOMRect[]; avoid: DOMRect[]; side?: DOMRect; maxWidth: number };
+/** Where the bubble may go: candidate regions (in order) and rectangles it must never cover (hero cards, the boss HP bar). Viewport
+ *  coordinates. */
+export type CoachLayout = { regions: DOMRect[]; avoid: DOMRect[]; maxWidth: number };
 const overlaps = (a: DOMRect, b: DOMRect) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
 
 /** The tip bubble: a short line (two lines at most) with an arrow at the control it is about, and a Skip button. It never blocks drags
@@ -57,10 +57,9 @@ export class Coach {
   }
   hide() { this.step = undefined; this.target = undefined; this.el.hidden = true; document.body.classList.remove('coaching'); }
   /** Place the bubble (G1 of the battle package): in the first candidate region where it fits without covering a hero card, the boss HP
-   *  bar or its target (the band between the threat panel and the front row, the focus bar's place, the column beside the arena in
-   *  landscape: the nearest that fits; beside a card on the arena's side in landscape); else above the target (below it when there is no room). The arrow points at the target: a stem reaches it when the bubble is away.
-   *  Everything stays inside the game's safe rectangle (#app's content box: the viewport less the notch, the home indicator and a
-   *  landscape phone's sides). */
+   *  bar or its target (the band between the threat panel and the front row, the focus bar's place: the nearest that fits); else above
+   *  the target (below it when there is no room). The arrow points at the target: a stem reaches it when the bubble is away.
+   *  Everything stays inside the game's safe rectangle (#app's content box: the viewport less the notch and the home indicator). */
   place() {
     const target = this.target?.();
     if (this.el.hidden || !target) return;
@@ -68,29 +67,20 @@ export class Coach {
     const app = document.getElementById('app'), frame = app?.getBoundingClientRect() ?? host, pad = app ? getComputedStyle(app) : undefined, px = (v?: string) => parseFloat(v ?? '') || 0;
     const minX = Math.max(0, frame.left + px(pad?.paddingLeft) - host.left), maxX = Math.min(host.width, frame.right - px(pad?.paddingRight) - host.left), minY = Math.max(0, frame.top + px(pad?.paddingTop) - host.top);
     const cx = box.left + box.width / 2 - host.left, cy = box.top + box.height / 2 - host.top, layout = this.layout?.();
-    const put = (left: number, top: number, width: number, mode: 'above' | 'below' | 'side', len: number) => {
+    const put = (left: number, top: number, width: number, mode: 'above' | 'below', len: number) => {
       this.el.classList.toggle('below', mode === 'below');
-      this.el.classList.toggle('side', mode === 'side');
       this.el.style.width = `${Math.round(width)}px`;
       this.el.style.left = `${Math.round(left)}px`;
       this.el.style.top = `${Math.round(top)}px`;
       this.el.style.setProperty('--arrow-len', `${Math.max(0, Math.round(len))}px`);
       this.el.style.setProperty('--arrow-x', `${Math.round(Math.max(14, Math.min(width - 14, cx - left)))}px`);
-      this.el.style.setProperty('--arrow-y', `${Math.round(Math.max(14, Math.min(this.el.offsetHeight - 14, cy - top)))}px`);
     };
     const sized = (width: number) => { this.el.style.width = `${Math.round(width)}px`; return this.el.offsetHeight; };
     if (layout) {
       const free = (r: DOMRect) => !layout.avoid.some(a => overlaps(r, a)) && !overlaps(r, box);
-      // Landscape: the column beside the arena, level with a target on the arena side (a hero card).
-      const side = layout.side;
-      if (side && box.right <= side.left) {
-        const width = Math.min(layout.maxWidth, side.width - 16), h = sized(width), left = side.left - host.left + 8;
-        const top = Math.max(side.top - host.top, Math.min(side.bottom - host.top - h, cy - h / 2));
-        if (h <= side.height) { put(left, top, width, 'side', left - (box.right - host.left) - 9); return; }
-      }
       // The fitting region nearest the target wins (ties keep the given order): a tray tip sits over the focus bar, a card tip in the band.
       const gap = (r: DOMRect) => Math.max(0, r.top - box.bottom, box.top - r.bottom) + Math.max(0, r.left - box.right, box.left - r.right);
-      const regions = [...layout.regions, ...(side ? [side] : [])].map((r, i) => ({ r, i, d: gap(r) })).sort((a, b) => a.d - b.d || a.i - b.i).map(x => x.r);
+      const regions = layout.regions.map((r, i) => ({ r, i, d: gap(r) })).sort((a, b) => a.d - b.d || a.i - b.i).map(x => x.r);
       for (const r of regions) {
         const width = Math.min(layout.maxWidth, r.width - 8, maxX - minX - 16);
         if (width < 120) continue;

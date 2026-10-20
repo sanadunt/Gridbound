@@ -193,11 +193,17 @@ export async function withBrowser(run, { width = 1440, height = 1000, mobile = f
       const current = { dpr: 3, ua: 'android', insets: {}, landscape: false, ...phone };
       const { windowId } = await send('Browser.getWindowForTarget');
       await send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'normal' } }).catch(() => {});
-      await send('Browser.setWindowBounds', { windowId, bounds: { width: Math.max(current.width, 400) + 40, height: Math.max(current.height, 400) + 140 } });
+      // The window only grows (a rotation in place needs room for both shapes: touches outside the window are never delivered).
+      const bounds = { width: 0, height: 0 }, fit = async () => {
+        const want = { width: Math.max(bounds.width, Math.max(current.width, 400) + 40), height: Math.max(bounds.height, Math.max(current.height, 400) + 140) };
+        if (want.width !== bounds.width || want.height !== bounds.height) { Object.assign(bounds, want); await send('Browser.setWindowBounds', { windowId, bounds: want }); }
+      };
+      await fit();
       await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
       await send('Emulation.setUserAgentOverride', PHONE_UA[current.ua] ?? PHONE_UA.android);
       setPhone = async (changes = {}) => {
         Object.assign(current, changes);
+        await fit();
         await send('Emulation.setDeviceMetricsOverride', { width: current.width, height: current.height, deviceScaleFactor: current.dpr, mobile: true, screenOrientation: current.landscape ? { type: 'landscapePrimary', angle: 90 } : { type: 'portraitPrimary', angle: 0 } });
         const insets = { top: 0, right: 0, bottom: 0, left: 0, ...current.insets };
         try { await send('Emulation.setSafeAreaInsetsOverride', { insets }); phone.insetsOverride = true; } catch (error) { phone.insetsOverride = String(error.message).slice(0, 160); }

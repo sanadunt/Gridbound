@@ -10,9 +10,9 @@
 // - no 'GSAP target … not found' warning during a real (webdriver spoofed) town walk, where the free-slot question also shows unforced.
 // - a quick double tap on Promote or on Buy & equip (Pixel 7, real touches) acts once (phone contract G7);
 // - phone contract L8/L9/G8 (TOWN, part `phone`): at 375×553 a tapped job card's Promote and a tapped item's Buy & equip are on screen and hit
-//   at their centre above the sticky Depart bar; at 390×844 a tab switch starts at the top while an equip keeps the scroll; at 852×393
-//   (landscape) Party scrolls as one page and Depart is hit-testable at its end; a Crystal Exchange ware only opens its inspector (nothing
-//   spent) and its Buy spends once;
+//   at their centre above the sticky Depart bar; at 390×844 a tab switch starts at the top while an equip keeps the scroll; held sideways
+//   (844×390) the Turn card covers Jobs, which is inert under it (nothing spent), upright again the same tab, and Back passes through it;
+//   a Crystal Exchange ware only opens its inspector (nothing spent) and its Buy spends once;
 // TOWN_ONLY=party|depart|jobs|doubletap|claim|menu|journal|gsap|phone|shots runs one part; screenshots go to artifacts/town-flows/.
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -443,20 +443,42 @@ if (runs('phone')) await withBrowser(async tools => {
 }, { phone: { width: 390, height: 844, dpr: 2, ua: 'android' } });
 
 if (runs('phone')) await withBrowser(async tools => {
-  const { wait, evaluate, click, touch, screenshot, errors } = tools;
+  const { wait, evaluate, click, touch, key, screenshot, setPhone, errors } = tools;
   await boot(tools, phoneSave);
-  for (const [route, tab] of [['party', 'gear'], ['party-advanced', 'jobs']]) {
-    await click.nav(route);
-    await touch.tap(`[data-training-tab="${tab}"]`);
-    await wait(`Boolean(document.querySelector('[data-training-panel="${tab}"]'))`);
-    // Landscape: the route scrolls as one page (no nested panel), and Depart stays reachable at its end.
-    assert.deepEqual(await evaluate(`(() => { const s = document.querySelector('.town-scene > .party-scene'), p = document.querySelector('[data-training-panel]'); return [getComputedStyle(s).overflowY, getComputedStyle(p).overflowY]; })()`), ['auto', 'visible'], `852×393 ${tab}: the route scrolls as one`);
-    await evaluate(`document.querySelector('.town-scene > .party-scene').scrollTop = 1e6, true`);
-    await sleep(150);
-    assert.equal(await hitAtCentre(evaluate, '.party-deploy-button'), true, `852×393 ${tab}: Depart is reachable`);
-  }
-  await screenshot(`${out}/party-landscape-852x393.png`);
+  await click.nav('party-advanced');
+  await touch.tap('[data-training-tab="jobs"]');
+  await wait(`Boolean(document.querySelector('[data-training-panel="jobs"]'))`);
+  await evaluate(`document.querySelector('.town-scene > .party-scene').scrollTop = 1e6, true`);
+  await sleep(150);
+  const view = () => evaluate(`(() => { const s = document.querySelector('.town-scene > .party-scene'); return { route: ${route}, tab: document.querySelector('[data-training-panel]')?.dataset.trainingPanel, scroll: Math.round(s.scrollTop), gold: window.gridbound.profile().gold, party: window.gridbound.profile().storyActive.join() }; })()`);
+  const before = await view();
+  // Portrait only (L6): held sideways, the Turn card covers Party; the screen behind it is inert (a tap where Depart would be, Enter and
+  // a job card's keyboard press reach nothing), and Back still walks the route stack beneath it.
+  await setPhone({ width: 844, height: 390, landscape: true, insets: { left: 47, right: 47, bottom: 21 } });
+  await wait(`getComputedStyle(document.getElementById('turn-card')).display !== 'none'`);
+  await sleep(300);
+  const card = await evaluate(`(() => { const c = document.getElementById('turn-card'), miss = []; for (const fx of [.05, .5, .95]) for (const fy of [.05, .5, .95]) { const e = document.elementFromPoint(fx * innerWidth, fy * innerHeight); if (!c.contains(e)) miss.push(e?.className || e?.tagName); } return { miss, inert: document.getElementById('app').inert, title: document.getElementById('turn-title').textContent, focus: c.contains(document.activeElement) }; })()`);
+  assert.deepEqual(card.miss, [], `the Turn card covers the screen: ${JSON.stringify(card)}`);
+  assert.ok(card.inert && card.focus && /upright/i.test(card.title), `Party behind the card is inert and the card has the focus: ${JSON.stringify(card)}`);
+  await screenshot(`${out}/party-turn-844x390.png`);
+  await touch.tap({ x: 422, y: 360 }); await sleep(200);
+  await key('Enter'); await sleep(200);
+  assert.deepEqual({ ...await view(), scroll: 0 }, { ...before, scroll: 0 }, 'nothing on Party moves or spends under the Turn card (the page behind it may re-lay out)');
+  assert.equal(await evaluate(`Boolean(document.querySelector('[data-confirm-job]'))`), false, 'no job inspector opened under the card');
+  await setPhone({ width: 390, height: 844, landscape: false, insets: {} });
+  await wait(`getComputedStyle(document.getElementById('turn-card')).display === 'none' && !document.getElementById('app').inert`);
+  await sleep(300);
+  const after = await view();
+  assert.deepEqual({ ...after, scroll: 0 }, { ...before, scroll: 0 }, 'upright again: the same route and tab, nothing spent');
+  assert.equal(await hitAtCentre(evaluate, '.party-deploy-button'), true, 'upright again: Depart is reachable');
+  // Back passes through the card: held sideways, Escape walks Party → camp beneath it.
+  await setPhone({ width: 844, height: 390, landscape: true, insets: { left: 47, right: 47, bottom: 21 } });
+  await wait(`getComputedStyle(document.getElementById('turn-card')).display !== 'none'`);
+  await key('Escape');
+  await wait(`${route} !== ${JSON.stringify(before.route)}`, 4000);
+  await setPhone({ width: 390, height: 844, landscape: false, insets: {} });
+  await wait(`!document.getElementById('app').inert`);
   assert.deepEqual(errors, []);
-  console.log('PASS phone: Party and Jobs scroll as one page in landscape, Depart reachable (852×393)');
-}, { phone: { width: 852, height: 393, dpr: 2, ua: 'iphone', landscape: true, insets: { left: 59, right: 59, bottom: 21 } } });
+  console.log('PASS phone: held sideways, the Turn card covers Party (inert, nothing spent), upright again the same tab; Back passes through');
+}, { phone: { width: 390, height: 844, dpr: 2, ua: 'iphone' } });
 console.log('PASS town flows');

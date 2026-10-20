@@ -88,20 +88,11 @@ body.title-up .town-map *, body.title-up .town-map *::before, body.title-up .tow
 /* A short phone (the browser bars shown, an iPhone SE): the guide keeps its heading, Go and 'Next: CH n' at full size, its text on one line
    (a screen reader still reads all of it), and the map gets the height back, so the signs stay readable. The guide stays at the bottom, in
    the thumb zone. */
-@media (max-height: 700px) and (max-width: 600px) and (orientation: portrait) {
+@media (max-height: 700px) and (max-width: 600px) {
   .camp-copy { margin: 6px 8px 8px; padding-top: 8px; padding-bottom: 8px; }
   .camp-copy h1 { margin-bottom: 4px; }
   .camp-guide p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden; font-size: 14px; }
   .camp-copy .continue-story, .continue-row { margin-top: 8px; }
-}
-/* A phone held sideways: the map on the left at a readable width (the camp scrolls down it) and the guide beside it, stuck to the bottom of
-   the screen, so 'Next: CH n' is in reach without a scroll. */
-@media (orientation: landscape) and (max-height: 500px) {
-  .camp-scene { flex-direction: row; align-items: flex-start; gap: 8px; }
-  .camp-scene .town-map-frame { flex: 1 1 0; min-width: 0; min-height: 0; height: auto; container-type: inline-size; }
-  .camp-scene .town-map { width: 100%; }
-  .camp-scene .camp-copy { flex: 0 0 min(250px, 44%); position: sticky; bottom: 8px; align-self: flex-end; width: auto; margin: 8px 8px 8px 0; }
-  .camp-scene .camp-guide { flex-wrap: wrap; }
 }
 /* A paused Story chapter: Resume takes the full row; a compact Abandon… sits in the guide row (or beside Resume when the guide has its own Go). */
 .continue-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }

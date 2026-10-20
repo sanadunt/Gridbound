@@ -69,8 +69,8 @@ itch.io berbeda dari rilis sebelumnya.
 | Opsi | Pilihan | Alasan |
 | --- | --- | --- |
 | Embed options | Embed in page | Game tampil langsung di halaman. |
-| Viewport dimensions | **540 × 900** | Ukuran yang direkomendasikan (lolos `npm run test:itch` secara lokal; konfirmasi di halaman draft). Game adalah satu kolom potret (lebar maks. 600 px) yang menyesuaikan diri dengan ukuran frame. Kalau tinggi 900 px tidak muat di layar laptop: selama frame terpotong oleh jendela, roda mouse menggulir halaman itch.io supaya game bisa dibawa ke layar, dan tombol fullscreen itch.io tetap ada. Alternatif yang lebih pendek: 480 × 760 (sudah dicek lokal: kota dan pertarungan utuh, arena sedikit mengecil). Embed lanskap seperti 960 × 600 juga berjalan (pertarungan pindah ke tata letak dua kolom), tetapi peta kota jadi sempit; pakai hanya sebagai cadangan. |
-| Mobile friendly | **Ya**, Orientation: **Portrait** | Seluruh game dirancang potret dan bisa dimainkan dengan sentuhan. |
+| Viewport dimensions | **540 × 900** | Ukuran yang direkomendasikan (lolos `npm run test:itch` secara lokal; konfirmasi di halaman draft). Game adalah satu kolom potret (lebar maks. 600 px) yang menyesuaikan diri dengan ukuran frame. Kalau tinggi 900 px tidak muat di layar laptop: selama frame terpotong oleh jendela, roda mouse menggulir halaman itch.io supaya game bisa dibawa ke layar, dan tombol fullscreen itch.io tetap ada. Alternatif yang lebih pendek: 480 × 760 (sudah dicek lokal: kota dan pertarungan utuh, arena sedikit mengecil). Jangan pakai embed lanskap (lebih lebar daripada tinggi): di ponsel itch.io memakai bentuk embed untuk memutar layar (lihat Orientation di bawah). Di jendela lebar (laptop, layar penuh desktop) game tetap satu kolom potret di tengah. |
+| Mobile friendly | **Ya**, Orientation: **Portrait** (wajib) | Seluruh game hanya potret dan dimainkan dengan sentuhan. Di ponsel itch.io selalu menjalankan game HTML di layar penuhnya sendiri dan **mengunci orientasi ponsel sesuai setelan ini**; *Default* mengikuti bentuk viewport, *Landscape* memutar ponsel ke samping. Dari dalam frame game tidak bisa membatalkan kunci itu dengan pasti, jadi setelan yang salah membuat pemain melihat kartu *Putar ponselmu* alih-alih game. |
 | Automatically start on page load | **Tidak** (click to play) | Halaman lebih ringan untuk pengunjung yang belum bermain; game baru dimuat saat pemain menekan Run game. |
 | Fullscreen button | **Ya** | Tombol layar penuh dari itch.io. Di dalam frame, game juga punya opsi Pengaturan → Layar penuh sendiri (Config → Fullscreen dalam bahasa Inggris), yang hanya muncul kalau browser dan frame mengizinkan. |
 | Enable scrollbars | **Tidak** | Halaman game tidak menggulir; panel di dalam game punya scroll sendiri. |
@@ -120,6 +120,11 @@ Halaman Draft hanya bisa dilihat olehmu. Tes di desktop (Chrome atau Edge, Firef
 - [ ] Pengaturan → Unduh cadangan save: file terunduh, dan teks cadangan juga tampil untuk disalin. Lalu Muat Game (atau
       MENU → Save) → Tempel cadangan untuk memastikan cadangan bisa dipulihkan (jadi Commander file baru).
 - [ ] Ponsel: orientasi potret, semua tombol terjangkau, kota dan pertarungan tidak terpotong pada ukuran embed yang dipilih.
+- [ ] Ponsel: Run game (layar penuh itch.io) → layar tetap tegak. Putar ponsel ke samping → hanya kartu *Putar ponselmu*
+      (Turn your phone upright) yang tampil dan pertarungan yang sedang berjalan dijeda; putar kembali → layar yang sama, menu jeda
+      menunggu, tidak ada yang berlanjut sendiri. Kalau tombol *Main tegak* muncul, tekan: ponsel terkunci tegak, atau kartu
+      menjelaskan bahwa halaman menahan layar menyamping (cek ulang Orientation: Portrait). Hasil di perangkat nyata dicatat di
+      `docs/GUI-VERIFIED.md`.
 - [ ] Ponsel: usap game ke atas dan ke bawah (peta kota, bilah HUD, panel ancaman dan Guard saat bertarung, ujung daftar
       Quest) → halaman itch.io tidak bergulir dan tidak dimuat ulang (tarik-untuk-muat-ulang di Android), sedangkan daftar
       Quest sendiri tetap bisa digulir. Ini baru dicek di Chromium headless dengan sentuhan emulasi (`npm run test:itch`).

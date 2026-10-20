@@ -182,12 +182,10 @@ dialog#modal .depth-dossier h3 { margin: 12px 0 6px; font-family: var(--pixel); 
   .dungeon-hero img { width: 32px; height: 32px; }
 }
 
-/* A phone (also held sideways): the intro is two lines, so the first depth is on screen on arrival (contract L8). */
-@media (max-width: 480px), (orientation: landscape) and (max-height: 500px) {
+/* A phone: the intro is two lines, so the first depth is on screen on arrival (contract L8). */
+@media (max-width: 480px) {
   .dungeon-intro p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 }
-/* Held sideways the intro keeps its kicker and two lines (the route title is in the HUD, the party and its power are in each depth's dossier). */
-@media (orientation: landscape) and (max-height: 500px) { .dungeon-intro h2, .dungeon-intro .dungeon-party { display: none; } .dungeon-intro { padding-top: 6px; padding-bottom: 6px; } }
 
 /* Lore fragment on a guardian clear */
 .dungeon-lore { margin: 12px 0; padding: 8px 12px; border-left: 3px solid var(--gold-border); background: var(--inset); text-align: left; }

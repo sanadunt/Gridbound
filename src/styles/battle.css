@@ -247,9 +247,9 @@
   .party-health-card { min-height: 44px; }
   .cmd, .ready-actions .btn { min-height: 44px; font-size: 14px; }
 }
-/* Short portrait phones (the browser bars showing, an iPhone SE): the place label keeps one line and the focus bar steps aside (the
-   selected card is highlighted, the Status view has the details), so the grid keeps the full width. */
-@media (orientation: portrait) and (max-height: 700px) {
+/* Short screens (a phone with the browser bars showing, an iPhone SE, a short desktop window): the place label keeps one line and the
+   focus bar steps aside (the selected card is highlighted, the Status view has the details), so the grid keeps its width. */
+@media (max-height: 700px) {
   #battle-screen { gap: 4px; padding-top: 4px; }
   .arena-column { gap: 6px; }
   .battle-place span { -webkit-line-clamp: 1; line-clamp: 1; }
@@ -263,47 +263,15 @@
   body.coaching .intent-panel span { display: none; }
 }
 
-/* Landscape / short-wide screens: arena on the left, HUD on the right. */
-@media (orientation: landscape) and (min-width: 700px) and (max-height: 820px) {
-  body[data-screen="battle"] #app { --app-max: 1180px; max-width: min(100vw, 1180px); }
-  .arena-column { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 400px); grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px 10px; }
-  .arena-slot { grid-column: 1; grid-row: 1 / 4; }
-  .threat-band { grid-column: 2; grid-row: 1; }
-  .focus-bar { grid-column: 2; grid-row: 2; align-self: start; }
-  .action-bar { grid-column: 2; grid-row: 3; }
-}
-/* A landscape phone (L6): the arena takes the whole height in column 1 (cropping up to 120 canvas px of sky only to reach a 300px
-   wide grid), and column 2 holds the top bar, the boss window, the threat panel (beside the arena, never over the boss), the focus
-   bar and the tray. */
-@media (orientation: landscape) and (max-height: 500px) {
-  body[data-screen="battle"] #app { --app-max: 1180px; max-width: min(100vw, 1180px); }
-  #battle-screen[data-battle-view="arena"] { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto auto auto minmax(0, 1fr) auto; gap: 6px 12px; }
-  #battle-screen[data-battle-view="arena"] > .battle-top { grid-column: 2; grid-row: 1; }
-  #battle-screen[data-battle-view="arena"] .arena-column, #battle-screen[data-battle-view="arena"] .arena-slot { display: contents; }
-  #battle-screen[data-battle-view="arena"] .threat-band { grid-column: 2; grid-row: 2; }
-  #battle-screen[data-battle-view="arena"] .arena-intel { position: relative; grid-column: 2; grid-row: 3; top: auto; left: auto; right: auto; }
-  #battle-screen[data-battle-view="arena"] .focus-bar { grid-column: 2; grid-row: 4; align-self: start; }
-  #battle-screen[data-battle-view="arena"] .action-bar { grid-column: 2; grid-row: 6; }
-  #battle-screen[data-battle-view="arena"] .arena { --lh: calc(100dvh - var(--safe-t) - var(--safe-b) - 14px); grid-column: 1; grid-row: 1 / -1; align-self: end; height: var(--lh); width: clamp(var(--lh) * 600 / 760, 300px, var(--lh) * 600 / 640); }
-  .battle-place span { -webkit-line-clamp: 1; line-clamp: 1; }
-  .boss-hud { padding: 4px 8px 6px; }
-  .boss-title h2 { font-size: 16px; }
-  .cmd, .ready-actions .btn { min-height: 44px; }
-  /* Status and Log scroll as one page under a sticky top bar (two side-by-side scrollers left the log a 70px sliver). */
-  #battle-screen:not([data-battle-view="arena"]) { overflow-y: auto; overscroll-behavior: contain; }
-  #battle-screen:not([data-battle-view="arena"]) > .battle-top { position: sticky; top: -6px; z-index: 2; margin: -6px -8px 0; padding: 6px 8px; background: var(--night); }
-  #battle-screen[data-battle-view="hero"] .right-sidebar, #battle-screen[data-battle-view="log"] .right-sidebar, #battle-screen[data-battle-view="log"] .left-sidebar { flex: none; min-height: auto; overflow: visible; }
-}
-
-/* A portrait phone too: Status and Log scroll as one page under the sticky top bar, so the Log is never a sliver above the stage panel
+/* A phone: Status and Log scroll as one page under the sticky top bar, so the Log is never a sliver above the stage panel
    (contract L7: no nested scroller under 40% of the screen). */
 @media (max-width: 600px) {
   #battle-screen:not([data-battle-view="arena"]) { overflow-y: auto; overscroll-behavior: contain; }
   #battle-screen:not([data-battle-view="arena"]) > .battle-top { position: sticky; top: -6px; z-index: 2; margin: -6px -8px 0; padding: 6px 8px; background: var(--night); }
   #battle-screen[data-battle-view="hero"] .right-sidebar, #battle-screen[data-battle-view="log"] .right-sidebar, #battle-screen[data-battle-view="log"] .left-sidebar { flex: none; min-height: auto; overflow: visible; }
 }
-/* A short portrait screen pads the battle screen by 4px only: the sticky bar meets the top edge there. */
-@media (max-width: 600px) and (orientation: portrait) and (max-height: 700px) {
+/* A short phone pads the battle screen by 4px only: the sticky bar meets the top edge there. */
+@media (max-width: 600px) and (max-height: 700px) {
   #battle-screen:not([data-battle-view="arena"]) > .battle-top { top: -4px; margin-top: -4px; padding-top: 4px; }
 }
 
@@ -378,7 +346,7 @@
 /* First-battle coach: a tip bubble with an arrow at the control it is about; it never blocks taps or drags (only Skip is clickable). */
 /* The bubble lives on body, outside #app: it takes #app's touch rules itself (no selection or callout on a long press of Skip). */
 /* Two columns: the label and a tip of at most two lines, then Skip (the bubble's only control, 44×44). ui/coach.ts places it in the band
-   above the front row (or over the focus bar, or beside the arena in landscape), off every hero card and the boss HP bar, with its arrow
+   above the front row (or over the focus bar), off every hero card and the boss HP bar, with its arrow
    (a stem when it has to reach further) at the control it is about. */
 .coach-bubble { position: fixed; z-index: 35; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 8px; padding: 4px 6px 4px 10px; border: 2px solid var(--gold); border-radius: var(--radius); background: #12231ef2; box-shadow: 0 0 0 3px #000a, 0 8px 22px #000c; color: var(--ink); pointer-events: none; animation: coach-in .2s ease-out; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .coach-bubble[hidden] { display: none; }
@@ -395,9 +363,6 @@
 .coach-bubble.below .coach-arrow { top: auto; bottom: 100%; }
 .coach-bubble.below .coach-arrow::before { top: auto; bottom: 0; }
 .coach-bubble.below .coach-arrow::after { bottom: auto; top: 0; border-top: 0; border-bottom: 9px solid var(--coach-color); border-left-color: transparent; border-right-color: transparent; }
-.coach-bubble.side .coach-arrow { top: calc(var(--arrow-y, 50%) - 9px); left: auto; right: 100%; width: calc(var(--arrow-len, 0px) + 9px); height: 18px; }
-.coach-bubble.side .coach-arrow::before { left: auto; right: 0; top: 8px; width: var(--arrow-len, 0px); height: 2px; }
-.coach-bubble.side .coach-arrow::after { left: 0; top: 0; bottom: auto; border: 9px solid transparent; border-left: 0; border-right-color: var(--coach-color); }
 @keyframes coach-in { from { opacity: 0; transform: translateY(6px); } }
 /* PERF (P6): while nothing is fighting (ready window, paused, ended: body.battle-idle, main.ts syncEngine) the HUD's endless pulses stop. */
 body.battle-idle :is(#battle-screen.boss-broken .stagger-track i, .intent-panel.danger, .guard-button.ready-window, .ultimate-button.ready, .unit-card.low-health .unit-hp, .unit-card.interrupt-ready .unit-skill, .status-chip.enrage, .party-health-card.charged .party-atb) { animation-play-state: paused; }

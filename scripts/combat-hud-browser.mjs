@@ -368,8 +368,10 @@ const PHONES = {
   'a360-bars': { width: 360, height: 640, dpr: 3, ua: 'android' },
   'se-bars': { width: 375, height: 553, dpr: 2, ua: 'iphone' },
   'i15-bars': { width: 393, height: 659, dpr: 3, ua: 'iphone' },
-  'land-bars': { width: 852, height: 343, dpr: 3, ua: 'iphone', insets: { left: 59, right: 59, bottom: 21 }, landscape: true },
-  'land': { width: 852, height: 393, dpr: 3, ua: 'iphone', insets: { left: 59, right: 59, bottom: 21 }, landscape: true },
+  // Portrait only (L6): a desktop or laptop window, itch's inline embed held wide, shows the same one 600px column, the arena sized by height.
+  'desk-1280': { width: 1280, height: 720, desktop: true },
+  'desk-1366': { width: 1366, height: 768, desktop: true },
+  'desk-960': { width: 960, height: 600, desktop: true },
   'i15': { width: 393, height: 852, dpr: 3, ua: 'iphone', insets: { top: 59, bottom: 34 } },
   'p7': { width: 412, height: 915, dpr: 2.625, ua: 'android', insets: { bottom: 24 } },
 };
@@ -390,10 +392,12 @@ const GRID = `(() => { const cards = [...document.querySelectorAll('#unit-layer 
   return { heroes: cards.length, cell: [Math.min(...cards.map(r => r.width)), Math.min(...cards.map(r => r.height))].map(Math.round),
     cut: names.filter(n => n.scrollWidth > n.clientWidth + .5).map(n => n.textContent), fonts: Math.min(...names.map(n => parseFloat(getComputedStyle(n).fontSize))), scroll: document.documentElement.scrollWidth - innerWidth }; })()`;
 // L10/K5: during the ready window every hero card is hit at its centre (the sheet ends above the front row), and FIGHT! with its ◀ Back sit in
-// the tray, in the bottom 40% of a portrait screen and hit-testable. 8 heroes (the late save) in chapters 1, 5 and 11; the grid, chips and name
-// tags (K2: cells >= 75px wide in portrait, >= 64 in landscape; T1/T3: 12px, never cut) in the fight that follows; 6 heroes (the mid save) too.
-for (const [name, lang] of [['se-bars', 'en'], ['se-bars', 'id'], ['a360-bars', 'en'], ['a360-bars', 'id'], ['i15-bars', 'en'], ['land-bars', 'en'], ['land', 'en']]) {
-  const phone = PHONES[name], minCell = phone.landscape ? 64 : 75;
+// the tray, in the bottom 40% of the screen (of #app on a wide window) and hit-testable. 8 heroes (the late save) in chapters 1, 5 and 11; the
+// grid, chips and name tags (K2: cells >= 75px wide; T1/T3: 12px, never cut) in the fight that follows; 6 heroes (the mid save) too. On the
+// desktop windows (1280×720, 1366×768, 960×600) the battle is one portrait column: #app at most 600px wide, centred, the arena and the tray
+// sharing a left edge.
+for (const [name, lang] of [['se-bars', 'en'], ['se-bars', 'id'], ['a360-bars', 'en'], ['a360-bars', 'id'], ['i15-bars', 'en'], ['desk-1280', 'en'], ['desk-1366', 'en'], ['desk-960', 'en'], ['desk-960', 'id']]) {
+  const phone = PHONES[name], minCell = 75;
   for (const save of [LATE, MID]) await withBrowser(async h => {
     const { wait, evaluate, screenshot, errors } = h, heroes = save === LATE ? 8 : 6;
     await phoneOpen(h, save, lang);
@@ -401,12 +405,17 @@ for (const [name, lang] of [['se-bars', 'en'], ['se-bars', 'id'], ['a360-bars', 
       await phoneChapter(h, chapter);
       const ready = await evaluate(`(() => { const H = innerHeight, cover = [];
         for (const c of document.querySelectorAll('#unit-layer .unit-card')) { const r = c.getBoundingClientRect(), e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!c.contains(e)) cover.push(c.dataset.hero + '→' + (e?.id || e?.className)); }
-        const at = sel => { const e = document.querySelector(sel), r = e.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { top: r.top / H, hit: e.contains(hit), shown: r.height > 0 }; };
-        return { cover, start: at('#start'), back: at('#ready-back'), cmds: [...document.querySelectorAll('.action-bar > .cmd')].filter(c => c.getBoundingClientRect().height > 0).length }; })()`);
+        const app = document.getElementById('app').getBoundingClientRect(), H0 = app.top, AH = app.height;
+        const at = sel => { const e = document.querySelector(sel), r = e.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { top: (r.top - H0) / AH, hit: e.contains(hit), shown: r.height > 0 }; };
+        const slot = document.querySelector('.arena-slot').getBoundingClientRect(), tray = document.querySelector('.action-bar').getBoundingClientRect();
+        return { cover, start: at('#start'), back: at('#ready-back'), cmds: [...document.querySelectorAll('.action-bar > .cmd')].filter(c => c.getBoundingClientRect().height > 0).length,
+          app: [Math.round(app.left), Math.round(app.width), Math.round(innerWidth - app.right)], column: Math.abs(slot.left - tray.left) <= 1 && tray.top >= slot.bottom - 1 }; })()`);
       const where = `${name} ${lang} CH${chapter} ${heroes} heroes: ${JSON.stringify(ready)}`;
       assert.deepEqual(ready.cover, [], `L10: nothing covers a hero card before FIGHT! (${where})`);
       assert.ok(ready.start.shown && ready.start.hit && ready.back.shown && ready.back.hit, `FIGHT! and ◀ Back are on screen and hit-testable (${where})`);
-      if (!phone.landscape) assert.ok(ready.start.top >= .6 && ready.back.top >= .6, `K5: FIGHT! and ◀ Back sit in the bottom 40% (${where})`);
+      assert.ok(ready.start.top >= .6 && ready.back.top >= .6, `K5: FIGHT! and ◀ Back sit in the bottom 40% (${where})`);
+      assert.ok(ready.column, `L6: one column, the tray under the arena on the same left edge (${where})`);
+      if (phone.desktop) assert.ok(ready.app[1] <= 600 && Math.abs(ready.app[0] - ready.app[2]) <= 1, `L6: #app is one centred column at most 600px wide (${where})`);
       assert.equal(ready.cmds, 0, `the tray shows only FIGHT! and its Back before the fight (${where})`);
     }
     await screenshot(`artifacts/combat-hud-phone-${name}-${lang}-${heroes}-ready.png`);
@@ -415,14 +424,14 @@ for (const [name, lang] of [['se-bars', 'en'], ['se-bars', 'id'], ['a360-bars', 
     await evaluate(frames); await new Promise(resolve => setTimeout(resolve, 300));
     const grid = await evaluate(GRID), where = `${name} ${lang} ${heroes} heroes: ${JSON.stringify(grid)}`;
     assert.equal(grid.heroes, heroes, where);
-    assert.ok(grid.cell[0] >= minCell && grid.cell[1] >= (phone.landscape ? 50 : 56), `K2: hero cards at least ${minCell}px wide (${where})`);
+    assert.ok(grid.cell[0] >= minCell && grid.cell[1] >= 56, `K2: hero cards at least ${minCell}px wide (${where})`);
     assert.deepEqual(grid.cut, [], `T3: no skill chip or name tag is cut (${where})`);
     assert.ok(grid.fonts >= 12 && grid.scroll <= 1, `T1: chips and name tags are 12px or more, no sideways scroll (${where})`);
     assert.equal(await evaluate('[...document.querySelectorAll(".action-bar > .cmd")].filter(c => c.getBoundingClientRect().height > 0).length'), 3, 'Guard, Potion and Ninefold Dawn are back in the tray after FIGHT!');
     await screenshot(`artifacts/combat-hud-phone-${name}-${lang}-${heroes}-fight.png`);
     assert.deepEqual(errors, []);
     console.log(`✓ phone ${name} ${lang}, ${heroes} heroes: ready window clear of the grid, FIGHT! in the tray, cells ${grid.cell.join('×')}, labels whole`);
-  }, { phone });
+  }, phone.desktop ? { width: phone.width, height: phone.height } : { phone });
 }
 
 // G5/G6/G7 with real touches on the iPhone 15 and Pixel 7 profiles: the card's zones, drags from the chip, a slid tap, two thumbs, Potion.

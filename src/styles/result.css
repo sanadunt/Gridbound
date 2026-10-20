@@ -127,15 +127,6 @@ dialog#modal .journal-companions .btn { min-height: 44px; margin: 0; }
   .boon-draft-modal .boon-modal-subtitle { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* hidden, still read */
   .boon-draft-modal .boon-modal-title { margin: 2px 0; }
 }
-/* A phone held sideways: compact cards (the whole card is the button; its gem and 'Take' tag are decoration) and a slimmer footer, so a
-   whole card is on screen above 'Leave for now…' on arrival. */
-@media (orientation: landscape) and (max-height: 500px) {
-  .boon-draft-grid, .boon-draft-grid[data-cards] { grid-template-columns: repeat(2, 1fr); }
-  .boon-draft-modal .boon-card { gap: 2px; padding: 8px 10px; }
-  .boon-draft-modal .boon-card-gem, .boon-draft-modal .boon-cta { display: none; }
-  .boon-draft-modal .boon-desc { font-size: 13px; }
-  .boon-modal-footer { padding-top: 6px; padding-bottom: calc(8px + var(--safe-b)); }
-}
 .rogue-promote h3 { margin: 0 0 4px; font-family: var(--pixel); font-size: 11px; color: var(--gold); }
 .rogue-promote .hint { margin: 0 0 8px; font-size: 12px; }
 .rogue-promote-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; padding: 6px 0; border-top: 1px solid var(--line); }
