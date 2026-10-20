@@ -432,6 +432,8 @@ for (const [width, height, insets = {}, landscape = false] of PHONES) for (const
     await seedSave(send, late, 'en');
     await send('Page.navigate', { url });
     await wait('window.gridbound && document.querySelector(".town-game-shell")?.dataset.townRoute === "camp"', 20000);
+    // Headless Chrome applies the safe-area override a moment after load: measure once #app is padded by it (a fast boot gets here first).
+    await wait(`getComputedStyle(document.getElementById('app')).paddingBottom === '${insets.bottom ?? 0}px'`, 10000);
     await click.nav('dungeon');
     await wait('document.querySelectorAll(".depth-card").length === 8');
     await touch.tap(`[data-dungeon-pick="${depth}"]`);

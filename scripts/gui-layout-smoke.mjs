@@ -17,6 +17,8 @@ for (const [width, height] of viewports) {
     const measure = async (name, actionSelector = '') => {
       // Town navigation flushes the Commander save before rendering, so give the route a moment to appear.
       if (actionSelector) await wait(`Boolean(document.querySelector(${JSON.stringify(actionSelector)}))`, 5000).catch(() => {});
+      // Measure the settled layout: a route's one-shot entrance (Web Animations, e.g. the departure button growing from 96%) has finished.
+      await wait('document.getAnimations().every(a => a.effect?.getTiming().iterations === Infinity || a.playState !== "running")', 5000).catch(() => {});
       const result = await evaluate(`(() => {
         const selector = ${JSON.stringify(actionSelector)};
         const action = selector ? document.querySelector(selector) : null;

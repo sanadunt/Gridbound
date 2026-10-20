@@ -29,7 +29,6 @@
   "dependencies": {
     "@fontsource/press-start-2p": "^5.2.0",
     "@fontsource/space-grotesk": "^5.2.0",
-    "gsap": "^3.15.0",
     "phaser": "^3.90.0"
   },
   "devDependencies": {

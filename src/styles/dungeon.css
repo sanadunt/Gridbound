@@ -128,7 +128,7 @@ dialog#modal .depth-dossier h3 { margin: 12px 0 6px; font-family: var(--pixel); 
 .room img { width: 28px; height: 28px; image-rendering: pixelated; }
 .room.closed { opacity: .45; cursor: default; }
 .room.visited { opacity: .7; border-color: var(--gold-deep); cursor: default; }
-.room.open { border-color: var(--gold-bright); background: #3a2d1b; animation: node-pulse 1s ease-in-out infinite; }
+.room.open { border-color: var(--gold-bright); background: #3a2d1b; } /* its pulse: .room.open::after in town.css */
 .room.current { border-color: #fff; background: #4d3a1e; box-shadow: 0 0 0 3px var(--gold), 0 2px 0 #000; cursor: default; }
 .room-elite { border-radius: var(--radius); }
 .room-guardian { width: 52px; height: 52px; border-color: var(--danger); }

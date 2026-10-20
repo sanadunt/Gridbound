@@ -7,12 +7,11 @@ import { Sound } from '../audio/sound';
 import { t, lang, fmtInt } from '../i18n';
 import { eventText } from '../i18n/content';
 import { HitStats, allowedShake, SHAKE_PER_SECOND, HIT_STOP_GAP } from './hit-feedback';
+import { ARENA, cell, center } from './arena';
+export { ARENA, cell, center } from './arena';
 /** Floating numbers follow the game language (3,000 / 3.000); seconds texts like '−0.6s' are localized by eventText(). */
 const num = (value: number | string) => typeof value === 'number' ? fmtInt(value) : value;
 
-export const ARENA={width:600,height:760,x:72,y:367,cw:144,ch:112,gap:12};
-export function cell(slot:number){return {x:ARENA.x+(slot%3)*(ARENA.cw+ARENA.gap),y:ARENA.y+Math.floor(slot/3)*(ARENA.ch+ARENA.gap)};}
-export function center(slot:number){const p=cell(slot);return {x:p.x+72,y:p.y+54};}
 type Particle={x:number;y:number;vx:number;vy:number;life:number;max:number;color:number;size:number;gravity:number};
 type BossCue={color:number;kind:'threat'|'phase'|'break'|'summon'|'ultimate'|'victory';left:number;total:number};
 // Heroes stand in the upper part of their cell; the DOM unit card puts HP and the skill chip below them.

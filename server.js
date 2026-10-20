@@ -1,9 +1,11 @@
 import { createServer } from 'node:http';
-import { createReadStream, realpathSync, statSync } from 'node:fs';
-import { realpath, stat } from 'node:fs/promises';
-import { dirname, extname, resolve, sep } from 'node:path';
+import { createReadStream, readdirSync, realpathSync, statSync } from 'node:fs';
+import { readFile, realpath, stat } from 'node:fs/promises';
+import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pipeline } from 'node:stream/promises';
+import { promisify } from 'node:util';
+import { brotliCompress, constants, gzip } from 'node:zlib';
 
 const rawPort = process.env.PORT ?? '3000';
 if (!/^\d+$/.test(rawPort) || Number(rawPort) > 65535) {
@@ -25,6 +27,42 @@ const types = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
   '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
 };
+// Text is served compressed (contract P8): Brotli, else gzip, else as is, by the request's Accept-Encoding. Each file is compressed once per
+// process (hashed assets at the strongest level, they never change; index.html and the icon are re-checked by mtime) and kept in memory;
+// the cache is warmed at startup, so the first visitor does not wait for it. Fonts and images are already compressed.
+const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.svg', '.webmanifest']);
+const HASHED = /-[A-Za-z0-9_-]{8,}\.(js|css|woff2?)$/;
+const brotli = promisify(brotliCompress), gzipAsync = promisify(gzip);
+const compressed = new Map();
+function encodingFor(header = '') {
+  const q = {};
+  for (const part of String(header).toLowerCase().split(',')) {
+    const [name, ...params] = part.trim().split(';');
+    const weight = params.map(p => p.trim()).find(p => p.startsWith('q='));
+    if (name) q[name] = weight ? Number(weight.slice(2)) || 0 : 1;
+  }
+  const allowed = name => (q[name] ?? q['*'] ?? 0) > 0;
+  return allowed('br') ? 'br' : allowed('gzip') ? 'gzip' : undefined;
+}
+function compressedBody(file, info, encoding) {
+  const key = `${encoding}:${file}`, cached = compressed.get(key);
+  if (cached && cached.mtimeMs === info.mtimeMs && cached.size === info.size) return cached.body;
+  const strong = HASHED.test(file);
+  const body = readFile(file).then(raw => encoding === 'br'
+    ? brotli(raw, { params: { [constants.BROTLI_PARAM_QUALITY]: strong ? 11 : 9, [constants.BROTLI_PARAM_SIZE_HINT]: raw.length } })
+    : gzipAsync(raw, { level: 9 }));
+  body.catch(() => compressed.delete(key));
+  compressed.set(key, { mtimeMs: info.mtimeMs, size: info.size, body });
+  return body;
+}
+function warmCache() {
+  const files = [resolve(root, 'index.html'), resolve(root, 'favicon.svg')];
+  try { for (const name of readdirSync(join(root, 'assets'))) files.push(join(root, 'assets', name)); } catch { /* no assets folder */ }
+  for (const file of files) {
+    if (!COMPRESSIBLE.has(extname(file))) continue;
+    try { const info = statSync(file); if (info.isFile()) for (const encoding of ['br', 'gzip']) compressedBody(file, info, encoding).catch(() => {}); } catch { /* skipped */ }
+  }
+}
 const server = createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -55,11 +93,16 @@ const server = createServer(async (req, res) => {
     if (!file.startsWith(root + sep)) return fail(404, 'Not found');
     const info = await stat(file);
     if (!info.isFile()) return fail(404, 'Not found');
-    const hashed = /-[A-Za-z0-9_-]{8,}\.(js|css|woff2?)$/.test(path);
-    res.writeHead(200, {
-      'Content-Type': type, 'Content-Length': info.size,
-      'Cache-Control': hashed ? 'public, max-age=31536000, immutable' : 'no-cache, must-revalidate',
-    });
+    const hashed = HASHED.test(path);
+    const headers = { 'Content-Type': type, 'Cache-Control': hashed ? 'public, max-age=31536000, immutable' : 'no-cache, must-revalidate' };
+    const compressible = COMPRESSIBLE.has(extname(path)), encoding = compressible ? encodingFor(req.headers['accept-encoding']) : undefined;
+    if (compressible) headers.Vary = 'Accept-Encoding';
+    if (encoding) {
+      const body = await compressedBody(file, info, encoding);
+      res.writeHead(200, { ...headers, 'Content-Encoding': encoding, 'Content-Length': body.length });
+      return res.end(req.method === 'HEAD' ? undefined : body);
+    }
+    res.writeHead(200, { ...headers, 'Content-Length': info.size });
     if (req.method === 'HEAD') return res.end();
     await pipeline(createReadStream(file), res);
   } catch (error) {
@@ -75,6 +118,7 @@ server.on('error', error => {
 });
 server.listen(Number(rawPort), process.env.HOST || '0.0.0.0', () => {
   console.log(`Gridbound production server listening on port ${server.address().port}`);
+  warmCache();
 });
 function shutdown() {
   server.close(() => process.exit(0));

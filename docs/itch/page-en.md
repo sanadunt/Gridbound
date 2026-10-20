@@ -126,7 +126,7 @@ Keyboard (click the game once so it has the keyboard):
 ### Credits
 
 - Game: **[your name or studio]**
-- Built with [Phaser 3](https://phaser.io) (MIT) and [GSAP](https://gsap.com) (Standard "no charge" license).
+- Built with [Phaser 3](https://phaser.io) (MIT).
 - Fonts: Press Start 2P (CodeMan38) and Space Grotesk (Florian Karsten), both SIL Open Font License 1.1.
 - Pixel art and sound are generated in code; no third-party art or audio files.
 

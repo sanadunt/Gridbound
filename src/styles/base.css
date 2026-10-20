@@ -305,7 +305,7 @@ dialog#modal {
   padding: 18px 16px 16px;
   transform-origin: center top;
 }
-dialog#modal::backdrop { background: rgba(6, 14, 12, 0.88); backdrop-filter: blur(3px); }
+dialog#modal::backdrop { background: rgba(6, 14, 12, 0.92); } /* not blurred: a blur filter re-ran over the arena every frame (P6) */
 dialog#modal h2 { font-family: var(--pixel); font-size: 13px; font-weight: 400; color: var(--gold); margin: 0 40px 12px 0; line-height: 1.5; }
 dialog#modal h3 { color: var(--gold-bright); margin: 12px 0 6px; font-size: 15px; }
 dialog#modal > .btn, dialog#modal .btn + .btn { margin-top: 8px; }

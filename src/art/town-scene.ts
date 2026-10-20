@@ -571,9 +571,18 @@ export function townSceneCanvas(): HTMLCanvasElement {
   return el;
 }
 
-let sceneURL = '';
-/** The town scene as a data URL, drawn once per page (the title backdrop and the camp share it: each draw runs a full-frame lighting pass). */
-export function townSceneDataURL(): string { return sceneURL ||= townSceneCanvas().toDataURL(); }
+let sceneURL = '', scenePending: Promise<string> | undefined;
+/** The town scene's image URL once drawn ('' before): the camp renders its <img> without a src until then (see townSceneURL). */
+export const townSceneReady = () => sceneURL;
+/** The town scene as an image URL, drawn once per page (the title backdrop and the camp share it: each draw runs a full-frame lighting pass).
+ *  The PNG is encoded off the main thread (toBlob, an object URL kept for the page's life); a data URL where toBlob is missing or fails. */
+export function townSceneURL(): Promise<string> {
+  if (sceneURL) return Promise.resolve(sceneURL);
+  return scenePending ??= new Promise<string>(resolve => {
+    const canvas = townSceneCanvas(), fallback = () => resolve(sceneURL = canvas.toDataURL());
+    try { canvas.toBlob(blob => { if (blob) resolve(sceneURL = URL.createObjectURL(blob)); else fallback(); }); } catch { fallback(); }
+  });
+}
 
 /** Animated flames for the plaza campfire: 16×24, transparent, frame % 4. */
 export function campfireCanvas(frame: number): HTMLCanvasElement {

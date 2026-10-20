@@ -14,7 +14,7 @@ import { heroCanvas, heroKey } from '../art/pixels';
 import { itemIcon, type ItemSlot } from '../art/items';
 import { dungeonIcon } from '../art/dungeon-icons';
 import { monsterDataURL, monsterShadowDataURL } from '../art/monsters';
-import { townSceneDataURL, campfireCanvas, smokeCanvas, TOWN_HOTSPOTS, TOWN_W, TOWN_H, PLAZA, CAMPFIRE, CHIMNEYS, SMOKE_SIZE } from '../art/town-scene';
+import { townSceneReady, campfireCanvas, smokeCanvas, TOWN_HOTSPOTS, TOWN_W, TOWN_H, PLAZA, CAMPFIRE, CHIMNEYS, SMOKE_SIZE } from '../art/town-scene';
 import { renderWorldMap } from './world-map';
 import { dungeonScene } from './dungeon';
 import { heroPower, partyPower, powerVerdict, recommendedPower } from '../game/power';
@@ -146,7 +146,7 @@ const SPOT_FEATURE: Partial<Record<string, Feature>> = { chapel: 'dungeon', lodg
 export const pausedTitle = (paused: PausedStory) => `${t('story.paused.title', { n: paused.chapter + 1, k: paused.battle, total: paused.total })}${paused.heroic ? ` · ${t('heroic.heroic')}` : ''}`;
 
 function campScene(p: Profile, state: TownState) {
-  const townImage = townSceneDataURL();
+  const townImage = townSceneReady();
   fireStrip ||= strip([0, 1, 2, 3].map(frame => campfireCanvas(frame)));
   smokeStrip ||= strip([0, 1, 2, 3].map(frame => smokeCanvas(frame)));
   const party = (p.storyActive.length ? p.storyActive : p.roster.slice(0, 3)).slice(0, 4);
@@ -182,9 +182,9 @@ function campScene(p: Profile, state: TownState) {
     : next !== undefined ? `<button class="btn primary continue-story ${go ? '' : 'guide-go'}" data-continue-story="${next}">${escape(t('town.continue', { n: next + 1, name: CAMPAIGN[next].name }))} ▶</button>` : '';
   return `<section class="camp-scene" aria-labelledby="camp-title">
     <div class="town-map-frame" style="--town-w:${TOWN_W};--town-h:${TOWN_H}"><div class="town-map">
-      <img draggable="false" class="town-map-art camp-art" src="${townImage}" alt="${escape(t('town.alt'))}"/>
-      <span class="town-fire" style="left:${CAMPFIRE.x}%;top:${CAMPFIRE.y}%;width:${CAMPFIRE.w / TOWN_W * 100}%;height:${CAMPFIRE.h / TOWN_H * 100}%;background-image:url(${fireStrip})" aria-hidden="true"></span>
-      ${CHIMNEYS.slice(1).map((c, i) => `<span class="town-smoke" style="left:${c.x}%;top:${c.y}%;width:${SMOKE_SIZE.w / TOWN_W * 100}%;height:${SMOKE_SIZE.h / TOWN_H * 100}%;background-image:url(${smokeStrip});animation-delay:${i * -0.5}s" aria-hidden="true"></span>`).join('')}
+      <img draggable="false" class="town-map-art camp-art" data-town-art${townImage ? ` src="${townImage}"` : ''} alt="${escape(t('town.alt'))}"/>
+      <span class="town-fire" style="left:${CAMPFIRE.x}%;top:${CAMPFIRE.y}%;width:${CAMPFIRE.w / TOWN_W * 100}%;height:${CAMPFIRE.h / TOWN_H * 100}%" aria-hidden="true"><i style="background-image:url(${fireStrip})"></i></span>
+      ${CHIMNEYS.slice(1).map((c, i) => `<span class="town-smoke" style="left:${c.x}%;top:${c.y}%;width:${SMOKE_SIZE.w / TOWN_W * 100}%;height:${SMOKE_SIZE.h / TOWN_H * 100}%" aria-hidden="true"><i style="background-image:url(${smokeStrip});animation-delay:${i * -0.5}s"></i></span>`).join('')}
       ${heroes}
       ${spots}
     </div></div>

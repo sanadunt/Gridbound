@@ -134,7 +134,7 @@ Keyboard (klik game sekali supaya keyboard masuk ke game):
 ### Kredit
 
 - Game: **[nama kamu atau studio]**
-- Dibuat dengan [Phaser 3](https://phaser.io) (MIT) dan [GSAP](https://gsap.com) (lisensi Standard "no charge").
+- Dibuat dengan [Phaser 3](https://phaser.io) (MIT).
 - Font: Press Start 2P (CodeMan38) dan Space Grotesk (Florian Karsten), keduanya SIL Open Font License 1.1.
 - Pixel art dan suara dibuat oleh kode; tidak ada file gambar atau audio pihak ketiga.
 

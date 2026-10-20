@@ -1,5 +1,6 @@
-import Phaser from 'phaser';
-import gsap from 'gsap';
+// Phaser and the scene are loaded by startEngine() (a dynamic import, P3): only their types here, never a value import.
+import type Phaser from 'phaser';
+import type { BattleScene } from './render/BattleScene';
 import '@fontsource/press-start-2p/latin-400.css';
 import '@fontsource/space-grotesk/latin-400.css';
 import '@fontsource/space-grotesk/latin-500.css';
@@ -13,7 +14,7 @@ import './styles/battle.css';
 import './styles/result.css';
 import './styles/dungeon.css';
 import { currencyAmount } from './ui/currency';
-import { townSceneDataURL } from './art/town-scene';
+import { townSceneURL } from './art/town-scene';
 import { Battle, GUARD_DURATION, ENRAGE_WARN, ENRAGE_AT, ENRAGE_DMG, BREAK_SECONDS, MOVE_PENALTY, MARK_DAMAGE, WEAKEN_DAMAGE, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
@@ -37,7 +38,7 @@ import { actArt, starRow } from './ui/world-map';
 import { playDialogue, paginate, CHOICE_INPUT_DELAY_MS, type DialoguePage } from './ui/dialogue';
 import { DANGER_CONTROLS, INPUT_DELAY_MS, TOWN_HELD, TOWN_SPEND, holdInput, inputHeld, keepDangerOff, pressHeld } from './ui/input-guard';
 import { fullscreenAvailable, fullscreenOn, installEmbedGuards, toggleFullscreen } from './ui/embed';
-import { BattleScene, ARENA, cell } from './render/BattleScene';
+import { ARENA, cell } from './render/arena';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
 import { loadSave, saveProfile, backupLegacy, legacyBackup, commanderFromBackup, isCompleteV3, SAVE_KEY } from './game/save';
@@ -72,11 +73,13 @@ type Targets = Element | null | undefined | ArrayLike<Element | null | undefined
  *  so animations get element lists filtered for null, never a bare selector. */
 const present = (...targets: Targets[]) => targets.flatMap(target => !target ? [] : target instanceof Element ? [target] : Array.from(target)).filter((el): el is Element => Boolean(el));
 const q = (selector: string, root: ParentNode = document) => root.querySelectorAll(selector);
-/** gsap.fromTo (or a timeline's, at `position`) on the targets that exist; nothing (no tween, no warning) when none does. */
-function fromTo(targets: Targets, from: gsap.TweenVars, to: gsap.TweenVars, tl?: gsap.core.Timeline, position?: gsap.Position) {
-  const els = present(targets);
-  if (!els.length) return;
-  if (tl) tl.fromTo(els, from, to, position); else gsap.fromTo(els, from, to);
+type Enter = { duration?: number; delay?: number; stagger?: number; easing?: string };
+const EASE_OUT = 'cubic-bezier(.22,.61,.36,1)', EASE_BACK = 'cubic-bezier(.34,1.56,.64,1)';
+/** A one-shot entrance (Web Animations API) on the targets that exist, from `from` to the element's own style: explicit keyframes and
+ *  `fill: backwards`, so nothing reads computed styles or forces a layout of the fresh DOM (P7) and the element keeps its CSS afterwards.
+ *  Transform and opacity only, so the compositor runs it. Callers check motionOn(). */
+function enter(targets: Targets, from: Keyframe, { duration = 220, delay = 0, stagger = 0, easing = EASE_OUT }: Enter = {}) {
+  present(targets).forEach((el, i) => el.animate?.([from, {}], { duration, delay: delay + i * stagger, easing, fill: 'backwards' }));
 }
 let storageFailed = false;
 const heroName = (h: { name: string }) => eventText(h.name, lang());
@@ -94,9 +97,9 @@ function updateTitleStatus() {
   setText(enter.querySelector('.menu-subtext')!, t(fresh ? 'title.begin.sub' : 'title.enter.sub'));
 }
 function titleMarkup() {
-  return `<div class="title-backdrop" aria-hidden="true"><img class="title-world-art" alt="" draggable="false" /><div class="title-vignette"></div></div>
+  return `<div class="title-backdrop" aria-hidden="true"><img class="title-world-art" data-town-art alt="" draggable="false" /><div class="title-vignette"></div></div>
   <div class="title-content">
-    <div class="title-brand"><span class="title-eyebrow">${t('title.eyebrow')}</span><h1 class="title-logo">GRIDBOUND</h1><div class="title-subtitle-wrap"><span class="title-flourish"></span><span>${t('title.subtitle')}</span><span class="title-flourish right"></span></div></div>
+    <div class="title-brand"><span class="title-eyebrow">${t('title.eyebrow')}</span><h1 class="title-logo">GRIDBOUND<span class="title-logo-glow" aria-hidden="true">GRIDBOUND</span></h1><div class="title-subtitle-wrap"><span class="title-flourish"></span><span>${t('title.subtitle')}</span><span class="title-flourish right"></span></div></div>
     <p class="title-press" aria-hidden="true">${t('title.press')}</p>
     <nav class="win title-menu menu-list" aria-label="${t('title.menu')}">
       <button id="title-enter" class="title-menu-item menu-item primary" type="button"><span class="menu-title">${t('title.enter')}</span><span class="menu-subtext">${t('title.enter.sub')}</span></button>
@@ -112,17 +115,17 @@ function showTitleScreen(animated = true) {
   const titleScreen = $('title-screen');
   if (!titleScreen) return;
   titleScreen.classList.remove('dismissing');
-  // The backdrop is drawn on the first showing (never under automation, which skips the title), from the camp's cached scene.
-  const art = titleScreen.querySelector<HTMLImageElement>('.title-world-art');
-  if (art && !art.src) art.src = townSceneDataURL();
   titleScreen.hidden = false;
+  // The camp's decorations stop under the opaque title (P6); the backdrop (the camp's scene) is drawn after the first paint (P2).
+  document.body.classList.add('title-up');
+  paintTownArt();
   updateTitleStatus();
+  // The entrance never blocks a tap: PRESS START and the menu take taps while it plays.
   if (animated && motionOn()) {
-    const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
-    fromTo(q('.title-logo', titleScreen), { opacity: 0, y: -30, scale: 1.4 }, { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: 'back.out(1.6)' }, tl);
-    fromTo(q('.title-flourish', titleScreen), { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: 'power3.out' }, tl, '-=0.2');
-    fromTo(q('.title-menu', titleScreen), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.35, clearProps: 'transform' }, tl, '-=0.1');
-    fromTo(q('.title-footer', titleScreen), { opacity: 0 }, { opacity: 1, duration: 0.3, clearProps: 'all' }, tl, '-=0.2');
+    enter(q('.title-logo', titleScreen), { opacity: 0, transform: 'translateY(-30px) scale(1.4)' }, { duration: 600, easing: EASE_BACK });
+    enter(q('.title-flourish', titleScreen), { transform: 'scaleX(0)' }, { duration: 350, delay: 400 });
+    enter(q('.title-menu', titleScreen), { opacity: 0, transform: 'translateY(16px)' }, { duration: 350, delay: 650 });
+    enter(q('.title-footer', titleScreen), { opacity: 0 }, { duration: 300, delay: 800 });
   }
   requestAnimationFrame(() => $('title-enter')?.focus({ preventScroll: true }));
 }
@@ -131,35 +134,26 @@ function animateTownEntrance() {
   const town = $('town-screen');
   if (!town || town.hidden) return;
   // Entering from the title lands on whatever route was open (MENU → Title → Enter): only the camp has a map and a guide to bring in.
-  fromTo(q('.town-map', town), { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', clearProps: 'opacity' });
-  fromTo(q('.camp-copy', town), { opacity: 0, y: 16 }, { opacity: 1, y: 0, delay: 0.25, duration: 0.3, ease: 'power2.out', clearProps: 'all' });
+  enter(q('.town-map', town), { opacity: 0 }, { duration: 500 });
+  enter(q('.camp-copy', town), { opacity: 0, transform: 'translateY(16px)' }, { delay: 250, duration: 300 });
 }
 function enterEmberhollow() {
   const titleScreen = $('title-screen');
-  if (!titleScreen || titleScreen.hidden) return;
+  if (!titleScreen || titleScreen.hidden || titleScreen.classList.contains('dismissing')) return;
   sound.unlock();
   sound.play('confirm');
-  if (motionOn()) {
-    const tl = gsap.timeline({
-      onComplete: () => {
-        titleScreen.hidden = true;
-        titleScreen.classList.remove('dismissing');
-        gsap.set(present(titleScreen, q('.title-menu', titleScreen)), { clearProps: 'all' });
-        animateTownEntrance();
-        if (inTown && townState.tab === 'camp') void playCampScenes();
-      }
-    });
-    const enter = present($('title-enter'));
-    if (enter.length) tl.to(enter, { x: 8, duration: 0.08, yoyo: true, repeat: 1 });
-    tl.to(titleScreen, { opacity: 0, duration: 0.35, ease: 'power2.in' }, 0.12);
-  } else {
-    titleScreen.classList.add('dismissing');
-    setTimeout(() => {
-      titleScreen.hidden = true;
-      titleScreen.classList.remove('dismissing');
-      if (inTown && townState.tab === 'camp') void playCampScenes();
-    }, 250);
-  }
+  // The title fades out with its CSS transition (.dismissing, 0.25 s); with motion the Enter entry nudges first.
+  if (motionOn()) $('title-enter')?.animate?.([{}, { transform: 'translateX(8px)' }, {}], { duration: 160, easing: EASE_OUT });
+  titleScreen.classList.add('dismissing');
+  setTimeout(() => {
+    titleScreen.hidden = true;
+    titleScreen.classList.remove('dismissing');
+    document.body.classList.remove('title-up');
+    if (motionOn()) animateTownEntrance();
+    if (inTown && townState.tab === 'camp') void playCampScenes();
+    // The engine starts after the title (P4), in the first idle moment of the camp: the title's tap never waits behind WebGL.
+    scheduleEngine();
+  }, motionOn() ? 280 : 250);
 }
 /** HUD wallet: Story gold and challenge Crystal in every mode. Each mode's profile zeroes the currency it cannot spend, so the other one comes from the Commander document. */
 function walletAmounts() {
@@ -223,14 +217,30 @@ function persist(slotId: SlotId = 'auto', edit?: (document: CommanderDocument) =
 const sound = new Sound();
 sound.enabled = profile.sound;
 let battle = new Battle('adventure', 1, profileModifiers(profile), storyBattleOptions(profile));
-let scene: BattleScene;
+/** The arena scene: constructed by startEngine() once the engine chunk has loaded; `initialized` once its first frame created it. */
+let scene: BattleScene | undefined;
 let inTown = true;
 /** When showTown last rendered a notice (dismissNotice ignores input in the first moment after it). */
 let noticeAt = 0;
 let initialized = false;
 let engine: Phaser.Game | undefined;
-/** The Phaser loop runs only while a fight is on screen: in town (once the result screen is closed) it sleeps, so the hidden arena is not redrawn every frame; boot() wakes it. */
-function engineAwake(awake: boolean) { const loop = engine?.loop; if (!loop?.started) return; if (awake) loop.wake(); else if (resultScreen.hidden && $('battle-screen').hidden) loop.sleep(); }
+/** The Phaser loop runs only while the arena can change on screen (P6): a fight in progress, the ready window (its grid can be dragged) with
+ *  no dialog over it, or a won boss still dying (a result waits for that animation), on the arena view. It sleeps in town, behind a result
+ *  or wave-clear card, on the Status and Log views and while the fight is paused behind a dialog; a paused battle needs no ticks, so the
+ *  fixed-step simulation is unchanged. Waking runs one step at once (scene.update → frame()), so the arena is never stale. */
+function arenaLive() {
+  if (inTown || $('battle-screen').hidden || !resultScreen.hidden) return false;
+  const s = battle.status;
+  if (s === 'victory' && initialized && !scene!.isEnemyDeathAnimationComplete()) return true;
+  return ($('battle-screen').dataset.battleView ?? 'arena') === 'arena' && (s === 'fighting' || s === 'ready' && !modal.open);
+}
+/** Wake or sleep the loop to match arenaLive(); the HUD's endless pulses (body.battle-idle, battle.css) stop whenever nothing is fighting. */
+function syncEngine() {
+  document.body.classList.toggle('battle-idle', battle.status !== 'fighting');
+  const loop = engine?.loop;
+  if (!loop?.started) return;
+  if (arenaLive()) loop.wake(); else loop.sleep();
+}
 let recorded = false;
 let chapterResult: { stars: number; improved: boolean; heroic?: { gold: number; materials: Record<string, number> } } | undefined;
 /** What the last settled result credited (gold for Story, bank Crystal otherwise) and the party cap it unlocked (0 = unchanged). */
@@ -524,7 +534,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   if ((tab === 'raid' && townState.suspended.raid) || (tab === 'endless' && townState.suspended.roguelike)) townState.tonic = false;
   $('town-screen').hidden = false;
   $('battle-screen').hidden = true;
-  engineAwake(false); void keepAwake(false);
+  syncEngine(); void keepAwake(false);
   document.body.dataset.screen = tab === 'camp' ? 'camp' : 'town';
   routeStack = pushRoute(routeStack, tab);
   if (isFeature(tab)) markVisited(tab);
@@ -553,6 +563,8 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   const partyList = routeChanged ? null : $('town-screen').querySelector<HTMLDetailsElement>('details.story-party:not(.locked)');
   if (partyList) townState.storyPartyOpen = partyList.open;
   renderTown($('town-screen'), profile, townState);
+  paintTownArt();
+  if (tab === 'mission') prebuildChapterArt(townState.zone);
   // G7: the controls a re-render can put under the finger (the next gear piece, Equip now after Promote) ignore taps for a moment.
   const renderedAt = performance.now(), held = Array.from($('town-screen').querySelectorAll<HTMLElement>(TOWN_HELD));
   holdInput(held.filter(el => !el.matches(TOWN_SPEND)), INPUT_DELAY_MS, renderedAt); holdInput(held.filter(el => el.matches(TOWN_SPEND)), CHOICE_INPUT_DELAY_MS, renderedAt);
@@ -561,9 +573,11 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   if (routeChanged) {
     const scene = $('town-screen').querySelector<HTMLElement>('.town-scene');
     const heading = scene?.querySelector<HTMLElement>('h1') ?? scene;
+    // The heading takes the focus in the next frame, where the layout it needs is computed anyway (P7), unless something took it meanwhile.
     if (heading) {
       heading.tabIndex = -1;
-      heading.focus({ preventScroll: true });
+      const before = document.activeElement;
+      requestAnimationFrame(() => { const now = document.activeElement; if (heading.isConnected && !modal.open && (now === before || now === document.body || !now?.isConnected)) heading.focus({ preventScroll: true }); });
     }
     // Back in the Undercroft with news (a fled or interrupted fight): open on the room panel that explains it; else on the open rooms.
     if (tab === 'dungeon' && townState.dungeonOutcome) scene?.querySelector('.room-panel')?.scrollIntoView({ block: 'end' });
@@ -573,7 +587,7 @@ function showTown(tab: TownTab = townState.tab, notice = '', animate = false) {
   if (animate && motionOn()) {
     if (tab === 'camp') animateTownEntrance();
     else {
-      fromTo(document.querySelector('.town-scene'), { opacity: 0.6 }, { opacity: 1, duration: 0.2, ease: 'power2.out', clearProps: 'opacity' });
+      enter(document.querySelector('.town-scene'), { opacity: 0.6 }, { duration: 200 });
     }
     if (tab === 'party' || tab === 'party-advanced') animateMirrorTalents();
     else if (tab === 'bestiary') animateCodexEntry();
@@ -767,7 +781,7 @@ $('town-screen').addEventListener('click', event => {
     townState.pendingGear = townState.pendingJob = undefined;
     showTown(townState.tab === 'party-advanced' ? 'party-advanced' : 'party', '', true);
     if (motionOn()) {
-      fromTo(document.querySelector(`[data-town-hero="${townState.hero}"]`), { scale: 0.93 }, { scale: 1, duration: 0.22, ease: 'back.out(2)', clearProps: 'transform' });
+      enter(document.querySelector(`[data-town-hero="${townState.hero}"]`), { transform: 'scale(.93)' }, { duration: 220, easing: EASE_BACK });
     }
   }
   if (button.dataset.act !== undefined) {
@@ -858,7 +872,7 @@ $('town-screen').addEventListener('click', event => {
     const gearName = ok && ok.gear ? GEAR.find(g => g.id === ok.gear)?.name ?? ok.gear : '';
     showTown('quests',ok?t(!ok.gear ? 'notice.quest.ok' : ok.refund ? 'notice.quest.gear.refund' : ok.equipped ? 'notice.quest.gear.equipped' : 'notice.quest.ok.gear', { name: ROSTER[ok.hero].name, gear: gearName, gold: ok.refund }):t('notice.quest.fail'), true);
     if (ok && motionOn()) {
-      fromTo(document.querySelector(`[data-quest="${questId}"]`), { scale: 0.96, filter: 'brightness(1.5)' }, { scale: 1, filter: 'brightness(1)', duration: 0.35, ease: 'back.out(2)', clearProps: 'transform,filter' });
+      enter(document.querySelector(`[data-quest="${questId}"]`), { transform: 'scale(.96)', opacity: 0.6 }, { duration: 350, easing: EASE_BACK });
     }
   }
   if(button.dataset.trackQuest){const q=QUESTS.find(q=>q.id===button.dataset.trackQuest);if(q&&questProgress(profile,q).unlocked){profile.trackedQuest=q.id;showTown('quests',t('notice.quest.track'));}}
@@ -1390,7 +1404,9 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   lastStatus = 'ready';
   moveMode = false;
   touches.clear();
-  if (initialized) { scene.dragId = -1; scene.dragPoint = undefined; scene.hoverSlot = -1; scene.replace(battle); }
+  // The engine starts on demand when a departure comes before it (a fast player, a slow network): the arena draws once it is ready.
+  void startEngine();
+  arenaBattle();
   const fromTown = !$('town-screen').hidden;
   $('town-screen').hidden = true;
   $('battle-screen').hidden = false;
@@ -1403,9 +1419,9 @@ function boot(mode: Mode = 'adventure', floor = 1, options: Partial<BattleOption
   addLog(t('log.ready'));
   document.querySelectorAll<HTMLElement>('[data-lane]').forEach(el => { el.classList.remove('active'); el.setAttribute('aria-pressed', 'false'); });
   // Waking runs one engine step at once (scene.update → frame()), so it comes after the new battle's unit layer and ready window exist.
-  engineAwake(true);
+  syncEngine();
   frame(1);
-  requestAnimationFrame(() => scene.scale?.refresh());
+  requestAnimationFrame(() => scene?.scale?.refresh());
   $('battle-screen').scrollTop = 0;
 }
 /** Spend journey Crystal on a run item and apply its effect to the current battle. */
@@ -1499,7 +1515,7 @@ function showReady() {
   $('start').textContent = t('battle.begin');
   updateReadyBack();
   if (motionOn()) {
-    fromTo(q('#start-overlay .start-window'), { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
+    enter(q('#start-overlay .start-window'), { opacity: 0, transform: 'translateY(-12px)' }, { duration: 220 });
   }
 }
 /** The ready window's Back, before FIGHT!: free ('◀ Back', nothing spent) or guarded ('◀ Leave…', the leave dialog). Also the Log view's exit label. */
@@ -1586,6 +1602,9 @@ function goOrigin() {
 let startCheckpoint: Promise<unknown> = Promise.resolve();
 async function begin() {
   if (inTown) return;
+  // The fight ticks in the engine's loop: a FIGHT! pressed while the engine still loads (a departure right after the title on a slow
+  // network) starts it once the arena is up, if that battle is still waiting.
+  if (!initialized) { const waiting = battle; void startEngine().then(() => { if (battle === waiting && !inTown && battle.status === 'ready') void begin(); }); return; }
   if (['victory', 'defeat'].includes(battle.status)) { result(); return; }
   // FIGHT! in a read-only tab says why it cannot start (its checkpoint could not be saved).
   if (commander.stale) { staleModal(); return; }
@@ -1601,7 +1620,8 @@ async function begin() {
   battle.start();
   readySheet(false);
   updateReadyBack();
-  if (initialized) scene.encounterStart();
+  if (initialized) scene!.encounterStart();
+  syncEngine();
   addLog(t('log.begin'));
   startCheckpoint = ensureCommander().then(() => commander.flush()).then(() => checkpoint(true));
 }
@@ -1874,13 +1894,11 @@ function bindPointer(el: HTMLElement, id: number, origin: 'card' | 'chip') {
   });
   el.addEventListener('pointermove', e => {
     const t = touches.get(e.pointerId);
-    if (!t || scene.dragId !== -1 && scene.dragId !== id) return;
+    if (!t || scene && scene.dragId !== -1 && scene.dragId !== id) return;
     if (!t.drag && Math.hypot(e.clientX - t.x, e.clientY - t.y) <= DRAG_START_PX) return;
     if (!t.drag && t.origin === 'chip') { battle.selected = id; closeSkillPicker(); renderInspector(); }
     t.drag = true;
-    scene.dragId = id;
-    scene.dragPoint = point(e.clientX, e.clientY);
-    scene.hoverSlot = slotAt(scene.dragPoint);
+    if (scene) { scene.dragId = id; scene.dragPoint = point(e.clientX, e.clientY); scene.hoverSlot = slotAt(scene.dragPoint); }
     el.closest('.unit-card')?.classList.add('dragging');
   });
   const finish = (e: PointerEvent, cancelled = false) => {
@@ -1895,7 +1913,7 @@ function bindPointer(el: HTMLElement, id: number, origin: 'card' | 'chip') {
       else if (t.origin === 'chip' && !t.drag) chipSwitch(id);
       else tapHero(id, [...touches.values()].some(other => other.id === id && Math.abs(other.started - t.started) < 120));
     }
-    if (t.drag) { scene.dragId = -1; scene.dragPoint = undefined; scene.hoverSlot = -1; }
+    if (t.drag && scene) { scene.dragId = -1; scene.dragPoint = undefined; scene.hoverSlot = -1; }
     el.closest('.unit-card')?.classList.remove('dragging');
   };
   el.addEventListener('pointerup', e => finish(e));
@@ -1947,6 +1965,7 @@ function setBattleView(view: 'arena' | 'hero' | 'log') {
   if (view === 'arena') { syncSlot(); chipFitKey = String(Number(chipFitKey) + 1); }
   if (view === 'hero') renderInspector();
   frame(1);
+  syncEngine();
 }
 function cycleSkill(id: number, direction = 1) {
   const h = battle.hero(id);
@@ -2012,6 +2031,7 @@ function frame(dt: number) {
   drawIn = .06;
   if (battle.status !== lastStatus) {
     lastStatus = battle.status; renderInspector(); updateReadyBack();
+    document.body.classList.toggle('battle-idle', battle.status !== 'fighting');
     if (battle.status === 'victory' || battle.status === 'defeat') { announce(t(battle.status === 'victory' ? 'a11y.victory' : 'a11y.defeat', { name: battle.enemyName }), true); result(); }
   }
   for (const h of battle.heroes) { if (h.hp <= 0) downed.add(h.id); else if (downed.delete(h.id)) announce(t('a11y.revived', { name: heroName(h) })); }
@@ -2035,7 +2055,7 @@ function frame(dt: number) {
   intent.classList.toggle('danger', isDanger);
   intent.classList.toggle('guarding', !isDanger && battle.guardLeft > 0);
   if (isDanger && !wasDanger && motionOn()) {
-    fromTo($('intent'), { scale: 1.08 }, { scale: 1, duration: 0.25, ease: 'back.out(2)', clearProps: 'transform' });
+    enter($('intent'), { transform: 'scale(1.08)' }, { duration: 250, easing: EASE_BACK });
   }
   setText(intent.querySelector('b')!, threat ? `${t('battle.intent.time', { name: eventText(threat.name, lang()), s: fmtDec(Math.max(0, threat.left)) })}${threat.targetId !== undefined ? ` → ${heroLabel(threat.targetId)}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: fmtDec(battle.guardLeft) }) : t('battle.watch'));
   setText(intent.querySelector('span')!, threat ? `${threat.counter ? touchText(eventText(threat.counter, lang())) : t('battle.counter.default')}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.hint'));
@@ -2095,7 +2115,7 @@ function frame(dt: number) {
  * (BattleScene.timeScale: fewer fixed 1/60 s ticks per frame, never a different tick). Skipped under automation unless QA forces it
  * with window.gridbound.coach(true).
  */
-function endCoachStep(step?: CoachStep) { if (step) markCoach(step); coach.hide(); if (initialized) scene.timeScale = 1; }
+function endCoachStep(step?: CoachStep) { if (step) markCoach(step); coach.hide(); if (scene) scene.timeScale = 1; }
 /** The coach will teach this battle (Chapter 1 before its first clear, tips on, some left): its tips replace the ready window's how-to-play line. */
 function coachDue() { return battle.mode === 'adventure' && battle.floor === 1 && !battle.heroic && !COACH_STEPS.every(coachDone) && (coachForced || (!navigator.webdriver && coachEnabled() && !profile.cleared.includes(0))); }
 const coachOn = () => battle.status === 'fighting' && coachDue();
@@ -2115,7 +2135,7 @@ function coachFrame(guardWindow: boolean) {
     if (coach.step) endCoachStep(coach.step);
     coachThreat = ground.id; coachHero = victim.id;
     coach.show('drag', t('coach.drag', { name: heroName(victim) }), card(victim.id));
-    if (initialized) scene.timeScale = .3;
+    if (scene) scene.timeScale = .3;
   } else if (calm && !coachDone('guard') && guardWindow) {
     if (coach.step) endCoachStep(coach.step);
     coach.show('guard', t('coach.guard'), () => $('guard'));
@@ -2260,13 +2280,15 @@ function openModal(content: string, options: boolean | ModalOptions = true) {
     // cross-origin frame (itch.io) Chrome blocks it with a console error.
     modal.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
     sound.modalReveal();
-    if (motionOn()) gsap.fromTo(modal, { opacity: 0 }, { opacity: 1, duration: 0.15, ease: 'power2.out', clearProps: 'opacity' });
+    if (motionOn()) enter(modal, { opacity: 0 }, { duration: 150 });
+    syncEngine();
   } else {
     // New content in an open modal (Pause → Settings) destroyed the focused button: move the focus to its safe choice, the new title, or its first control.
     const safe = modal.querySelector<HTMLElement>('[data-autofocus]'), title = modal.querySelector<HTMLElement>('#modal-title');
     if (safe) safe.focus({ preventScroll: true });
     else if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }); }
     else modal.querySelector<HTMLElement>('button:not([disabled]), input, select, textarea, [href]')?.focus({ preventScroll: true });
+    syncEngine();
   }
   // K6: a destructive option never lands where the control that opened this content was (Leave battle…, Flee the room…, Delete…). A control in
   // the sticky exit row (the dossier's Descend) is never moved: a margin there would stretch the whole row over the dialog; the G7 hold and its
@@ -2301,6 +2323,7 @@ modal.addEventListener('close', () => {
   if (modal.open) return;
   modalParent = undefined; modal.dataset.blocking = '';
   if (resumeOnClose && !inTown && battle.status === 'paused') battle.pause(); resumeOnClose = false;
+  syncEngine();
   const back = modalReturn; modalReturn = null;
   if (back?.isConnected && !back.closest('[hidden],[inert]') && (document.activeElement === document.body || modal.contains(document.activeElement))) back.focus({ preventScroll: true });
   // Camp scenes that waited for this dialog (an import or a Delete that activated a file owing them) play now, then the unlock card. After the
@@ -2422,6 +2445,7 @@ function clearResultState() {
   resultScreen.hidden = true;
   resultScreen.innerHTML = '';
   $('battle-screen').inert = false;
+  syncEngine();
 }
 function showResultScreen(content: string) {
   clearResultState(); void keepAwake(false);
@@ -2430,6 +2454,7 @@ function showResultScreen(content: string) {
   resultScreen.tabIndex = -1;
   $('battle-screen').inert = true;
   resultScreen.focus({ preventScroll: true });
+  syncEngine();
 }
 resultScreen.addEventListener('click', event => {
   if (resultScreen.dataset.result === 'true' && !resultGate.allows(performance.now(), resultGeneration)) {
@@ -2443,58 +2468,58 @@ const boonColor = (id: string) => BOON_COLORS[id] ?? '#f5c462';
 
 function animateBoonDraft() {
   if (!motionOn()) return;
-  fromTo(q('.boon-card', resultScreen), { opacity: 0, y: 35, scale: 0.88 }, { opacity: 1, y: 0, scale: 1, stagger: 0.08, duration: 0.4, ease: 'back.out(1.6)', clearProps: 'opacity,transform' });
+  enter(q('.boon-card', resultScreen), { opacity: 0, transform: 'translateY(35px) scale(.88)' }, { stagger: 80, duration: 400, easing: EASE_BACK });
 }
 
 function animateCeremony() {
   if (!motionOn()) return;
   const modalEl = resultScreen.querySelector('.result-ceremony-modal');
   if (!modalEl) return;
-  const tl = gsap.timeline(), crest = modalEl.querySelector('.result-banner');
-  if (crest) {
-    fromTo(crest, { scale: 2.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(2.2)', clearProps: 'opacity,transform' }, tl);
-    fromTo(q('.win', modalEl), { opacity: 0, scaleY: 0.3 }, { opacity: 1, scaleY: 1, stagger: 0.08, duration: 0.2, ease: 'power2.out', clearProps: 'opacity,transform' }, tl, '-=0.1');
-  }
-  fromTo(q('.stat-plaque', modalEl), { opacity: 0, y: 14 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.28, ease: 'power2.out', clearProps: 'opacity,transform' }, tl, '-=0.15');
-  fromTo(q('.xp-card', modalEl), { opacity: 0, x: -14 }, { opacity: 1, x: 0, stagger: 0.035, duration: 0.25, ease: 'power2.out', clearProps: 'opacity,transform' }, tl, '-=0.1');
+  const crest = modalEl.querySelector('.result-banner'), wins = crest ? q('.win', modalEl) : [];
+  // The crest lands, the windows unfold one after another, then the plaques and the EXP cards follow.
+  if (crest) enter(crest, { opacity: 0, transform: 'scale(2.4)' }, { duration: 450, easing: 'cubic-bezier(.34,1.8,.64,1)' });
+  enter(wins, { opacity: 0, transform: 'scaleY(.3)' }, { delay: 350, stagger: 80, duration: 200 });
+  const plaques = crest ? 350 + Math.max(0, wins.length - 1) * 80 + 50 : 0;
+  enter(q('.stat-plaque', modalEl), { opacity: 0, transform: 'translateY(14px)' }, { delay: plaques, stagger: 50, duration: 280 });
+  enter(q('.xp-card', modalEl), { opacity: 0, transform: 'translateX(-14px)' }, { delay: plaques + 200, stagger: 35, duration: 250 });
 }
 
+/** Route entrances (P7): Web Animations from explicit keyframes on the fresh DOM, never a GSAP read of computed styles. */
 function animateMirrorTalents() {
   if (!motionOn()) return;
-  fromTo(q('.talent-flow-node'), { opacity: 0, scale: 0.94 }, { opacity: 1, scale: 1, stagger: 0.02, duration: 0.2, ease: 'power2.out', clearProps: 'opacity,transform' });
+  enter(q('.talent-flow-node'), { opacity: 0, transform: 'scale(.94)' }, { stagger: 20, duration: 200 });
 }
 
 function animateCodexEntry() {
   if (!motionOn()) return;
   const art = document.querySelector<HTMLElement>('.bestiary-list article');
   if (!art) return;
-  const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
-  fromTo(art.querySelector('img'), { opacity: 0, scale: 0.88, rotate: -2 }, { opacity: 1, scale: 1, rotate: 0, duration: 0.28 }, tl);
-  fromTo(art.querySelector('div')?.children, { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: 0.04, duration: 0.22, clearProps: 'all' }, tl, '-=0.15');
+  enter(art.querySelector('img'), { opacity: 0, transform: 'scale(.88) rotate(-2deg)' }, { duration: 280 });
+  enter(art.querySelector('div')?.children, { opacity: 0, transform: 'translateY(10px)' }, { delay: 130, stagger: 40, duration: 220 });
 }
 
 function animateProphecies() {
   if (!motionOn()) return;
-  fromTo(q('.quest-entry'), { opacity: 0, y: 12 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.25, ease: 'power2.out', clearProps: 'all' });
+  enter(q('.quest-entry'), { opacity: 0, transform: 'translateY(12px)' }, { stagger: 50, duration: 250 });
 }
 
 function animateChallengeShop() {
   if (!motionOn()) return;
-  fromTo(q('.challenge-shop-grid .shop-item'), { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: 0.03, duration: 0.22, ease: 'power2.out', clearProps: 'all' });
+  enter(q('.challenge-shop-grid .shop-item'), { opacity: 0, transform: 'translateY(10px)' }, { stagger: 30, duration: 220 });
 }
 
 function animatePactRaid() {
   if (!motionOn()) return;
-  fromTo(q('.raid-roster button'), { opacity: 0, scale: 0.95, y: 8 }, { opacity: 1, scale: 1, y: 0, stagger: 0.03, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,transform' });
-  fromTo(document.querySelector('.mission-brief'), { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.25, ease: 'power2.out', clearProps: 'opacity,transform' });
-  fromTo(document.querySelector('.secondary-deploy'), { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.24, ease: 'power2.out', clearProps: 'opacity,transform' });
+  enter(q('.raid-roster button'), { opacity: 0, transform: 'translateY(8px) scale(.95)' }, { stagger: 30, duration: 220 });
+  enter(document.querySelector('.mission-brief'), { opacity: 0, transform: 'translateY(12px)' }, { duration: 250 });
+  enter(document.querySelector('.secondary-deploy'), { opacity: 0, transform: 'translateY(8px)' }, { duration: 240 });
 }
 
 function animateSunkenDescent() {
   if (!motionOn()) return;
-  fromTo(q('.endless-rules p'), { opacity: 0, y: 10 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.24, ease: 'power2.out', clearProps: 'opacity,transform' });
-  fromTo(q('.loadout-slots label'), { opacity: 0 }, { opacity: 1, stagger: 0.06, duration: 0.25, ease: 'power2.out', clearProps: 'opacity' });
-  fromTo(document.querySelector('button[data-depart="endless"]'), { opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1, duration: 0.28, ease: 'power2.out', clearProps: 'opacity,transform' });
+  enter(q('.endless-rules p'), { opacity: 0, transform: 'translateY(10px)' }, { stagger: 50, duration: 240 });
+  enter(q('.loadout-slots label'), { opacity: 0 }, { stagger: 60, duration: 250 });
+  enter(document.querySelector('button[data-depart="endless"]'), { opacity: 0, transform: 'scale(.96)' }, { duration: 280 });
 }
 
 function result() {
@@ -2536,7 +2561,7 @@ function result() {
   // settles the result at once (resultNow), so an OS discard in the background never loses a won battle.
   let started = false;
   const once = () => { if (started) return; started = true; resultNow = undefined; void show(); };
-  const readiness = battle.status === 'victory' && !document.hidden ? scene?.waitForEnemyDeathAnimation?.() : undefined;
+  const readiness = battle.status === 'victory' && !document.hidden && initialized ? scene!.waitForEnemyDeathAnimation() : undefined;
   if (readiness) { resultNow = once; readiness.then(once, once); } else once();
 }
 /** A result waiting for the boss's death animation; the page going to the background settles it without waiting. */
@@ -2896,10 +2921,12 @@ function advanceWave() {
   if (!battle.nextWave()) return;
   lastStatus = 'ready';
   recorded = false;
-  if (initialized) scene.replace(battle);
+  arenaBattle();
   makeUnits();
   updateExpedition();
   showReady();
+  // The won wave's clear card put the loop to sleep (status 'victory'): the next battle's ready window wakes it, or its arena stays a stale frame.
+  syncEngine();
   frame(1);
   void checkpoint();
 }
@@ -2916,7 +2943,7 @@ function resumeEncounter(savedEncounter: NonNullable<typeof encounter>) {
   runBoons = [...frozen.boons]; runSeed = frozen.seed; boonReroll = Number.isInteger(frozen.reroll) && frozen.reroll! > 0 ? frozen.reroll! : 0;
   recorded = frozen.settled;
   townState.rogueSetup = battle.rogueBuild ? structuredClone(battle.rogueBuild) : townState.rogueSetup;
-  if (initialized) scene.replace(battle);
+  arenaBattle();
   makeUnits(); updateExpedition(); showReady();
   setReadyCopy(t('ready.resume')); $('ready-tip').hidden = true;
   if (frozen.settled) result();
@@ -3547,7 +3574,7 @@ window.addEventListener('keydown', e => {
  *  as it does under a dialog already open. */
 function pauseAway(menu = true) {
   if (inTown || battle.status !== 'fighting') return;
-  if (modal.open || !menu) { battle.pause(); awayPaused = true; return; }
+  if (modal.open || !menu) { battle.pause(); awayPaused = true; syncEngine(); return; }
   renderPause();
 }
 /** Back from a blur (the window has the focus again, or the page is shown): the pause menu that waited for the player. */
@@ -3599,24 +3626,62 @@ async function keepAwake(on: boolean) {
     } else if (!on && wakeLock) { const lock = wakeLock; wakeLock = null; await lock.release(); }
   } catch { /* refused: nothing to undo */ }
 }
-scene = new BattleScene(battle, sound, frame);
 /** Push the effective motion setting to the arena (no flashes, shake, hit-stop or boss bob) and the CSS (body.reduced-motion). */
 function applyMotion() { if (scene) scene.reducedMotion = !motionOn(); document.body.classList.toggle('reduced-motion', !motionOn()); }
 applyMotion();
 reduceMotionQuery.addEventListener('change', applyMotion);
-/** The engine's first frame sets up WebGL and the scene (enemy art is registered on first use); it starts once the save layer has settled (or after 6 s, for a lookup that never answers) so the Commander is active before the player can act. A battle booted before that renders once the engine starts (scene calls are guarded by `initialized`). */
-function startEngine() {
-  if (initialized) return;
-  scene.battle = battle;
-  engine = new Phaser.Game({ type: Phaser.AUTO, parent: 'game-canvas', width: ARENA.width, height: ARENA.height, backgroundColor: '#0e1e19', pixelArt: true, roundPixels: true, antialias: false, scene: [scene], scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, input: { activePointers: 3 }, audio: { noAudio: true }, render: { preserveDrawingBuffer: true }, banner: false });
-  // The first frame creates the scene; a player still in town then lets the loop sleep until a battle boots.
-  engine.events.once(Phaser.Core.Events.POST_RENDER, () => engineAwake(!inTown));
-  initialized = true;
+/** Point the arena at the current battle: a created scene replaces its sprites; one still loading draws it in its create(). */
+function arenaBattle() { if (initialized) scene!.replace(battle); else if (scene) scene.battle = battle; }
+let engineReady: Promise<void> | undefined;
+/** Phaser renders a frame once the smoothed frame time reaches 1000/limit ms: a cap of exactly 60 skipped every other frame of a 60 Hz screen
+ *  (16.66 ms falls just short of 16.67 by rounding), so the cap sits at 61, which still holds a 120 Hz screen to 60 frames and a 90 Hz one to 45. */
+const FPS_CAP = 61;
+/**
+ * The engine (P3/P4/P9): Phaser and the scene are a dynamic import, off the critical path (the title paints without them; the built page
+ * never modulepreloads the engine chunk). It starts once the save layer has settled — at once under automation, so tests and the dev hook
+ * keep their timing; for a player after the title (scheduleEngine) — or on demand when a battle boots first, or after 6 s for a lookup
+ * that never answers. Resolves when the first frame has created the scene (`initialized`); a battle booted meanwhile is drawn by create().
+ * No pre/post FX pipelines (none is used: 11 shader programs instead of 31), at most 60 rendered frames a second on a 90/120 Hz screen
+ * (FPS_CAP; the fixed 1/60 s tick loop keeps the simulation identical at any render rate) and no preserveDrawingBuffer (nothing reads the
+ * canvas back; screenshots use the compositor).
+ */
+function startEngine(): Promise<void> {
+  return engineReady ??= (async () => {
+    const [{ default: PhaserLib }, { BattleScene: Scene }] = await Promise.all([import('phaser'), import('./render/BattleScene')]);
+    scene = new Scene(battle, sound, frame);
+    applyMotion();
+    engine = new PhaserLib.Game({ type: PhaserLib.AUTO, parent: 'game-canvas', width: ARENA.width, height: ARENA.height, backgroundColor: '#0e1e19', pixelArt: true, roundPixels: true, antialias: false, scene: [scene], scale: { mode: PhaserLib.Scale.FIT, autoCenter: PhaserLib.Scale.CENTER_BOTH }, input: { activePointers: 3 }, audio: { noAudio: true }, render: { preserveDrawingBuffer: false }, disablePreFX: true, disablePostFX: true, fps: { target: 60, limit: FPS_CAP }, banner: false });
+    // The first frame creates the scene; a player still in town then lets the loop sleep until a battle boots.
+    await new Promise<void>(resolve => engine!.events.once(PhaserLib.Core.Events.POST_RENDER, () => resolve()));
+    initialized = true;
+    syncEngine();
+  })();
+}
+/** A player's engine starts in the camp's first idle moment after the title (at most 2 s later), never under the title's first tap. */
+function scheduleEngine() {
+  // Before the boot step settles, its own end starts the engine (the title is gone by then): the engine's long first frame never holds back the save lookup.
+  if (engineReady || !commanderChecked) return;
+  const run = () => void startEngine();
+  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 2000 }); else setTimeout(run, 200);
+}
+/** While a chapter's dossier is open, its foes' battle textures (all 8 frames each) are drawn in idle moments, one foe per moment, so
+ *  Depart does not pay for them in one long task (P7). Only once the engine runs; never during a battle. */
+function prebuildChapterArt(zone: number) {
+  const ids = [...new Set(CAMPAIGN[zone]?.stages.map(stage => stage.enemy) ?? [])];
+  const idle = (run: () => void) => 'requestIdleCallback' in window ? requestIdleCallback(run, { timeout: 3000 }) : setTimeout(run, 50);
+  const next = () => { const id = ids.shift(); if (!id || !initialized || !inTown || townState.tab !== 'mission' || townState.zone !== zone) return; scene!.enemyTexture(id, 0); idle(next); };
+  idle(next);
+}
+/** The town scene art (the camp's map, the title's backdrop) comes after the first paint: its drawing and PNG encoding (async, toBlob)
+ *  never hold back the screen that shows it (P2/P7). */
+function paintTownArt() {
+  if (!document.querySelector('img[data-town-art]:not([src])')) return;
+  requestAnimationFrame(() => setTimeout(() => void townSceneURL().then(url => document.querySelectorAll<HTMLImageElement>('img[data-town-art]:not([src])').forEach(img => { img.src = url; })), 0));
 }
 // A stalled Commander lookup (IndexedDB that never answers) must not leave progress only in RAM: after 1.5 s the raw legacy save is backed up and the live profile is written to gridbound.v3 until a Commander activates.
 const saveFallback = window.setTimeout(() => { if (!commander.document && !commanderChecked) { backupLegacyNow(); commanderChecked = true; storageStatus(); } }, 1500);
 // The engine waits longer: started early, its long first frame would hold back a lookup that is merely slow (a busy device).
-const engineFallback = window.setTimeout(startEngine, 6000);
+const engineFallback = window.setTimeout(() => void startEngine(), 6000);
 showTown();
 if (typeof navigator !== 'undefined' && !navigator.webdriver) {
   titleScreenEl.classList.add('press-phase');
@@ -3628,7 +3693,7 @@ const exposeQaHook = () => { if (import.meta.env.DEV) Object.assign(window, { gr
   get runBoons() { return runBoons; },
   setRunBoons: (b: string[]) => { runBoons = [...b]; battle.boons = [...b]; updateExpedition(); },
   step: (seconds: number) => { for (let t = 0; t < Math.min(600, Math.max(0, seconds)); t += 1 / 60) battle.tick(1 / 60); frame(1); },
-  boot, scene, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro, recruitScene: (id: number) => recruitScene(id, true), campScenes: () => playCampScenes(true), endingScene,
+  boot, get scene() { return scene; }, showTitle: showTitleScreen, hideTitle: enterEmberhollow, showBoonTray, chapterIntro, recruitScene: (id: number) => recruitScene(id, true), campScenes: () => playCampScenes(true), endingScene,
   /** Force the first-battle coach on (tips replay from the start) or off, regardless of automation and Config. */
   coach: (force = true) => { coachForced = force; if (force) resetCoach(); else if (coach.step) endCoachStep(); return { step: coach.step ?? null, done: COACH_STEPS.filter(coachDone) }; },
   /** Ask before a Story departure with free party slots even under automation (`on = false`: back to skipping it there). */
@@ -3647,4 +3712,4 @@ const exposeQaHook = () => { if (import.meta.env.DEV) Object.assign(window, { gr
 } }); };
 // Every player gets a Commander: the latest one, or one migrated from the legacy save (backed up first). The dev QA hook appears once that has settled, so tests never race the migration.
 // The browser/phone Back stays in the game from then on (also under automation: the navigation tests need it).
-void ensureCommander().finally(() => { commanderChecked = true; storageStatus(); window.clearTimeout(saveFallback); window.clearTimeout(engineFallback); startEngine(); backGuard ??= installBackGuard({ onBack: () => goBack('history'), wantGuard: () => !bareTitle() }); exposeQaHook(); if (inTown && townState.tab === 'camp') void playCampScenes(); });
+void ensureCommander().finally(() => { commanderChecked = true; storageStatus(); window.clearTimeout(saveFallback); window.clearTimeout(engineFallback); if (navigator.webdriver || $('title-screen')?.hidden !== false) void startEngine(); backGuard ??= installBackGuard({ onBack: () => goBack('history'), wantGuard: () => !bareTitle() }); exposeQaHook(); if (inTown && townState.tab === 'camp') void playCampScenes(); });

@@ -106,6 +106,8 @@ await withBrowser(async ({ send, evaluate, wait, click, screenshot, errors }) =>
       if (stage < count - 1) {
         await click('#next-wave');
         await wait('window.gridbound.battle.status === "ready" && document.querySelector("#result-screen").hidden');
+        // The next battle's ready window wakes the sleeping engine loop (asleep behind the wave-clear card): its arena draws the new boss.
+        assert.equal(await evaluate('window.gridbound.scene.game.loop.running'), true, `the engine loop runs on chapter ${chapter} battle ${stage + 2}'s ready window`);
         await click('#start');
         await wait('window.gridbound.battle.status === "fighting"');
       }

@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { request } from 'node:http';
 import { once } from 'node:events';
+import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 
 function get(port: number, path: string, method = 'GET') {
   return new Promise<{status: number, headers: import('node:http').IncomingHttpHeaders, body: string}>((resolve, reject) => {
@@ -22,6 +23,20 @@ function get(port: number, path: string, method = 'GET') {
   });
 }
 
+function raw(port: number, path: string, headers: Record<string, string> = {}, method = 'GET') {
+  return new Promise<{status: number, headers: import('node:http').IncomingHttpHeaders, body: Buffer}>((resolve, reject) => {
+    const req = request({host: '127.0.0.1', port, path, method, headers}, res => {
+      const chunks: Buffer[] = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => resolve({status: res.statusCode!, headers: res.headers, body: Buffer.concat(chunks)}));
+    });
+    req.on('error', reject);
+    req.setTimeout(5000, () => req.destroy(new Error('HTTP timeout')));
+    req.end();
+  });
+}
+const BIG_JS = `export const lines = [${Array.from({length: 2000}, (_, i) => `'line ${i} of the fixture'`).join(',')}];\n`;
+
 test('Node hosting entry serves built assets without exposing the repository', async t => {
   const root = await mkdtemp(join(tmpdir(), 'gridbound-node-test-'));
   let child: ReturnType<typeof spawn> | undefined;
@@ -31,6 +46,8 @@ test('Node hosting entry serves built assets without exposing the repository', a
     await mkdir(join(root, 'dist/assets'), {recursive: true});
     await writeFile(join(root, 'dist/index.html'), '<!doctype html><title>Static server test fixture</title>');
     await writeFile(join(root, 'dist/assets/game-abcdefgh.js'), 'export const fixture = true;');
+    await writeFile(join(root, 'dist/assets/big-abcdefgh.js'), BIG_JS);
+    await writeFile(join(root, 'dist/assets/font-abcdefgh.woff2'), 'wOF2 fixture bytes wOF2 fixture bytes wOF2 fixture bytes');
     await writeFile(join(root, 'dist/.htaccess'), '# fixture');
     await symlink(join(root, 'package.json'), join(root, 'dist/assets/escape-abcdefgh.js'));
     child = spawn(process.execPath, [join(root, 'server.js')], {
@@ -72,6 +89,39 @@ test('Node hosting entry serves built assets without exposing the repository', a
         assert.match(response.headers['cache-control']!, /no-store/);
         assert.equal(response.body.includes('testFixture'), false, path);
       }
+    });
+    await t.test('text is compressed (P8): br first, then gzip, identity without Accept-Encoding; HEAD has no body; fonts never', async () => {
+      const gz = await raw(port, '/assets/big-abcdefgh.js', {'Accept-Encoding': 'gzip'});
+      assert.equal(gz.status, 200);
+      assert.equal(gz.headers['content-encoding'], 'gzip');
+      assert.match(gz.headers.vary!, /Accept-Encoding/i);
+      assert.equal(Number(gz.headers['content-length']), gz.body.length);
+      assert.ok(gz.body.length < BIG_JS.length / 4, `gzip body ${gz.body.length} B`);
+      assert.equal(gunzipSync(gz.body).toString(), BIG_JS);
+      assert.match(gz.headers['cache-control']!, /immutable/);
+      const br = await raw(port, '/assets/big-abcdefgh.js', {'Accept-Encoding': 'gzip, deflate, br'});
+      assert.equal(br.headers['content-encoding'], 'br');
+      assert.equal(brotliDecompressSync(br.body).toString(), BIG_JS);
+      assert.equal((await raw(port, '/assets/big-abcdefgh.js', {'Accept-Encoding': 'br;q=0, gzip'})).headers['content-encoding'], 'gzip');
+      const plain = await raw(port, '/assets/big-abcdefgh.js');
+      assert.equal(plain.headers['content-encoding'], undefined);
+      assert.match(plain.headers.vary!, /Accept-Encoding/i);
+      assert.equal(plain.body.toString(), BIG_JS);
+      assert.equal((await raw(port, '/assets/big-abcdefgh.js', {'Accept-Encoding': 'identity'})).headers['content-encoding'], undefined);
+      const head = await raw(port, '/assets/big-abcdefgh.js', {'Accept-Encoding': 'gzip'}, 'HEAD');
+      assert.equal(head.status, 200);
+      assert.equal(head.body.length, 0);
+      assert.equal(head.headers['content-encoding'], 'gzip');
+      assert.equal(head.headers['content-length'], gz.headers['content-length']);
+      const page = await raw(port, '/', {'Accept-Encoding': 'br'});
+      assert.equal(page.headers['content-encoding'], 'br');
+      assert.match(page.headers['cache-control']!, /no-cache/);
+      assert.match(brotliDecompressSync(page.body).toString(), /Static server test fixture/);
+      const font = await raw(port, '/assets/font-abcdefgh.woff2', {'Accept-Encoding': 'gzip, br'});
+      assert.equal(font.status, 200);
+      assert.equal(font.headers['content-encoding'], undefined);
+      assert.equal(font.headers.vary, undefined);
+      assert.equal(font.headers['x-content-type-options'], 'nosniff');
     });
     await t.test('malformed URLs and writes are rejected', async () => {
       assert.equal((await get(port, '/%')).status, 400);

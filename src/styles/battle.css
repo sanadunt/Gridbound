@@ -399,3 +399,5 @@
 .coach-bubble.side .coach-arrow::before { left: auto; right: 0; top: 8px; width: var(--arrow-len, 0px); height: 2px; }
 .coach-bubble.side .coach-arrow::after { left: 0; top: 0; bottom: auto; border: 9px solid transparent; border-left: 0; border-right-color: var(--coach-color); }
 @keyframes coach-in { from { opacity: 0; transform: translateY(6px); } }
+/* PERF (P6): while nothing is fighting (ready window, paused, ended: body.battle-idle, main.ts syncEngine) the HUD's endless pulses stop. */
+body.battle-idle :is(#battle-screen.boss-broken .stagger-track i, .intent-panel.danger, .guard-button.ready-window, .ultimate-button.ready, .unit-card.low-health .unit-hp, .unit-card.interrupt-ready .unit-skill, .status-chip.enrage, .party-health-card.charged .party-atb) { animation-play-state: paused; }

@@ -15,9 +15,12 @@
   color: var(--gold);
   letter-spacing: 2px;
   text-shadow: 0 3px 0 #7e6734, 0 6px 0 #07120f, 0 0 26px #e5c68744;
-  animation: logo-glow 3s ease-in-out infinite;
+  position: relative;
 }
-@keyframes logo-glow { 50% { text-shadow: 0 3px 0 #7e6734, 0 6px 0 #07120f, 0 0 38px #e5c68777; } }
+/* The glow pulses as a copy of the word with a static halo whose opacity animates (compositor-only, P6; an animated text-shadow restyled
+   and repainted the title 60 times a second). */
+.title-logo-glow { position: absolute; inset: 0; color: transparent; text-shadow: 0 0 38px #e5c68777; opacity: 0; pointer-events: none; will-change: opacity; animation: logo-glow 3s ease-in-out infinite; }
+@keyframes logo-glow { 50% { opacity: 1; } }
 .title-subtitle-wrap { display: flex; align-items: center; justify-content: center; gap: 10px; font-family: var(--pixel); font-size: 11px; color: #fff; text-shadow: 2px 2px 0 #000; letter-spacing: 2px; }
 .title-flourish { display: block; width: 40px; height: 3px; background: linear-gradient(90deg, transparent, var(--gold)); transform-origin: right; }
 .title-flourish.right { background: linear-gradient(90deg, var(--gold), transparent); transform-origin: left; }

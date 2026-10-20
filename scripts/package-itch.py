@@ -16,8 +16,8 @@ MAX_FILES = 999  # itch.io refuses an HTML upload with 1000 files or more
 MAX_BYTES = 64 * 1024 * 1024  # extracted size; itch allows 500 MB, our bundle is a few MB, so anything near this is a mistake
 ASSET_TYPES = {'.js', '.css', '.woff', '.woff2', '.ttf', '.otf', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.ogg', '.mp3', '.wav'}
 SKIPPED = {'.htaccess'}  # Apache config for the Hostinger ZIP; itch serves its own headers
-# Host names that appear in the bundle as inert strings, never fetched: XML namespaces, Phaser's banner/gameURL metadata, a GSAP warning.
-INERT_HOSTS = {'www.w3.org', 'phaser.io', 'gsap.com'}
+# Host names that appear in the bundle as inert strings, never fetched: XML namespaces and Phaser's banner/gameURL metadata.
+INERT_HOSTS = {'www.w3.org', 'phaser.io'}
 HOST = re.compile(r'(?:(?:https?|wss?):)?//((?:[a-z0-9-]+\.)+[a-z]{2,})(?![a-z0-9-])', re.I)
 DATA_URI = re.compile(r'data:[^"\'`)\s]*', re.I)
 HTML_REF = re.compile(r'\b(?:src|href)\s*=\s*["\']([^"\']*)["\']', re.I)

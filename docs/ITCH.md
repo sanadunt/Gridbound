@@ -229,7 +229,7 @@ detailnya sedikit berbeda setiap kali dijalankan. Setelah membuat ulang, lihat s
 ## Keputusan pemilik
 
 - **Harga**: gratis, gratis dengan donasi, atau berbayar. Kalau berbayar: Phaser (MIT) dan font (SIL OFL 1.1) boleh dipakai
-  komersial; GSAP memakai lisensi Standard "no charge", baca sekali di https://gsap.com/standard-license.
+  komersial.
 - **Slug URL** proyek (sekaligus nilai `ITCH_GAME`).
 - **Screenshot** bahasa Inggris, Indonesia, atau campuran.
 - **Deskripsi** satu bahasa atau dua bahasa (lihat Langkah 2).

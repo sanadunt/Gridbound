@@ -146,8 +146,17 @@ async function session({ name, width, height, mobile = false, query = '', previo
     const clickAt = async ({ x, y }) => {
       for (let attempt = 1; attempt <= 4; attempt++) {
         const downs = await inFrame('window.__itchDowns').catch(() => -1);
-        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y }); await sleep(60);
-        for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, button: 'left', clickCount: 1, x, y });
+        if (mobile && attempt > 2 && frame) {
+          // On a phone, headless Chrome can keep routing the page's mouse input into the out-of-process frame by stale geometry once its
+          // layout changed a lot (the battle screen appearing), as it does with touches: the finger then taps through the frame's own session.
+          const outer = await evaluate('(() => { const r = document.querySelector("#game_drop").getBoundingClientRect(); return { x: r.x, y: r.y }; })()');
+          const finger = { x: x - outer.x, y: y - outer.y, id: 1, radiusX: 4, radiusY: 4, force: 1 };
+          await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [finger] }, frame); await sleep(40);
+          await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }, frame);
+        } else {
+          await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y }); await sleep(60);
+          for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, button: 'left', clickCount: 1, x, y });
+        }
         if (downs < 0) return;
         for (let i = 0; i < 10; i++) { const now = await inFrame('window.__itchDowns').catch(() => -1); if (now !== downs) return; await sleep(50); }
       }
@@ -506,6 +515,9 @@ try {
     // Swipes on the game never move itch's page under the overlay (or pull it to refresh), from its top and scrolled down.
     const still = (what, from) => swipesKeep(t, what, from);
     for (const from of [0, 300]) { await still('.town-map', from); await still('.site-header', from); }
+    // The fight starts with itch's page at its top (the swipes above and below cover 300): headless Chrome hit-tests a click into the
+    // out-of-process frame by stale geometry after a host scroll under load, so FIGHT! could miss the frame.
+    await evaluate('scrollTo(0, 0)'); await sleep(300);
     await battle(t);
     await shot('battle');
     for (const what of ['.unit-skill:not(:disabled)', '#guard', '#intent']) for (const from of [0, 300]) { await inFight(t); await still(what, from); }
