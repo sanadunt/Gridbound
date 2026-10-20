@@ -78,8 +78,8 @@ for (const [width, height] of viewports) {
         ['boss health', document.querySelector('#battle-screen #boss-health')],
         ...[...document.querySelectorAll('#battle-screen .lane-targets button')].map((element, index) => [\`target lane \${index + 1}\`, element]),
         ...[...document.querySelectorAll('#battle-screen #unit-layer .unit-skill')].map((element, index) => [\`unit skill \${index + 1}\`, element]),
-        // A short portrait phone hides the focus bar (the selected card is highlighted; the Status view has the details).
-        ...(innerHeight > 700 || innerWidth > innerHeight ? [['focus bar', document.querySelector('#battle-screen #focus-bar')]] : []),
+        // A screen up to 760px tall hides the focus bar (the selected card is highlighted; the Status view has the details).
+        ...(innerHeight > 760 ? [['focus bar', document.querySelector('#battle-screen #focus-bar')]] : []),
         ...[...document.querySelectorAll('#battle-screen .action-bar > button')].map(element => [element.id, element])
       ];
       const bounds = selector => {
@@ -107,7 +107,7 @@ for (const [width, height] of viewports) {
       assert.ok(rect.width >= 1 && rect.height >= 1 && rect.left >= 0 && rect.right <= width && rect.top >= 0 && rect.bottom <= height,
         `${name} remains visible at ${width}×${height}: ${JSON.stringify(rect)}`);
     }
-    const shortPortrait = height <= 700 && height > width;
+    const shortPortrait = height <= 760;
     assert.deepEqual(active.controls.map(control => control.name), [
       'boss HUD', 'boss name', 'boss health', 'target lane 1', 'target lane 2', 'target lane 3',
       'unit skill 1', 'unit skill 2', 'unit skill 3', ...(shortPortrait ? [] : ['focus bar']), 'guard', 'potion', 'ultimate'

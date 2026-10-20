@@ -127,6 +127,7 @@ Phones change the type scale by moving small labels from the pixel font to the b
 - **T3 Names never break mid-word and are never ellipsized where the player must identify them.**
   - No `overflow-wrap: anywhere` on names; whole words wrap.
   - Battle skill chips show the full name if it fits, otherwise the first word, otherwise the skill's 2-letter emblem. The full name is in the chip's `aria-label`/`title`, the focus bar, the Status view and the switch toast.
+  - Icon-only battle controls (Battle/Status/Log, the tray's orbs) carry their names in `aria-label`/`title` or a visible plate; the threat panel's three words never replace the full counter, which is in the Log.
   - Hero name tags and route titles never use an ellipsis on phones; they wrap to 2 lines or shrink to the floor.
 - **T4 Units stay together.** 'CH 7' and 'HEROIC · CH 7' use a no-break space (U+00A0) in `en.ts` and `id.ts` and never split. Only stage names wrap.
 - **T5 Both languages fit.** Indonesian strings run about 20% longer. Every layout check runs in ID too (§1 matrix). Content names (skills, talents, chapters, enemies) stay English inside the ID UI.
@@ -148,6 +149,7 @@ Phones change the type scale by moving small labels from the pixel font to the b
 - **K5 Thumb zone.**
   - In portrait, the screen's forward action sits in the bottom 40% of the viewport, normally in a sticky footer or the battle tray. This covers the L8 primaries: Depart, Enter, Hunt, Descend, FIGHT!, the result actions and Claim all.
   - FIGHT! and its ◀ Back sit in the battle tray (the action bar) during the ready window.
+  - From FIGHT! on the tray holds Guard, Potion and Ninefold Dawn as round icon buttons (64px; 56px up to 700px tall, 50px up to 600px tall, so the grid keeps K2's cells): each is one control with its name on a plate over the orb, at least 44×44 and 8px apart (K1/K3). The tray keeps one height before and after FIGHT!, so the arena never jumps. Up to 760px tall the focus bar steps aside to give the tray its height.
   - The navigation exits keep their navigation-contract places (◀ Back top-left, MENU and Ⅱ Menu top-right, Skip top-right). They are rare actions, and "same place every time" wins.
 - **K6 Danger placement.**
   - A destructive button (`.btn.danger`: Abandon, Leave the chapter, Flee, Delete, Reset) is never focused by default and never first in its row.

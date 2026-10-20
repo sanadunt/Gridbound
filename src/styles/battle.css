@@ -7,7 +7,9 @@
 .battle-place span { font-size: 13px; color: var(--ink-soft); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; line-height: 1.15; overflow-wrap: anywhere; }
 /* Battle / Status / Log are one segmented control (they touch); separate controls keep 8px apart (K3). */
 .battle-view-tabs { display: flex; gap: 0; }
-.battle-view-tabs button { position: relative; min-width: 46px; min-height: 44px; padding: 4px 8px; border: 1px solid var(--win-edge); border-radius: 0; background: var(--inset); color: var(--ink-soft); font-size: 13px; }
+.battle-view-tabs button { position: relative; display: grid; place-items: center; min-width: 46px; min-height: 44px; padding: 4px 8px; border: 1px solid var(--win-edge); border-radius: 0; background: var(--inset); color: var(--ink-soft); font-size: 13px; }
+/* Battle / Status / Log are icons (P2): their names are the buttons' aria-label and title. */
+.hud-icon { display: block; flex: 0 0 auto; }
 .battle-view-tabs button + button { margin-left: -1px; }
 .battle-view-tabs button:first-child { border-radius: var(--radius) 0 0 var(--radius); }
 .battle-view-tabs button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
@@ -18,6 +20,18 @@
 .battle-menu.btn { min-width: 44px; min-height: 44px; padding: 4px 10px; font: 700 14px/1 var(--text); white-space: nowrap; border-color: var(--gold-border); }
 /* Small phones: tighter tabs and Menu leave the place label room for whole words ('LANTAI 1 / Kedalaman 1' next to ✦ in Bell Trials and raids). */
 @media (max-width: 380px) { .battle-view-tabs button { padding: 4px 6px; font-size: 12px; } .battle-menu.btn { padding: 4px 6px; } }
+/* J8 danger edges: one click-through vignette on the side a threat comes from (the boss's for ground and all-grid hits, the marked hero's
+   side for a mark), two pulses when it shows, a steady pulse in its last second and the GUARD NOW window. Opacity only (P6). */
+.danger-edge { position: absolute; inset: 0; z-index: 8; pointer-events: none; opacity: 0; }
+.danger-edge.edge-top { background: linear-gradient(180deg, #ff2a3aa6, #ff2a3a00 24%); }
+.danger-edge.edge-bottom { background: linear-gradient(0deg, #ff2a3aa6, #ff2a3a00 24%); }
+.danger-edge.edge-left { background: linear-gradient(90deg, #ff2a3aa6, #ff2a3a00 22%); }
+.danger-edge.edge-right { background: linear-gradient(270deg, #ff2a3aa6, #ff2a3a00 22%); }
+.danger-edge.on { animation: edge-pulse 0.42s ease-in-out 2; }
+.danger-edge.on.hot { animation: edge-hot 0.5s ease-in-out infinite alternate; }
+@keyframes edge-pulse { 50% { opacity: 1; } }
+@keyframes edge-hot { from { opacity: .35; } to { opacity: 1; } }
+body.reduced-motion .danger-edge.on { animation: none; opacity: .7; }
 .combat-boons-btn { position: relative; }
 .boon-count-badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; border-radius: 9px; background: var(--gold); color: #263329; font-size: 10px; font-weight: 700; line-height: 18px; text-shadow: none; }
 
@@ -50,7 +64,8 @@
 .boss-meter { position: relative; height: 14px; margin: 4px 0; border: 2px solid #fff; border-radius: 3px; background: #1a0610; box-shadow: 0 0 0 2px #000; overflow: hidden; }
 /* HUD bars are full-width fills scaled with transform: scaleX (main.ts setScale), so a frame's bar updates never re-lay out the page. */
 .boss-hp-ghost, #boss-hp { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left; }
-.boss-hp-ghost { background: #fff3a8; transition: transform 0.6s 0.25s ease-out; }
+/* J6: the white 'damage taken' layer holds where the HP was (main.ts drains it 400 ms after the last hit), then slides down. */
+.boss-hp-ghost { background: #fffbe6; transition: transform 0.5s ease-out; }
 #boss-hp { background: linear-gradient(180deg, #ff9d9d, var(--danger) 40%, var(--danger-deep)); transition: transform 0.08s linear; }
 .boss-phase-notch { position: absolute; top: 0; bottom: 0; width: 2px; background: #000a; }
 .boss-phase-notch.p1 { left: 66.6%; } .boss-phase-notch.p2 { left: 33.3%; }
@@ -58,7 +73,11 @@
 #clock { order: 4; }
 /* Battle readouts keep a 10px floor (Press Start 2P is unreadable below that on phones). */
 .stagger-row { display: flex; align-items: center; gap: 8px; font-family: var(--pixel); font-size: 10px; color: var(--ink-dim); }
-.stagger-track { flex: 1; height: 6px; border: 1px solid var(--win-edge); background: var(--inset); }
+.stagger-track { position: relative; flex: 1; height: 6px; border: 1px solid var(--win-edge); background: var(--inset); }
+/* An armour break shatters the bar: six shards fly off (main.ts animates them on the break). */
+.armor-shards { position: absolute; inset: 0; pointer-events: none; }
+.armor-shards i { position: absolute; top: -1px; width: 9px; height: 6px; background: linear-gradient(180deg, #fff6b0, var(--gold)); opacity: 0; }
+.armor-shards i:nth-child(1) { left: 6%; } .armor-shards i:nth-child(2) { left: 22%; } .armor-shards i:nth-child(3) { left: 38%; } .armor-shards i:nth-child(4) { left: 54%; } .armor-shards i:nth-child(5) { left: 70%; } .armor-shards i:nth-child(6) { left: 86%; }
 .stagger-track i { display: block; height: 100%; transform-origin: left; background: linear-gradient(180deg, #e9f6ff, #8fb4d8); }
 #battle-screen.boss-broken .stagger-track i { background: linear-gradient(180deg, #fff6b0, var(--gold)); animation: blink 0.3s steps(2) infinite; }
 #battle-screen.boss-broken #stagger-label { color: var(--gold); }
@@ -93,9 +112,14 @@
 @keyframes tap-pop { 0% { opacity: 1; transform: translate(-50%, 6px) scale(1.4); } 100% { opacity: 0; transform: translate(-50%, -10px) scale(1); } }
 
 .arena-intel { position: absolute; z-index: 4; top: 6px; left: calc((var(--slot-w) - var(--arena-w)) / 2 + 6px); right: calc((var(--slot-w) - var(--arena-w)) / 2 + 6px); display: flex; flex-direction: column; gap: 4px; pointer-events: none; contain: layout style; }
-.intent-panel { position: relative; padding: 5px 10px 6px; font-size: 13px; opacity: .85; transition: opacity 0.15s; pointer-events: none; }
-.intent-panel b { display: block; font-family: var(--pixel); font-size: 10px; font-weight: 400; line-height: 1.6; }
-.intent-panel span { display: block; color: var(--ink-soft); line-height: 1.25; }
+.intent-panel { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 8px; align-items: center; padding: 5px 10px 6px; font-size: 13px; opacity: .85; transition: opacity 0.15s; pointer-events: none; }
+/* An icon for the threat's family and a few words: the threat with its seconds, then what to do (the full counter is in the Log). */
+.intent-icon { grid-row: 1 / 3; display: grid; place-items: center; color: var(--gold); }
+.intent-panel b { display: block; min-width: 0; font-family: var(--pixel); font-size: 10px; font-weight: 400; line-height: 1.6; }
+.intent-panel span { display: block; min-width: 0; color: var(--ink-soft); font-weight: 700; line-height: 1.25; }
+.intent-panel.danger .intent-icon { color: #fff3a8; }
+.intent-panel.danger span { color: #fff; }
+.intent-panel.guarding .intent-icon { color: var(--mana); }
 /* Between threats the panel teaches the basics; threats and Guard make it fully opaque. */
 .intent-panel.danger, .intent-panel.guarding { opacity: 1; }
 .intent-panel.danger { background: linear-gradient(180deg, #b8263a, #5a0a1c); border-color: #ffd0d0; animation: danger-pulse 0.6s steps(2) infinite; }
@@ -109,6 +133,25 @@
 .battle-banner.ultimate { color: var(--gold); font-size: clamp(14px, 5cqw, 22px); background: linear-gradient(90deg, transparent, #5a3b00cc 15%, #5a3b00cc 85%, transparent); }
 .battle-banner.break { color: #fff3a8; }
 .battle-banner.interrupt { color: #9ff0d6; }
+
+/* J5: a new phase slams in (main.ts animates the banner), in the boss's gold. */
+.battle-banner.phase { color: var(--gold); font-size: clamp(12px, 4cqw, 18px); }
+/* J3 combo: clean taps count up at the right of the boss area (×12), its colour stepping up at 10/25/50; a fatigued tap ends it. */
+.combo { position: absolute; z-index: 5; right: 3%; top: 31%; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000; }
+.combo[hidden] { display: none; }
+.combo b { font-family: var(--pixel); font-size: clamp(16px, 5.5cqw, 26px); font-weight: 400; line-height: 1.1; color: #fff3b0; }
+.combo small { font-family: var(--pixel); font-size: 10px; color: var(--ink-soft); }
+.combo[data-tier="1"] b { color: var(--gold); }
+.combo[data-tier="2"] b { color: #ff9f43; }
+.combo[data-tier="3"] b { color: #ff5d8f; text-shadow: 2px 2px 0 #000, 0 0 10px #ff5d8faa; }
+/* J10 cut-in: a diagonal band across the arena with the lead hero's portrait and NINEFOLD DAWN for 600 ms (main.ts slides it). */
+.cutin { position: absolute; inset: 0; z-index: 6; display: grid; align-items: center; overflow: hidden; pointer-events: none; transform: rotate(-8deg); }
+.cutin[hidden] { display: none; }
+.cutin-band { display: flex; align-items: center; gap: 3%; height: 21%; margin: 0 -12%; padding: 0 14%; border-block: 3px solid #ffe3a0; background: linear-gradient(90deg, #3a2400f0, #a8761cf2 45%, #3a2400f0); box-shadow: 0 0 24px #ffd54f88; }
+.cutin-band img { height: 92%; width: auto; aspect-ratio: 30 / 33; image-rendering: pixelated; }
+.cutin-band b { min-width: 0; font-family: var(--pixel); font-size: clamp(12px, 4.2cqw, 22px); font-weight: 400; color: #fff3c0; text-shadow: 3px 3px 0 #3a2400; white-space: nowrap; }
+/* J9 kill cam: the camera zooms on the boss, so the DOM layers over the grid step aside until the boss's death plays. */
+.arena.kill-cam :is(#unit-layer, .lane-targets, .board-bottom, .combo) { opacity: 0; transition: opacity 0.12s; }
 
 /* Boss status chips (Mark / Weaken / Curse) with a draining countdown fill. */
 .boss-status { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
@@ -144,6 +187,13 @@
 .start-window small { color: var(--ink-dim); }
 .start-window #ready-label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .start-window h3 { font-family: var(--pixel); font-size: 12px; color: var(--gold); margin: 2px 0; line-height: 1.5; }
+/* J5 the boss's title card (Hades nameplate): the name in big pixel type, its epithet under it and a red rule drawn across. */
+.boss-plate { position: relative; display: flex; flex-direction: column; align-items: center; margin: 0 auto 4px; }
+.start-overlay.boss-card #ready-title { margin: 2px 0 0; font-size: clamp(16px, 6cqw, 28px); line-height: 1.2; color: #fff; text-shadow: 3px 3px 0 #000, 0 0 14px #ff3b3b66; }
+.start-window .boss-plate-epithet { margin: 2px 0 0; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); }
+.start-window .boss-plate-epithet[hidden] { display: none; }
+.boss-plate-rule { display: none; }
+.start-overlay.boss-card .boss-plate-rule { display: block; align-self: stretch; height: 3px; margin-top: 4px; transform-origin: left; background: linear-gradient(90deg, #ff3b3b00, #ff3b3b 15%, #ff7a5b 50%, #ff3b3b 85%, #ff3b3b00); }
 .start-window p { margin: 2px 0 4px; font-size: 13px; line-height: 1.3; color: var(--ink-soft); }
 .ready-story { display: flex; align-items: center; gap: 8px; text-align: left; }
 .ready-story #ready-copy { flex: 1 1 auto; min-width: 0; }
@@ -155,7 +205,8 @@
 .action-bar .ready-actions { display: none; grid-column: 1 / -1; gap: 8px; }
 #battle-screen[data-ready] .action-bar > .cmd { display: none; }
 #battle-screen[data-ready] .action-bar .ready-actions { display: flex; }
-.ready-actions .btn { min-height: 48px; }
+.action-bar .ready-actions { align-self: center; }
+.ready-actions .btn { min-height: 52px; }
 .ready-actions #ready-back { flex: 0 0 auto; width: auto; min-width: 96px; font: 700 15px/1 var(--text); }
 .ready-actions #start { flex: 1 1 auto; font-family: var(--pixel); font-size: 14px; }
 
@@ -184,18 +235,36 @@
 .party-health-card.downed { opacity: 0.55; }
 .party-health-card.downed .party-hp b { color: var(--danger); }
 
-/* Command row */
-.action-bar { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 8px; contain: layout style; }
-.cmd { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 4px 6px; border: 1px solid var(--win-edge); border-radius: var(--radius); background: var(--win-mid);  color: #fff; overflow: hidden; font-size: 15px; line-height: 1.1; }
-.cmd > span { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; }
-.cmd small { font-size: 12px; color: var(--ink-soft); }
-.cmd b { position: relative; z-index: 1; font-family: var(--pixel); font-size: 12px; color: var(--hp); font-weight: 400; }
-.cmd:disabled { filter: grayscale(0.6) brightness(0.7); cursor: default; }
-.guard-button.guarding { border-color: var(--mana); background: #1d3c4a; }
+/* Command row (P2): Guard, Potion and Ninefold Dawn are 64px round icon buttons (56px on short screens) with a conic ring (--p, main.ts
+   setTurn: Guard's cooldown or its time up, the Potions left, Ninefold Dawn's Resolve) and a name plate over the orb's lower edge. The
+   tray keeps one height before and after FIGHT!, so the arena never jumps. */
+.action-bar { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; gap: 8px; min-height: var(--tray-h, 76px); contain: layout style; --orb: 64px; }
+.cmd { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: var(--tray-h, 76px); padding: 0; border: 0; border-radius: var(--radius); background: transparent; color: #fff; font-size: 12px; line-height: 1.2; }
+.cmd-orb { position: relative; display: grid; place-items: center; width: var(--orb); height: var(--orb); border: 2px solid var(--win-edge); border-radius: 50%; background: radial-gradient(circle at 50% 32%, #2f5a4b, #10241d 72%); box-shadow: 0 0 0 2px #000a, inset 0 -6px 12px #0009; --ring: var(--gold); }
+.cmd-orb::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; background: conic-gradient(var(--ring) calc(var(--p, 1) * 360deg), #ffffff1f 0); -webkit-mask: radial-gradient(farthest-side, #0000 calc(100% - 4px), #000 calc(100% - 3.5px)); mask: radial-gradient(farthest-side, #0000 calc(100% - 4px), #000 calc(100% - 3.5px)); }
+.cmd-orb .hud-icon { width: calc(var(--orb) * .46); height: calc(var(--orb) * .46); transform: translateY(-5px); }
+.cmd-count { position: absolute; left: 0; right: 0; bottom: 11px; font: normal 400 10px/1 var(--pixel); text-align: center; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; }
+.cmd-count:empty { display: none; }
+.cmd-plate { position: relative; z-index: 1; display: flex; align-items: center; gap: 4px; max-width: 100%; margin-top: -10px; padding: 1px 7px; border: 1px solid var(--win-edge); border-radius: 3px; background: #07120fee; font-weight: 700; white-space: nowrap; }
+.cmd-name { min-width: 0; overflow: hidden; text-overflow: clip; }
+.cmd-state:empty { display: none; }
+.cmd-plate .key-hint { color: var(--ink-dim); }
+.cmd:disabled { cursor: default; }
+.cmd:disabled .cmd-orb { filter: grayscale(0.6) brightness(0.75); }
+.cmd:disabled .cmd-plate { color: var(--ink-dim); }
+.cmd:focus-visible { outline: none; }
+.cmd:focus-visible .cmd-orb { outline: 2px solid var(--gold); outline-offset: 6px; }
+/* Potions: a count badge on the orb. */
+.potion-button .cmd-orb { --ring: var(--hp); }
+.potion-button .cmd-orb b { position: absolute; top: -4px; right: -6px; min-width: 22px; height: 22px; padding: 0 4px; border: 2px solid #07120f; border-radius: 11px; background: var(--hp); color: #0d2318; font: 400 10px/18px var(--pixel); text-align: center; }
+.guard-button:disabled .cmd-orb { --ring: #8fb4d8; }
+.guard-button.guarding .cmd-orb { border-color: var(--mana); background: radial-gradient(circle at 50% 32%, #2f6075, #102a36 72%); --ring: var(--mana); }
 /* GUARD NOW: an all-grid hit lands within the Guard duration, so pressing now still covers the impact. */
-.guard-button.ready-window { border-color: #fff3a8; background: #2f5a3e; animation: guard-now 0.5s steps(2) infinite; }
-.guard-button.ready-window small { color: #fff3a8; font-family: var(--pixel); font-size: 10px; }
-@keyframes guard-now { 50% { box-shadow: 0 0 0 2px var(--win-shadow), 0 0 14px 4px #fff3a8aa; } }
+.guard-button.ready-window .cmd-orb { border-color: #fff3a8; background: radial-gradient(circle at 50% 32%, #4f8a5e, #1c3a2a 72%); animation: guard-now 0.5s steps(2) infinite; }
+.guard-button.ready-window .cmd-name { display: none; }
+.guard-button.ready-window .cmd-plate, .ultimate-button.ready .cmd-plate { border-color: #fff3a8; }
+.guard-button.ready-window .cmd-state, .ultimate-button.ready .cmd-state { color: #fff3a8; font-family: var(--pixel); font-size: 10px; font-weight: 400; }
+@keyframes guard-now { 50% { box-shadow: 0 0 0 2px var(--win-shadow), 0 0 16px 6px #fff3a8aa; } }
 /* Keyboard letters (G/H/R) are hidden where the primary pointer is a finger. Mouse screens (pointer: fine) and
    keyboard-only devices (pointer: none, also what headless Chrome reports) keep them. */
 .key-hint { font: inherit; }
@@ -203,10 +272,10 @@
 /* Nothing follows the Potion key (its count is the big number): no dangling separator ('H ·'). */
 .key-hint:last-child::after { content: none; }
 @media (pointer: coarse) { .key-hint { display: none; } }
-#resolve-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left; background: linear-gradient(180deg, #ffe48a66, #e0a93a55); transition: transform 0.2s; }
-.ultimate-button.ready { border-color: var(--gold); background: #e6c88d; color: #263329; text-shadow: none; animation: ult-ready 0.5s steps(2) infinite; filter: none; }
-.ultimate-button.ready small { color: #4a4a32; }
-@keyframes ult-ready { 50% { box-shadow: 0 0 0 2px var(--win-shadow), 0 0 16px 4px #e5c687aa; } }
+.ultimate-button .cmd-orb { --ring: #ffd54f; }
+.ultimate-button.ready .cmd-orb { border-color: var(--gold); background: radial-gradient(circle at 50% 32%, #fff3c0, #d9a23a 72%); color: #3a2600; animation: ult-ready 0.5s steps(2) infinite; }
+.ultimate-button.ready .cmd-name { display: none; }
+@keyframes ult-ready { 50% { box-shadow: 0 0 0 2px var(--win-shadow), 0 0 18px 6px #e5c687cc; } }
 
 /* Status / log views */
 .battle-detail-pause-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; font-size: 14px; }
@@ -245,7 +314,8 @@
   .boss-hud { padding: 4px 8px 6px; }
   .stagger-row { margin-top: -2px; }
   .party-health-card { min-height: 44px; }
-  .cmd, .ready-actions .btn { min-height: 44px; font-size: 14px; }
+  .action-bar { --orb: 56px; --tray-h: 66px; }
+  .ready-actions .btn { min-height: 48px; font-size: 14px; }
 }
 /* Short screens (a phone with the browser bars showing, an iPhone SE, a short desktop window): the place label keeps one line and the
    focus bar steps aside (the selected card is highlighted, the Status view has the details), so the grid keeps its width. */
@@ -254,8 +324,12 @@
   .arena-column { gap: 6px; }
   .battle-place span { -webkit-line-clamp: 1; line-clamp: 1; }
   .boss-title h2 { font-size: 16px; }
-  #battle-screen .focus-bar { display: none; }
 }
+/* The focus bar steps aside on phones up to 760px tall (P2: the round tray buttons take its height; the selected card is highlighted and
+   the Status view has the details), so the grid keeps its width. */
+@media (max-height: 760px) { #battle-screen .focus-bar { display: none; } }
+/* The shortest phones (an iPhone SE with the browser bars): smaller orbs, so the grid keeps 75px cells (K2). */
+@media (max-height: 600px) { .action-bar { --orb: 50px; --tray-h: 56px; } .action-bar .cmd-plate { margin-top: -9px; padding: 0 6px; } .cmd-count { bottom: 9px; } }
 /* The threat panel stays short on phones: the threat line in full, its counter on one line (the whole text is in the log and the
    announcer); while a coach tip shows, only the threat line. */
 @media (max-height: 760px) {
@@ -365,4 +439,4 @@
 .coach-bubble.below .coach-arrow::after { bottom: auto; top: 0; border-top: 0; border-bottom: 9px solid var(--coach-color); border-left-color: transparent; border-right-color: transparent; }
 @keyframes coach-in { from { opacity: 0; transform: translateY(6px); } }
 /* PERF (P6): while nothing is fighting (ready window, paused, ended: body.battle-idle, main.ts syncEngine) the HUD's endless pulses stop. */
-body.battle-idle :is(#battle-screen.boss-broken .stagger-track i, .intent-panel.danger, .guard-button.ready-window, .ultimate-button.ready, .unit-card.low-health .unit-hp, .unit-card.interrupt-ready .unit-skill, .status-chip.enrage, .party-health-card.charged .party-atb) { animation-play-state: paused; }
+body.battle-idle :is(#battle-screen.boss-broken .stagger-track i, .intent-panel.danger, .guard-button.ready-window .cmd-orb, .ultimate-button.ready .cmd-orb, .unit-card.low-health .unit-hp, .unit-card.interrupt-ready .unit-skill, .status-chip.enrage, .party-health-card.charged .party-atb, .danger-edge.on) { animation-play-state: paused; }

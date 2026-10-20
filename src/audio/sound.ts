@@ -318,13 +318,25 @@ export class Sound {
     });
   }
 
-  play(kind: string) {
-    if (!this.live(() => this.play(kind))) return;
+  /** A bell: inharmonic partials (1, 2.4, 3.9, 5.4 × `base`) with a long decay. */
+  private bell(base: number, duration = 0.9, volume = 0.016) {
+    [1, 2.4, 3.9, 5.4].forEach((ratio, i) => this.synthNote(base * ratio, duration / (1 + i * 0.45), { type: 'sine', volume: volume / (1 + i * 0.6), attack: 0.004 }));
+  }
+  private lastLunge = -Infinity;
+
+  /** Play a cue. `value` (0..1) tunes the cues that take one: tap-tick's pitch climbs with the hero's charge ring, combo-up chimes once per tier. */
+  play(kind: string, value = 0) {
+    if (!this.live(() => this.play(kind, value))) return;
     const now = performance.now();
     const combatHit = kind === 'hit' || kind === 'hit-heavy' || kind === 'hit-magic' || kind === 'hit-slash';
     if (combatHit) {
       if (now - this.last < 55) return;
       this.last = now;
+    }
+    // A dense fight casts several times a second: one swoosh per 70 ms is enough.
+    if (kind === 'lunge') {
+      if (now - this.lastLunge < 70) return;
+      this.lastLunge = now;
     }
     const supportCue = kind === 'heal' || kind === 'shield' || kind === 'buff';
     if (supportCue) {
@@ -340,6 +352,38 @@ export class Sound {
 
       case 'clink':
         this.clink();
+        break;
+
+      // Battle juice (P2): every tap ticks, a cast swooshes, tiers chime, a PERFECT guard rings the bell, titles and kills boom.
+      case 'tap-tick': {
+        const fill = Math.max(0, Math.min(1, value));
+        this.synthNote(520 + fill * 760, 0.045, { type: 'square', volume: 0.013, slide: 120, attack: 0.003 });
+        this.synthNote(130, 0.04, { type: 'sine', volume: 0.02, slide: -30 });
+        break;
+      }
+      case 'lunge':
+        this.noiseBurst(0.08, 0.018, 2600, 'highpass');
+        this.synthNote(190, 0.08, { type: 'triangle', volume: 0.016, slide: -70 });
+        break;
+      case 'combo-up':
+        [784, 988, 1175, 1568].slice(0, 1 + Math.max(0, Math.min(3, Math.round(value)))).forEach((n, i) => setTimeout(() => this.synthNote(n, 0.12, { type: 'square', volume: 0.01, attack: 0.004 }), i * 55));
+        break;
+      case 'perfect':
+        this.bell(523, 1.1, 0.02);
+        this.noiseBurst(0.12, 0.02, 4200, 'highpass');
+        break;
+      case 'title-slam':
+        this.synthNote(72, 0.42, { type: 'sine', volume: 0.05, slide: -30 });
+        this.noiseBurst(0.22, 0.03, 300, 'lowpass');
+        break;
+      case 'kill':
+        this.synthNote(55, 0.6, { type: 'sine', volume: 0.055, slide: -20 });
+        this.noiseBurst(0.3, 0.03, 260, 'lowpass');
+        setTimeout(() => this.bell(392, 1.2, 0.016), 90);
+        break;
+      case 'cut-in':
+        this.synthNote(220, 0.5, { type: 'sawtooth', volume: 0.014, slide: 980, filterFreq: 2400 });
+        this.noiseBurst(0.4, 0.016, 1800, 'bandpass');
         break;
 
       case 'card-deal':

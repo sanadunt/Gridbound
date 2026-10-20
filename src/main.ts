@@ -15,7 +15,7 @@ import './styles/result.css';
 import './styles/dungeon.css';
 import { currencyAmount } from './ui/currency';
 import { townSceneURL } from './art/town-scene';
-import { Battle, GUARD_DURATION, ENRAGE_WARN, ENRAGE_AT, ENRAGE_DMG, BREAK_SECONDS, MOVE_PENALTY, MARK_DAMAGE, WEAKEN_DAMAGE, type BattleEvent, type BattleOptions } from './game/simulation';
+import { Battle, GUARD_DURATION, GUARD_COOLDOWN, GUARD_COOLDOWN_BELL, ENRAGE_WARN, ENRAGE_AT, ENRAGE_DMG, BREAK_SECONDS, MOVE_PENALTY, MARK_DAMAGE, WEAKEN_DAMAGE, type BattleEvent, type BattleOptions } from './game/simulation';
 import { KITS, ROSTER, type Mode } from './game/content';
 import { CHARACTERS } from './game/characters';
 import { CAMPAIGN, BOONS, ENEMIES, boonChoices } from './game/world';
@@ -40,6 +40,8 @@ import { DANGER_CONTROLS, INPUT_DELAY_MS, TOWN_HELD, TOWN_SPEND, holdInput, inpu
 import { fullscreenAvailable, fullscreenEscape, fullscreenOn, installEmbedGuards, installFullscreen, playUpright, standaloneApp, toggleFullscreen, uprightAvailable } from './ui/embed';
 import { installTurnCard } from './ui/turn-card';
 import { ARENA, cell } from './render/arena';
+import { ICONS, threatFamily } from './ui/battle-icons';
+import { dangerSide } from './render/juice';
 import { ResultGate, RESULT_INPUT_DELAY_MS, type ResultGateGeneration } from './ui/result-gate';
 import { Sound } from './audio/sound';
 import { loadSave, saveProfile, backupLegacy, legacyBackup, commanderFromBackup, isCompleteV3, SAVE_KEY } from './game/save';
@@ -266,6 +268,19 @@ function setScale(el: HTMLElement, ratio: number) {
   el.style.transform = `scaleX(${Math.round(r * 10000) / 10000})`;
 }
 const setDisabled = (el: HTMLButtonElement, disabled: boolean) => { if (el.disabled !== disabled) el.disabled = disabled; };
+/** A round tray button's conic ring (--p, 0..1): rewritten only on a change of 1% or more, or on reaching empty or full. */
+const turns = new WeakMap<HTMLElement, number>();
+function setTurn(el: HTMLElement, ratio: number) {
+  const r = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0, last = turns.get(el);
+  if (last !== undefined && Math.abs(last - r) < .01 && !((r === 0 || r === 1) && last !== r)) return;
+  turns.set(el, r);
+  el.style.setProperty('--p', String(Math.round(r * 1000) / 1000));
+}
+/** J6: the boss bar's white 'damage taken' layer holds where the HP was until GHOST_DELAY_MS after the last hit, then drains (CSS). */
+const GHOST_DELAY_MS = 400;
+let ghostRatio = 1, ghostHitAt = 0, lastBossRatio = 1;
+/** J8: the danger vignette's current class (written only when it changes). */
+let edgeClass = '';
 /** Heroes seen down in this battle (frame() announces one that gets back up). */
 const downed = new Set<number>();
 /** One visually hidden polite live region (#battle-announcer) speaks the fight's meaningful moments: a threat's onset with its target and
@@ -386,12 +401,13 @@ $('app').innerHTML = `
 </header>
   <main id="town-screen" class="town-screen"></main>
   <main id="battle-screen" class="game-layout" data-battle-view="arena" hidden>
+    <div id="danger-edge" class="danger-edge" aria-hidden="true"></div>
     <div class="battle-top">
       <div class="battle-place"><b id="mode-label"></b><span id="encounter-label"></span></div>
       <nav class="battle-view-tabs" aria-label="${t('battle.views')}">
-        <button type="button" data-battle-view="arena" aria-controls="battle-arena-panel" aria-pressed="true">${t('battle.view.arena')}</button>
-        <button type="button" data-battle-view="hero" aria-controls="battle-details-panel" aria-pressed="false">${t('battle.view.hero')}</button>
-        <button type="button" data-battle-view="log" aria-controls="battle-details-panel" aria-pressed="false">${t('battle.view.log')}</button>
+        <button type="button" data-battle-view="arena" aria-controls="battle-arena-panel" aria-pressed="true" aria-label="${t('battle.view.arena')}" title="${t('battle.view.arena')}">${ICONS.arena}</button>
+        <button type="button" data-battle-view="hero" aria-controls="battle-details-panel" aria-pressed="false" aria-label="${t('battle.view.hero')}" title="${t('battle.view.hero')}">${ICONS.status}</button>
+        <button type="button" data-battle-view="log" aria-controls="battle-details-panel" aria-pressed="false" aria-label="${t('battle.view.log')}" title="${t('battle.view.log')}">${ICONS.log}</button>
       </nav>
       <div class="arena-heading-controls">
         <button id="combat-boons" class="icon-button combat-boons-btn" aria-label="${t('battle.boons')}" title="${t('battle.boons')} [B]">✦<span id="boon-count-badge" class="boon-count-badge" style="display:none">0</span></button>
@@ -413,19 +429,21 @@ $('app').innerHTML = `
           <div class="boss-hud-inner">
             <div class="boss-title"><h2 id="boss-name"></h2><span id="boss-title"></span><span id="phase" class="boss-phase-badge"></span></div>
             <div class="boss-meter"><div id="boss-hp-ghost" class="boss-hp-ghost"></div><div id="boss-hp"></div><div class="boss-phase-notch p1"></div><div class="boss-phase-notch p2"></div></div>
-            <div class="stagger-row"><span id="boss-health"></span><span id="stagger-label">${t('battle.armor')}</span><div class="stagger-track"><i id="stagger"></i></div><span id="clock">00:00</span></div>
+            <div class="stagger-row"><span id="boss-health"></span><span id="stagger-label">${t('battle.armor')}</span><div class="stagger-track"><i id="stagger"></i><span id="armor-shards" class="armor-shards" aria-hidden="true">${'<i></i>'.repeat(6)}</span></div><span id="clock">00:00</span></div>
           </div>
         </div>
       </div>
       <div class="arena-slot">
       <div class="arena-intel">
         <div id="boss-status" class="boss-status" aria-label="${t('battle.status.aria')}"></div>
-        <div id="intent" class="intent-panel msg-window"><b></b><span></span></div>
+        <div id="intent" class="intent-panel msg-window"><i class="intent-icon" aria-hidden="true">${ICONS.watch}</i><b></b><span></span></div>
       </div>
       <div id="arena" class="arena">
         <div id="arena-stage" class="arena-stage">
         <div id="game-canvas" aria-hidden="true"></div>
         <div id="banner" class="battle-banner" aria-hidden="true"></div>
+        <div id="combo" class="combo" aria-hidden="true" hidden><b></b><small>${t('battle.combo')}</small></div>
+        <div id="cutin" class="cutin" aria-hidden="true" hidden><span class="cutin-band"><img alt="" draggable="false"/><b>${t('battle.cutin')}</b></span></div>
         <div id="skill-toast" class="skill-toast" role="status" aria-live="polite" hidden></div>
         <div class="lane-targets" aria-label="${t('battle.lanes')}">${[0, 1, 2].map(i => `<button data-lane="${i}" aria-label="${t('battle.lane', { n: i + 1 })}" aria-pressed="false"><span>${['I', 'II', 'III'][i]}</span></button>`).join('')}</div>
         <div id="unit-layer"></div>
@@ -435,7 +453,7 @@ $('app').innerHTML = `
         <section id="start-overlay" class="start-overlay" aria-labelledby="ready-title">
           <div class="win start-window">
             <small id="ready-label"></small>
-            <h3 id="ready-title"></h3>
+            <div class="boss-plate"><h3 id="ready-title"></h3><p id="ready-epithet" class="boss-plate-epithet"></p><i class="boss-plate-rule" aria-hidden="true"></i></div>
             <div class="ready-story"><p id="ready-copy"></p><button id="ready-more" class="ready-more" type="button" aria-expanded="false" aria-controls="ready-copy" hidden>${t('ready.more')}</button></div>
             <p id="ready-tip" class="ready-tip" hidden>${t('ready.copy.story')}</p>
             <p id="ready-back-hint" class="ready-back-hint" hidden></p>
@@ -446,9 +464,9 @@ $('app').innerHTML = `
       <button id="focus-bar" type="button" class="win focus-bar" aria-label="${t('battle.focus.aria')}"><img class="focus-face" alt="" draggable="false"/><span class="focus-id"><b class="focus-name"></b><small class="focus-skill"></small></span><span class="focus-stats"><span class="focus-hp">HP <b></b></span><span class="focus-status"></span></span></button>
       <div class="action-bar">
         <div class="ready-actions"><button id="ready-back" class="btn" type="button" data-nav-exit="back"></button><button id="start" class="btn primary">${t('battle.begin')}</button></div>
-        <button id="guard" class="cmd guard-button"><span>${t('battle.guard')}<small><kbd class="key-hint">G</kbd><span id="guard-label"></span></small></span></button>
-        <button id="potion" class="cmd potion-button"><span>${t('battle.potion')}<small><kbd class="key-hint">H</kbd></small></span><b>2</b></button>
-        <button id="ultimate" class="cmd ultimate-button" disabled><i id="resolve-fill"></i><span>${t('battle.ultimate')}<small><kbd class="key-hint">R</kbd><span id="resolve-label"></span></small></span></button>
+        <button id="guard" class="cmd guard-button"><span class="cmd-orb">${ICONS.guard}<em id="guard-count" class="cmd-count"></em></span><span class="cmd-plate"><span class="cmd-name">${t('battle.guard')}</span><span id="guard-label" class="cmd-state"></span><kbd class="key-hint">G</kbd></span></button>
+        <button id="potion" class="cmd potion-button"><span class="cmd-orb">${ICONS.potion}<b>2</b></span><span class="cmd-plate"><span class="cmd-name">${t('battle.potion')}</span><kbd class="key-hint">H</kbd></span></button>
+        <button id="ultimate" class="cmd ultimate-button" disabled><span class="cmd-orb">${ICONS.dawn}<em id="resolve-count" class="cmd-count"></em></span><span class="cmd-plate"><span class="cmd-name">${t('battle.ultimate')}</span><span id="resolve-label" class="cmd-state"></span><kbd class="key-hint">R</kbd></span></button>
       </div>
     </section>
     <aside id="battle-details-panel" class="right-sidebar">
@@ -1509,7 +1527,17 @@ function showReady() {
   syncSlot();
   void keepAwake(true);
   $('ready-label').textContent = battle.stageCount > 1 ? `${t('map.wave', { n: battle.stage + 1 })}/${battle.stageCount} · ${stageLabel()}` : stageLabel();
-  $('ready-title').textContent = battle.stage > 0 ? t('ready.title.next') : t('ready.title.first', { name: battle.enemyName });
+  // J5: the boss's title card: its name slams in from the left, its epithet slides under it and a red rule draws across.
+  $('start-overlay').classList.add('boss-card');
+  $('ready-title').textContent = battle.enemyName;
+  $('ready-epithet').textContent = battle.enemyTitle;
+  $('ready-epithet').hidden = !battle.enemyTitle;
+  sound.play('title-slam');
+  if (motionOn()) {
+    enter(q('#ready-title'), { opacity: 0, transform: 'translateX(-56px) scale(1.3)' }, { duration: 260, easing: EASE_BACK });
+    enter(q('#ready-epithet'), { opacity: 0, transform: 'translateX(-24px)' }, { duration: 240, delay: 140 });
+    enter(q('#start-overlay .boss-plate-rule'), { transform: 'scaleX(0)' }, { duration: 320, delay: 180 });
+  }
   const beat = battle.mode === 'adventure' ? CAMPAIGN[battle.floor - 1]?.stages[battle.stage]?.beat : undefined;
   setReadyCopy(beat ?? (battle.stage > 0 ? t('ready.copy.next') : battle.mode === 'adventure' ? t('ready.copy.story') : t('ready.copy.other')));
   $('ready-copy').classList.toggle('story-beat', Boolean(beat));
@@ -1539,6 +1567,8 @@ function showAfterOverlay(visible = true) {
   const won = battle.status === 'victory', moreWaves = won && battle.mode === 'adventure' && battle.stage + 1 < battle.stageCount;
   readySheet(visible);
   $('ready-label').textContent = '';
+  $('start-overlay').classList.remove('boss-card');
+  $('ready-epithet').hidden = true;
   $('ready-title').textContent = won ? moreWaves ? t('ready.after.wave') : t('ready.after.win') : t('ready.after.lose');
   setReadyCopy(t('ready.after.copy'));
   $('ready-tip').hidden = true;
@@ -1688,6 +1718,7 @@ function updatePartyHealthView(h: PartyHero) {
   }
 }
 function makeUnits() {
+  bestCombo = 0; $('combo').hidden = true; $('cutin').hidden = true;
   $('unit-layer').innerHTML = battle.heroes.map(h => {
     const p = cell(h.slot);
     return `<div class="unit-card" data-hero="${h.id}" style="left:${p.x / 6}%;top:${p.y / 7.6}%;width:24%;height:${UNIT_H / 7.6}%;--row:${3 - Math.floor(h.slot / 3)};--class-color:${KITS[h.classId].color}"><button class="unit-tap" data-tap="${h.id}" aria-label="${t('battle.tap.aria', { name: heroName(h) })}"><span class="unit-name">${heroName(h)}</span><span class="tap-flash">${t('battle.tempo')}</span></button><span class="unit-hp" aria-hidden="true"><i></i><em></em></span><button type="button" class="unit-skill" data-skill-switch="${h.id}"><i class="unit-skill-fill"></i><span class="unit-skill-name"></span><span class="unit-skill-icon" aria-hidden="true"></span></button></div>`;
@@ -2042,9 +2073,12 @@ function frame(dt: number) {
   if (battle.mode === 'dungeon' && battle.status === 'fighting') noteDungeonFight();
   // Every HUD write below skips unchanged values (setText/setScale/setDisabled): a frame of the fight never re-lays out the page (P5).
   setText($('boss-health'), `${fmtInt(Math.ceil(battle.bossHp))} / ${fmtInt(battle.bossMax)}`);
-  const hpRatio = battle.bossHp / battle.bossMax;
+  const hpRatio = battle.bossHp / battle.bossMax, now = performance.now();
   setScale($('boss-hp'), hpRatio);
-  setScale($('boss-hp-ghost'), hpRatio);
+  if (hpRatio < lastBossRatio - 1e-6) ghostHitAt = now;
+  lastBossRatio = hpRatio;
+  if (hpRatio >= ghostRatio || now - ghostHitAt >= GHOST_DELAY_MS) ghostRatio = hpRatio;
+  setScale($('boss-hp-ghost'), ghostRatio);
   setText($('phase'), t('battle.phase', { n: battle.phase }));
   setScale($('stagger'), battle.breakLeft > 0 ? battle.breakLeft / BREAK_SECONDS : battle.stagger / battle.staggerThreshold());
   setText($('stagger-label'), battle.breakLeft > 0 ? t('battle.break') : t('battle.armor'));
@@ -2061,28 +2095,41 @@ function frame(dt: number) {
   if (isDanger && !wasDanger && motionOn()) {
     enter($('intent'), { transform: 'scale(1.08)' }, { duration: 250, easing: EASE_BACK });
   }
+  // The panel is an icon and a few words (the threat, its seconds and who it marks; then what to do): the counter's full text is in the Log.
+  const family = threat ? threatFamily(threat.type) : battle.guardLeft > 0 ? 'guarding' : 'watch';
+  if (intent.dataset.icon !== family) { intent.dataset.icon = family; intent.querySelector('.intent-icon')!.innerHTML = ICONS[family]; }
   setText(intent.querySelector('b')!, threat ? `${t('battle.intent.time', { name: eventText(threat.name, lang()), s: fmtDec(Math.max(0, threat.left)) })}${threat.targetId !== undefined ? ` → ${heroLabel(threat.targetId)}` : ''}` : battle.guardLeft > 0 ? t('battle.guarding', { s: fmtDec(battle.guardLeft) }) : t('battle.watch'));
-  setText(intent.querySelector('span')!, threat ? `${threat.counter ? touchText(eventText(threat.counter, lang())) : t('battle.counter.default')}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.hint'));
+  setText(intent.querySelector('span')!, threat ? `${t(`battle.do.${threatFamily(threat.type)}` as never)}${battle.threats.length > 1 ? ` (+${battle.threats.length - 1})` : ''}` : t('battle.watch.short'));
   placeBanner();
   setText($('damage'), fmtInt(battle.damage));
   setText($('blocked'), fmtInt(battle.blocked));
   setText($('loot'), battle.mode === 'endless' ? `${fmtInt(runWallet.crystal)} ◇` : battle.mode === 'raid' ? (battle.raidContract?.sandbox ? t('raid.sandbox.short') : t(`raid.tier.${battle.raidContract?.tier ?? 'bronze'}` as never)) : `${fmtInt(battle.gold)}G`);
   setText($('standing'), t('battle.standing', { n: battle.living().length, total: battle.heroes.length }));
   setText($('move-tip'), moveMode ? t('battle.move.pick') : t('battle.drag'));
-  setScale($('resolve-fill'), battle.resolve / 100);
-  setText($('resolve-label'), battle.resolve >= 100 ? t('battle.ult.ready') : t('battle.ult.charge', { n: Math.floor(battle.resolve) }));
   const ultReady = battle.resolve >= 100 && battle.status === 'fighting';
+  // The tray's round buttons: a conic ring for Guard's cooldown (or its time up), Ninefold Dawn's Resolve and the Potions left.
+  setTurn($('ultimate'), battle.resolve / 100);
+  setText($('resolve-count'), ultReady ? '' : t('battle.ult.charge', { n: Math.floor(battle.resolve) }));
+  setText($('resolve-label'), ultReady ? t('battle.ult.ready') : '');
   setDisabled($<HTMLButtonElement>('ultimate'), !ultReady);
   $('ultimate').classList.toggle('ready', ultReady);
   setDisabled($<HTMLButtonElement>('potion'), battle.potions <= 0 || battle.status !== 'fighting');
   setText($('potion').querySelector('b')!, String(battle.potions));
+  setTurn($('potion'), battle.potions > 0 ? 1 : 0);
   setDisabled($<HTMLButtonElement>('guard'), battle.guardCooldown > 0 || battle.status !== 'fighting');
   // Guard only helps if it is still up at impact: cue the window once an all-grid hit is within GUARD_DURATION
   // (minus a few frames, since guardLeft ticks down before the impact resolves).
   const guardWindow = battle.status === 'fighting' && battle.guardCooldown <= 0 && battle.guardLeft <= 0 && battle.threats.some(v => v.type === 'all' && v.left <= GUARD_DURATION - GUARD_MARGIN);
   $('guard').classList.toggle('ready-window', guardWindow);
-  setText($('guard-label'), guardWindow ? t('battle.guard.now') : battle.guardLeft > 0 ? t('battle.guard.active', { s: fmtDec(battle.guardLeft) }) : battle.guardCooldown > 0 ? t('battle.guard.cd', { s: fmtDec(battle.guardCooldown) }) : t('battle.guard.ready'));
+  setText($('guard-label'), guardWindow ? t('battle.guard.now') : '');
+  setText($('guard-count'), battle.guardLeft > 0 || battle.guardCooldown > 0 ? t('battle.guard.cd', { s: fmtDec(battle.guardLeft > 0 ? battle.guardLeft : battle.guardCooldown) }) : '');
+  setTurn($('guard'), battle.guardLeft > 0 ? battle.guardLeft / GUARD_DURATION : 1 - battle.guardCooldown / (battle.boons.includes('bell') ? GUARD_COOLDOWN_BELL : GUARD_COOLDOWN));
   $('guard').classList.toggle('guarding', battle.guardLeft > 0);
+  // J8: a red vignette on the side the threat comes from (the boss's for ground and all-grid hits, the marked hero's side for a mark),
+  // pulsing twice when it shows and steadily in its last second or the GUARD NOW window.
+  const edgeSide = threat && battle.status === 'fighting' ? dangerSide({ type: threat.type, targetSlot: threat.targetId !== undefined ? battle.hero(threat.targetId)?.slot : undefined }) : '';
+  const edge = edgeSide ? `danger-edge on edge-${edgeSide}${threat!.left < 1 || guardWindow ? ' hot' : ''}` : 'danger-edge';
+  if (edge !== edgeClass) { edgeClass = edge; $('danger-edge').className = edge; }
   coachFrame(guardWindow);
   document.querySelector('.lane-targets')?.classList.toggle('has-minions', battle.minions.length > 0);
   for (const h of battle.heroes) {
@@ -2206,16 +2253,19 @@ const downCause = (e: BattleEvent) => e.kind === 'claw' ? t('log.cause.claw') : 
 window.addEventListener('battle-banner', event => {
   if (inTown) return;
   const e = (event as CustomEvent<BattleEvent>).detail;
-  if (e.type === 'warning') announceThreat(e);
+  if (e.type === 'warning') { announceThreat(e); if (battle.threats.some(v => v.name === e.text && v.type === 'target')) buzz(); }
   else if (e.type === 'down') announce(t('a11y.down', { name: heroLabel(e.source) }));
   else if (e.type === 'phase') announce(t('a11y.phase', { name: battle.enemyName, n: battle.phase }));
   else if (e.type === 'break') announce(t('a11y.break', { s: BREAK_SECONDS }));
   const text = e.type === 'down' ? t('battle.ko', { name: heroLabel(e.source) }) : e.text ? eventText(e.text, lang()) : '';
   // The stage name already headlines the ready window: log it, but keep the arena clear for the FIGHT! cue.
-  if (e.kind !== 'stage') {
+  // The ultimate's name rides on its cut-in band (J10): the banner stays clear, the log keeps it.
+  if (e.kind !== 'stage' && e.type !== 'ultimate') {
     $('banner').textContent = text;
     bannerSpot = undefined;
-    $('banner').className = `battle-banner visible ${['warning', 'down', 'enrage'].includes(e.type) ? 'danger' : e.type === 'ultimate' ? 'ultimate' : e.type === 'break' ? 'break' : e.type === 'interrupt' ? 'interrupt' : ''}`;
+    $('banner').className = `battle-banner visible ${['warning', 'down', 'enrage'].includes(e.type) ? 'danger' : e.type === 'ultimate' ? 'ultimate' : e.type === 'break' ? 'break' : e.type === 'interrupt' ? 'interrupt' : e.type === 'phase' ? 'phase' : ''}`;
+    // J5: a new phase slams in like the boss's title card.
+    if (e.type === 'phase') { sound.play('title-slam'); if (motionOn()) enter($('banner'), { opacity: 0, transform: 'scale(1.8)' }, { duration: 260, easing: EASE_BACK }); }
     clearTimeout(bannerTimer);
     bannerTimer = window.setTimeout(() => {
       const banner = $('banner');
@@ -2233,8 +2283,52 @@ window.addEventListener('battle-banner', event => {
     const h = battle.hero(e.source ?? -1);
     addLog(t('log.interrupt', { hero: heroLabel(e.source), skill: h ? KITS[h.classId].skills[h.stance].name : '?', name: (e.name ?? '').split(' · ').map(name => eventText(name, lang())).join(' · ') }));
   } else if (e.kind === 'potion') addLog(t('log.potion', { n: battle.potions }));
-  else if (text) addLog(text);
+  else if (e.type === 'warning') {
+    // The threat panel shows a few words; the counter's full text goes to the Log.
+    const threat = [...battle.threats].reverse().find(v => v.name === e.text);
+    addLog(threat?.counter ? `${text} · ${touchText(eventText(threat.counter, lang()))}` : text);
+  } else if (text) addLog(text);
+  // J6: an armour break shatters the armour bar.
+  if (e.type === 'break' && motionOn()) document.querySelectorAll<HTMLElement>('#armor-shards i').forEach((shard, i) => shard.animate?.([{ opacity: 1, transform: 'translate(0, 0) rotate(0)' }, { opacity: 0, transform: `translate(${(i - 2.5) * 14}px, ${(i % 2 ? -1 : 1) * (10 + i * 3)}px) rotate(${(i - 2.5) * 70}deg)` }], { duration: 520, easing: EASE_OUT }));
 });
+/** P2 battle juice on the HUD (the scene sends window events): the combo counter (J3), the ultimate's cut-in band (J10) and the kill cam's
+ *  clear arena (J9). The combo's best in this battle shows in the result's details. */
+let bestCombo = 0, cutinTimer = 0, killTimer = 0;
+window.addEventListener('battle-combo', event => {
+  if (inTown) return;
+  const d = (event as CustomEvent<{ count: number; best: number; tier: number }>).detail, el = $('combo');
+  bestCombo = Math.max(bestCombo, d.best);
+  if (d.count < 2) { el.hidden = true; return; }
+  el.hidden = false;
+  setText(el.querySelector('b')!, `×${d.count}`);
+  setAttr(el, 'data-tier', String(d.tier));
+  if (motionOn()) enter(el.querySelector('b'), { transform: 'scale(1.2)' }, { duration: 140, easing: EASE_BACK });
+});
+window.addEventListener('battle-cutin', event => {
+  if (inTown) return;
+  const h = battle.hero((event as CustomEvent<{ hero?: number }>).detail.hero ?? -1), el = $('cutin'), img = el.querySelector('img')!;
+  if (h) img.src = face(h);
+  img.hidden = !h;
+  el.hidden = false;
+  sound.play('cut-in');
+  clearTimeout(cutinTimer);
+  // A 600 ms diagonal band: in, hold, out (under reduced motion it only shows).
+  if (motionOn()) el.querySelector('.cutin-band')?.animate?.([{ transform: 'translateX(-115%)' }, { transform: 'translateX(0)', offset: .2 }, { transform: 'translateX(0)', offset: .8 }, { transform: 'translateX(115%)' }], { duration: 600, easing: 'linear' });
+  cutinTimer = window.setTimeout(() => { el.hidden = true; }, 600);
+});
+window.addEventListener('battle-killcam', event => {
+  const seconds = (event as CustomEvent<{ seconds: number }>).detail.seconds;
+  clearTimeout(killTimer);
+  $('arena').classList.toggle('kill-cam', seconds > 0);
+  if (seconds > 0) killTimer = window.setTimeout(() => $('arena').classList.remove('kill-cam'), seconds * 1000);
+});
+/** J8: a short buzz when a mark lands on a hero — the web build only (never in itch's frame), never under automation, and only while
+ *  Config → Vibration is on (a per-viewer flag, on by default). */
+const VIBRATION_KEY = 'gridbound.ui.vibration';
+const vibrationAvailable = () => !embedded && typeof navigator.vibrate === 'function';
+function vibrationOn() { try { return localStorage.getItem(VIBRATION_KEY) !== 'off'; } catch { return true; } }
+function setVibration(on: boolean) { try { if (on) localStorage.removeItem(VIBRATION_KEY); else localStorage.setItem(VIBRATION_KEY, 'off'); } catch { /* storage blocked: the default stays */ } }
+function buzz() { if (!vibrationAvailable() || navigator.webdriver || !vibrationOn()) return; try { navigator.vibrate(25); } catch { /* refused */ } }
 // Telegraph impacts go to the log only: who was hit and for how much. A finished channel hits nobody by design (its heal has its own banner).
 // Stuns put their DELAYED/RESISTED note in the boss status strip (never covered, unlike the canvas above the boss) and the log.
 window.addEventListener('battle-log', event => {
@@ -2351,6 +2445,7 @@ function settings(fromPause = false) {
     <label class="setting-row"><span><b>${t('settings.sound')}</b><small>${t('settings.sound.sub')}${/iP(hone|ad|od)/.test(navigator.userAgent) ? ` ${t('settings.sound.ios')}` : ''}</small></span><input id="setting-sound" type="checkbox" ${profile.sound ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.motion')}</b><small>${reduceMotionQuery.matches ? t('settings.motion.device') : t('settings.motion.sub')}</small></span><input id="setting-motion" type="checkbox" ${profile.motion ? 'checked' : ''}></label>
     <label class="setting-row"><span><b>${t('settings.coach')}</b><small>${t('settings.coach.sub')}</small></span><input id="setting-coach" type="checkbox" ${coachEnabled() ? 'checked' : ''}></label>
+    ${vibrationAvailable() ? `<label class="setting-row"><span><b>${t('settings.vibration')}</b><small>${t('settings.vibration.sub')}</small></span><input id="setting-vibration" type="checkbox" ${vibrationOn() ? 'checked' : ''}></label>` : ''}
     ${fullscreenAvailable() && !appFullscreen() ? `<label class="setting-row"><span><b>${t('settings.fullscreen')}</b><small>${t(coarsePointer.matches ? 'settings.fullscreen.sub.touch' : 'settings.fullscreen.sub')}</small></span><input id="setting-fullscreen" type="checkbox" ${fullscreenOn() ? 'checked' : ''}></label>` : ''}
     ${installOffered() ? `<div id="install-row" class="setting-row"><span><b>${t('settings.install')}</b><small>${t(coarsePointer.matches ? 'settings.install.sub' : 'settings.install.sub.desktop')}</small></span><button id="install-app" type="button" class="btn">${t('settings.install.button')}</button></div>` : ''}
     ${storageNoteMarkup(true)}<p class="hint">${t('settings.save.note')}</p><div class="departure-actions backup-actions"><button id="export-save" class="btn">${t('settings.export')}</button><button id="export-text" class="btn">${t('profiles.export.text')}</button></div><button class="btn primary" ${fromPause ? 'data-nav-parent' : 'data-close'}>${t('common.back')}</button>`, { parent: fromPause ? renderPause : undefined });
@@ -2359,6 +2454,7 @@ function settings(fromPause = false) {
   document.getElementById('install-app')?.addEventListener('click', () => { void installApp(); });
   $('setting-sound').addEventListener('change', e => { profile.sound = (e.target as HTMLInputElement).checked; updateSound(); });
   $('setting-coach').addEventListener('change', e => { setCoachEnabled((e.target as HTMLInputElement).checked); if (coach.step) endCoachStep(); });
+  document.getElementById('setting-vibration')?.addEventListener('change', e => setVibration((e.target as HTMLInputElement).checked));
   $('setting-motion').addEventListener('change', e => { profile.motion = (e.target as HTMLInputElement).checked; applyMotion(); persist(); });
   // The checkbox shows the real state: a refused request (no user gesture, a page that disallows it) puts it back.
   document.getElementById('setting-fullscreen')?.addEventListener('change', e => { void toggleFullscreen().then(on => { (e.target as HTMLInputElement).checked = on; }); });
@@ -2728,7 +2824,7 @@ async function presentResult() {
       </section>
       ${defeatHelp}
       <section class="win result-details" id="result-details" aria-label="${t('result.details')}" hidden>
-        <dl class="stat-table"><div><dt>${t('battle.stat.damage')}</dt><dd>${fmtInt(battle.damage)}</dd></div><div><dt>${t('result.detail.healed')}</dt><dd>${fmtInt(battle.healed)}</dd></div><div><dt>${t('battle.stat.blocked')}</dt><dd>${fmtInt(battle.blocked)}</dd></div><div><dt>${t('result.detail.dodged')}</dt><dd>${battle.dodged}</dd></div><div><dt>${t('result.detail.taps')}</dt><dd>${battle.taps}</dd></div><div><dt>${t('result.detail.moves')}</dt><dd>${battle.relocations}</dd></div></dl>
+        <dl class="stat-table"><div><dt>${t('battle.stat.damage')}</dt><dd>${fmtInt(battle.damage)}</dd></div>${bestCombo >= 2 ? `<div><dt>${t('result.combo')}</dt><dd>×${fmtInt(bestCombo)}</dd></div>` : ''}<div><dt>${t('result.detail.healed')}</dt><dd>${fmtInt(battle.healed)}</dd></div><div><dt>${t('battle.stat.blocked')}</dt><dd>${fmtInt(battle.blocked)}</dd></div><div><dt>${t('result.detail.dodged')}</dt><dd>${battle.dodged}</dd></div><div><dt>${t('result.detail.taps')}</dt><dd>${battle.taps}</dd></div><div><dt>${t('result.detail.moves')}</dt><dd>${battle.relocations}</dd></div></dl>
         ${starGoals.length ? `<h3 class="subheading">${t('result.detail.stars')}</h3><ul class="result-star-goals">${starGoals.map(([key, met]) => `<li class="${met ? 'met' : ''}">${t(key, { s: STAR_PAR_SECONDS })}</li>`).join('')}</ul>` : ''}
         <p class="hint">${t('result.xp.note', { n: Math.round(FALLEN_XP * 100) })}</p>
       </section>

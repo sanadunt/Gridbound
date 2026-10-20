@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Battle, ENRAGE_AT, type BattleEvent } from '../game/simulation';
+import { Battle, ENRAGE_AT, SUPPORT_KINDS, type BattleEvent } from '../game/simulation';
 import { installArt, heroCanvas, heroKey } from '../art/pixels';
 import { monsterCanvas } from '../art/monsters';
 import { KITS, type ClassId } from '../game/content';
@@ -8,12 +8,17 @@ import { t, lang, fmtInt } from '../i18n';
 import { eventText } from '../i18n/content';
 import { HitStats, allowedShake, SHAKE_PER_SECOND, HIT_STOP_GAP } from './hit-feedback';
 import { ARENA, cell, center } from './arena';
+import { comboStep, comboAlive, comboTier, newCombo, isPerfectGuard, mergeNumber, slowmoScale, lungeShare, lungeDone, LUNGE, KILL_CAM, PERFECT_SLOWMO, type Combo, type HitNumber } from './juice';
 export { ARENA, cell, center } from './arena';
 /** Floating numbers follow the game language (3,000 / 3.000); seconds texts like '−0.6s' are localized by eventText(). */
 const num = (value: number | string) => typeof value === 'number' ? fmtInt(value) : value;
 
 type Particle={x:number;y:number;vx:number;vy:number;life:number;max:number;color:number;size:number;gravity:number};
 type BossCue={color:number;kind:'threat'|'phase'|'break'|'summon'|'ultimate'|'victory';left:number;total:number};
+/** One entry of the dev-only juice log (window.gridbound.scene.juiceLog): what the scene answered, at which battle time. */
+export type JuiceEntry={type:'ring'|'lunge'|'strike'|'combo'|'tired'|'perfect'|'blocked'|'slowmo'|'killcam'|'cutin'|'revive'|'pop';at:number;source?:number;value?:number};
+/** Hex colour string ('#e7b96c') to a Phaser colour number. */
+const hex=(color:string|number)=>typeof color==='number'?color:Number.parseInt(color.slice(1),16);
 // Heroes stand in the upper part of their cell; the DOM unit card puts HP and the skill chip below them.
 const HERO_SCALE=2,HERO_LIFT=18;
 export const ENEMY_DEATH_ANIMATION_MS=780;
@@ -23,13 +28,28 @@ export class BattleScene extends Phaser.Scene {
  reducedMotion=false;hoverSlot=-1;dragId=-1;dragPoint?:{x:number;y:number};
  private heroes=new Map<number,Phaser.GameObjects.Image>();private enemies=new Map<number,Phaser.GameObjects.Image>();
  private particles:Particle[]=[];private age=0;private accumulator=0;/** Battle speed against the wall clock (the first-battle coach slows the fight to 0.3 while it explains a move): each frame feeds dt × timeScale into the fixed 1/60 s tick loop, so determinism is unchanged. */public timeScale=1;private pulse=0;private shake=0;private bossCue?:BossCue;
- private flashes=new Map<number,number>();private attacks=new Map<number,number>();private bg!:Phaser.GameObjects.Image;
+ private flashes=new Map<number,number>();private bg!:Phaser.GameObjects.Image;
  private floor!:Phaser.GameObjects.Graphics;
  private dragon!:Phaser.GameObjects.Image;
  private threats!:Phaser.GameObjects.Graphics;
  private fx!:Phaser.GameObjects.Graphics;
  private hits=new HitStats();private shakeUsed=0;private lastStop=-9;
  private hitStop=0;private bossKick=0;private flashRect!:Phaser.GameObjects.Rectangle;private introLeft=0;private victoryAge=0;
+ /** J1 lunges (start in scene age, distance factor), J2 tap squash (scene age) and the charge ring's shown fill per hero, the offset each
+  *  sprite carries this frame (so the sprite's eased follow never smooths a 90 ms lunge away). */
+ private lunges=new Map<number,{at:number;scale:number}>();private squashes=new Map<number,number>();private rings=new Map<number,{shown:number;boost:number}>();private offsets=new Map<number,{x:number;y:number}>();
+ /** J3 combo (battle time), J4 the last party Guard (battle time), J7 the open boss number per source, heroes seen down (J11 revive). */
+ private combo:Combo=newCombo();private guardAt:number|undefined;private numbers=new Map<number,{n:HitNumber;label:Phaser.GameObjects.Text}>();private lastNumber?:Phaser.GameObjects.Text;private downSeen=new Set<number>();
+ /** Taps drained this frame: a cast by a hero tapped in the same frame is a TAP-STRIKE (its projectile's number is gold). */
+ private frameTaps=new Set<number>();private strikes=new Set<number>();
+ /** Slow motion (J4 PERFECT, J9 kill cam) on top of the coach's timeScale: wall-clock seconds left, the starting scale, held or eased back. */
+ private slowmoLeft=0;private slowmoTotal=0;private slowmoFrom=1;private slowmoHold=false;slowmo=1;private killCam=0;
+ /** Pools: floating numbers/texts and slash arcs/runes are reused instead of created and destroyed per hit. */
+ private textPool:Phaser.GameObjects.Text[]=[];private arcPool:Phaser.GameObjects.Graphics[]=[];
+ /** Dev builds only: the last 200 juice answers, read by scripts/juice-browser.mjs. */
+ juiceLog:JuiceEntry[]|undefined=import.meta.env?.DEV?[]:undefined;
+ /** The battle's speed against the wall clock: the coach's timeScale times the juice slow-mo. */
+ get speed(){return this.timeScale*this.slowmo;}
  private enemyDeathElapsed=0;private enemyDeathDuration=ENEMY_DEATH_ANIMATION_MS;private enemyDeathEnemyId:string|null=null;private enemyDeathStarted=false;private enemyDeathComplete=true;private enemyDeathWaiters:Array<()=>void>=[];
  constructor(battle:Battle,sound:Sound,onFrame:(dt:number)=>void){super('battle');this.battle=battle;this.soundBox=sound;this.onFrame=onFrame;}
  private setBossCue(kind:BossCue['kind'],color:number,duration:number){
@@ -61,7 +81,14 @@ export class BattleScene extends Phaser.Scene {
  }
  /** create() has run (the engine's first step): from then on a new battle goes through replace(), which builds its hero sprites. */
  get created(){return Boolean(this.floor);}
- replace(battle:Battle){this.tweens.killAll();for(const child of [...this.children.list])if('depth' in child && Number(child.depth)>=17)child.destroy();this.fx=this.add.graphics().setDepth(20);this.flashRect=this.add.rectangle(300,380,600,760,0xffffff,0).setDepth(45);this.hitStop=0;this.bossKick=0;this.introLeft=0;this.victoryAge=0;this.pulse=0;this.shake=0;this.bossCue=undefined;this.dragId=-1;this.dragPoint=undefined;this.hoverSlot=-1;this.battle=battle;this.heroes.forEach(s=>s.destroy());this.heroes.clear();this.enemies.forEach(s=>s.destroy());this.enemies.clear();this.particles=[];this.flashes.clear();this.attacks.clear();this.accumulator=0;this.timeScale=1;this.resetHitStats();this.resetEnemyDeathAnimation();this.syncHeroes();}
+ replace(battle:Battle){this.tweens.killAll();for(const child of [...this.children.list])if('depth' in child && Number(child.depth)>=17)child.destroy();this.fx=this.add.graphics().setDepth(20);this.flashRect=this.add.rectangle(300,380,600,760,0xffffff,0).setDepth(45);this.hitStop=0;this.bossKick=0;this.introLeft=0;this.victoryAge=0;this.pulse=0;this.shake=0;this.bossCue=undefined;this.dragId=-1;this.dragPoint=undefined;this.hoverSlot=-1;this.battle=battle;this.heroes.forEach(s=>s.destroy());this.heroes.clear();this.enemies.forEach(s=>s.destroy());this.enemies.clear();this.particles=[];this.flashes.clear();this.accumulator=0;this.timeScale=1;this.resetJuice();this.resetHitStats();this.resetEnemyDeathAnimation();this.syncHeroes();}
+ /** A new battle starts with no slow-mo, combo, lunge or open number, the camera at rest (J9) and the pools emptied (replace() destroyed their objects). */
+ private resetJuice(){this.slowmo=1;this.slowmoLeft=0;this.killCam=0;this.lunges.clear();this.squashes.clear();this.rings.clear();this.offsets.clear();this.numbers.clear();this.lastNumber=undefined;this.downSeen.clear();this.guardAt=undefined;this.frameTaps.clear();this.strikes.clear();this.textPool=[];this.arcPool=[];if(this.combo.count>0)this.emitCombo('reset');this.combo=newCombo();this.cameras?.main?.setZoom(1).setScroll(0,0);window.dispatchEvent(new CustomEvent('battle-killcam',{detail:{seconds:0}}));}
+ private log(entry:JuiceEntry){const log=this.juiceLog;if(!log)return;log.push(entry);if(log.length>200)log.splice(0,log.length-200);}
+ /** Slow the arena (and the fight under it) to `scale` for `seconds` of wall-clock time, eased back to full speed unless `hold`; never under reduced motion. */
+ slowMotion(seconds:number,scale:number,hold=false){if(this.reducedMotion)return;this.slowmoLeft=seconds;this.slowmoTotal=seconds;this.slowmoFrom=scale;this.slowmoHold=hold;this.slowmo=scale;this.log({type:'slowmo',at:this.battle.time,value:scale});}
+ private advanceSlowmo(wall:number){if(this.slowmoLeft<=0){this.slowmo=1;return;}this.slowmoLeft-=wall;this.slowmo=this.slowmoLeft<=0?1:this.slowmoHold?this.slowmoFrom:slowmoScale(this.slowmoTotal-this.slowmoLeft,this.slowmoTotal,this.slowmoFrom);}
+ private emitCombo(event:string,source?:number){window.dispatchEvent(new CustomEvent('battle-combo',{detail:{count:this.combo.count,best:this.combo.best,tier:comboTier(this.combo.count),event,source}}));}
  private resetHitStats(){this.hits.reset();this.shakeUsed=0;this.lastStop=-9;}
  /** Add screen shake within a per-second budget so dense fights do not shake constantly; `force` (ultimate, KO, break) ignores the budget. */
  private addShake(amount:number,force=false){const use=allowedShake(amount,this.shakeUsed,force);if(use<=0)return;this.shake=Math.max(this.shake,use);this.shakeUsed+=use;}
@@ -113,12 +140,17 @@ export class BattleScene extends Phaser.Scene {
  private heroTexture(h:{id:number;classId:ClassId},frame:number){const look=this.battle.mode==='endless'?undefined:h.id,key=`${heroKey(h.classId,look)}-${frame}`;if(!this.textures.exists(key))this.textures.addCanvas(key,heroCanvas(h.classId,frame,look));return key;}
  private syncHeroes(){if(!this.floor)return;for(const h of this.battle.heroes){if(this.heroes.has(h.id))continue;const p=center(h.slot);this.heroes.set(h.id,this.add.image(p.x,p.y-HERO_LIFT,this.heroTexture(h,0)).setScale(HERO_SCALE).setDepth(9));}}
  update(_time:number,delta:number){
-  let dt=Math.min(delta/1000,.1);
+  let dt=Math.min(delta/1000,.1);const wall=dt;
   if(this.hitStop>0){this.hitStop-=dt;dt*=.08;}
+  // Slow motion scales both the arena's visuals and the fight's fixed ticks (dt × speed into the 1/60 s loop: determinism unchanged).
+  this.advanceSlowmo(wall);dt*=this.slowmo;if(this.killCam>0)this.killCam-=wall;
   this.age+=dt;
   if(this.battle.status==='fighting'){this.accumulator+=dt*this.timeScale;while(this.accumulator>=1/60){this.battle.tick(1/60);this.accumulator-=1/60;}}
   this.shakeUsed=Math.max(0,this.shakeUsed-dt*SHAKE_PER_SECOND);
+  this.frameTaps.clear();this.strikes.clear();
   const events=this.battle.drain();events.forEach(e=>{const cue=this.event(e)??this.soundKind(e);if(cue)this.soundBox.play(cue);});
+  // A combo ends COMBO_WINDOW s (battle time) after its last clean tap.
+  if(this.combo.count>0&&!comboAlive(this.combo,this.battle.time)){this.combo={...this.combo,count:0};this.emitCombo('end');}
   this.advanceEnemyDeathAnimation(dt);
   this.draw(dt);this.onFrame(dt);
  }
@@ -131,7 +163,10 @@ export class BattleScene extends Phaser.Scene {
   const bossFrame=death&&this.enemyDeathComplete?0:this.reducedMotion?0:Math.floor(t*7)%8,idleBob=death||this.reducedMotion?0:Math.sin(t*1.8)*5,shakeScale=charging&&!this.reducedMotion?Math.sin(t*16)*.035:0;
   this.dragon.setTexture(this.enemyTexture(b.enemyId,bossFrame)).setY(194+idleBob-intro*intro*70-kick*10+(death&&!this.reducedMotion?collapse*34:0)).setX(300+(kick>0?Math.sin(t*90)*4*kick:0)).setScale(baseScale*(1+(!this.reducedMotion?collapse*.08:0)+shakeScale),baseScale*(1-(death&&!this.reducedMotion?collapse*.72:0)));
   this.dragon.setAlpha(death?Math.max(0,1-progress):1).setRotation(death&&!this.reducedMotion?collapse*.18:0);if(this.pulse>0){this.pulse-=dt;this.dragon.setTintFill(0xffffff);}else if(death)this.dragon.setTint(0xf1c77f);else if(b.stageTime>ENRAGE_AT)this.dragon.setTint(0xffb0a4);else this.dragon.clearTint();
-  if(this.shake>0&&!this.reducedMotion){this.shake-=dt;this.cameras.main.setScroll(Math.sin(t*80)*this.shake*9,Math.cos(t*70)*this.shake*7);}else this.cameras.main.setScroll(0,0);
+  // J9 kill cam: the camera zooms in on the boss (its spot on screen stays put, the grid below slides off) while the arena runs slow.
+  const zoom=this.killCam>0&&!this.reducedMotion?1+(KILL_CAM.zoom-1)*Math.min(1,(KILL_CAM.seconds-this.killCam)/.12,this.killCam/.18):1,zoomY=(194-380)*(1-1/zoom);
+  if(this.cameras.main.zoom!==zoom)this.cameras.main.setZoom(zoom);
+  if(this.shake>0&&!this.reducedMotion){this.shake-=dt;this.cameras.main.setScroll(Math.sin(t*80)*this.shake*9,Math.cos(t*70)*this.shake*7+zoomY);}else this.cameras.main.setScroll(0,zoomY);
   // Slot borders remain visible beneath effects and communicate the legal drop area.
   for(let i=0;i<9;i++){
    const p=cell(i),h=b.heroes.find(a=>a.slot===i),selected=h?.id===b.selected;
@@ -143,23 +178,42 @@ export class BattleScene extends Phaser.Scene {
     // A hero without a sprite (a battle handed over without replace()) gets one here instead of breaking the frame.
     if(!this.heroes.has(h.id))this.syncHeroes();
     const pos=center(i),image=this.heroes.get(h.id)!;let x=pos.x,y=pos.y-HERO_LIFT;
-    const attack=this.attacks.get(h.id)??0;if(attack>0){this.attacks.set(h.id,attack-dt);if(!this.reducedMotion)y-=Math.sin(Math.min(1,attack/.34)*Math.PI)*26;}
     if(this.victoryAge>0&&h.hp>0&&!this.reducedMotion)y-=Math.abs(Math.sin((this.victoryAge*2.6+h.id*.37)*Math.PI))*18;
-    if(this.dragId===h.id&&this.dragPoint){x=this.dragPoint.x;y=this.dragPoint.y;image.setDepth(30);}else image.setDepth(9);
-    image.x=Phaser.Math.Linear(image.x,x,Math.min(1,dt*18));image.y=Phaser.Math.Linear(image.y,y,Math.min(1,dt*18));image.setTexture(this.heroTexture(h,Math.floor(t*4+h.id)%4));
-    image.setAlpha(h.hp<=0?.2:1);const flash=this.flashes.get(h.id)??0;if(flash>0){this.flashes.set(h.id,flash-dt);image.setTint(0xff857e);}else image.clearTint();
+    const dragged=this.dragId===h.id&&this.dragPoint;
+    if(dragged){x=this.dragPoint!.x;y=this.dragPoint!.y;image.setDepth(30);}else image.setDepth(9);
+    // J1: the lunge rides on top of the sprite's eased follow (front row: toward the boss; back rows lean), so it is never smoothed away.
+    const lunge=this.lunges.get(h.id),last=this.offsets.get(h.id)??{x:0,y:0};let ox=0,oy=0;
+    if(lunge){const elapsed=this.age-lunge.at;if(lungeDone(elapsed))this.lunges.delete(h.id);else if(!this.reducedMotion&&!dragged){const dx=300-pos.x,dy=194-(pos.y-HERO_LIFT),len=Math.hypot(dx,dy)||1,share=lungeShare(elapsed)*lunge.scale*(i<3?LUNGE.distance:LUNGE.lean);ox=dx/len*share;oy=dy/len*share;}}
+    image.x=Phaser.Math.Linear(image.x-last.x,x,Math.min(1,dt*18))+ox;image.y=Phaser.Math.Linear(image.y-last.y,y,Math.min(1,dt*18))+oy;this.offsets.set(h.id,{x:ox,y:oy});image.setTexture(this.heroTexture(h,Math.floor(t*4+h.id)%4));
+    // J2: a tap squashes the sprite for 80 ms.
+    const squash=this.squashes.get(h.id);if(squash!==undefined&&this.age-squash>.08)this.squashes.delete(h.id);const squashing=squash!==undefined&&this.age-squash<=.08&&!this.reducedMotion;
+    image.setScale(HERO_SCALE*(squashing?1.1:1),HERO_SCALE*(squashing?.9:1));
+    // J11: a downed hero greys out; one that stands again gets a light pillar.
+    if(h.hp<=0)this.downSeen.add(h.id);else if(this.downSeen.delete(h.id))this.pillar(pos.x,pos.y,h.id);
+    image.setAlpha(h.hp<=0?.45:1);const flash=this.flashes.get(h.id)??0;if(flash>0){this.flashes.set(h.id,flash-dt);image.setTint(0xff857e);}else if(h.hp<=0)image.setTint(0x6d6a66);else image.clearTint();
+    // J2: the charge ring around the hero fills with its gauge (1 − remaining/total); a tap makes it jump and glow for a moment.
+    if(h.hp>0&&(b.status==='fighting'||b.status==='ready'||b.status==='paused')){
+     const fill=Math.max(0,Math.min(1,1-h.remaining/Math.max(.001,h.total))),ring=this.rings.get(h.id)??{shown:fill,boost:-9};
+     ring.shown=fill<ring.shown-.05?fill:Phaser.Math.Linear(ring.shown,fill,Math.min(1,dt*(this.age-ring.boost<.2?30:14)));this.rings.set(h.id,ring);
+     const boost=Math.max(0,1-(this.age-ring.boost)/.35),cy=image.y,cx=image.x,color=hex(KITS[h.classId].color),full=ring.shown>=.985;
+     this.threats.lineStyle(3,0x07120f,.55).strokeCircle(cx,cy,31);
+     if(ring.shown>.01)this.threats.lineStyle(3+boost*2,full?0xfff3b0:color,.5+.5*Math.max(boost,full?.6:0)).beginPath().arc(cx,cy,31,-Math.PI/2,-Math.PI/2+ring.shown*Math.PI*2,false).strokePath();
+    }
     this.floor.fillStyle(0x050818,.55).fillEllipse(pos.x,pos.y+17,62,12);
     if(h.shield>0||b.guardLeft>0){const shieldAlpha=this.reducedMotion?.6:.6+Math.sin(t*3)*.15;this.threats.lineStyle(2,0x9bd8ef,shieldAlpha);this.threats.strokeEllipse(pos.x,pos.y-HERO_LIFT,72,74);this.threats.fillStyle(0x8acee8,.04).fillEllipse(pos.x,pos.y-HERO_LIFT,72,74);}
     if(h.buff>0){const buffWidth=this.reducedMotion?61:61+Math.sin(t*5)*4;this.threats.lineStyle(2,0x8bf3ca,.7);this.threats.strokeEllipse(pos.x,pos.y+14,buffWidth,13);}
     // Counter stance: a gold diamond that fades as the stance runs out.
     if(h.hp>0&&h.counterLeft>0){const r=40+(this.reducedMotion?0:Math.sin(t*6)*2),cy=pos.y-HERO_LIFT;this.threats.lineStyle(2,0xf2c46d,.35+.55*Math.min(1,h.counterLeft/3.5)).strokePoints([{x:pos.x,y:cy-r},{x:pos.x+r,y:cy},{x:pos.x,y:cy+r},{x:pos.x-r,y:cy}],true,true);}
-    if(h.hp<=0){this.threats.lineStyle(2,0xa19788,.7).lineBetween(pos.x-8,pos.y-28,pos.x+8,pos.y-12).lineBetween(pos.x+8,pos.y-28,pos.x-8,pos.y-12);}
+    // J11: the fallen hero's cell cracks.
+    if(h.hp<=0){const c=cell(i);this.threats.lineStyle(2,0xa19788,.7).lineBetween(pos.x-8,pos.y-28,pos.x+8,pos.y-12).lineBetween(pos.x+8,pos.y-28,pos.x-8,pos.y-12);this.threats.lineStyle(2,0xd9d0c2,.45).strokePoints([{x:c.x+18,y:c.y+6},{x:c.x+44,y:c.y+30},{x:c.x+36,y:c.y+48},{x:c.x+66,y:c.y+70},{x:c.x+58,y:c.y+86},{x:c.x+92,y:c.y+108}],false).lineBetween(c.x+44,c.y+30,c.x+70,c.y+22).lineBetween(c.x+66,c.y+70,c.x+104,c.y+64).lineBetween(c.x+104,c.y+64,c.x+130,c.y+82);}
    }
   }
   for(const danger of b.threats){const blink=this.reducedMotion?.22:.22+Math.sin(t*5)*.065;for(const s of danger.slots){const p=cell(s),color=danger.type==='all'?0xd9b5ee:danger.type==='target'?0xffba78:danger.type==='breath'?0xeb9d5f:0xef786b;this.threats.fillStyle(color,blink).fillRect(p.x+3,p.y+3,138,106);this.threats.lineStyle(2,color,.85).strokeRect(p.x+3,p.y+3,138,106);
    this.threats.fillStyle(color,.7).fillRect(p.x+3,p.y+3,138*danger.left/danger.total,3);
    this.threats.lineStyle(1,color,.28);for(let stripe=0;stripe<6;stripe++)this.threats.lineBetween(p.x+8+stripe*24,p.y+111,p.x+30+stripe*20,p.y+5);
    this.threats.lineStyle(2,0xffd4a6,.8).strokeTriangle(p.x+119,p.y+15,p.x+111,p.y+29,p.x+127,p.y+29);
+   // J8: in its last second a telegraphed tile's outline flashes.
+   if(danger.left<1&&b.status==='fighting'&&!this.reducedMotion&&Math.sin(t*28)>0)this.threats.lineStyle(4,0xffffff,.9).strokeRect(p.x+1,p.y+1,142,110);
    if(danger.type==='target'){const marked=center(s);this.threats.lineStyle(3,0xffce91).strokeCircle(marked.x,marked.y-HERO_LIFT,33);this.threats.lineBetween(marked.x,marked.y-HERO_LIFT-42,marked.x,marked.y-HERO_LIFT-22);}
    if(b.status==='fighting'&&danger.type==='meteor'&&danger.left<.55&&!this.reducedMotion){const hit=center(s),yy=hit.y-230*(danger.left/.55);this.fx.fillStyle(0xfac589,.9).fillRect(hit.x-4,yy,8,13);this.fx.fillStyle(0xee9970,.5).fillRect(hit.x-2,yy-17,4,19);this.particle(hit.x,yy,0xfac589,3,.25,0,-20,0);}
   }}
@@ -178,14 +232,48 @@ export class BattleScene extends Phaser.Scene {
  }
  private particle(x:number,y:number,color:number,size=3,life=.7,vx=(Math.random()-.5)*170,vy=(Math.random()-.5)*150,gravity=70){if(this.particles.length>240)return;this.particles.push({x,y,vx,vy,life,max:life,color,size,gravity});}
  private burst(x:number,y:number,color:number,n=22){const count=Math.min(n,this.reducedMotion?4:18);for(let i=0;i<count;i++){const size=this.reducedMotion?3:Math.random()>.5?4:2,life=this.reducedMotion?.22:.4+Math.random()*.6;this.particle(x,y,color,size,life,this.reducedMotion?0:(Math.random()-.5)*170,this.reducedMotion?0:(Math.random()-.5)*150,this.reducedMotion?0:70);}}
- floating(x:number,y:number,text:string,color='#ffdfa0',big=false,crit=false){
-  const size = crit ? '36px' : big ? '28px' : '22px';
+ /** A floating text (J7: numbers 24px, big 28px, crits 36px) from the pool; returns it so a merged hit can update it. */
+ floating(x:number,y:number,text:string,color='#ffdfa0',big=false,crit=false,size?:number){
+  const px=size??(crit?36:big?28:24);
   const strokeColor = crit ? '#5c3900' : '#122825';
   const strokeThickness = crit ? 7 : 5;
-  const label=this.add.text(x,y,eventText(text,lang()),{fontFamily:'"Press Start 2P"',fontSize:size,color,stroke:strokeColor,strokeThickness}).setOrigin(.5).setDepth(40);
-  if(this.reducedMotion){this.time.delayedCall(220,()=>label.destroy());return;}
+  const style={fontFamily:'"Press Start 2P"',fontSize:`${px}px`,color,stroke:strokeColor,strokeThickness};
+  // A pooled text keeps its style when the next one matches (each setStyle re-renders the text's canvas).
+  const key=`${px}${color}${strokeThickness}`,pooled=this.textPool.pop();
+  if(pooled&&pooled.getData('style')!==key)pooled.setStyle(style).setData('style',key);
+  const label=pooled?.setText(eventText(text,lang())).setPosition(x,y).setAlpha(1).setScale(1).setVisible(true).setActive(true)??this.add.text(x,y,eventText(text,lang()),style).setOrigin(.5).setDepth(40).setData('style',key);
+  this.rise(label,y,crit);return label;
+ }
+ /** The pop and rise of a floating text, started again when a merged hit bumps its number. */
+ private rise(label:Phaser.GameObjects.Text,y:number,crit=false){
+  this.tweens.killTweensOf(label);label.setAlpha(1).setY(y);
+  if(this.reducedMotion){this.time.delayedCall(260,()=>this.release(label));return;}
   label.setScale(crit?1.6:1.3);this.tweens.add({targets:label,scale:1,y:y-8,duration:120,ease:'Back.easeOut'});
-  this.tweens.add({targets:label,y:y-(crit?60:46),alpha:0,delay:crit?420:280,duration:crit?900:700,onComplete:()=>label.destroy()});
+  this.tweens.add({targets:label,y:y-(crit?60:46),alpha:0,delay:crit?420:280,duration:crit?900:700,onComplete:()=>this.release(label)});
+ }
+ private release(label:Phaser.GameObjects.Text){if(!label.active&&!label.visible)return;label.setVisible(false).setActive(false);if(this.textPool.length<40)this.textPool.push(label);else label.destroy();}
+ /** J7: a hit on the boss. Hits from the same source within MERGE_WINDOW stack into one rising total in its class colour (gold for a
+  *  crit or a TAP-STRIKE). */
+ private bossNumber(x:number,y:number,amount:number,source:number,color:string,crit:boolean,big:boolean){
+  const open=this.numbers.get(source),merge=mergeNumber(open?.n,{source,at:this.age,amount});
+  if(merge.merged&&open&&open.label.active&&open.label.text===fmtInt(open.n.total)){open.n=merge.number;open.label.setText(fmtInt(merge.number.total));if(crit)open.label.setStyle({fontSize:'36px',color,stroke:'#5c3900',strokeThickness:7}).setData('style',`36${color}7`);this.rise(open.label,open.label.y+8,crit);this.lastNumber=open.label;return;}
+  const label=this.floating(x,y,fmtInt(amount),color,big,crit);this.numbers.set(source,{n:merge.number,label});this.lastNumber=label;
+ }
+ /** J1: three class-coloured slash strokes at the boss (attack casts) or a rising rune at the hero (support casts), pooled. */
+ private castMark(x:number,y:number,color:number,support:boolean){
+  const g=this.arcPool.pop()?.setVisible(true).setActive(true).setAlpha(1).setScale(1).setAngle(0).setPosition(0,0)??this.add.graphics().setDepth(19);g.clear();
+  if(support){g.setPosition(x,y);g.lineStyle(2,color,.95).strokePoints([{x:0,y:-14},{x:11,y:0},{x:0,y:14},{x:-11,y:0}],true,true).lineStyle(1,0xffffff,.7).strokeCircle(0,0,5);}
+  else{const tilt=(this.age*137%1-.5)*.8;g.setPosition(x,y);for(let i=0;i<3;i++)g.lineStyle(4-i,i===1?0xffffff:color,.95).beginPath().arc(-8+i*8,-6+i*6,34,-2.6+tilt,.2+tilt).strokePath();}
+  const done=()=>{g.setVisible(false).setActive(false);if(this.arcPool.length<16)this.arcPool.push(g);else g.destroy();};
+  if(this.reducedMotion){this.time.delayedCall(140,done);return;}
+  this.tweens.add({targets:g,alpha:0,scale:support?1:1.15,y:support?y-26:y,angle:support?45:0,duration:support?420:220,ease:'Quad.easeOut',onComplete:done});
+ }
+ /** J11: a light pillar where a fallen hero stands again. */
+ private pillar(x:number,y:number,id:number){
+  this.log({type:'revive',at:this.battle.time,source:id});
+  const beam=this.add.rectangle(x,y-80,46,200,0xfff3c0,.55).setDepth(18);for(let i=0;i<8;i++)this.particle(x+(i-3.5)*6,y,0xfff3c0,3,.7,0,-90-i*6,0);
+  if(this.reducedMotion){this.time.delayedCall(200,()=>beam.destroy());return;}
+  this.tweens.add({targets:beam,scaleX:0,alpha:0,duration:520,ease:'Quad.easeIn',onComplete:()=>beam.destroy()});
  }
  spawnDamageNumber(x: number, y: number, value: number | string, options: { isCrit?: boolean; isBreak?: boolean; isHeal?: boolean; isBlocked?: boolean } = {}) {
    if (options.isCrit) {
@@ -219,13 +307,16 @@ export class BattleScene extends Phaser.Scene {
   const color=e.kind==='nova'||e.kind==='magic'||e.kind==='burst'?0x9bcdf3:e.kind==='steal'?0xd2b0ed:0xf1d393;
   const bolt=this.add.rectangle(from.x,from.y,e.kind==='arrow'?4:11,e.kind==='arrow'?24:11,color).setDepth(18).setRotation(Math.atan2(to.y-from.y,to.x-from.x)+Math.PI/2);
   const isBig=e.kind==='nova'||e.kind==='burst'||e.kind==='ultimate';
-  const amount=Math.round(e.amount??0),share=e.lane===-1?amount/Math.max(1,this.battle.bossMax):0;
+  const amount=Math.round(e.amount??0),share=e.lane===-1?amount/Math.max(1,this.battle.bossMax):0,strike=this.strikes.has(e.source??-2),source=e.source??-1;
+  // J7: boss numbers carry the hero's class colour; a crit or a TAP-STRIKE is gold.
+  const tone=strike?'#ffd54f':h&&e.kind!=='ultimate'?KITS[h.classId].color:e.kind==='nova'?'#b5dbff':'#f6dfab';
   const finish=()=>{
    bolt.destroy();
    this.burst(to.x,to.y,color,isCrit?18:isBig?14:8);
    // Crits are relative to this encounter; shake and flash scale with the hit's share of the boss's HP, and only crits stop time.
-   if(isCrit){this.floating(to.x,to.y,fmtInt(amount),'#ffe082',true,true);this.addShake(.1+Math.min(.18,share*4));this.ring(to.x,to.y,0xffd54f,14,2.6);this.freeze(.07,true);this.screenFlash(0xffffff,Math.min(.22,.08+share*3));}
-   else this.floating(to.x,to.y,fmtInt(amount),e.kind==='nova'?'#b5dbff':'#f6dfab',isBig);
+   if(isCrit){if(e.lane===-1)this.bossNumber(to.x,to.y,amount,source,'#ffe082',true,true);else this.floating(to.x,to.y,fmtInt(amount),'#ffe082',true,true);this.addShake(.1+Math.min(.18,share*4));this.ring(to.x,to.y,0xffd54f,14,2.6);this.freeze(.07,true);this.screenFlash(0xffffff,Math.min(.22,.08+share*3));}
+   else if(e.lane===-1)this.bossNumber(to.x,to.y,amount,source,tone,false,isBig||strike);
+   else this.floating(to.x,to.y,fmtInt(amount),tone,isBig);
    if(e.lane===-1){this.pulse=.08;this.bossKick=.14;this.ring(to.x,to.y,color,12,2.2);}
    if(isBig&&!isCrit)this.addShake(.06+Math.min(.1,share*3));
   };
@@ -235,14 +326,27 @@ export class BattleScene extends Phaser.Scene {
  /** Play an event's effects; returns a sound cue when it differs from soundKind (crits). */
  private event(e:BattleEvent):string|undefined{
   const pos=e.slot!==undefined?center(e.slot):{x:300,y:220};let cue:string|undefined;
-  if(e.type==='tap'){this.attacks.set(e.source!,.13);this.ring(pos.x,pos.y,0xe8d49a,12,2.2);this.burst(pos.x,pos.y,0xf4d991,4);if(e.text)this.floating(pos.x,pos.y-20,e.text,'#ffeeac');}
+  if(e.type==='tap'){
+   // J2: the tap answers on the hero itself: squash, spark and the charge ring's jump (no '−0.6s' text); the tick's pitch climbs with the ring.
+   // J3: clean taps count the combo, a fatigued one breaks it with a grey TIRED puff.
+   const h=this.battle.hero(e.source??-1),fill=h?Math.max(0,Math.min(1,1-h.remaining/Math.max(.001,h.total))):0;this.frameTaps.add(e.source!);this.squashes.set(e.source!,this.age);
+   const ring=this.rings.get(e.source!);if(ring)ring.boost=this.age;else this.rings.set(e.source!,{shown:fill,boost:this.age});
+   this.burst(pos.x,pos.y-HERO_LIFT,0xf4d991,5);if(e.text==='SYNC!')this.floating(pos.x,pos.y-20,e.text,'#ffeeac',false,false,18);
+   this.log({type:'ring',at:this.battle.time,source:e.source,value:fill});this.soundBox.play('tap-tick',fill);cue='';
+   const step=comboStep(this.combo,{at:this.battle.time,amount:e.amount??0});this.combo=step.combo;
+   if(step.event==='tired'){this.floating(pos.x,pos.y-54,t('battle.tired'),'#b9b2a6',false,false,16);this.log({type:'tired',at:this.battle.time,source:e.source});}
+   else{this.log({type:'combo',at:this.battle.time,source:e.source,value:this.combo.count});if(step.event==='tier')this.soundBox.play('combo-up',comboTier(this.combo.count));}
+   this.emitCombo(step.event,e.source);
+  }
   if(e.type==='cast'){
-   this.attacks.set(e.source!,.34);
    const h=this.battle.hero(e.source??-1);
    if(h){
-    const kind=e.kind??'attack',color=kind==='heal'||kind==='regen'?0x69f0ae:kind==='shield'||kind==='partyshield'?0x80deea:kind==='buff'?0x96f2be:KITS[h.classId].color;
-    const castColor=typeof color==='number'?color:Number.parseInt(color.slice(1),16);
-    const p=center(h.slot);this.ring(p.x,p.y,castColor,13,2.1);this.burst(p.x,p.y,castColor,4);
+    const kind=e.kind??'attack',support=SUPPORT_KINDS.includes(kind),strike=this.frameTaps.has(h.id)&&!support,color=kind==='heal'||kind==='regen'?0x69f0ae:kind==='shield'||kind==='partyshield'?0x80deea:kind==='buff'?0x96f2be:hex(KITS[h.classId].color);
+    const p=center(h.slot);this.ring(p.x,p.y,color,13,2.1);this.burst(p.x,p.y,color,4);
+    // J1: every cast lunges; attacks slash the boss (a one-frame white flash), support casts raise a rune. A cast in the frame of its tap is a TAP-STRIKE.
+    this.lunges.set(h.id,{at:this.age,scale:strike?LUNGE.strike:1});this.log({type:'lunge',at:this.battle.time,source:h.id,value:strike?LUNGE.strike:1});
+    if(support)this.castMark(p.x,p.y-HERO_LIFT-30,color,true);else{this.castMark(300,200,hex(KITS[h.classId].color),false);this.pulse=Math.max(this.pulse,.05);this.soundBox.play('lunge');}
+    if(strike){this.strikes.add(h.id);this.floating(p.x,p.y-62,t('battle.tapstrike'),'#ffd54f',false,false,14);this.log({type:'strike',at:this.battle.time,source:h.id});}
    }
   }
   if(e.type==='projectile'){
@@ -280,6 +384,9 @@ export class BattleScene extends Phaser.Scene {
    const slots=e.targets??(e.slot!==undefined?[e.slot]:[]);
    if(slots.length)for(const slot of slots){const p=center(slot);this.ring(p.x,p.y,0x80deea,15,2.2);}
    else this.ring(pos.x,pos.y,0x80deea,15,2.2);
+   // J4: the party Guard's moment (battle time) decides a PERFECT; J7: a hero's barrier gain floats in blue.
+   if(e.text&&e.source===undefined)this.guardAt=this.battle.time;
+   else if(e.slot!==undefined&&(e.amount??0)>=1)this.floating(pos.x+22,pos.y-34,`+${fmtInt(e.amount!)}`,'#80deea',false,false,18);
   }
   if(e.type==='buff'){
    const color=e.kind==='mark'?0xffc46b:e.kind==='weaken'?0xc4b0ff:e.kind==='curse'?0xb07ae0:e.kind==='turret'?0xe0b860:e.kind==='counter'?0xf2c46d:0x96f2be;
@@ -294,7 +401,12 @@ export class BattleScene extends Phaser.Scene {
   if(e.type==='move')this.floating(pos.x,pos.y-25,e.text??t('battle.fx.move'),'#eed69a');
   if(e.type==='impact'){
    for(const slot of e.targets??[]){const p=center(slot),color=e.kind==='breath'?0x8ceeaa:0xf49b70;this.burst(p.x,p.y,color,12);this.ring(p.x,p.y,0xf4c07e,12,1.9);if(e.kind==='breath'&&!this.reducedMotion)for(let n=0;n<8;n++){const ratio=n/8;this.particle(305+(p.x-305)*ratio,215+(p.y-215)*ratio,0xa6e1a0,5,.38,15,70,10);}}
-   if(e.kind==='all'){this.addShake(.3,true);this.screenFlash(0xd9b5ee,.2);}else if(e.targets?.length)this.addShake(.18); // a finished channel hits no tile
+   // J4: an all-grid hit met by a Guard raised at most PERFECT_WINDOW s before it is PERFECT (gold flash, a short slow-mo, the bell);
+   // any other guarded one is BLOCKED (a small shake).
+   const guarded=e.kind==='all'&&this.battle.guardLeft>0&&(e.hit?.length??0)>0;
+   if(guarded&&isPerfectGuard(this.guardAt,this.battle.time)){cue='perfect';this.screenFlash(0xffd54f,.35);this.slowMotion(PERFECT_SLOWMO.seconds,PERFECT_SLOWMO.scale);this.floating(300,520,t('battle.perfect'),'#ffe082',true,true);this.ring(300,520,0xffd54f,20,3);this.log({type:'perfect',at:this.battle.time,value:this.battle.time-(this.guardAt??0)});}
+   else if(guarded){this.floating(300,520,t('battle.blocked'),'#80deea',true);this.addShake(.1);this.log({type:'blocked',at:this.battle.time});}
+   else if(e.kind==='all'){this.addShake(.3,true);this.screenFlash(0xd9b5ee,.2);}else if(e.targets?.length)this.addShake(.18); // a finished channel hits no tile
   }
   if(e.type==='claw'){
    this.burst(pos.x,pos.y,0xf0c19a,7);
@@ -305,12 +417,24 @@ export class BattleScene extends Phaser.Scene {
    const from={x:144+(e.lane??1)*156,y:320},bolt=this.add.rectangle(from.x,from.y,5,5,0xd3e1a1).setDepth(17);
    if(this.reducedMotion){bolt.setPosition(pos.x,pos.y);bolt.destroy();}else this.tweens.add({targets:bolt,x:pos.x,y:pos.y,duration:210,onComplete:()=>bolt.destroy()});
   }
-  if(e.type==='minionDown')this.burst(144+e.lane!*156,320,0xb9d58a,14);
-  if(e.type==='ultimate'){this.setBossCue('ultimate',0xffe3a0,.65);this.addShake(.55,true);this.freeze(.12);this.screenFlash(0xfff3c0,.7);this.bossKick=.14;this.pulse=.12;this.ring(300,420,0xffe3a0,18,2.7);this.ring(300,220,0xffe3a0,14,2.4);this.burst(300,220,0xf3dda4,20);}
+  if(e.type==='minionDown'){
+   // J14: the minion pops (a ring and a burst; the Feast boon sends green motes to every hero it heals).
+   const x=144+e.lane!*156;this.burst(x,320,0xb9d58a,14);this.ring(x,320,0xffffff,10,2.6);this.log({type:'pop',at:this.battle.time,value:e.lane});
+   if(this.battle.boons.includes('feast')&&!this.reducedMotion)for(const h of this.battle.living()){const p=center(h.slot);for(let n=0;n<3;n++)this.particle(x,320,0x69f0ae,3,.6,(p.x-x)/.6+(n-1)*12,(p.y-320)/.6-20,0);}
+  }
+  if(e.type==='ultimate'){
+   // J10: the HUD plays the cut-in band (the lead hero's portrait, NINEFOLD DAWN) over the hit.
+   const lead=this.battle.hero(this.battle.selected)??this.battle.living()[0];window.dispatchEvent(new CustomEvent('battle-cutin',{detail:{hero:lead?.id}}));this.log({type:'cutin',at:this.battle.time,source:lead?.id});
+   this.setBossCue('ultimate',0xffe3a0,.65);this.addShake(.55,true);this.freeze(.12);this.screenFlash(0xfff3c0,.7);this.bossKick=.14;this.pulse=.12;this.ring(300,420,0xffe3a0,18,2.7);this.ring(300,220,0xffe3a0,14,2.4);this.burst(300,220,0xf3dda4,20);}
   if(e.type==='warning')this.setBossCue('threat',0xef786b,.34);
   if(e.type==='phase'){this.setBossCue('phase',0xffd54f,.56);this.ring(300,220,0xffd54f,18,2.5);}
   if(e.type==='summon'){this.setBossCue('summon',0x9bd1a1,.4);this.ring(300,320,0x9bd1a1,20,2.4);}
-  if(e.type==='victory'){this.ensureEnemyDeathAnimation();this.screenFlash(0xffffff,.6);this.freeze(.15);this.setBossCue('victory',0xffe3a0,.72);this.ring(300,194,0xffe3a0,18,2.8);this.burst(300,194,0xf3dda4,18);}
+  if(e.type==='victory'){
+   // J9 kill cam: 0.8 s at 0.2 speed with the camera on the boss and the last number doubled, then the death animation (the fight is over:
+   // nothing it slows can change an outcome). Skipped under reduced motion.
+   if(!this.reducedMotion){this.slowMotion(KILL_CAM.seconds,KILL_CAM.scale,true);this.killCam=KILL_CAM.seconds;this.log({type:'killcam',at:this.battle.time});window.dispatchEvent(new CustomEvent('battle-killcam',{detail:{seconds:KILL_CAM.seconds}}));this.soundBox.play('kill');
+    const last=this.lastNumber;if(last?.active){this.tweens.killTweensOf(last);last.setAlpha(1);this.tweens.add({targets:last,scale:2,duration:140,ease:'Back.easeOut'});this.tweens.add({targets:last,alpha:0,delay:700,duration:400,onComplete:()=>this.release(last)});}}
+   this.ensureEnemyDeathAnimation();this.screenFlash(0xffffff,.6);this.freeze(.15);this.setBossCue('victory',0xffe3a0,.72);this.ring(300,194,0xffe3a0,18,2.8);this.burst(300,194,0xf3dda4,18);}
   if(['banner','phase','warning','break','summon','ultimate','interrupt','down','enrage'].includes(e.type)||(e.type==='shield'&&e.text))window.dispatchEvent(new CustomEvent('battle-banner',{detail:e}));
   if(e.type==='impact'||e.type==='stun')window.dispatchEvent(new CustomEvent('battle-log',{detail:e}));
   return cue;

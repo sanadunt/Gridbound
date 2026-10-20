@@ -43,7 +43,9 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
     };
   })()`);
   assert.ok(Math.abs(bossHealth.health - bossHealth.expected) < 0.05, `Boss HP bar must track the current health ratio: ${JSON.stringify(bossHealth)}`);
-  assert.equal(bossHealth.ghost, bossHealth.health, 'Ghost bar must follow the current health ratio');
+  // J6: the ghost bar holds the HP just taken, then drains to it once 400 ms have passed without a hit.
+  assert.ok(bossHealth.ghost > bossHealth.health, `Ghost bar must hold the HP just taken: ${JSON.stringify(bossHealth)}`);
+  await wait('Math.abs(parseFloat(document.querySelector("#boss-hp-ghost").style.transform.replace("scaleX(", "")) - parseFloat(document.querySelector("#boss-hp").style.transform.replace("scaleX(", ""))) < .01', 3000);
 
   // 3. Test Threat / Intent Danger Mode
   await evaluate(`(() => {
@@ -82,7 +84,7 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await evaluate('window.gridbound.battle.threats = []; window.gridbound.battle.guardLeft = 0; window.gridbound.step(0)');
   await wait('!document.querySelector("#intent").classList.contains("danger") && !document.querySelector("#intent").classList.contains("guarding")');
   const idle = await evaluate(`({ opacity: Number(getComputedStyle(document.querySelector('#intent')).opacity), hint: document.querySelector('#intent span').textContent })`);
-  assert.ok(idle.opacity > 0.5 && /Tap heroes/.test(idle.hint), `Idle intent hint is visible: ${JSON.stringify(idle)}`);
+  assert.ok(idle.opacity > 0.5 && /Tap to charge/.test(idle.hint), `Idle intent hint is visible: ${JSON.stringify(idle)}`);
 
   // 7. GUARD NOW: only once an all-grid hit is inside the Guard duration (2.8s).
   await evaluate(`(() => { const b = window.gridbound.battle; b.guardLeft = 0; b.guardCooldown = 0; b.threats = [{ id: 990, name: 'WORLDLESS RITUAL', type: 'all', slots: [0,1,2,3,4,5,6,7,8], left: 4.1, total: 4.2 }]; window.gridbound.step(0); })()`);
@@ -215,7 +217,11 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click }) => {
   await evaluate(`(() => { const b = window.gridbound.battle; b.resolve = 40; b.guardLeft = 0; b.guardCooldown = 0; b.markLeft = 3; b.weakenLeft = 4; b.stageTime = 140;
     b.threats = [{ id: 997, name: 'WORLDLESS RITUAL', type: 'all', slots: [0,1,2,3,4,5,6,7,8], left: 2.4, total: 4.2, counter: 'ALL GRID: Guard menjelang impact (G) atau cast skill interrupt. Pindah tile tidak membantu.' }]; window.gridbound.step(0); })()`);
   await wait('document.querySelector("#guard").classList.contains("ready-window") && document.querySelectorAll("#boss-status .status-chip").length === 3 && Boolean(document.querySelector("#boss-status [data-status=enrage]"))');
-  assert.match(await evaluate('document.querySelector("#intent span").textContent'), /^ALL GRID: Guard just before impact/, 'The simulation\'s counter text reaches the HUD in English');
+  // The threat panel shows an icon and a few words (what to do); the simulation's full counter text, in English, goes to the Log.
+  assert.equal(await evaluate('document.querySelector("#intent span").textContent'), 'Guard before impact', 'The threat panel says what to do in three words');
+  assert.equal(await evaluate('document.querySelector("#intent").dataset.icon'), 'all', 'The threat panel shows the all-grid icon');
+  await evaluate('window.gridbound.battle.emit({ type: "warning", text: "WORLDLESS RITUAL", targets: [0,1,2,3,4,5,6,7,8] })');
+  await wait('[...document.querySelectorAll("#combat-log .log-entry")].some(p => /WORLDLESS RITUAL · ALL GRID: Guard just before impact/.test(p.textContent))');
   const intel = await evaluate(`(() => { const r = s => document.querySelector(s).getBoundingClientRect(), card = r('#unit-layer .unit-card'), intent = r('#intent'), status = r('#boss-status');
     return { intentBottom: intent.bottom, statusBottom: status.bottom, frontRow: card.top }; })()`);
   assert.ok(intel.intentBottom <= intel.frontRow && intel.statusBottom <= intel.frontRow, `Intent panel and boss statuses stay above the front row: ${JSON.stringify(intel)}`);
@@ -319,6 +325,8 @@ await withBrowser(async ({ send, wait, evaluate, screenshot, click, errors }) =>
   assert.ok(shortPhone.bannerTop >= shortPhone.intentBottom && shortPhone.bannerBottom <= shortPhone.frontRow, `The warning banner sits between the intent panel and the front row: ${JSON.stringify(shortPhone)}`);
   assert.ok(shortPhone.track >= 40 && shortPhone.rowScroll <= shortPhone.rowClient, `The enrage countdown leaves the ARMOR meter alone: ${JSON.stringify(shortPhone)}`);
   assert.ok(!/\(G\)/.test(shortPhone.counter), `Touch players do not see keyboard letters in counter texts: ${shortPhone.counter}`);
+  const logged = await evaluate('[...document.querySelectorAll("#combat-log .log-entry")].map(p => p.textContent).find(t => /TOLLING SILENCE · /.test(t)) ?? ""');
+  assert.ok(/ALL GRID: Guard just before impact/.test(logged) && !/\(G\)/.test(logged), `The full counter goes to the Log, without keyboard letters on a touch screen: ${logged}`);
   await screenshot('artifacts/combat-hud-360x640-threat.png');
   // Skill chips keep a >= 24px tap target inside their own card on a 360px phone; the card's middle and the hero's body (~30% down) stay the
   // hero's tap area, and so does the top strip (name tag) of a card right under another. Stack a hero directly under another.
